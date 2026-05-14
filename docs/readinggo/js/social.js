@@ -8,85 +8,120 @@ const SEED_TOP3 = [
 ];
 
 // ── 모이 상세 페이지 ───────────────────────────────────────────────────────────
-const MoiDetail = ({ item, isJaekd, isBookmarked, isWished, onBack, onJaek, onBookmark, onAddWish }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-    {/* 상단 바 */}
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px',
-      borderBottom: '2px solid #E5E5E5', background: '#fff', flexShrink: 0 }}>
-      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-        <BackIcon s={22} style={{ color: '#AFAFAF' }}/>
-      </button>
-      <span style={{ flex: 1, fontWeight: 900, fontSize: 17, color: '#1F1F1F' }}>모이</span>
-      <button onClick={onBookmark} style={{
-        background: isBookmarked ? '#F0FDF4' : '#F7F7F7',
-        border: `1.5px solid ${isBookmarked ? '#D7F0BF' : '#E5E5E5'}`,
-        borderRadius: 20, padding: '6px 12px', cursor: 'pointer',
-        fontWeight: 800, fontSize: 12, fontFamily: 'inherit',
-        color: isBookmarked ? '#58CC02' : '#AFAFAF',
-      }}>
-        🔖 {isBookmarked ? '저장됨' : '저장'}
-      </button>
-    </div>
+const MoiDetail = ({ item, isJaekd, isBookmarked, isWished, onBack, onJaek, onBookmark, onAddWish }) => {
+  const [bookInfo, setBookInfo] = React.useState(null);
 
-    <div className="rg-scroll" style={{ padding: '20px 16px' }}>
-      {/* 유저 정보 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#F0FDF4',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Sparrow size={34}/>
-        </div>
-        <div>
-          <p style={{ fontWeight: 800, fontSize: 14, color: '#1F1F1F', margin: 0 }}>{item.name}</p>
-          <p style={{ fontSize: 12, color: '#AFAFAF', margin: 0 }}>@{item.handle} · {item.time}</p>
-        </div>
-      </div>
+  React.useEffect(() => {
+    loadBooks().then(books => {
+      const found = item.isbn
+        ? books.find(b => b.isbn === item.isbn)
+        : books.find(b => b.title === item.book);
+      setBookInfo(found || null);
+    });
+  }, [item.isbn, item.book]);
 
-      {/* 모이 텍스트 */}
-      <div style={{ background: '#F0FDF4', borderLeft: '4px solid #3FD17F',
-        borderRadius: '0 16px 16px 0', padding: '16px 20px', marginBottom: 20 }}>
-        <p style={{ fontSize: 17, fontWeight: 700, color: '#1F1F1F', lineHeight: 1.7,
-          margin: 0, fontStyle: 'italic' }}>{item.sentence}</p>
-      </div>
-
-      {/* 책 정보 + 관심 책 추가 */}
-      <div className="rg-card" style={{ padding: 16, marginBottom: 20 }}>
-        <p style={{ fontSize: 11, color: '#AFAFAF', fontWeight: 700, margin: '0 0 4px' }}>출처</p>
-        <p style={{ fontWeight: 900, fontSize: 15, color: '#1F1F1F', margin: '0 0 2px' }}>{item.book}</p>
-        {item.page && (
-          <p style={{ fontSize: 13, color: '#AFAFAF', margin: '0 0 12px' }}>p.{item.page}</p>
-        )}
-        <button onClick={onAddWish} disabled={isWished} style={{
-          width: '100%', padding: '10px 0', borderRadius: 12, cursor: isWished ? 'default' : 'pointer',
-          fontWeight: 800, fontSize: 13, fontFamily: 'inherit',
-          background: isWished ? '#F0FDF4' : '#3FD17F',
-          color: isWished ? '#58CC02' : '#fff',
-          border: isWished ? '1.5px solid #D7F0BF' : 'none',
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* 상단 바 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px',
+        borderBottom: '2px solid #E5E5E5', background: '#fff', flexShrink: 0 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+          <BackIcon s={22} style={{ color: '#AFAFAF' }}/>
+        </button>
+        <span style={{ flex: 1, fontWeight: 900, fontSize: 17, color: '#1F1F1F' }}>모이</span>
+        <button onClick={onBookmark} style={{
+          background: isBookmarked ? '#F0FDF4' : '#F7F7F7',
+          border: `1.5px solid ${isBookmarked ? '#D7F0BF' : '#E5E5E5'}`,
+          borderRadius: 20, padding: '6px 12px', cursor: 'pointer',
+          fontWeight: 800, fontSize: 12, fontFamily: 'inherit',
+          color: isBookmarked ? '#58CC02' : '#AFAFAF',
         }}>
-          {isWished ? '관심 책에 담음 ✓' : '+ 관심 책에 추가'}
+          🔖 {isBookmarked ? '저장됨' : '저장'}
         </button>
       </div>
 
-      {/* 짹 */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <button
-          onClick={() => item.handle !== 'me' && onJaek()}
-          disabled={item.handle === 'me'}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '10px 28px', borderRadius: 20,
-            cursor: item.handle === 'me' ? 'default' : 'pointer',
-            fontWeight: 800, fontSize: 14, fontFamily: 'inherit',
-            background: isJaekd ? '#FFF3E0' : '#F7F7F7',
-            color: isJaekd ? '#FF9600' : '#AFAFAF',
-            border: `1.5px solid ${isJaekd ? '#FFC800' : '#E5E5E5'}`,
-            opacity: item.handle === 'me' ? 0.4 : 1,
+      <div className="rg-scroll" style={{ padding: '20px 16px' }}>
+        {/* 유저 정보 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#F0FDF4',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Sparrow size={34}/>
+          </div>
+          <div>
+            <p style={{ fontWeight: 800, fontSize: 14, color: '#1F1F1F', margin: 0 }}>{item.name}</p>
+            <p style={{ fontSize: 12, color: '#AFAFAF', margin: 0 }}>@{item.handle} · {item.time}</p>
+          </div>
+        </div>
+
+        {/* 모이 텍스트 */}
+        <div style={{ background: '#F0FDF4', borderLeft: '4px solid #3FD17F',
+          borderRadius: '0 16px 16px 0', padding: '16px 20px', marginBottom: 20 }}>
+          <p style={{ fontSize: 17, fontWeight: 700, color: '#1F1F1F', lineHeight: 1.7,
+            margin: 0, fontStyle: 'italic' }}>{item.sentence}</p>
+        </div>
+
+        {/* 책 상세 정보 + 관심 책 추가 */}
+        <div className="rg-card" style={{ padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
+            <BookCover book={bookInfo || { cover_url: '', title: item.book }} size={80} radius={12}/>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontWeight: 900, fontSize: 15, color: '#1F1F1F', margin: '0 0 4px',
+                lineHeight: 1.3 }}>{item.book}</p>
+              {bookInfo ? (
+                <>
+                  <p style={{ fontSize: 13, color: '#5A5F69', fontWeight: 700, margin: '0 0 2px' }}>
+                    {bookInfo.author}
+                  </p>
+                  <p style={{ fontSize: 12, color: '#AFAFAF', margin: '0 0 2px' }}>
+                    {bookInfo.publisher}
+                  </p>
+                  <p style={{ fontSize: 12, color: '#AFAFAF', margin: 0 }}>
+                    총 {bookInfo.total_pages}p
+                  </p>
+                </>
+              ) : (
+                <p style={{ fontSize: 12, color: '#AFAFAF', margin: 0 }}>로딩 중...</p>
+              )}
+              {item.page && (
+                <p style={{ fontSize: 12, color: '#3FD17F', fontWeight: 800, margin: '6px 0 0' }}>
+                  인용 p.{item.page}
+                </p>
+              )}
+            </div>
+          </div>
+          <button onClick={onAddWish} disabled={isWished} style={{
+            width: '100%', padding: '10px 0', borderRadius: 12, cursor: isWished ? 'default' : 'pointer',
+            fontWeight: 800, fontSize: 13, fontFamily: 'inherit',
+            background: isWished ? '#F0FDF4' : '#3FD17F',
+            color: isWished ? '#58CC02' : '#fff',
+            border: isWished ? '1.5px solid #D7F0BF' : 'none',
           }}>
-          🐦 짹 {item.jaeks}
-        </button>
+            {isWished ? '관심 책에 담음 ✓' : '+ 관심 책에 추가'}
+          </button>
+        </div>
+
+        {/* 짹 */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={() => item.handle !== 'me' && onJaek()}
+            disabled={item.handle === 'me'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '10px 28px', borderRadius: 20,
+              cursor: item.handle === 'me' ? 'default' : 'pointer',
+              fontWeight: 800, fontSize: 14, fontFamily: 'inherit',
+              background: isJaekd ? '#FFF3E0' : '#F7F7F7',
+              color: isJaekd ? '#FF9600' : '#AFAFAF',
+              border: `1.5px solid ${isJaekd ? '#FFC800' : '#E5E5E5'}`,
+              opacity: item.handle === 'me' ? 0.4 : 1,
+            }}>
+            🐦 짹 {item.jaeks}
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── SocialView ─────────────────────────────────────────────────────────────────
 const SocialView = ({ state, onStateChange }) => {
