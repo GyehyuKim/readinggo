@@ -196,8 +196,8 @@ const NestBanner = ({ userBook, onTap }) => {
 const BottomNav = ({ active, onChange }) => {
   const tabs = [
     { id: 'nest',    label: '둥지',   IC: HomeIcon  },
-    { id: 'village', label: '마을',   IC: MapIcon   },
     { id: 'social',  label: '소셜',   IC: UsersIcon },
+    { id: 'village', label: '마을',   IC: MapIcon   },
     { id: 'library', label: '내서재', IC: BookIcon  },
   ];
   return (
