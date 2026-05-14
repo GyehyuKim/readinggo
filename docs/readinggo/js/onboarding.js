@@ -1,4 +1,4 @@
-// onboarding.js — 가입 여정 A → C1 → C2 → D1 → D2 → D3 → E
+// onboarding.js — 가입 여정 A → C1 → C2 → D3
 // 의존: data.js, components.js
 
 // ── Screen A: 진입 (비로그인) ─────────────────────────────────────────────────
@@ -145,33 +145,43 @@ const ScreenC1 = ({ onSelect, onManual }) => {
   );
 };
 
-// ── Screen C-2: 확인 / 직접 등록 ──────────────────────────────────────────────
+// ── Screen C-2: 확인 / 직접 등록 + 오늘의 모이 입력 ───────────────────────────
 const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
-  const [page,       setPage]       = React.useState('0');
+  const [page,         setPage]         = React.useState('0');
+  const [sentencePage, setSentencePage] = React.useState('');
+  const [sentenceText, setSentenceText] = React.useState(() => {
+    try { return localStorage.getItem('rg_pending_sentence') || ''; } catch { return ''; }
+  });
   const [title,      setTitle]      = React.useState(book ? book.title : '');
   const [author,     setAuthor]     = React.useState(book ? book.author : '');
   const [totalPages, setTotalPages] = React.useState(book ? String(book.total_pages) : '');
 
+  React.useEffect(() => {
+    try { localStorage.setItem('rg_pending_sentence', sentenceText); } catch {}
+  }, [sentenceText]);
+
   const valid = isManual
-    ? title.trim() && parseInt(totalPages) > 0
-    : true;
+    ? title.trim() && parseInt(totalPages) > 0 && sentenceText.trim().length > 0
+    : sentenceText.trim().length > 0;
 
   const handleConfirm = () => {
     const b = isManual
       ? { book_id: genId(), title: title.trim(), author: author.trim(), total_pages: parseInt(totalPages), cover_url: '' }
       : book;
-    onConfirm(b, parseInt(page) || 0);
+    const currPage = parseInt(page) || 0;
+    const sPage    = parseInt(sentencePage) || currPage;
+    onConfirm(b, currPage, sentenceText.trim(), sPage);
   };
 
-  const inputStyle = { marginBottom: 12 };
   const focus = e => e.target.style.borderColor = '#58CC02';
   const blur  = e => e.target.style.borderColor = '#E5E5E5';
+  const iStyle = { marginBottom: 12 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 상단 바 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px',
-        borderBottom: '2px solid #E5E5E5' }}>
+        borderBottom: '2px solid #E5E5E5', flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
           <BackIcon s={22} style={{ color: '#AFAFAF' }}/>
         </button>
@@ -189,11 +199,11 @@ const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
         {isManual ? (
           <>
             <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>제목 *</p>
-            <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="책 제목" className="rg-input" style={inputStyle} onFocus={focus} onBlur={blur}/>
+            <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="책 제목" className="rg-input" style={iStyle} onFocus={focus} onBlur={blur}/>
             <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>저자</p>
-            <input value={author} onChange={e=>setAuthor(e.target.value)} placeholder="저자명" className="rg-input" style={inputStyle} onFocus={focus} onBlur={blur}/>
+            <input value={author} onChange={e=>setAuthor(e.target.value)} placeholder="저자명" className="rg-input" style={iStyle} onFocus={focus} onBlur={blur}/>
             <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>총 페이지 *</p>
-            <input type="number" value={totalPages} onChange={e=>setTotalPages(e.target.value)} placeholder="예: 300" className="rg-input" style={inputStyle} onFocus={focus} onBlur={blur}/>
+            <input type="number" value={totalPages} onChange={e=>setTotalPages(e.target.value)} placeholder="예: 300" className="rg-input" style={iStyle} onFocus={focus} onBlur={blur}/>
           </>
         ) : (
           <div style={{ background: '#F0FDF4', border: '2px solid #D7F0BF', borderRadius: 16, padding: 16, marginBottom: 16 }}>
@@ -202,12 +212,40 @@ const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
           </div>
         )}
 
-        <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>
-          현재 어디까지 읽었어요?
-        </p>
+        <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>현재까지 읽은 페이지</p>
         <input type="number" value={page} onChange={e=>setPage(e.target.value)} placeholder="0"
           min={0} max={isManual ? parseInt(totalPages) || 9999 : book.total_pages}
-          className="rg-input" style={inputStyle} onFocus={focus} onBlur={blur}/>
+          className="rg-input" style={iStyle} onFocus={focus} onBlur={blur}/>
+
+        {/* 오늘의 모이 */}
+        <div style={{ height: 1, background: '#E5E5E5', margin: '8px 0 16px' }}/>
+        <p style={{ fontWeight: 900, fontSize: 15, color: '#1F1F1F', margin: '0 0 4px' }}>오늘의 모이 🐦</p>
+        <p style={{ fontSize: 12, color: '#AFAFAF', fontWeight: 600, marginBottom: 14 }}>
+          오늘 읽은 내용 중 마음에 남는 한 문장
+        </p>
+
+        <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>어느 페이지에서?</p>
+        <input type="number" value={sentencePage} onChange={e=>setSentencePage(e.target.value)}
+          placeholder={page || '페이지 번호'}
+          className="rg-input" style={iStyle} onFocus={focus} onBlur={blur}/>
+
+        <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>문장</p>
+        <textarea
+          value={sentenceText}
+          onChange={e => { if (e.target.value.length <= 200) setSentenceText(e.target.value); }}
+          placeholder="마음에 든 한 줄을 적어주세요 (최대 200자)"
+          rows={4}
+          style={{ width: '100%', border: '2px solid #E5E5E5', borderRadius: 16, padding: '14px 16px',
+            fontSize: 15, fontWeight: 600, outline: 'none', resize: 'none',
+            fontFamily: 'Nunito', lineHeight: 1.6, transition: 'border-color .2s',
+            boxSizing: 'border-box', marginBottom: 4 }}
+          onFocus={focus} onBlur={blur}
+        />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: sentenceText.length > 180 ? '#FF4B4B' : '#AFAFAF', fontWeight: 700 }}>
+            {sentenceText.length}/200
+          </span>
+        </div>
       </div>
 
       <div className="rg-bottom-bar">
@@ -221,156 +259,6 @@ const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
   );
 };
 
-// ── Screen D-1: 페이지 입력 ───────────────────────────────────────────────────
-const ScreenD1 = ({ book, initPage, onNext }) => {
-  const [page, setPage] = React.useState(initPage || 0);
-  const [showInput, setShowInput] = React.useState(false);
-  const [inputVal, setInputVal]   = React.useState('');
-
-  const bump = delta => setPage(p => Math.max(0, Math.min(p + delta, book.total_pages)));
-  const confirm = () => {
-    const v = parseInt(inputVal);
-    if (!isNaN(v)) setPage(Math.max(0, Math.min(v, book.total_pages)));
-    setShowInput(false);
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
-      {/* 진행 표시 */}
-      <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ height: 6, flex: 1, borderRadius: 3, background: '#58CC02' }}/>
-        <div style={{ height: 6, flex: 1, borderRadius: 3, background: '#E5E5E5' }}/>
-      </div>
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', padding: '0 32px', gap: 0 }}>
-
-        <BookCover book={book} size={80} radius={14}/>
-        <p style={{ fontWeight: 800, fontSize: 14, color: '#1F1F1F', margin: '12px 0 4px', textAlign: 'center' }}>
-          {book.title}
-        </p>
-        <p style={{ fontSize: 12, color: '#AFAFAF', marginBottom: 32 }}>오늘 읽은 마지막 페이지</p>
-
-        {/* 큰 페이지 숫자 */}
-        <button onClick={() => { setInputVal(String(page)); setShowInput(true); }}
-          style={{ background: 'none', border: '3px solid #58CC02', borderRadius: 20,
-            padding: '16px 40px', cursor: 'pointer', marginBottom: 28 }}>
-          <span style={{ fontWeight: 900, fontSize: 56, color: '#1F1F1F', lineHeight: 1 }}>{page}</span>
-          <span style={{ fontWeight: 700, fontSize: 16, color: '#AFAFAF' }}> / {book.total_pages}p</span>
-        </button>
-
-        {/* ±1 / +10 버튼 */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <button onClick={() => bump(-1)} className="btn-duo btn-white"
-            style={{ width: 64, height: 64, padding: 0, fontSize: 20, borderRadius: 18 }}>−1</button>
-          <button onClick={() => bump(1)} className="btn-duo btn-green"
-            style={{ width: 64, height: 64, padding: 0, fontSize: 20, borderRadius: 18 }}>+1</button>
-          <button onClick={() => bump(10)} className="btn-duo btn-yellow"
-            style={{ width: 72, height: 64, padding: 0, fontSize: 16, borderRadius: 18 }}>+10</button>
-        </div>
-      </div>
-
-      <div className="rg-bottom-bar">
-        <button onClick={() => onNext(page)} className="btn-duo btn-green" style={{ width: '100%' }}>
-          다음
-        </button>
-      </div>
-
-      {/* 직접 입력 모달 */}
-      {showInput && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div className="pop-in" style={{ background: '#fff', borderRadius: 24, padding: 28, width: 280 }}>
-            <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 16 }}>페이지 직접 입력</p>
-            <input type="number" value={inputVal} onChange={e => setInputVal(e.target.value)}
-              autoFocus
-              style={{ width: '100%', border: '2px solid #58CC02', borderRadius: 12,
-                padding: '12px 16px', fontSize: 24, fontWeight: 900, textAlign: 'center',
-                outline: 'none', fontFamily: 'Nunito', marginBottom: 16 }}/>
-            <button onClick={confirm} className="btn-duo btn-green" style={{ width: '100%' }}>확인</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Screen D-2: 오늘의 문장 ───────────────────────────────────────────────────
-const ScreenD2 = ({ initPage, onBack, onNext }) => {
-  const [text, setText] = React.useState(() => {
-    try { return localStorage.getItem('rg_pending_sentence') || ''; } catch { return ''; }
-  });
-  const [sentencePage, setSentencePage] = React.useState(initPage || 0);
-  const valid = text.trim().length > 0;
-
-  React.useEffect(() => {
-    try { localStorage.setItem('rg_pending_sentence', text); } catch {}
-  }, [text]);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* 진행 표시 */}
-      <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ height: 6, flex: 1, borderRadius: 3, background: '#58CC02' }}/>
-        <div style={{ height: 6, flex: 1, borderRadius: 3, background: '#58CC02' }}/>
-      </div>
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '28px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <button onClick={onBack} className="rg-btn-icon">
-            <BackIcon s={20} style={{ color: '#AFAFAF' }}/>
-          </button>
-          <p style={{ fontWeight: 900, fontSize: 18, color: '#1F1F1F', margin: 0 }}>
-            오늘의 문장
-          </p>
-        </div>
-        <p style={{ fontSize: 13, color: '#AFAFAF', fontWeight: 600, marginBottom: 16 }}>
-          오늘 읽은 내용 중 마음에 남는 한 문장을 적어주세요.
-        </p>
-
-        {/* 문장 페이지 입력 */}
-        <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>어느 페이지에서?</p>
-        <input
-          type="number"
-          value={sentencePage}
-          onChange={e => setSentencePage(e.target.value)}
-          placeholder="페이지 번호"
-          className="rg-input"
-          style={{ marginBottom: 16 }}
-          onFocus={e => e.target.style.borderColor = '#58CC02'}
-          onBlur={e => e.target.style.borderColor  = '#E5E5E5'}
-        />
-
-        <p style={{ fontWeight: 800, fontSize: 13, color: '#1F1F1F', marginBottom: 6 }}>문장</p>
-        <textarea
-          value={text}
-          onChange={e => { if (e.target.value.length <= 200) setText(e.target.value); }}
-          placeholder="마음에 든 한 줄을 적어주세요 (최대 200자)"
-          rows={4}
-          autoFocus
-          style={{ flex: 1, border: '2px solid #E5E5E5', borderRadius: 16, padding: '14px 16px',
-            fontSize: 15, fontWeight: 600, outline: 'none', resize: 'none',
-            fontFamily: 'Nunito', lineHeight: 1.6, transition: 'border-color .2s' }}
-          onFocus={e => e.target.style.borderColor = '#58CC02'}
-          onBlur={e => e.target.style.borderColor  = '#E5E5E5'}
-        />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-          <span style={{ fontSize: 12, color: text.length > 180 ? '#FF4B4B' : '#AFAFAF', fontWeight: 700 }}>
-            {text.length}/200
-          </span>
-        </div>
-      </div>
-
-      <div className="rg-bottom-bar">
-        <button onClick={() => valid && onNext(text.trim(), parseInt(sentencePage) || 0)}
-          className={`btn-duo ${valid ? 'btn-green' : 'btn-off'}`}
-          style={{ width: '100%' }} disabled={!valid}>
-          기록 완료 🔥
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // ── Screen D-3: 세리머니 ──────────────────────────────────────────────────────
 const ScreenD3 = ({ sessionNum, xpGained, onContinue, isLoggedIn }) => {
@@ -417,39 +305,12 @@ const ScreenD3 = ({ sessionNum, xpGained, onContinue, isLoggedIn }) => {
       </div>
 
       <button onClick={onContinue} className="btn-duo btn-green" style={{ width: '100%', maxWidth: 280, fontSize: 16 }}>
-        {isLoggedIn ? '내일도 짹 →' : '계속하려면 로그인'}
+        {isLoggedIn ? '내일도 짹 →' : 'Google로 계속'}
       </button>
     </div>
   );
 };
 
-// ── Screen E: 가입 (Google 로그인 시뮬레이션) ─────────────────────────────────
-const ScreenE = ({ onLogin }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: '100%',
-    background: 'linear-gradient(160deg,#F0FDF4 0%,#fff 50%)' }}>
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: '0 32px', textAlign: 'center', gap: 20 }}>
-      <div className="sparrow-bounce"><Sparrow size={80}/></div>
-      <div>
-        <p style={{ fontWeight: 900, fontSize: 20, color: '#1F1F1F', margin: '0 0 10px', lineHeight: 1.4 }}>
-          "하루 한 페이지,<br/>한 문장에서 시작해요."
-        </p>
-        <p style={{ fontSize: 14, color: '#AFAFAF', fontWeight: 600, margin: 0, lineHeight: 1.6 }}>
-          계속 이어가려면 로그인하세요.<br/>
-          오늘의 기록은 저장되어 있어요 🐦
-        </p>
-      </div>
-    </div>
-    <div style={{ padding: '0 24px 48px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <button onClick={onLogin} className="btn-duo btn-green" style={{ width: '100%', fontSize: 15 }}>
-        Google로 계속
-      </button>
-      <p style={{ textAlign: 'center', fontSize: 11, color: '#AFAFAF', margin: 0, fontWeight: 600 }}>
-        Phase 0 데모 — 실제 OAuth 없이 시뮬레이션됩니다
-      </p>
-    </div>
-  </div>
-);
 
 // ── Onboarding 컨테이너 ────────────────────────────────────────────────────────
 const OnboardingFlow = ({ state, onStateChange, onDone }) => {
@@ -460,30 +321,29 @@ const OnboardingFlow = ({ state, onStateChange, onDone }) => {
   const handleSelectBook = book => {
     onStateChange(prev => ({ ...prev, onboardingBook: book, onboardingStep: 'C2' }));
   };
-  const handleConfirmBook = (book, page) => {
-    onStateChange(prev => ({ ...prev, onboardingBook: book, onboardingPage: page, onboardingStep: 'D1' }));
-  };
-  const handlePage = page => {
-    onStateChange(prev => ({ ...prev, onboardingPage: page, onboardingStep: 'D2' }));
-  };
-  const handleSentence = (text, page) => {
-    onStateChange(prev => ({ ...prev, onboardingText: text, onboardingSentencePage: page, onboardingStep: 'D3' }));
-  };
-  const handleContinue = () => {
-    // Phase 0: 가입 전이면 E, 이미 핸들 있으면 홈으로
-    if (state.user.handle) {
-      onDone();
-    } else {
-      go('E');
-    }
+  const handleConfirmBook = (book, page, text, sentencePage) => {
+    onStateChange(prev => ({
+      ...prev,
+      onboardingBook: book,
+      onboardingPage: page,
+      onboardingText: text,
+      onboardingSentencePage: sentencePage,
+      onboardingStep: 'D3',
+    }));
   };
   const handleLogin = () => {
-    // 구글 로그인 시뮬레이션 → 닉네임 자동 부여 후 홈
     onStateChange(prev => ({
       ...prev,
       user: { ...prev.user, handle: 'me', displayName: '나' },
     }));
     onDone();
+  };
+  const handleContinue = () => {
+    if (state.user.handle) {
+      onDone();
+    } else {
+      handleLogin();
+    }
   };
 
   if (step === 'A')  return <ScreenA onStart={() => go('C1')}/>;
@@ -496,20 +356,6 @@ const OnboardingFlow = ({ state, onStateChange, onDone }) => {
       onConfirm={handleConfirmBook}
     />
   );
-  if (step === 'D1') return (
-    <ScreenD1
-      book={state.onboardingBook}
-      initPage={state.onboardingPage}
-      onNext={handlePage}
-    />
-  );
-  if (step === 'D2') return (
-    <ScreenD2
-      initPage={state.onboardingPage}
-      onBack={() => go('D1')}
-      onNext={handleSentence}
-    />
-  );
   if (step === 'D3') return (
     <ScreenD3
       sessionNum={1}
@@ -518,16 +364,12 @@ const OnboardingFlow = ({ state, onStateChange, onDone }) => {
       isLoggedIn={!!state.user.handle}
     />
   );
-  if (step === 'E') return <ScreenE onLogin={handleLogin}/>;
   return <ScreenA onStart={() => go('C1')}/>;
 };
 
 // ── window exports ─────────────────────────────────────────────────────────────
-window.ScreenA       = ScreenA;
-window.ScreenC1      = ScreenC1;
-window.ScreenC2      = ScreenC2;
-window.ScreenD1      = ScreenD1;
-window.ScreenD2      = ScreenD2;
-window.ScreenD3      = ScreenD3;
-window.ScreenE       = ScreenE;
+window.ScreenA        = ScreenA;
+window.ScreenC1       = ScreenC1;
+window.ScreenC2       = ScreenC2;
+window.ScreenD3       = ScreenD3;
 window.OnboardingFlow = OnboardingFlow;
