@@ -1,10 +1,52 @@
 // village.js — 마을 탭 (§5.5 리딩 빌리지)
 // 의존: data.js, components.js
 
+// ── 책 상세 시트 ───────────────────────────────────────────────────────────────
+const VillageBookDetail = ({ title, onClose }) => {
+  const [bookInfo, setBookInfo] = React.useState(null);
+
+  React.useEffect(() => {
+    loadBooks().then(books => {
+      setBookInfo(books.find(b => b.title === title) || null);
+    });
+  }, [title]);
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(0,0,0,.55)',
+      display: 'flex', alignItems: 'flex-end' }} onClick={onClose}>
+      <div style={{ width: '100%', background: '#fff', borderRadius: '24px 24px 0 0',
+        padding: '20px 20px 40px', maxHeight: '70%', overflowY: 'auto' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <p style={{ fontWeight: 900, fontSize: 16, color: '#1F1F1F', margin: 0 }}>책 정보</p>
+          <button onClick={onClose} className="rg-btn-icon"><XIcon s={20}/></button>
+        </div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          <BookCover book={bookInfo || { cover_url: '', title }} size={88} radius={14}/>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontWeight: 900, fontSize: 17, color: '#1F1F1F', margin: '0 0 6px', lineHeight: 1.3 }}>{title}</p>
+            {bookInfo ? (
+              <>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#5A5F69', margin: '0 0 4px' }}>{bookInfo.author}</p>
+                <p style={{ fontSize: 13, color: '#AFAFAF', margin: '0 0 4px' }}>{bookInfo.publisher}</p>
+                <p style={{ fontSize: 13, color: '#AFAFAF', margin: 0 }}>총 {bookInfo.total_pages}p</p>
+              </>
+            ) : (
+              <p style={{ fontSize: 13, color: '#AFAFAF', margin: 0 }}>로딩 중...</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── 친구 상세 시트 ─────────────────────────────────────────────────────────────
 const FriendDetail = ({ friend, onClose }) => {
   const npcInfo = NPC_SEARCH_USERS.find(n => n.handle === friend.handle);
   const books = npcInfo?.books || [];
+  const [selectedBook, setSelectedBook] = React.useState(null);
+
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(0,0,0,.5)',
       display: 'flex', alignItems: 'flex-end' }} onClick={onClose}>
@@ -31,10 +73,13 @@ const FriendDetail = ({ friend, onClose }) => {
             <p style={{ fontSize: 12, fontWeight: 800, color: '#AFAFAF', marginBottom: 8 }}>읽고 있는 책</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
               {books.map(b => (
-                <span key={b} style={{ background: '#F0FDF4', border: '1.5px solid #D7F0BF',
-                  borderRadius: 10, padding: '4px 10px', fontSize: 12, fontWeight: 700, color: '#1F8E4D' }}>
+                <button key={b} onClick={() => setSelectedBook(b)} style={{
+                  background: '#F0FDF4', border: '1.5px solid #D7F0BF',
+                  borderRadius: 10, padding: '4px 10px', fontSize: 12, fontWeight: 700,
+                  color: '#1F8E4D', cursor: 'pointer', fontFamily: 'inherit',
+                }}>
                   {b}
-                </span>
+                </button>
               ))}
             </div>
           </>
@@ -50,6 +95,9 @@ const FriendDetail = ({ friend, onClose }) => {
           </>
         )}
       </div>
+      {selectedBook && (
+        <VillageBookDetail title={selectedBook} onClose={() => setSelectedBook(null)}/>
+      )}
     </div>
   );
 };
