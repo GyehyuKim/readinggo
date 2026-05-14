@@ -381,8 +381,12 @@ const NestView = ({ state, onStateChange }) => {
         };
       });
 
-      const newXP     = prev.user.xp + xpGained;
-      const newStreak = prev.user.streak + 1;
+      const newXP = prev.user.xp + xpGained;
+      const sessionDates = getSessionDates(prev.userBooks);
+      const prevDay = new Date(activeDate);
+      prevDay.setDate(prevDay.getDate() - 1);
+      const yesterday = prevDay.toISOString().slice(0, 10);
+      const newStreak = sessionDates.has(yesterday) ? prev.user.streak + 1 : 1;
       const newFeed   = [
         { id: genId(), handle: 'me', name: prev.user.displayName || '나',
           book: activeBook.book.title, sentence: text, time: '방금', claps: 0, sympathy: 0, saves: 0 },

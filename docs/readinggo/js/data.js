@@ -152,7 +152,7 @@ const INITIAL_STATE = {
 };
 
 function loadAppState() {
-  const s = LS.get('rg_v41', null);
+  const s = LS.get('rg_v42', null);
   if (!s) return { ...INITIAL_STATE };
   // 새 필드 merge
   return {

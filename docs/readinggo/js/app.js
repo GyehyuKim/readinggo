@@ -8,7 +8,7 @@ const App = () => {
 
   // localStorage 동기화
   React.useEffect(() => {
-    LS.set('rg_v41', state);
+    LS.set('rg_v42', state);
   }, [state]);
 
   // Toast 전역 헬퍼 (village.js, library.js에서 window._showToast로 호출)
