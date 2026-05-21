@@ -59,12 +59,21 @@ const SEED_LEAGUE = [
 ];
 
 const SEED_FEED = [
-  { id: 'fd1', handle: 'gyehyu',           name: '계휴',         book: '어린 왕자',
-    sentence: '"별은 아름답다, 모래들이 아름답듯이."',        time: '2시간 전', claps: 3, sympathy: 2, saves: 1 },
-  { id: 'fd2', handle: 'activist_raccoon', name: '활자라쿤',     book: '1984',
-    sentence: '"빅브라더는 당신을 지켜보고 있다."',             time: '4시간 전', claps: 7, sympathy: 4, saves: 3 },
-  { id: 'fd3', handle: 'book_bear',        name: '책읽는곰돌이',  book: '사피엔스',
-    sentence: '"역사는 언제나 승자의 기록이다."',               time: '어제',     claps: 5, sympathy: 1, saves: 2 },
+  { id: 'fd1', handle: 'gyehyu',           name: '계휴',
+    book: '어린 왕자', isbn: '9788937460449', page: 72,
+    sentence: '"별은 아름답다, 모래들이 아름답듯이."',   time: '2시간 전', jaeks: 3 },
+  { id: 'fd2', handle: 'activist_raccoon', name: '활자라쿤',
+    book: '1984',     isbn: '9788937460319', page: 156,
+    sentence: '"빅브라더는 당신을 지켜보고 있다."',      time: '4시간 전', jaeks: 7 },
+  { id: 'fd3', handle: 'book_bear',        name: '책읽는곰돌이',
+    book: '사피엔스', isbn: '9788934972464', page: 89,
+    sentence: '"역사는 언제나 승자의 기록이다."',        time: '어제',     jaeks: 5 },
+  { id: 'fd4', handle: 'reading_owl',      name: '독서올빼미',
+    book: '데미안',   isbn: '9788937460647', page: 114,
+    sentence: '"새는 알을 깨고 나온다. 알은 세계다."',   time: '3시간 전', jaeks: 12 },
+  { id: 'fd5', handle: 'page_fox',         name: '한페이지여우',
+    book: '어린 왕자', isbn: '9788937460449', page: 38,
+    sentence: '"가장 중요한 것은 눈에 보이지 않아."',    time: '5시간 전', jaeks: 9 },
 ];
 
 // ── TSV loader ─────────────────────────────────────────────────────────────────
@@ -135,15 +144,15 @@ const INITIAL_STATE = {
   feed: SEED_FEED,
   friends: SEED_FRIENDS,
   leagueData: SEED_LEAGUE,
-  clappedFeed: {},          // feedId -> bool
-  sympathyFeed: {},         // feedId -> bool
-  savedFeed: {},            // feedId -> bool
+  jaekFeed: {},             // feedId -> bool (짹 여부)
+  bookmarks: [],            // [{id,name,handle,book,isbn,page,sentence,time,jaeks,bookmarkedAt}]
+  wishBooks: [],            // [{bookTitle,isbn,addedAt}]
   pokes: {},                // friendId -> bool (오늘 보냈는지)
   simDate: null,            // 날짜 시뮬레이터 (null = 오늘)
 };
 
 function loadAppState() {
-  const s = LS.get('rg_v41', null);
+  const s = LS.get('rg_v42', null);
   if (!s) return { ...INITIAL_STATE };
   // 새 필드 merge
   return {
@@ -153,6 +162,9 @@ function loadAppState() {
     feed: s.feed || SEED_FEED,
     friends: s.friends || SEED_FRIENDS,
     leagueData: s.leagueData || SEED_LEAGUE,
+    jaekFeed:  s.jaekFeed  || {},
+    bookmarks: s.bookmarks || [],
+    wishBooks: s.wishBooks || [],
   };
 }
 

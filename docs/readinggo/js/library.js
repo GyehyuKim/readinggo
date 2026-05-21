@@ -194,8 +194,11 @@ const LibraryView = ({ state, onStateChange, onAddBook }) => {
   const [query,      setQuery]  = React.useState('');
   const [detail,     setDetail] = React.useState(null); // userBook id
   const [showSettings, setSettings] = React.useState(false);
+  const [libTab, setLibTab] = React.useState('shelf'); // 'shelf' | 'wish' | 'bookmark'
 
-  const userBooks = state.userBooks || [];
+  const userBooks  = state.userBooks  || [];
+  const wishBooks  = state.wishBooks  || [];
+  const bookmarks  = state.bookmarks  || [];
   const activeBook = getActiveBook(state);
 
   const filtered = query
@@ -257,7 +260,92 @@ const LibraryView = ({ state, onStateChange, onAddBook }) => {
         </button>
       </div>
 
+      {/* 탭 행 */}
+      <div style={{ display: 'flex', padding: '0 16px', borderBottom: '2px solid #E5E5E5',
+        background: '#fff', gap: 0, flexShrink: 0 }}>
+        {[['shelf','내 책장'],['wish','관심 책'],['bookmark','책갈피']].map(([id, label]) => (
+          <button key={id} onClick={() => setLibTab(id)} style={{
+            flex: 1, padding: '10px 0', border: 'none', background: 'none', cursor: 'pointer',
+            fontWeight: 800, fontSize: 13, fontFamily: 'inherit',
+            color: libTab === id ? '#3FD17F' : '#AFAFAF',
+            borderBottom: libTab === id ? '2.5px solid #3FD17F' : '2.5px solid transparent',
+            marginBottom: -2,
+          }}>{label}</button>
+        ))}
+      </div>
+
       <div className="rg-scroll">
+        {/* ── 관심 책 탭 ── */}
+        {libTab === 'wish' && (
+          <div style={{ padding: '16px 0' }}>
+            {wishBooks.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#AFAFAF' }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>📌</div>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0 }}>마음에 드는 책을 발견하면 담아두세요</p>
+                <p style={{ fontSize: 12, margin: '6px 0 0', color: '#C7CCD3' }}>소셜 피드 모이 → 책 상세 → 관심 책 추가</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {wishBooks.slice().reverse().map((w, i) => (
+                  <div key={i} className="rg-card" style={{ padding: '14px 16px' }}>
+                    <p style={{ fontWeight: 900, fontSize: 14, color: '#1F1F1F', margin: '0 0 2px' }}>{w.bookTitle}</p>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <a href={KYOBO_URLS[w.isbn] || `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(w.isbn || w.bookTitle)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ flex: 1, textAlign: 'center', padding: '8px 0',
+                          background: '#FFF9F0', border: '1.5px solid #FFE0A0', borderRadius: 10,
+                          fontSize: 12, fontWeight: 800, color: '#C8901C', textDecoration: 'none' }}>
+                        교보문고에서 보기 →
+                      </a>
+                      <button
+                        onClick={() => onStateChange(prev => ({
+                          ...prev,
+                          wishBooks: prev.wishBooks.filter((_, idx) => idx !== prev.wishBooks.length - 1 - i),
+                        }))}
+                        style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid #E5E5E5',
+                          background: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                          color: '#AFAFAF', fontFamily: 'inherit' }}>
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 책갈피 탭 ── */}
+        {libTab === 'bookmark' && (
+          <div style={{ padding: '16px 0' }}>
+            {bookmarks.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#AFAFAF' }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🔖</div>
+                <p style={{ fontWeight: 700, fontSize: 14, margin: 0 }}>저장한 모이가 없어요</p>
+                <p style={{ fontSize: 12, margin: '6px 0 0', color: '#C7CCD3' }}>소셜 피드에서 🔖 탭하면 여기에 모여요</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {bookmarks.slice().reverse().map(b => (
+                  <div key={b.id} className="rg-card" style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#3FD17F' }}>{b.book}</span>
+                      {b.page && <span style={{ fontSize: 12, color: '#AFAFAF', fontWeight: 700 }}>p.{b.page}</span>}
+                    </div>
+                    <p style={{ fontSize: 13, color: '#4a4a4a', fontStyle: 'italic', lineHeight: 1.6,
+                      margin: '0 0 8px', borderLeft: '3px solid #3FD17F', paddingLeft: 10 }}>
+                      {b.sentence}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#AFAFAF', margin: 0 }}>@{b.handle} · {b.time}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 내 책장 탭 ── */}
+        {libTab === 'shelf' && (<>
         {/* 현재 읽는 중 카드 (§5.7) */}
         {activeBook && (
           <div onClick={() => setDetail(activeBook.id)} className="rg-card" style={{
@@ -337,6 +425,7 @@ const LibraryView = ({ state, onStateChange, onAddBook }) => {
         <button onClick={onAddBook} className="btn-duo btn-white" style={{ width: '100%' }}>
           + 책 추가하기
         </button>
+        </>)}
       </div>
     </div>
   );
