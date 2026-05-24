@@ -2,7 +2,8 @@
 
 > 기준일: 2026-05-24  
 > 상태: 실서비스 대상 기능 정의  
-> 참고: `Reading_GO_Service_Planning_v1.pdf` · 데모 https://sparkling-biscotti-9b9cf4.netlify.app/
+> 참고: `Reading_GO_Service_Planning_v1.pdf` · 데모 https://sparkling-biscotti-9b9cf4.netlify.app/  
+
 
 ---
 
@@ -246,99 +247,4 @@
 
 
 
----
 
-## 8. 데이터 모델 (MVP 최소)
-
-```
-User
-  id, name, avatar, timezone, streak, xp, shields
-
-Book
-  id, isbn, title, author, cover_url, total_pages, chapters[]
-
-Chapter
-  id, book_id, title, start_page, end_page, order
-
-UserBook
-  user_id, book_id, status (reading | finished | wishlist)
-
-ReadingSession
-  id, user_book_id, date, current_page, pages_read, sentence, is_spoiler, xp_earned
-
-Village (마을)
-  id, book_id, name, is_public, milestones[]
-
-VillageMember
-  village_id, user_id, contribution_pages
-
-Streak
-  user_id, current, longest, last_check_in_date, shields_remaining, pause_until
-```
-
-저장: MVP 데모는 JSON/localStorage → 실제 서비스 시 Supabase로 마이그레이션.
-
----
-
-## 9. 플랫폼 전략
-
-| 마일스톤 | 산출물 | 범위 |
-|---|---|---|
-| **Peer Review (#58, 2026-05-16)** | 웹 HTML 클릭 프로토타입 | `docs/readinggo/index.html`. 데이터는 하드코딩 + localStorage. 3분 시연 |
-| **최종 발표 (학기말)** | **Android APK** | 개인 폰에 사이드로드 설치 후 시연. 실제 푸시 알림 + 로컬 DB로 1주일 이상 진짜 사용 가능한 수준 |
-| **스펙 작성 대상** | 웹 + 네이티브 (Android 우선, iOS 후순위) | — |
-| **알림** | 네이티브 푸시 | 피어 리뷰 단계엔 정적 시뮬레이션, 최종 발표 APK엔 실제 동작 |
-
-### 9.1 Android APK 준비 (최종 발표 대비)
-
-- 빌드 스택 후보: React Native / Flutter / Expo (EAS Build) — 별도 결정 이슈
-- 배포: GitHub Release에 APK 첨부 + QR로 사이드로드 안내
-- 개인 폰 설치 대상: 팀원 3명 (계휴, 윤지, 승원) + 피드용 NPC 2명은 시드 데이터로
-- 최종 발표 시연 핵심: "**실제로 매일 쓰고 있는 앱**"을 보여줌 → 1-2주 누적 데이터(스트릭, 문장 모음)로 진정성 확보
-
----
-
-## 10. 소셜 Cold Start
-
-| 단계 | 인원 | 방식 |
-|---|---|---|
-| Day -3 ~ Day 0 | 팀원 3 (계휴, 윤지, 승원) + NPC 2 | 팀원은 데모 3일 전부터 실제 사용. NPC 2명은 소수 시드 |
-| Day 0 (데모) | 팀원 3 + NPC 2 | 피드에 진짜 + 가상 혼합 표시 |
-| Day 1-14 | +지인 7명 | 팀원 1명당 2-3명씩 초대. **목표 10명**. NPC는 자연 비활성화 |
-| Day 14+ | 마을 자연 확장 | 같은 책 마을이 자동 그룹핑되며 외부 유입 받음 |
-
-NPC 정책: 데모용 2명만, 시연 후 페이드. UI상 일반 유저와 구분 안 됨.
-
----
-
-## 11. MVP 범위 (Cut Line)
-
-**포함**:
-- 둥지 탭 (현재 책, 둥지 상태, 오늘의 한쪽, 내 한문장)
-- 스트릭 + XP + 둥지 단계
-- 마을 (독서 모임, 마일스톤, 랭킹, 모이)
-- 소셜 피드 (팔로우 피드, 박수, 책갈피, 리그)
-- 도서 검색 모달 + 도서 상세
-- 프로필 + 책장 + 내 서재
-- 알림 5종
-
-**제외 (Post-MVP)**:
-- 댓글
-- 이미지 카드 Export
-- 알라딘 프리미엄 API 자동 연동
-- 결제 / 방패 추가 구매
-- iOS 네이티브
-
----
-
-## 12. 오픈 태스크
-
-1. `docs/readinggo/index.html` 데모 구현 (Peer Review용)
-2. 디자인 토큰 (색/타이포) 확정
-3. NPC 시드 데이터 2건 준비
-4. **Android APK 빌드 스택 결정** (React Native / Flutter / Expo)
-5. **Android APK MVP 구현** (최종 발표 대비)
-
----
-
-*v3.1 · 2026-05-24 · KAIST 69911 · 윤지 기능 스펙 + 팀 아키텍처 통합*
