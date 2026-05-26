@@ -237,7 +237,7 @@ git fetch --prune
 13. **`git checkout --orphan` 절대 금지.** 세션 시작 시 `git log --oneline -1`로 현재 브랜치가
     정상 커밋을 갖는지 확인한다. 실패하면 즉시 사용자에게 보고하고 임의로 수정하지 않는다.
 14. **Fork 금지.** 모든 브랜치는 `GyehyuKim/glocalx` 원본 repo에 직접 생성한다.
-15. **v5급 결정 전 3-Round Adversarial Review.** spec 메이저 개편·아키텍처 결정·데모 차단 가능성 있는 변경 전에는 codex/gemini로 *적대적 리뷰 3회* 후 차단 이슈를 사용자에게 보고한다. 사후 코드 리뷰로는 못 잡는 데모 실패를 사전 발견하기 위함. 근거: [LF: 3-Round Adversarial Review](./docs/lecture-frameworks.md#lf-week9-adversarial-review).
+15. **v5급 결정 전 적대적 리뷰 — 권장 (강제 아님).** spec 메이저 개편·아키텍처 결정·데모 차단 가능성 있는 변경 전에는 *적대적 리뷰*를 **사용자에게 제안**한다. 가용 도구가 있으면 codex/gemini 3회 리뷰 (`/codex challenge`, `/ccg` 등), 없으면 Claude 자체 self-critique 또는 팀 동료 리뷰로 대체 가능. 팀원마다 LLM 구독이 다르므로 도구를 강요하지 않는다. 사용자가 "skip" 결정하면 패스 — 단, 결정 사항을 PR 설명에 기록. 근거: [LF: 3-Round Adversarial Review](./docs/lecture-frameworks.md#lf-week9-adversarial-review).
 16. **Spec/코드 PR 분리 (§4.1).** spec 파일과 구현 코드를 같은 PR에 묶지 않는다. spec PR이 먼저, 코드 PR이 나중. 묶어야 할 사유가 있으면 PR 설명에 명시.
 17. **Stack Lock 준수.** `CLAUDE.md` Stack Lock 절에 명시된 결정 (iOS=Capacitor, 데이터=TSV 등) 외 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 근거: [LF: Lock Stack](./docs/lecture-frameworks.md#lf-week9-lock-stack).
 
