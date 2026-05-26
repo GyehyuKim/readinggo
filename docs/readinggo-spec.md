@@ -15,57 +15,6 @@
 
 ---
 
-## 0.1 데모 자가평가 (4축)
-
-본 spec은 [LF: Final Demo 평가 루브릭](./lecture-frameworks.md#lf-week11-final-demo-rubric)을 목표 함수로 설정한다. 2026-06-20 단일 데모, 외부 평가자.
-
-| 축 | 가중치 | 현재 자평 | 보강 위치 |
-|---|---|---|---|
-| What's new (경쟁사 대비) | 20% | 4/5 — `COMPETITIVE-ANALYSIS.md` 16개 비교, "한 문장 강제 입력" wedge 발견 | §0.2, §1 |
-| Why You (차별화 노력) | 20% | 3/5 — 운영자 짹 컨시어지가 강한 카드, 팀 배경 서술 빈약 | §0.2 |
-| So What (실제 사용자 반응) | 30% | **2/5** — L1 추정, L3 인터뷰 0건 | §4 가입 여정 + 외부 인터뷰 결과 |
-| Is AI Native (AI 효율성) | 30% | **2/5** — *현재 가장 약함*. AI는 운영자 짹 응답 보조 정도 | §7 백엔드에서 보강 (요약·추천·정서 분석 후보) |
-
-**합산 자평 목표**: 75/100 (현재 ~55). Is AI Native 30점의 빈 공간이 가장 비싸다. 데모 전 이 칸의 구체 답을 갖춰야 한다.
-
----
-
-## 0.2 Why = Moat (3축 답)
-
-[LF: DARPA Heilmeier](./lecture-frameworks.md#lf-week5-darpa-heilmeier) + [LF: Why = Moat](./lecture-frameworks.md#lf-week10-why-moat).
-
-- **So what?** — 한국 성인 60%가 1년에 책 0권을 읽는다 (문체부 2023). 읽고 싶지만 못 읽는 사람들에게 *오늘 한 문장*이라는 가장 작은 진입점을 준다. 운영자 짹이 첫 7일 동안 직접 응대해 *떠나지 않는 이유*를 만든다.
-- **What's new?** — 북모리(국내 250-500만 DL, 4.78★)가 *의도적으로* 소셜·게이미를 배제한 자리. Bookly는 *"like Duolingo, but for reading"* 슬로건이지만 한국 미진출·한국어 미지원·소셜 부재. Fable은 글로벌 표준 소셜이지만 *클럽 가입* 부담이 있고 한국 미진출. **"한 문장 강제 입력 + 자동 그룹화 + 운영자 컨시어지"** 조합은 16개 경쟁자 분석에서 어디에도 없음.
-- **Why you?** — 팀 4명 모두 *책을 사놓고 못 읽는 사람*. 메모리에 박힌 원칙: "Duolingo 벤치마킹 금지" — 익숙한 답을 거부하고 ReadingGo 고유 발상을 요구. 운영자 짹은 *우리 손으로* 첫 사용자를 모집하겠다는 선언 ([LF: Concierge MVP](./lecture-frameworks.md#lf-week11-concierge-mvp)).
-
----
-
-## 0.3 가장 위험한 가정 (Riskiest Assumption)
-
-[LF: Riskiest Assumption First](./lecture-frameworks.md#lf-week9-riskiest-assumption) — UI 손대기 전 *하드 제약*부터 측정한다.
-
-| 가정 | 위험도 | 검증 방법 | 데드라인 |
-|---|---|---|---|
-| **A1**: Capacitor + WKWebView에서 푸시 알림·인앱결제·로컬 데이터 영속이 의도대로 동작 | 높음 — Phase 2 전체가 의존 | Capacitor 헬로월드 + 푸시·결제 PoC | Phase 2 진입 전 |
-| **A2**: 같은 책 자동 묶음에서 *시작 후 안 읽는 사용자* (T2 좀비) 처리가 churn을 막음 | 높음 — 메모리에 핵심 우려로 박힘 | 운영자 짹 데이터에서 미응답 패턴 측정 | 데모 전 |
-| **A3**: 운영자 짹 인력 부담이 첫 7일 안에 자동화 점진으로 견딜 만함 | 중간 — 메모리: "자동화 점진 계획은 별도 안건" | 짹 응답 시간·빈도 로그 + 자동 응답 후보 도출 | 데모 전 |
-| **A4**: 한 문장 입력이 실제로 *읽음의 증명*으로 작동 (조작 저항성) | 중간 — wedge 자체의 정당성 | 사용자 인터뷰 (Mom Test) + 짹 로그 정성 분석 | L3 인터뷰 시 |
-
-UI·기능 작업 전에 가정 검증부터. 검증 결과가 위협적이면 §13 미해결 안건으로 강등하거나 §14 의도적 기각으로 이동.
-
----
-
-## 0.4 Living Document 약속
-
-[LF: Living Document Spec](./lecture-frameworks.md#lf-week9-living-document) + [LF: Spec Drift 4유형](./lecture-frameworks.md#lf-week11-spec-drift-types).
-
-- 이 spec은 *살아있는 문서*다. 한 번 쓰고 안 고치면 sketch지 spec이 아니다.
-- **목표 비율**: `SPEC commits : code commits ≥ 1 : 10`. 미만이면 drift.
-- **갱신 트리거**: 구현 중 (a) 가정이 틀렸음을 발견 (b) 예상보다 어려운 기능 → 컷 후보 (c) 예측 못 한 사용자 행동 발견 — 셋 다 *spec commit*이지 code commit이 아니다.
-- **신호**: `git log docs/readinggo-spec.md` 가 week 1 한 커밋뿐이면 red flag.
-
----
-
 ## 0.5 v5 도달까지의 여정
 
 이 절은 *왜 이 스펙이 이렇게 생겼는지*를 남긴다. 결정의 결과만 보면 자의적으로 보이는 항목이 많아서, 그 결정에 도달한 경로를 같이 박아둔다. 향후 누군가가 이 스펙을 뒤집고 싶을 때 *어디서부터 다시 검토해야 하는지* 를 알려주는 지도 역할.
