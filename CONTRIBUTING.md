@@ -98,6 +98,17 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 - **예외**: 단일 대형 문서(business-plan.html 같은) 1회 개편, 자동 생성 파일 (lock, 데이터셋) — PR 설명에 이유 적기.
 - **과분할도 금지**: 같은 하루에 동일 파일을 여러 PR로 쪼개 머지하면 히스토리 오염. 묶을 수 있으면 묶는다.
 
+### 4.1 Spec PR과 코드 PR 분리
+
+근거: [LF: Spec only PR](./docs/lecture-frameworks.md#lf-week6-spec-only-pr) + [LF: Spec-first Workflow](./docs/lecture-frameworks.md#lf-week9-spec-first-workflow).
+
+- **spec 파일(`docs/readinggo-spec.md`, `docs/readinggo-feature-spec.md`, `docs/readinggo/*.md`)과 구현 코드(`docs/readinggo/index.html`, `docs/readinggo/js/*` 등)를 같은 PR에 묶지 않는다.**
+- 순서: spec 변경 → spec-only PR → 팀이 머지·합의 → 별도 PR로 구현.
+- **이유**: Week 9 강의 점수표에서 14팀 중 13팀이 *코드+스펙 묶음 PR*로 처방을 어겼다. 묶음 PR은 (a) spec 합의가 코드 머지에 인질잡힘 (b) 다른 팀원이 spec만 보고 리뷰할 수 없음.
+- **예외**: 같은 PR 안에서 spec과 코드가 *동시에 결정되어야 하는* 작은 변경 (예: 데이터 스키마 + 그 스키마 쓰는 한 함수). 예외 시 PR 설명에 이유 기록.
+
+**살아있는 spec 의무**: 구현 중 가정이 틀렸음·예상보다 어려움·예측 못 한 사용자 행동을 발견하면 *spec commit*으로 먼저 반영. 코드 commit이 아니다. 근거: [LF: Living Document](./docs/lecture-frameworks.md#lf-week9-living-document).
+
 ---
 
 ## 5. 커밋 메시지
@@ -226,6 +237,9 @@ git fetch --prune
 13. **`git checkout --orphan` 절대 금지.** 세션 시작 시 `git log --oneline -1`로 현재 브랜치가
     정상 커밋을 갖는지 확인한다. 실패하면 즉시 사용자에게 보고하고 임의로 수정하지 않는다.
 14. **Fork 금지.** 모든 브랜치는 `GyehyuKim/glocalx` 원본 repo에 직접 생성한다.
+15. **v5급 결정 전 3-Round Adversarial Review.** spec 메이저 개편·아키텍처 결정·데모 차단 가능성 있는 변경 전에는 codex/gemini로 *적대적 리뷰 3회* 후 차단 이슈를 사용자에게 보고한다. 사후 코드 리뷰로는 못 잡는 데모 실패를 사전 발견하기 위함. 근거: [LF: 3-Round Adversarial Review](./docs/lecture-frameworks.md#lf-week9-adversarial-review).
+16. **Spec/코드 PR 분리 (§4.1).** spec 파일과 구현 코드를 같은 PR에 묶지 않는다. spec PR이 먼저, 코드 PR이 나중. 묶어야 할 사유가 있으면 PR 설명에 명시.
+17. **Stack Lock 준수.** `CLAUDE.md` Stack Lock 절에 명시된 결정 (iOS=Capacitor, 데이터=TSV 등) 외 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 근거: [LF: Lock Stack](./docs/lecture-frameworks.md#lf-week9-lock-stack).
 
 모순이 생기면 **이 `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타**의 우선순위를 따른다.
 
