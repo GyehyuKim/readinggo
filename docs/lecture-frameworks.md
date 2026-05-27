@@ -23,31 +23,71 @@
 
 ---
 
+## 각 주차 핵심 처방 (요약)
+
+카드 사전을 읽고도 *진짜 메시지*를 놓치지 않도록, 각 주차의 단일 처방을 한 줄로 박는다. 카드는 도구, 처방은 결론. 적용 우선순위 판단 시 이 절을 먼저 본다.
+
+### Week 1 — Why This Class Exists
+> **도구를 직접 쓰며 직관을 형성하라.** AI 진화 속도는 가르치는 사람도 모른다. Wake Up → Gear Up → Ship It 3막. 가르치는 사람도 도그푸드 원칙 ([3-Act](#lf-week1-3act), [Dogfood](#lf-week1-dogfood)).
+
+### Week 2 — Where Are We Going?
+> **Jagged Frontier를 직접 매핑하라.** AI는 균질하지 않다 — 어떤 건 초인적, 어떤 건 형편없음. Bifurcation에서 power user 쪽으로 가라. Dorothy Vaughan 질문: *나는 파동을 보고 있는가, 누가 알려주길 기다리는가?* ([Jagged Frontier](#lf-week2-jagged-frontier), [Bifurcation](#lf-week2-bifurcation), [Dorothy Vaughan](#lf-week2-dorothy-vaughan)).
+
+### Week 3 — How to Learn?
+> **AI는 Bloom의 2시그마를 실현시키는 도구.** 단, *Brain-to-LLM*이지 *LLM-to-Brain*이 아니다. 인지 부담을 먼저 한 뒤 AI 보조가 가장 좋다. Deliberate practice + 즉각 피드백 + Hallucination 3대응 ([Two Sigma](#lf-week3-two-sigma), [Deliberate Practice](#lf-week3-deliberate-practice), [Skill Atrophy](#lf-week3-skill-atrophy)).
+
+### Week 4 — What is Under the Hood?
+> **토큰 단위로 작동하는 확률 기계.** 사고하지 않는다. Context **quality** > length. 큰 요청은 작은 순차 단계로 분해. Premortem으로 사전 방어 ([Decomposition](#lf-week4-decomposition), [Context Window](#lf-week4-context-window), [Premortem](#lf-week4-premortem)).
+
+### Week 5 — What/How to Build
+> **Earnestness가 인간 창작의 식별 표지.** DARPA 3축 (So what / What's new / Why you) + Paul Graham *"매일 쓸 것인가?"*. Curiosity는 compass이자 *필터*. Why Tree로 솔루션 먼저 만들지 말고 *왜*부터 물어라 ([Earnestness](#lf-week5-earnestness), [DARPA Heilmeier](#lf-week5-darpa-heilmeier), [Why Tree](#lf-week5-why-tree)). Vibe coding은 평어 묘사 + COPY-PASTE-FOLLOW 디버그 루프.
+
+### Week 6 — How to Build (방법론)
+> **Build Cycle 5단계 (Spec → Review → Implement → Test → Commit). Review에 시간 가장 많이 쓴다.** SLC > MVP — 다듬은 한 기능 > 반쯤 만든 다섯 개. Stay on same repo (git history는 학습 기록). Spec only PR → 머지 → 코드 PR 분리 ([Build Cycle](#lf-week6-build-cycle), [SLC > MVP](#lf-week6-slc-over-mvp), [Spec only PR](#lf-week6-spec-only-pr)).
+
+### Week 9 — How to Build, Part 2 (Phase 1 회고)
+> **Phase 1의 5대 함정**: ① Narrow the wedge ② Making ≠ Validating ③ Code runs ≠ I understand ④ AI는 거울이지 매니저가 아님 ⑤ Prompts are wishes; guardrails are contracts. Spec-first 7단계 + P0/P1/P2 + Test 3종 + Concierge MVP ([5 Lessons](#lf-week9-5-lessons), [Spec-first Workflow](#lf-week9-spec-first-workflow), [Priority Labels](#lf-week9-priority-labels)).
+
+### Week 10 — Why You?
+> **AI는 예측 commodity. 보완재(판단·데이터·행동) 가치가 상승.** Find/Build/Choose는 한 밧줄의 세 가닥, whytree가 세 움직임을 동시에 강제한다. *Your why is your moat* — solopreneur는 why 없이는 자기 회사의 가장 싼 대체 가능 노동자가 된다 ([3 Approaches](#lf-week10-three-approaches), [Power & Prediction](#lf-week10-power-prediction), [Why = Moat](#lf-week10-why-moat)).
+
+### Week 11 — AI Native? (1/2)
+> **세 처방, 한 묶음.**
+> 1. **Spec**: 긴 산문 spec은 죽었다. *thin spec + feature별 분할 + real tests + 왜를 담은 커밋 메시지*로 갈아엎어라 ([Spec vs Prompts](#lf-week11-spec-vs-prompts), [Honest Synthesis](#lf-week11-spec-honest-synthesis), [Drift 4유형](#lf-week11-spec-drift-types)).
+> 2. **Test**: 테스트 인프라는 협상 대상 아니다. `/health` → 4계층 (unit/e2e/evals/contracts) → `npm test` 한 명령. **E2E는 Claude in Chrome으로 자연어 작성**해 Playwright 세금 0 ([/health](#lf-week11-health-bootstrap), [4계층](#lf-week11-test-platform-4-layers), [Claude in Chrome](#lf-week11-claude-in-chrome)).
+> 3. **Meet User**: 데모 전 L3 도달. Mom Test 3원칙 — *과거 행동*만 묻기. 사용자 인터뷰 0건이면 So What 30점 박살 ([Mom Test](#lf-week11-mom-test), [L0-L4](#lf-week11-user-contact-ladder), [Concierge MVP](#lf-week11-concierge-mvp)).
+> 
+> **부가**: agentic breadth 전에 harness depth. 모델은 뇌, 하니스가 몸 — 레버리지는 몸에 있다 ([Brain/Body](#lf-week11-brain-body), [Harness vs Agentic](#lf-week11-harness-vs-agentic), [Ralph Loop](#lf-week11-ralph-loop)).
+>
+> **Phase 2 점수표 (피해야 할 함정)**: 10/14팀 사용자 접촉 0, 11/14팀 자동화 테스트 0, 8/14팀 한 명이 40% 커밋, 0/14팀 자율 루프 ([Phase 2 Scorecard](#lf-week11-phase2-scorecard)).
+
+---
+
 ## 카테고리별 인덱스
 
 ### Spec
-[Drift 4유형](#lf-week11-spec-drift-types) · [Drift 방어 3패턴](#lf-week11-spec-drift-defense) · [Code-is-Spec 반대 진영](#lf-week11-code-is-spec) · [Spec 정직한 합성](#lf-week11-spec-honest-synthesis) · [Spec-first Workflow](#lf-week9-spec-first-workflow) · [Living Document](#lf-week9-living-document) · [P0/P1/P2 라벨](#lf-week9-priority-labels) · [3-Round Adversarial Review](#lf-week9-adversarial-review) · [Define NOT to Build](#lf-week9-define-not-to-build) · [Riskiest Assumption First](#lf-week9-riskiest-assumption) · [MANIFESTO vs MANIFEST](#lf-week6-manifesto-vs-manifest) · [Spec only PR](#lf-week6-spec-only-pr) · [LLM Trust vs Guardrails](#lf-week9-llm-vs-guardrails)
+[Drift 4유형](#lf-week11-spec-drift-types) · [Drift 방어 3패턴](#lf-week11-spec-drift-defense) · [Code-is-Spec 반대 진영](#lf-week11-code-is-spec) · [Spec 정직한 합성](#lf-week11-spec-honest-synthesis) · [Spec-first Workflow](#lf-week9-spec-first-workflow) · [Living Document](#lf-week9-living-document) · [P0/P1/P2 라벨](#lf-week9-priority-labels) · [3-Round Adversarial Review](#lf-week9-adversarial-review) · [Define NOT to Build](#lf-week9-define-not-to-build) · [Riskiest Assumption First](#lf-week9-riskiest-assumption) · [MANIFESTO vs MANIFEST](#lf-week6-manifesto-vs-manifest) · [Spec only PR](#lf-week6-spec-only-pr) · [LLM Trust vs Guardrails](#lf-week9-llm-vs-guardrails) · [Spec vs Prompts](#lf-week11-spec-vs-prompts)
 
 ### Test
-[통합 테스트 4계층](#lf-week11-test-platform-4-layers) · [/health 부트스트랩](#lf-week11-health-bootstrap) · [Test 3종](#lf-week9-test-3-types) · [3-Round Adversarial Review](#lf-week9-adversarial-review) · [Riskiest Assumption First](#lf-week9-riskiest-assumption)
+[통합 테스트 4계층](#lf-week11-test-platform-4-layers) · [/health 부트스트랩](#lf-week11-health-bootstrap) · [Test 3종](#lf-week9-test-3-types) · [3-Round Adversarial Review](#lf-week9-adversarial-review) · [Riskiest Assumption First](#lf-week9-riskiest-assumption) · [Claude in Chrome](#lf-week11-claude-in-chrome)
 
 ### User Research
 [Mom Test 3원칙](#lf-week11-mom-test) · [3 Voices](#lf-week11-three-voices) · [Concierge MVP (W11)](#lf-week11-concierge-mvp) · [Concierge MVP (W9)](#lf-week9-concierge-mvp) · [L0-L4 사다리](#lf-week11-user-contact-ladder) · [Whytree (faster horses)](#lf-week11-whytree-faster-horses) · [3 Professional Problems](#lf-week2-3-problems) · [Why Tree](#lf-week5-why-tree) · [신수정의 불가능한 미래](#lf-week5-impossible-future) · [Level 2 관찰](#lf-week9-level2-observation) · [Whytree→Purpose 매핑](#lf-week10-whytree-purpose) · [4 Lessons from Whytree](#lf-week10-whytree-4-lessons) · [Why = Moat](#lf-week10-why-moat)
 
 ### Harness
-[5요소](#lf-week11-harness-5-parts) · [Ralph Wiggum Loop](#lf-week11-ralph-loop) · [/goal Measurable+Uncorrectable](#lf-week11-goal-measurable) · [Goodhart & Reward Hacking](#lf-week11-goodhart) · [PROMPT.md 4규칙](#lf-week11-promptmd-rules) · [실패 모드 5종](#lf-week11-failure-modes) · [/team vs /autopilot](#lf-week11-team-vs-autopilot) · [/deep-interview](#lf-week11-deep-interview) · [Harness vs Agentic](#lf-week11-harness-vs-agentic) · [진단 2질문](#lf-week11-agent-diagnostic) · [/insights](#lf-week6-insights) · [gstack](#lf-week6-gstack) · [CLAUDE.md 위계](#lf-week9-claudemd-team-user) · [Commands/Skills/Plugins](#lf-week9-commands-skills-plugins) · [Worktree](#lf-week9-worktree) · [Lock Stack](#lf-week9-lock-stack) · [LLM Trust vs Guardrails](#lf-week9-llm-vs-guardrails)
+[5요소](#lf-week11-harness-5-parts) · [Ralph Wiggum Loop](#lf-week11-ralph-loop) · [/goal Measurable+Uncorrectable](#lf-week11-goal-measurable) · [Goodhart & Reward Hacking](#lf-week11-goodhart) · [PROMPT.md 4규칙](#lf-week11-promptmd-rules) · [실패 모드 5종](#lf-week11-failure-modes) · [/team vs /autopilot](#lf-week11-team-vs-autopilot) · [/deep-interview](#lf-week11-deep-interview) · [Harness vs Agentic](#lf-week11-harness-vs-agentic) · [진단 2질문](#lf-week11-agent-diagnostic) · [/insights](#lf-week6-insights) · [gstack](#lf-week6-gstack) · [CLAUDE.md 위계](#lf-week9-claudemd-team-user) · [Commands/Skills/Plugins](#lf-week9-commands-skills-plugins) · [Worktree](#lf-week9-worktree) · [Lock Stack](#lf-week9-lock-stack) · [LLM Trust vs Guardrails](#lf-week9-llm-vs-guardrails) · [Claude in Chrome](#lf-week11-claude-in-chrome) · [Brain/Body 은유](#lf-week11-brain-body)
 
 ### Agentic
 [Harness vs Agentic](#lf-week11-harness-vs-agentic) · [진단 2질문](#lf-week11-agent-diagnostic) · [/team vs /autopilot](#lf-week11-team-vs-autopilot)
 
 ### Evaluation
-[Final Demo 4축](#lf-week11-final-demo-rubric) · [Term Project 4축 초안](#lf-week5-term-eval-draft) · [DARPA Heilmeier](#lf-week5-darpa-heilmeier) · [L0-L4 사다리](#lf-week11-user-contact-ladder) · [Premortem](#lf-week4-premortem) · [Jagged Frontier](#lf-week2-jagged-frontier) · [3 Professional Problems](#lf-week2-3-problems) · [Power & Prediction](#lf-week10-power-prediction) · [SLC > MVP](#lf-week6-slc-over-mvp) · [Define NOT to Build](#lf-week9-define-not-to-build) · [/goal Measurable+Uncorrectable](#lf-week11-goal-measurable) · [Goodhart & Reward Hacking](#lf-week11-goodhart)
+[Final Demo 4축](#lf-week11-final-demo-rubric) · [Term Project 4축 초안](#lf-week5-term-eval-draft) · [DARPA Heilmeier](#lf-week5-darpa-heilmeier) · [L0-L4 사다리](#lf-week11-user-contact-ladder) · [Premortem](#lf-week4-premortem) · [Jagged Frontier](#lf-week2-jagged-frontier) · [3 Professional Problems](#lf-week2-3-problems) · [Power & Prediction](#lf-week10-power-prediction) · [SLC > MVP](#lf-week6-slc-over-mvp) · [Define NOT to Build](#lf-week9-define-not-to-build) · [/goal Measurable+Uncorrectable](#lf-week11-goal-measurable) · [Goodhart & Reward Hacking](#lf-week11-goodhart) · [Phase 2 Scorecard](#lf-week11-phase2-scorecard)
 
 ### Concept
-[Manna Two Worlds](#lf-week2-manna) · [Jagged Frontier](#lf-week2-jagged-frontier) · [Bifurcation](#lf-week2-bifurcation) · [Engels' Pause](#lf-week2-engels-pause) · [Labor-enabling vs replacing](#lf-week2-labor-enabling-replacing) · [AI 2027](#lf-week2-ai-2027) · [Dorothy Vaughan](#lf-week2-dorothy-vaughan) · [Centaur vs Cyborg](#lf-week3-centaur-cyborg) · [Hallucination 3대응](#lf-week3-hallucination) · [Skill Atrophy](#lf-week3-skill-atrophy) · [Token/Pre-training/Fine-tuning](#lf-week4-token-pretraining-finetuning) · [Temperature](#lf-week4-temperature) · [Context Window 원칙](#lf-week4-context-window) · [용어사 6단계](#lf-week11-term-history) · [Harness vs Agentic](#lf-week11-harness-vs-agentic) · [Naval 4가지 운](#lf-week5-naval-luck) · [Earnestness](#lf-week5-earnestness) · [Generation→Selection](#lf-week5-generation-selection) · [Vibe Coding 정의](#lf-week5-vibe-coding) · [MANIFESTO vs MANIFEST](#lf-week6-manifesto-vs-manifest) · [Commands/Skills/Plugins](#lf-week9-commands-skills-plugins) · [Code-is-Spec](#lf-week11-code-is-spec) · [Three Approaches to Purpose](#lf-week10-three-approaches) · [Naval's Algorithm](#lf-week10-naval-algorithm) · [Power & Prediction](#lf-week10-power-prediction) · [Coase+Solopreneur](#lf-week10-coase-solopreneur) · [Why = Moat](#lf-week10-why-moat) · [Pale Blue Dot](#lf-week10-pale-blue-dot) · [3-Act 학기](#lf-week1-3act) · [Eat Your Own Dogfood](#lf-week1-dogfood)
+[Manna Two Worlds](#lf-week2-manna) · [Jagged Frontier](#lf-week2-jagged-frontier) · [Bifurcation](#lf-week2-bifurcation) · [Engels' Pause](#lf-week2-engels-pause) · [Labor-enabling vs replacing](#lf-week2-labor-enabling-replacing) · [AI 2027](#lf-week2-ai-2027) · [Dorothy Vaughan](#lf-week2-dorothy-vaughan) · [Centaur vs Cyborg](#lf-week3-centaur-cyborg) · [Hallucination 3대응](#lf-week3-hallucination) · [Skill Atrophy](#lf-week3-skill-atrophy) · [Token/Pre-training/Fine-tuning](#lf-week4-token-pretraining-finetuning) · [Temperature](#lf-week4-temperature) · [Context Window 원칙](#lf-week4-context-window) · [용어사 6단계](#lf-week11-term-history) · [Harness vs Agentic](#lf-week11-harness-vs-agentic) · [Naval 4가지 운](#lf-week5-naval-luck) · [Earnestness](#lf-week5-earnestness) · [Generation→Selection](#lf-week5-generation-selection) · [Vibe Coding 정의](#lf-week5-vibe-coding) · [MANIFESTO vs MANIFEST](#lf-week6-manifesto-vs-manifest) · [Commands/Skills/Plugins](#lf-week9-commands-skills-plugins) · [Code-is-Spec](#lf-week11-code-is-spec) · [Three Approaches to Purpose](#lf-week10-three-approaches) · [Naval's Algorithm](#lf-week10-naval-algorithm) · [Power & Prediction](#lf-week10-power-prediction) · [Coase+Solopreneur](#lf-week10-coase-solopreneur) · [Why = Moat](#lf-week10-why-moat) · [Pale Blue Dot](#lf-week10-pale-blue-dot) · [3-Act 학기](#lf-week1-3act) · [Eat Your Own Dogfood](#lf-week1-dogfood) · [Spec vs Prompts](#lf-week11-spec-vs-prompts) · [Brain/Body 은유](#lf-week11-brain-body)
 
 ### Process
-[Build Cycle 5단계](#lf-week6-build-cycle) · [Vague vs Specific Prompts](#lf-week5-vague-vs-specific) · [COPY-PASTE-FOLLOW](#lf-week5-copy-paste-follow) · [Decomposition](#lf-week4-decomposition) · [Role Definition](#lf-week4-role-definition) · [Premortem](#lf-week4-premortem) · [Spec-first Workflow](#lf-week9-spec-first-workflow) · [Spec only PR](#lf-week6-spec-only-pr) · [Stay on Same Repo](#lf-week6-stay-on-repo) · [Public vs Private Repo](#lf-week6-public-private) · [Conventional Commits](#lf-week9-conventional-commits) · [revert vs reset](#lf-week9-revert-vs-reset) · [API Key 보안 사다리](#lf-week9-api-key-security) · [Tiny Experiments](#lf-week10-tiny-experiments) · [Concierge MVP (W11)](#lf-week11-concierge-mvp) · [Concierge MVP (W9)](#lf-week9-concierge-mvp) · [/deep-interview](#lf-week11-deep-interview) · [Drift 방어 3패턴](#lf-week11-spec-drift-defense) · [수업 시간 구조](#lf-week1-class-structure) · [3-Act 학기](#lf-week1-3act) · [Eat Your Own Dogfood](#lf-week1-dogfood) · [/insights](#lf-week6-insights) · [gstack](#lf-week6-gstack) · [P0/P1/P2 라벨](#lf-week9-priority-labels) · [Lock Stack](#lf-week9-lock-stack) · [Worktree](#lf-week9-worktree) · [Context Window 원칙](#lf-week4-context-window) · [SLC > MVP](#lf-week6-slc-over-mvp)
+[Build Cycle 5단계](#lf-week6-build-cycle) · [Vague vs Specific Prompts](#lf-week5-vague-vs-specific) · [COPY-PASTE-FOLLOW](#lf-week5-copy-paste-follow) · [Decomposition](#lf-week4-decomposition) · [Role Definition](#lf-week4-role-definition) · [Premortem](#lf-week4-premortem) · [Spec-first Workflow](#lf-week9-spec-first-workflow) · [Spec only PR](#lf-week6-spec-only-pr) · [Stay on Same Repo](#lf-week6-stay-on-repo) · [Public vs Private Repo](#lf-week6-public-private) · [Conventional Commits](#lf-week9-conventional-commits) · [revert vs reset](#lf-week9-revert-vs-reset) · [API Key 보안 사다리](#lf-week9-api-key-security) · [Tiny Experiments](#lf-week10-tiny-experiments) · [Concierge MVP (W11)](#lf-week11-concierge-mvp) · [Concierge MVP (W9)](#lf-week9-concierge-mvp) · [/deep-interview](#lf-week11-deep-interview) · [Drift 방어 3패턴](#lf-week11-spec-drift-defense) · [수업 시간 구조](#lf-week1-class-structure) · [3-Act 학기](#lf-week1-3act) · [Eat Your Own Dogfood](#lf-week1-dogfood) · [/insights](#lf-week6-insights) · [gstack](#lf-week6-gstack) · [P0/P1/P2 라벨](#lf-week9-priority-labels) · [Lock Stack](#lf-week9-lock-stack) · [Worktree](#lf-week9-worktree) · [Context Window 원칙](#lf-week4-context-window) · [SLC > MVP](#lf-week6-slc-over-mvp) · [Phase 2 Scorecard](#lf-week11-phase2-scorecard)
 
 ### Learning
 [Bloom's Two Sigma](#lf-week3-two-sigma) · [Deliberate Practice](#lf-week3-deliberate-practice) · [Hallucination 3대응](#lf-week3-hallucination) · [Skill Atrophy](#lf-week3-skill-atrophy) · [5MJ](#lf-week3-5mj) · [AI 학습 전략](#lf-week4-learning-strategies) · [ZPD](#lf-week4-zpd) · [Earnestness](#lf-week5-earnestness) · [Dorothy Vaughan](#lf-week2-dorothy-vaughan) · [수업 시간 구조](#lf-week1-class-structure) · [Three Approaches to Purpose](#lf-week10-three-approaches) · [Tiny Experiments](#lf-week10-tiny-experiments) · [Whytree→Purpose 매핑](#lf-week10-whytree-purpose) · [4 Lessons from Whytree](#lf-week10-whytree-4-lessons)
@@ -1370,8 +1410,65 @@ Blocked: if the source file is missing, write what is missing to BLOCKED.md.
 
 **경구**: "5분의 /deep-interview가 1시간의 drift를 막는다"
 
+### <a id="lf-week11-spec-vs-prompts"></a> Spec vs Prompts
+**출처**: Week 11, p.23 | **Origin**: 강의 정의 | **Category**: Spec, Concept
+**Summary**: spec과 prompt의 본질적 차이 — 영속성·검증성·git
+
+**정의**
+- **Spec** — *코드 작성 전에* 제품이 무엇을 하는지 *버전 관리된, 리뷰 가능한* 기술
+- **Prompt** — 그 순간 AI에 보내는 요청
+
+**핵심 차이**: *"Specs live in git. Prompts evaporate."* (스펙은 git에 산다. 프롬프트는 증발한다.)
+
+**시사**: 같은 대화가 두 번 일어나면 spec, 한 번이면 prompt. 반복 가능한 작업은 spec으로 옮겨라. *영속성이 결정한다.*
+
+### <a id="lf-week11-claude-in-chrome"></a> Claude in Chrome — 자연어 E2E
+**출처**: Week 11, p.32 | **Origin**: Anthropic Claude in Chrome | **Category**: Test, Harness
+**Summary**: Playwright 세금 없이 E2E 테스트를 자연어로
+
+**문제**: E2E는 가장 손으로 쓰기 어려운 테스트. Playwright 코드는 학습 곡선·유지보수 비용
+
+**해법**: Claude Code가 실제 Chrome 제어. 자연어 시나리오로 E2E 작성.
+
+**예시 프롬프트**: *"Open the deployed app at $URL. Log in as test@kaist.ac.kr. Click 'Add allergen', type '우유', press Enter. Assert the 우유 태그가 나타남. Screenshot before and after."*
+
+**효과**
+- 실제 브라우저 열림 → 클릭 → assertion → 스크린샷 터미널로 반환
+- Playwright 코드 0줄
+- **모든 팀원이 평어로 E2E 작성 가능. 세금 0.**
+
+### <a id="lf-week11-brain-body"></a> Brain / Body 은유 — Harness가 레버리지
+**출처**: Week 11, p.46 | **Origin**: 강의 명제 | **Category**: Harness, Concept
+**Summary**: 모델은 뇌, 하니스가 몸. 레버리지는 모두 몸에 있다.
+
+**원어**: *"The model is the brain. The harness is the body. All leverage lives in the body."*
+
+**시사**
+- 모델을 직접 못 바꿈 → 하니스 (loop·tools·file system·context·guardrails) 엔지니어링이 *유일한 레버리지*
+- agentic-setup (sub-agents, orchestrator-worker, parallel terminals)는 이번 주 드롭 — 대부분 준비 안 됨
+- **agentic breadth 전에 harness depth**
+
+**우선순위**: Ralph loop + measurable goal + 파일 기반 exit이 *먼저*. 멀티 에이전트는 그 다음.
+
+### <a id="lf-week11-phase2-scorecard"></a> Phase 2 Scorecard (2026-05-22)
+**출처**: Week 11, p.20 | **Origin**: 강의 진단 (14팀) | **Category**: Evaluation, Process
+**Summary**: 우리가 피해야 할 함정 5가지의 통계적 형태
+
+**14팀 진단 결과**
+- **10/14** teams: 문서화된 사용자 접촉 0건
+- **11/14** teams: 자동화 테스트 0건
+- **3 teams** with meaningful tests: Briefly, Fevio, RE Second Opinion
+- **8/14** teams: 한 명이 40% 이상 커밋 (자전거 사고 리스크)
+- **5/14** teams: autocomplete 넘어 harness 엔지니어링
+- **0/14** teams: 자율 루프 실행
+
+**3 처방 (Lesson 1·2·3)**: Spec (eyes open) / Test as integrated platform / Meet user (before 6/20, not at demo)
+
+**활용**: 우리 팀 자가 진단 시 위 6개 지표에 ✗/✓ 표시. 데모 전 ✗을 ✓로.
+
 ---
 
 ## 변경 이력
 
-- **2026-05-26** — 초안 작성. Week 1-11 71개 카드. (커밋 SHA는 머지 후 추가)
+- **2026-05-26** — 초안 작성. Week 1-11 71개 카드.
+- **2026-05-26 (2차)** — Week 11 재검토. (a) 각 주차 핵심 처방 절 신설 (요약 11개), (b) 누락 카드 4개 보강: [Spec vs Prompts](#lf-week11-spec-vs-prompts), [Claude in Chrome](#lf-week11-claude-in-chrome), [Brain/Body](#lf-week11-brain-body), [Phase 2 Scorecard](#lf-week11-phase2-scorecard). 총 97 카드.
