@@ -43,3 +43,7 @@ notice-*.txt
 # HW6 개인 제출 메모 (커밋 금지)
 90. Internal/hw6/
 .omc/
+
+# Ralph loop runtime state (PROMPT.md is tracked, DONE/BLOCKED are session-local)
+loop/*/DONE
+loop/*/BLOCKED.md
