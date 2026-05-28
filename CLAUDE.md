@@ -37,7 +37,7 @@ Other agents (Cursor, Continue, Aider) should enter via [`AGENTS.md`](./AGENTS.m
 - **iOS**: Capacitor로 점진 마이그레이션 (v5.1 결정). Swift/React Native 등 새 네이티브 프레임워크 도입 금지.
 - **웹/Phase 0-1**: 정적 HTML/JS (현재) → Phase 1 풀스택은 결정 시 spec PR 경유.
 - **데이터**: 책 데이터셋 TSV 포맷 유지 (#90 결정).
-- 변경 제안 시 `docs/2. specifications/readinggo-spec.md` (또는 PR #108 머지 후 `docs/readinggo/specs/`) spec PR 먼저, 코드 PR 나중 ([LF: Spec only PR](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)).
+- 변경 제안 시 해당 피처의 `docs/readinggo/specs/<feature>.md` spec PR 먼저, 코드 PR 나중 ([LF: Spec only PR](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)).
 
 새 프레임워크/라이브러리/언어 도입 제안이 들어오면 위 룰을 먼저 안내하고 사용자에게 확인.
 

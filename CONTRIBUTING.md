@@ -102,7 +102,7 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 
 근거: [LF: Spec only PR](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr) + [LF: Spec-first Workflow](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-spec-first-workflow).
 
-- **spec 파일(`docs/2. specifications/*.md`, `docs/readinggo/specs/**/*.md` (PR #108 머지 후), `docs/readinggo/{BACKLOG,ROADMAP,iOS-PLAN,COMPETITIVE-ANALYSIS}.md`)과 구현 코드(`docs/readinggo/index.html`, `docs/readinggo/js/*` 등)를 같은 PR에 묶지 않는다.**
+- **spec 파일(`docs/readinggo/specs/**/*.md`, `docs/2. specifications/readinggo-feature-spec.md`, `docs/readinggo/{BACKLOG,ROADMAP,iOS-PLAN,COMPETITIVE-ANALYSIS}.md`)과 구현 코드(`docs/readinggo/index.html`, `docs/readinggo/js/*` 등)를 같은 PR에 묶지 않는다.**
 - 순서: spec 변경 → spec-only PR → 팀이 머지·합의 → 별도 PR로 구현.
 - **이유**: Week 9 강의 점수표에서 14팀 중 13팀이 *코드+스펙 묶음 PR*로 처방을 어겼다. 묶음 PR은 (a) spec 합의가 코드 머지에 인질잡힘 (b) 다른 팀원이 spec만 보고 리뷰할 수 없음.
 - **예외**: 같은 PR 안에서 spec과 코드가 *동시에 결정되어야 하는* 작은 변경 (예: 데이터 스키마 + 그 스키마 쓰는 한 함수). 예외 시 PR 설명에 이유 기록.
