@@ -1,0 +1,424 @@
+
+===== PAGE 1 =====
+Week 6
+KAIST 69911
+KAIST
+Mid-semester Curriculum Supplement  ·  April 2026
+
+===== PAGE 2 =====
+What We Learned
+2
+•
+Team 11
+•
+Team 16
+
+===== PAGE 3 =====
+Happy Hour
+3
+•
+크치치킨, aiming to start at 15:30
+
+===== PAGE 4 =====
+Midterm
+4
+•
+This exam tests whether the concepts we have learned so far have become part of how you think.
+•
+(1) Vocabulary is your interface when prompting AI — precision in language means precision in control
+•
+(2) Using proper frameworks and terminology makes you more credible and persuasive in business settings
+•
+It’s not an English exam, but …
+•
+Exam questions will be in English and Korean
+•
+You can answer them in Korean, but the keywords should be in English
+
+===== PAGE 5 =====
+Project Review
+5
+•
+Coming up with a project idea is not easy.
+•
+Especially, when you have multiple members in the team.
+•
+Inch Wide, Miles Deep [1]
+•
+Small target users are fine.
+•
+However, don't worry. Focusing on building and learning.
+•
+Great to see that team15 (NEW), team_glocalx, team_subsidy-buddy are actively building without a specific 
+deadline.
+https://www.antler.co/blog/antler-early-days-episode-1-strava-with-mark-gainey
+
+===== PAGE 6 =====
+Part 1 — Make Your First Thing
+0 1
+
+===== PAGE 7 =====
+Set up
+7
+•
+Claude Code
+•
+Plugin ecosystem is strong
+•
+Opus 4.7 (4/16)
+•
+https://claude.ai/design (4/17)
+•
+"Auto mode" on
+•
+https://claude.com/blog/auto-mode
+•
+Model
+•
+Adjust the model according to your feeling (speed vs. intelligence)
+•
+Cursor
+•
+https://cursor.com/
+•
+Mostly for reviewing generated files, especially markdown files.
+•
+You need additional extensions: 
+•
+Markdown All in One
+•
+Markdown Preview Enhanced
+
+===== PAGE 8 =====
+Set the context
+8
+•
+Start with a clear vision and whytree.md
+•
+MANIFESTO.md, WHYTREE.md
+•
+Rename MANIFEST.md to MANIFESTO.md // My mistake
+•
+MANIFESTO.md: declares why the project exists and what it stands for (vision, values, principles)
+•
+MANIFEST.md: lists what a package/repo contains (files, dependencies, metadata)
+•
+I found that 4 / 14 teams contain some technical details
+•
+Likely, the influence of the name while you are using AI.
+•
+This is more evidence showing that precise naming matters immensely.
+•
+Update the MANIFESTO.md with the help of AI
+“Can you review MANIFESTO.md and interview me to clarify my intention?”
+“I would like to build pear_review, a classroom project peer review system. Can you interview me to clarify underlying 
+value and draft docs/MANIFESTO.md?”
+
+===== PAGE 9 =====
+Learn as you build
+9
+•
+If things are foreign to you, try to learn at that point.
+•
+Your learning is what you will gain through the process.
+•
+It will help you do things better next time.
+•
+If you keep clicking "yes" mindlessly, your next round of building will be the same.
+•
+While asking questions, share your current level of understanding.
+•
+Your AI's memory will learn about you.
+“What is vercel? Is it kind of a database system?”
+•
+How deep should I go in the process?
+•
+Self-awareness matters.
+•
+Feel stuck: You may spend too much time learning
+•
+Feel puzzled: You may need to learn what's going on before generating more code
+
+===== PAGE 10 =====
+Commit Frequently and Be BOLD
+10
+•
+Don't worry about breaking systems
+•
+As long as things are committed, you can start over again
+“Can you show me git history?”
+•
+Do the git revert not git reset
+•
+Why? I hope that you figure it out.
+“Revert our code to a63506f”
+
+===== PAGE 11 =====
+Build One Cycle at a Time
+11
+•
+The cycle (for now)
+•
+Spec
+•
+Review
+•
+Implement
+•
+Test
+•
+Commit
+•
+Don't try to build the whole thing
+•
+Which step do you think takes the most time?
+
+===== PAGE 12 =====
+Spec
+12
+“I would like to build the front page of pear_review. I wish that the front page delivers the vibe we decided on in 
+MANIFESTO.md. Interview me to clarify things.”
+•
+Be as specific as possible
+•
+Read the generated spec carefully
+
+===== PAGE 13 =====
+Review
+13
+“Summon a team of agents to review the spec and suggest things to update. If there are conflicting suggestions, 
+please ask me to decide.”
+•
+I tend to spend most of my time here
+•
+Whenever I cannot make a proper decision, I do follow-up Q&A until I can understand
+•
+If you know who would be the expert, please include the person in the review team
+“Summon a team of agents including Andrej Karpathy to review things.”
+•
+After your decision-making and revisions, do the review again
+“Bring in the same team again to review the spec.”
+
+===== PAGE 14 =====
+Implement
+15
+“Implement the system according to the spec. If I need to set up some infrastructure, give me step-by-step 
+instructions and explain why.”
+•
+You will need to set up infrastructure (Vercel, Supabase, Turso, GitHub, Firebase)
+•
+Use screenshots — these websites change frequently and AI may not know recent changes
+
+===== PAGE 15 =====
+Test
+16
+•
+You manually test things out
+•
+This phase will be automatically done in the future
+•
+If there are errors, copy & paste them back into the system
+•
+If something doesn't feel right, go back and update the spec
+
+===== PAGE 16 =====
+Commit
+17
+“Commit all the changes in logical clusters.”
+
+===== PAGE 17 =====
+Part 2 — Warning
+0 2
+
+===== PAGE 18 =====
+Never Commit Secrets — The Real Cost
+19
+•
+.env stays local and goes in .gitignore
+•
+Leaked API keys get stolen by scraper bots
+•
+++ Real risk: four-figure bills on your card
+•
+Defenses that work: spending caps
+•
+Survey: 7 of 15 teams missing a root .gitignore — fix today
+•
+~23.8M secrets leaked on GitHub in 2024 [1]
+[1] https://www.gitguardian.com/state-of-secrets-sprawl-report-2024
+
+===== PAGE 19 =====
+What If It Is Already Committed?
+20
+•
+Assume it's public forever
+•
+Step 1: rotate the key now — revoke at the provider, regenerate
+•
+Step 2: audit downstream — CI, Vercel env, teammates' .env
+“Walk me through rotating my OpenAI key at platform.openai.com, then audit usage and clean history.”
+
+===== PAGE 20 =====
+Public vs. Private Repos
+21
+Public
+Private
+vs
+•
+Visible to everyone (incl. scrapers)
+•
+Forces good hygiene habits
+•
+Great for portfolio and sharing
+•
+Real key-leak risk if careless
+•
+Only you + invited collaborators
+•
+Safer while learning
+•
+Invite the TA or instructor
+•
+Still: never commit keys
+
+===== PAGE 21 =====
+Keep Your Repo Public If Possible
+22
+•
+Some classes made all repos private due to leak concerns
+•
+My decision: keep repos public
+•
+Students need to learn how to interact with the general public
+•
+++ Different teams can see each other's work
+
+===== PAGE 22 =====
+Stay on the Same Repo — Don't Start Over
+23
+•
+Observed: some teams dump the old repo and create a new one
+•
+Result: we can't see how your thinking evolved
+•
+++ Your git history is your learning record — preserve it
+•
+Legitimate branches welcome: feat/..., experiment/...
+•
+Build on what you have, not around it
+
+===== PAGE 23 =====
+Part 3 — Team Work
+0 3
+
+===== PAGE 24 =====
+Stepping on Toes
+25
+•
+If everyone in a team builds features with different tech stacks:
+•
+Chaos.
+
+===== PAGE 25 =====
+Cycle as a Team (1/2)
+26
+•
+Create a separate branch first for an idea
+“Create a separate branch for the login feature.”
+•
+Do the cycle individually — spec > review > implement > test > commit
+•
+Demo with the team
+
+===== PAGE 26 =====
+Cycle as a Team (2/2)
+27
+•
+Pull request only the spec file
+“Can you generate a pull request for spec-xxx.md?”
+•
+Merge the specs
+•
+Do the cycle (spec > review > implement > test > commit) as a team on main
+
+===== PAGE 27 =====
+Part 4 — Additional Help
+0 4
+
+===== PAGE 28 =====
+Aim for SLC, not MVP
+29
+•
+Minimum Viable Product = "ugly but functional"
+•
+Simple, Lovable, Complete = "small but delightful"
+•
+++ With AI, finishing is cheap now — MVP's excuse is outdated
+•
+One polished feature > five half-done ones
+•
+Coined by Jason Cohen (2017) — fits the vibe-coding era [1]
+[1] https://longform.asmartbear.com/slc/
+
+===== PAGE 29 =====
+Mine Your Own Patterns — `/insights`
+30
+•
+Built-in Claude Code command — analyzes your last 30 days of sessions [1]
+•
+Produces an HTML report: usage stats, friction points, behavioral patterns
+•
+++ The goldmine: instructions you repeat often → paste into CLAUDE.md
+•
+Runs locally — no data leaves your machine
+•
+Run it after each milestone; monthly at minimum
+•
+Your CLAUDE.md gets smarter without you guessing what's missing
+[1] https://code.claude.com/docs/en/commands.md
+
+===== PAGE 30 =====
+Meet gstack — Your Advisory Team
+31
+•
+A family of Claude Code slash commands by Garry Tan (YC) [1]
+•
+/office-hours — brainstorm, forcing questions, "is this worth building ?"
+•
+/plan-ceo-review — scope & ambition challenge
+•
+/plan-eng-review — architecture, data flow, stack choices
+•
+/plan-design-review — UI/UX rated 0–10 per dimension
+•
+After build: /review (code), /qa (quality), /ship (deploy)
+[1] https://github.com/garrytan/gstack
+
+===== PAGE 31 =====
+Sample Prompt — `/office-hours` with SLC Lens
+32
+“/office-hours — My idea: [one-sentence pitch]. Review it against SLC: which single feature makes it lovable? What's 
+the minimum complete unit I can ship this week? What do I cut to stay simple?”
+“Now narrow it to one college and one course — the smallest lovable wedge.”
+
+===== PAGE 32 =====
+Homework
+0 5
+
+===== PAGE 33 =====
+HW6 —
+34
+•
+Due 11:59pm, 4/30/2026
+•
+1) Review the direction with AI
+•
+Install gstack and use /office-hours to review your project direction
+•
+Submissions: biggest lesson, one action item, result of doing that action item
+•
+2) Build a feature in a separate branch
+•
+Build for your group project; review with AI and your team members
+•
+Submissions: git branch URL, biggest challenge, meta-cognition lesson, technical lesson, team responses

@@ -1,0 +1,352 @@
+
+===== PAGE 1 =====
+Week1 - Why This Class Exists?
+“AI-Driven Business Evolution: Strategy and Practice”
+KAIST BIZ.69911 Spring 2026
+
+===== PAGE 2 =====
+“AI is evolving rapidly —
+but are you?”
+
+===== PAGE 3 =====
+Instruction Team
+
+===== PAGE 4 =====
+Instructor
+•
+Ji Soo Yi
+•
+linkedin.com/n/yijisoo
+•
+10 years at Samsung (MX Division)
+•
+Experience Planning, UX Research, Bixby, Samsung Keyboard, Acquisition, UX
+•
+7 years at Purdue
+•
+Human-Computer Interaction, Data Visualization, Industrial Engineering
+•
+3 months of vibe coding
+4
+
+===== PAGE 5 =====
+TAs
+•
+Seok Chae Yoon
+•
+Junghyun Park
+5
+
+===== PAGE 6 =====
+Students
+•
+We will have a formal, individual introduction of us next week.
+•
+Make a pair and introduce each other.
+•
+Anybody who would like to share about your partner?
+6
+
+===== PAGE 7 =====
+Course Overview
+
+===== PAGE 8 =====
+Started?
+•
+November 2025 was a pivotal point.
+•
+Opus 4.5 launched on November 24, 2025
+•
+Gemini 3.0 launched on November 18, 2025
+•
+Feels something different
+•
+Developed a usable Android app within 2 days w/o touching code
+•
+Felt something big is happening
+•
+Built and launched https://evolvingselves.com
+•
+A phone call from Prof. Kang on January 2nd, 2026
+•
+Discussed this issue
+•
+Initially thought of one hour lecture, but transformed into one semester
+course
+8
+
+===== PAGE 9 =====
+Problems
+•
+Noticed that managers/leaders generally have two different perspectives:
+•
+Some say "I tried. It doesn’t work."
+•
+Other say "AI can do everything."
+•
+Why?
+•
+AI evolves very quickly. Their experiences could be outdated.
+•
+Some heard of buzz, but they don’t have firsthand experiences.
+•
+Neither of the two is true.
+•
+The truth is usually somewhere in between.
+9
+
+===== PAGE 10 =====
+Survey
+10
+•
+I use ChatGPT everyday
+•
+I use Gemini everyday
+•
+I use Claude everyday
+•
+I use Grok everyday
+•
+I use DeepSeek everyday
+•
+I set up OpenClaw by myself
+•
+I build a personal app or web service with vibe coding
+•
+I build a tool for work with vibe coding
+•
+I am in AX TF in my company
+•
+I build a company with AI
+•
+I never use AI and hate it.
+•
+Anything else?
+
+===== PAGE 11 =====
+Course Goals
+•
+After this course, students will have a chance to
+•
+Learn any new domain rapidly with AI assistance
+•
+Audit AI output critically
+•
+Build a working AI-assisted product
+•
+Evaluate AI opportunities and risks in business contexts
+•
+Challenge established business assumptions
+11
+
+===== PAGE 12 =====
+Course Philosophy
+•
+AI intuition through building
+•
+Learn how to learn
+•
+Evolve together
+•
+Adapt the changes
+•
+Eat your own dogfood
+•
+You can use whatever AI tools you can use in this class (except for mid-term)
+•
+This slide deck was also generated with Claude plugin
+12
+
+===== PAGE 13 =====
+Course Details
+
+===== PAGE 14 =====
+Term Project
+•
+Building is means, not the end.
+•
+But, building still matters.
+•
+Next Week
+•
+Individual pitch: one-minute, 1 slide.
+•
+Send the slide to TAs and me via email by 11:59pm, 3/12/2026 (Wed)
+•
+You choose five members who you would like to work with.
+•
+The instruction team build the team (3-4 members) based on your preferences and background.
+14
+
+===== PAGE 15 =====
+Evolve Together
+•
+"We Learn One Thing" session
+•
+From Week 4
+•
+In-class participation
+•
+Bring your own notebook / tablet with you
+•
+Structured peer feedback
+•
+During the project explanation, you should provide structured feedback carefully.
+15
+
+===== PAGE 16 =====
+Class Structure
+•
+"We learn one thing" (15-20 mins)
+•
+Homework Discussion (30-45 mins)
+•
+Core Session (70-85 mins)
+•
+Reflection & Personal Growth Note (15 mins)
+16
+
+===== PAGE 17 =====
+Reading
+•
+Almost every week, you will have a reading assignment with HW.
+•
+Utilize whatever tools you have in reading the assignments.
+17
+
+===== PAGE 18 =====
+Same Seat policy
+•
+The seat in Week 2 will be your seat throughout your semester.
+•
+Pros
+•
+TAs can record your attendance, class participation easily.
+•
+You guys can remember each other.
+•
+Cons
+•
+Not much based on my prior experiences.
+•
+If two agree to swap, let me and TA know about it.
+18
+
+===== PAGE 19 =====
+Attendance
+•
+Being in the classroom every Saturday is an essential commitment.
+•
+Life is random; things happen.
+•
+You can have two absences without prior notice.
+•
+However, there should be some rules.
+•
+Additional absence beyond the two will cost you one letter grade down.
+•
+Not negotiable.
+•
+If you have other commitment, please reconsider taking this course.
+19
+
+===== PAGE 20 =====
+Adaptability
+•
+The contents should be updated almost daily because things change too fast.
+•
+There have been many new things since I drafted the syllabus
+•
+The syllabus will be updated accordingly.
+•
+However, I will keep the grading, attendance policy I wrote in syllabus.
+20
+
+===== PAGE 21 =====
+Grading
+•
+Class Participation: 30%
+•
+Weekly Homework: 20%
+•
+Midterm: 20% (Likely in class written exam, TBD)
+•
+Final Prototype and Insights: 30%
+21
+
+===== PAGE 22 =====
+Course Schedule
+•
+Act 1 (Week 1 - Week 5): Wake Up
+•
+Act 2 (Week 6 - Week 10): Gear Up
+•
+Act 3 (Week 11 - Week 16) Ship It
+•
+Please refer to Syllabus for details.
+22
+
+===== PAGE 23 =====
+Next Week
+
+===== PAGE 24 =====
+Introduction Slide
+•
+Due: 3/12/2026, 11:59pm
+•
+Format:
+•
+1-page pptx slide
+•
+Submission
+•
+Email TA and me.
+24
+
+===== PAGE 25 =====
+HW1
+•
+Due: 3/12/2026, 11:59pm
+•
+Reading Materials:
+•
+Manna, https://milweesci.weebly.com/uploads/1/3/2/4/13247648/mannapdf.pdf
+•
+Questions
+•
+After reading manna, which future you believe we will have? Why?
+•
+How did you read the article? What kinds of tools have you used?
+•
+Submission
+•
+Please do it via https://kardens.io
+25
+
+===== PAGE 26 =====
+Homework grading policy
+•
+Each HW is a 5 point worth
+•
+If you submit it on time, 5 point
+•
+If your submission is featured in the class discussion, +5 extra point
+26
+
+===== PAGE 27 =====
+https://kardens.io
+•
+PKM (Personal Knowledge Management) system with provenance feature.
+•
+As a newly developed tool, it may occasionally experience issues. This is intentional — working 
+with imperfect, evolving tools is part of the learning experience.
+•
+All submissions should be backed up locally (keep a copy in the pdf). Students will never be 
+penalized for platform-related issues.
+•
+If Kardens.io is temporarily unavailable, submit your work via email or follow the separate 
+instruction by the instructor.
+27
+
+===== PAGE 28 =====
+QnA

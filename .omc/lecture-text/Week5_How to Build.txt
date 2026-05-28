@@ -1,0 +1,223 @@
+
+===== PAGE 1 =====
+Vibe Coding 101
+No CS background required. Just curiosity.
+KAIST BIZ  |  Spring 2026
+
+===== PAGE 2 =====
+What is Vibe Coding?
+The Concept
+You describe what you want in plain English.
+AI writes the code for you.
+You iterate by talking, not typing code.
+"The hottest new programming
+language is English."
+— Andrej Karpathy
+AI agents get better every month.
+What seems hard today will be
+trivial tomorrow.
+Term coined by Andrej Karpathy (ex-Tesla AI Director, OpenAI founding member)
+
+===== PAGE 3 =====
+Why MBA Students Should Care
+Prototype Your Ideas
+Build MVPs for startup pitches without 
+hiring a dev team
+Automate Busywork
+Scripts for data cleaning, report generation, 
+web scraping
+Speak Dev Language
+Communicate with engineers as a PM, 
+founder, or consultant
+Career Edge
+Technical fluency is the #1 differentiator in 
+MBA job markets
+
+===== PAGE 4 =====
+The Reality Check
+AI writes the code, but you still need the plumbing
+Environment Setup
+Installing Git — the tools your code needs to run
+Terminal / Command Line
+Where you'll actually talk to Claude Code — basic commands are essential
+File Structure
+Understanding where your project files live and how they connect
+Deployment
+Getting your app from your laptop to the internet (Vercel, Netlify, etc.)
+API Keys & Secrets
+Managing passwords and keys that connect to external services
+These are one-time setup tasks — once done, AI handles the rest.
+
+===== PAGE 5 =====
+Setting Up Your Machine
+Mac
+Windows
+Terminal
+CMD+Space, “terminal”
+Window-R, “cmd”
+Code Editor
+Cursor
+Download Mac version
+Cursor
+Download Windows version
+Git
+Open Terminal, type git
+Mac prompts auto-install
+git-scm.com → Download
+Use default settings
+Claude
+claude.ai/download → Mac
+Drag to Applications
+claude.ai/download → Windows
+Run installer
+All tools are free. This is a one-time setup — takes about 20 minutes.
+
+===== PAGE 6 =====
+Terminal Basics
+Mac — Terminal
+$ cd ~/Documents/my-project
+Navigate to folder
+$ ls
+List files
+$ mkdir new-folder
+Create folder
+$ npm install
+Install dependencies
+$ npm run dev
+Start app locally
+$ claude
+Launch Claude Code
+Windows — CMD
+C:\Users\[id]> cd ~\Documents\my-project
+Navigate to folder
+C:\Users\[id]\my-project> dir
+List files
+C:\Users\[id]\my-project> mkdir new-folder
+Create folder
+C:\Users\[id]\my-project> npm install
+Install dependencies
+C:\Users\[id]\my-project> npm run dev
+Start app locally
+C:\Users\[id]\my-project> claude
+Launch Claude Code
+Most commands are identical — the key differences are: ls vs dir, / vs \, and the prompt symbol.
+
+===== PAGE 7 =====
+Working with Claude Code
+1
+Install Claude Desktop
+Depending on your OS (Mac or 
+Windows). Sign in with Pro or Max 
+account.
+2
+Select Code
+Select “Code” at the top and 
+click “New Session”
+3
+Select the Folder
+Select the folder icon to work on.
+4
+Describe What You 
+Want
+"Build me a landing page with
+an email signup form"
+5
+Review & Approve
+Claude shows changes before
+applying — you stay in control
+6
+Iterate
+"Change the color to blue"
+"Add a navigation bar"
+
+===== PAGE 8 =====
+Working with Codex
+1
+Install Codex
+Depending on your OS (Mac or 
+Windows). Sign in with Plus or Pro 
+account.
+2
+Select New Thread
+Choose Codex from the
+model/tool selector
+3
+Select the Folder
+At the center of the screen, select the 
+project name after “Let’s Build”
+4
+Describe What You 
+Want
+"Build me a landing page with
+an email signup form"
+5
+Review & Approve
+Codex shows changes before
+applying — you stay in control
+6
+Iterate
+"Change the color to blue"
+"Add a navigation bar"
+
+===== PAGE 9 =====
+How to Talk to AI Coders
+Vague Prompts
+"Make me a website"
+"Fix the bug"
+"Add a database"
+"Make it look better"
+Specific Prompts
+"Build a landing page with a hero section, 3 
+feature cards, and an email signup form using 
+React and Tailwind"
+"The login button returns a 404 — check the API 
+route in /api/auth"
+"Set up a PostgreSQL database with users and 
+orders tables"
+"Use a modern minimalist style: white 
+background, Inter font, rounded cards with 
+shadows"
+
+===== PAGE 10 =====
+When Things Go Wrong
+You don't need to understand the error. Just follow this loop.
+1
+COPY
+Select the entire
+error message
+in your terminal
+2
+PASTE
+Paste it into
+Claude Code
+or Codex
+3
+FOLLOW
+AI explains the fix.
+Apply it. Repeat
+if needed.
+Repeat until it works. Each cycle gets you closer — AI learns from the context.
+This is exactly how professional developers debug too — they just Google faster.
+
+===== PAGE 11 =====
+Try This Today
+Copy-paste this prompt into Claude Code:
+”You’re the vibe coding instructor for a mba student. I would like to build a 
+website doing xxx. I don’t have any CS background. I have built GitHub page for 
+my personal page before. Please interview me to better understand my level of 
+understanding. I am not comfortable in using command line interface.”
+What you'll get in ~5 minutes:
+A complete, working website
+All HTML, CSS, and JavaScript files
+Responsive design that works on 
+phones
+Then try: "Now deploy this to Vercel" — and you'll have a live website!
+
+===== PAGE 12 =====
+Key Takeaways
+AI can build almost anything — you just need to describe it clearly
+Some plumbing is still required — but it's a one-time setup
+Claude Code + Codex are your two best companions
+When stuck, paste the error back to AI — it will debug for you
+Start small, iterate fast — your first app is one prompt away
+The best way to learn vibe coding is to start building. Today.

@@ -1,0 +1,493 @@
+
+===== PAGE 1 =====
+Week 4
+
+===== PAGE 2 =====
+Key Question:
+"What is Under the Hood?"
+
+===== PAGE 3 =====
+What We Learned
+
+===== PAGE 4 =====
+What We Learned
+•
+Team 8
+•
+Team 3
+6
+
+===== PAGE 5 =====
+Announcements
+
+===== PAGE 6 =====
+Publishing to the Group
+•
+Publishing to the group
+•
+The Balance Matters [1]
+•
+If you have anything to share to the group. Please post your article.
+8
+[1] https://kardens.io/g/0fae7558-a6ad-49ee-b46f-c4ea90a50c97
+
+===== PAGE 7 =====
+Midterm - Heads Up
+•
+April 25, 2026
+•
+It will be in class, hand-written.
+•
+You need to have clear vocabularies to interact with AI better.
+•
+You need to have memorized knowledge to make yourself sound convincing.
+•
+Coverage: What we have learned until April 25.
+•
+I will update you more in details.
+9
+
+===== PAGE 8 =====
+HW3
+
+===== PAGE 9 =====
+Attention is All You Need
+•
+How was it?
+•
+Google Scholar Link
+12
+
+===== PAGE 10 =====
+Strategies - Worked Well
+•
+Forest first, then trees
+•
+Divide and Conquer
+•
+Context Sharing
+•
+Interview me first
+•
+”I am an MBA student.” vs. “Explain it to a middle schooler.”
+•
+Finding YouTube contents
+•
+3Blue1Brown's Neural Network [1]
+•
+Progressive Increase of Difficulties
+•
+꼬리에 꼬리를 무는 질문
+•
+Multi Tab Approach
+•
+Verify my understanding
+•
+Analogy?
+13
+[1] https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi
+
+===== PAGE 11 =====
+Strategies - Not So Much
+•
+Sequential/Linear Reading
+•
+Generic Summarization
+•
+Fragmented Lookups
+•
+Fake Learning?
+•
+Analogy?
+14
+
+===== PAGE 12 =====
+Strategies - Other Ideas
+•
+Asking How
+•
+”You are one the coauthor for the paper, “attention is all you need.” I am an MBA student with no CS 
+background but want to understand the paper. I have three hours. Interview me to understand my 
+level and suggest the best strategies”
+15
+
+===== PAGE 13 =====
+TurboQuant News
+•
+https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/
+•
+Have you checked out the original posting?
+•
+When you run into this kind of news, what is your gut reaction?
+16
+
+===== PAGE 14 =====
+GitHub and GitHub Pages
+•
+How was it?
+17
+
+===== PAGE 15 =====
+git
+•
+Do you know who created this?
+•
+Why is it named as “git”?
+•
+https://github.com/git/git/blob/master/README.md
+18
+
+===== PAGE 16 =====
+Let's See Some Personal Pages
+•
+If you don’t want to show yours, let me know. ☺
+•
+https://funjun2938.github.io/
+•
+https://byseren.github.io/
+•
+https://hwangbci.github.io/
+•
+https://iloveuz3z.github.io/homepage/
+•
+https://abraxaspark91.github.io/
+•
+(There are many more interesting ones)
+20
+
+===== PAGE 17 =====
+Strategies - Work Well
+•
+Interview me
+•
+Step by step instruction
+•
+Functional role separation
+•
+Traditional documents for procedural tasks
+•
+LLMs for generative tasks
+•
+Web over CLI
+•
+Copy and paste errors to AI
+•
+Specifying the reference design
+21
+
+===== PAGE 18 =====
+Strategies - Not So Much
+•
+Try everything at once
+•
+Fork didn't work
+•
+Ambiguous instruction
+22
+
+===== PAGE 19 =====
+Lessons
+•
+Implications on AI usages
+•
+What are the implications of context window?
+•
+Why are GPUs so demanded?
+•
+Why do AIs hallucinate?
+•
+Confidence/disappointment in challenging an impossible mission?
+•
+Unlearning
+•
+Meta-cognition
+•
+Have you sensed the “aha” moment when your mental model was incorrect?
+•
+Zone of Proximal Development (ZPD) by Lev Vygotsky
+•
+Have you sensed that you became cognitively passive?
+23
+
+===== PAGE 20 =====
+How LLMs Work
+
+===== PAGE 21 =====
+Disclaimer
+•
+The following slides are mainly inspired by Andrej Karpathy’s  famous LLM video [1].
+•
+We will discuss some of the topics from it to get the big picture, but I expect you to watch the 
+whole video (HW4).
+25
+[1] https://www.youtube.com/watch?v=7xTGNNLPyMI
+
+===== PAGE 22 =====
+Part 1: What AI Is Made Of
+
+===== PAGE 23 =====
+What is a Token?
+•
+AI doesn't read words. It reads "tokens”
+•
+"unhappiness" → "un" + "happiness" (2 tokens). This is why AI sometimes misspells or 
+miscounts letters.
+•
+English: ~1.3 tokens per word. 1,000 words ≈ 1,300 tokens.
+•
+Korean: ~2.5–3.5 tokens per word. The same meaning costs roughly 2× more tokens in Korean than 
+English.
+•
+In Llama 3, 128,256 unique tokens are used (vocabulary size)
+•
+This includes all the languages as well.
+•
+https://tiktokenizer.vercel.app/ (cl100k_base)
+•
+Why the tokens?
+27
+
+===== PAGE 24 =====
+What is Pre-training and Base Model?
+•
+Base Model: The model reads trillions of tokens of text and learns patterns (pre-training) by 
+playing the "predict the next token" game billions of times.
+•
+Fluent at language; but no manner
+•
+Someone who has read every book in the library, but never had a conversation.
+•
+Scale of modern LLMs:
+•
+Llama 3 was trained on 15 trillion tokens.
+•
+That's roughly the equivalent of 11 billion pages of text.
+•
+https://app.hyperbolic.ai/models/llama31-8b (It’s not working temporarily.)
+28
+
+===== PAGE 25 =====
+What is Fine Tuning?
+•
+Umbrella process of further training a pre-trained model on a specialized dataset
+•
+Supervised Fine Tuning: High-quality demonstration of the expected behavior
+•
+RLHF: humans rank multiple model outputs from best to worst. The model learns to prefer the kind of 
+answer humans rated highly.
+•
+https://arena.ai/
+•
+Analogy: Medical school is pre-training; Residency is fine tuning
+29
+[1] https://ibm.com/topics/fine-tuning
+
+===== PAGE 26 =====
+How Does "Just Predict the Next Word" Produce 
+Intelligence?
+•
+Still debated.
+•
+More readings later on this topic later in the semester.
+30
+
+===== PAGE 27 =====
+Part 2: How AI Behaves and 
+Misbehaves
+
+===== PAGE 28 =====
+Does AI "Think"?
+•
+More like No. It generates text that looks like thinking, because it has seen millions of 
+examples of human reasoning during training.
+•
+When you ask "analyze this business case," it produces text that resembles an analysis — but it 
+has no understanding of whether the analysis is correct.
+•
+However, various emergent behaviors have been reported, so more speculation needed.
+•
+Also, it depends on what “thinking” is.
+32
+
+===== PAGE 29 =====
+Why Does AI Hallucinate?
+•
+The model is optimized to produce fluent, plausible-sounding text. There is no internal "I'm not 
+sure" signal.
+•
+It can generate fake citations, invented statistics, and nonexistent quotes — all with perfect 
+confidence.
+•
+Rule for professionals: every specific number, quote, or citation from AI is a hypothesis, not a 
+finding. Verify independently.
+33
+
+===== PAGE 30 =====
+Why is Every Answer Different?
+•
+"Temperature" controls randomness. 
+•
+High temperature = creative and varied. 
+•
+Low temperature = predictable and repetitive.
+•
+Same prompt, different run = different token sampling = different answer. 
+•
+AI is probabilistic, not deterministic.
+34
+
+===== PAGE 31 =====
+Part 3: Prompting as a Skill
+
+===== PAGE 32 =====
+What is “Context”
+•
+An analogy:
+•
+Training: All the education up to college.
+•
+Context: The memo you hand them before a meeting.
+•
+Context windows have grown rapidly: 4K → 128K → 200K → 1M tokens.
+•
+1M is roughly 10 books.
+•
+But longer ≠ better. The model can get lost in irrelevant context.
+•
+The skill is giving the right context, not the most context.
+36
+
+===== PAGE 33 =====
+Why Does Role Definition Work?
+•
+"You are a McKinsey partner" is not a magic spell. It shifts which patterns the model draws 
+from.
+•
+The model has seen text from consultants, students, doctors, and poets. Role definition tells it: 
+sample from that region of your training.
+•
+Try it: "You are a first-year analyst" vs. "You are a CFO reviewing this for the board." Same 
+question, dramatically different output.
+37
+
+===== PAGE 34 =====
+Part 4: From Using AI to 
+Building With AI
+
+===== PAGE 35 =====
+Why Does Breaking a Big Request into Small 
+Steps Work Better?
+•
+Context quality > context length. One giant prompt forces the model to split attention across 
+many competing sub-tasks.
+•
+Sequential small prompts give the model full focus on one problem at a time. This is 
+decomposition — the core skill of vibe coding.
+•
+Mental model: you're managing a fast but literal-minded junior team member. Clear sequential 
+briefs beat ambitious all-at-once requests.
+39
+
+===== PAGE 36 =====
+What is an "Agent"?
+•
+An agent is AI that can act, not just answer — browse the web, run code, read files, call APIs.
+•
+This is the shift from "AI that talks" to "AI that does." Vibe coding is possible because AI can 
+now write code and run it and fix errors.
+•
+Business implication: prototyping that required a developer for a week can now happen in an 
+afternoon. This doesn't eliminate developers — it eliminates the excuse of "I can't prototype 
+because I don't code."
+40
+
+===== PAGE 37 =====
+What is AI Not Good At?
+•
+Novel reasoning with no precedent in training data
+•
+Reliable math on large numbers
+•
+Knowing what it doesn't know
+•
+Anything requiring real-world verification (live data, current facts)
+•
+Maintaining perfect consistency across very long outputs
+•
+The hardest part: you often can't tell when it fails, because the failure looks just like success.
+•
+Closing question: "If AI gets this wrong, would I notice — and what would it cost?"
+41
+
+===== PAGE 38 =====
+Personal Growth Note
+
+===== PAGE 39 =====
+Premortem
+•
+https://hbr.org/2007/09/performing-a-project-premortem
+•
+Steps
+•
+Prepare the team by informing them that the project has failed spectacularly and is now in the past.
+•
+Give everyone two minutes of silence to generate a list of every possible reason for that failure.
+•
+Conduct a 'round-robin' where each member shares one reason until all unique concerns are recorded.
+•
+Collectively narrow the list down to the top 3–5 most critical or likely threats.
+•
+Dedicate the remaining time to developing actionable 'pre-measures' for these specific issues.
+43
+
+===== PAGE 40 =====
+Premortem - Lessons
+•
+You can use it in a very small scale (e.g., right before the presentation) to spot the last minute 
+problems.
+•
+You need to come up with a story that makes the final destructive situation quite visible and 
+believable.
+•
+You need to clearly deliver that the good news is that you still have a time to fix it.
+•
+If you can come up with actionable solutions and the team handles the issues in advance, the 
+team can get the self-esteem boost.
+•
+In contrast, if you keep eliciting the problems but not solving them, the same issue stays.
+•
+Sharing each person's concerns and allowing them to speak up comfortably is the key benefit.
+•
+Allowing each member to think independently is important.
+44
+
+===== PAGE 41 =====
+HW4
+
+===== PAGE 42 =====
+HW4
+•
+What's new in HW4?
+•
+Make sure Pasted: 0%. 
+•
+Use your own language or getting some help from Mel from this time.
+•
+Reading (3 points)
+•
+https://www.paulgraham.com/greatwork.html
+•
+Discuss the overall impression.
+•
+Discuss which aspects of the essay still hold true and changed in the AI era?
+•
+What kinds of things you would like to work for the group project on given the criteria?
+•
+Watching (2 points)
+•
+https://www.youtube.com/watch?v=7xTGNNLPyMI
+•
+What are the key insights you learn from the video?
+•
+Any new strategies to use AI based on the insights you learned?
+46
