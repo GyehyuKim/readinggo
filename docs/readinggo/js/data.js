@@ -17,6 +17,19 @@ const NEST_STAGES = [
 ];
 const getNestStage = pct => NEST_STAGES.find(s => pct <= s.max) || NEST_STAGES[4];
 
+// 둥지 진화 마이크로카피 (§5.2) — 단계 전환 시 노출
+// from / to 는 NEST_STAGES 인덱스 (1-based).
+const NEST_STAGE_TRANSITIONS = [
+  { from: 1, to: 2, text: '참새가 자리를 잡았어요!' },
+  { from: 2, to: 3, text: '참새가 살림을 차렸어요!' },
+  { from: 3, to: 4, text: '다정한 이웃이 되었어요!' },
+  { from: 4, to: 5, text: '전설의 참새 성주!' },
+];
+const getEvolutionCopy = (fromLv, toLv) => {
+  const t = NEST_STAGE_TRANSITIONS.find(x => x.from === fromLv && x.to === toLv);
+  return t ? t.text : null;
+};
+
 // ── NPC 검색 풀 (소셜 탭 친구 찾기) ───────────────────────────────────────────
 const NPC_SEARCH_USERS = [
   { id: 'npc1', handle: 'book_bear',        name: '책읽는곰돌이', stage: 3, isLit: true,  isNpc: true,
@@ -290,6 +303,8 @@ window.SEED_BOARD_POSTS  = SEED_BOARD_POSTS;
 window.LS            = LS;
 window.NEST_STAGES   = NEST_STAGES;
 window.getNestStage  = getNestStage;
+window.NEST_STAGE_TRANSITIONS = NEST_STAGE_TRANSITIONS;
+window.getEvolutionCopy       = getEvolutionCopy;
 window.SEED_FRIENDS  = SEED_FRIENDS;
 window.SEED_LEAGUE   = SEED_LEAGUE;
 window.SEED_FEED     = SEED_FEED;
