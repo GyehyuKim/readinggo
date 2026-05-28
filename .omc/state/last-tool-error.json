@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"mkdir -p tests/data tests/e2e 2>&1; sleep 2; ls -1A tests/ 2>&1; echo \\\"---\\\"; ls -1A qa/ 2>&1; rmdir qa/data qa/e2e qa 2>&1\",\"description\":\"Retry tests/ after cleanup\"}",
-  "error": "Exit code 1\ndata/\ne2e/\n---\ndata/\ndesktop.ini\ne2e/\nrmdir: failed to remove 'qa/data': Directory not empty\nrmdir: failed to remove 'qa/e2e': Directory not empty\nrmdir: failed to remove 'qa': Directory not empty",
-  "timestamp": "2026-05-28T07:32:34.195Z",
+  "tool_input_preview": "{\"command\":\"find .git -name \\\"desktop.ini\\\" -type f -delete 2>/dev/null; git fetch origin readinggo-demo 2>&1 | tail -3 && git checkout readinggo-demo 2>&1\",\"description\":\"Fetch and checkout readinggo...",
+  "error": "Exit code 1\nfatal: couldn't find remote ref readinggo-demo\nerror: pathspec 'readinggo-demo' did not match any file(s) known to git",
+  "timestamp": "2026-05-28T13:41:15.944Z",
   "retry_count": 1
 }

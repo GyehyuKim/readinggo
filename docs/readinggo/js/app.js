@@ -129,7 +129,6 @@ function App() {
             <VillageView
               key="village"
               state={appState}
-              onSendSeed={handleSendSeed}
             />
           )}
           {activeTab === 'social' && (
