@@ -26,6 +26,48 @@
 
 ---
 
+## 편집 정책
+
+### 어디를 고치나
+| 변경 종류 | 대상 파일 |
+|---|---|
+| 화면 스펙 (둥지·독서모임·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `book-club.md`, `social.md`, `profile.md`) |
+| 가입 여정 | `onboarding.md` |
+| 시스템 로직 (스트릭·방패·XP·NPC·리그) | `systems.md` |
+| 데이터 모델·플랫폼 | `backend.md` |
+| 디자인 토큰·마이크로카피 | `design.md` |
+| 한 줄·약속·핵심 루프·Phase·데모·태스크 | 이 `README.md` |
+| 새 결정 등록 | `meta/decisions.md` 표 갱신 |
+| 미해결 안건 추가 | `meta/open-issues.md` |
+| 의도적 기각 보존 | `meta/rejected.md` |
+
+### PR 룰
+- **spec PR과 코드 PR을 분리.** spec PR 먼저 머지 → 코드 PR 별도. 근거: [LF: Spec only PR](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr).
+- **여러 파일 동시 변경**은 *논리적으로 한 변경*일 때만 허용. 관련 없는 두 피처는 두 PR.
+- **본 README의 파일 지도**는 *피처 추가·삭제* 시만 갱신. 일반 변경은 갱신 불요.
+
+### Cross-file 참조 규칙
+다른 spec 파일을 가리킬 때:
+```markdown
+[§5.6](./book-club.md)        ← 일반 참조
+[book-club.md §5.6.5](./book-club.md#565-자동화-점진-계획)  ← 정확한 앵커
+```
+같은 파일 내 참조는 `§X.Y` 그대로 둔다. 헤더 anchor는 GitHub 규칙 (한글 그대로, 공백 → `-`, 점·괄호 제거).
+
+### 살아있는 spec 의무
+구현 중 ① 가정이 틀림 ② 예상보다 어려움 ③ 예측 못 한 사용자 행동 발견 → **spec commit 먼저, 코드 commit 나중**. 근거: [LF: Living Document](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week9-living-document).
+
+### 파일 소유권 (임시)
+현재 *모두가 모든 파일 편집 가능*. 충돌 잦으면 피처별 ownership 도입 검토 (이슈 #100 후속 안건).
+
+| 피처 | 임시 owner | 비고 |
+|---|---|---|
+| `book-club.md` | gyehyu + yunji | 윤지님 `village.js` 구현과 동기화 필요 |
+| `nest.md` | gyehyu | 데모 핵심 경로 |
+| 나머지 | 미정 | claim 우선 |
+
+---
+
 ## 0. 한 줄
 
 > "하루 한 페이지, 한 문장에서 시작해요. 그냥 펴진 페이지 한 줄도 좋아요."
