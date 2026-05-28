@@ -42,3 +42,4 @@ notice-*.txt
 
 # HW6 개인 제출 메모 (커밋 금지)
 90. Internal/hw6/
+.omc/
