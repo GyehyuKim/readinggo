@@ -1,0 +1,145 @@
+
+===== PAGE 1 =====
+
+===== PAGE 2 =====
+Why Tree is a method developed with the inspiration of Work Domain Analysis 
+(WDA) that Rasmussen originally developed. I found that means-ends link is a 
+powerful tool to understand and design a system. In some senses, the overall 
+structure of Why Tree is a scaled down version of WDA, but the means-ends links 
+are more nuanced to help people understand how to apply the technique in 
+everyday problem solving and design.
+Disclaimer
+
+===== PAGE 3 =====
+
+===== PAGE 4 =====
+Start
+●
+Start with a product or feature in your mind.
+bed
+
+===== PAGE 5 =====
+Why Up
+●
+You need to keep asking “why?” on each mean.
+●
+Do it recursively and boldly.
+●
+There is nothing right or wrong.
+bed
+sleep
+refreshed self
+a great day
+
+===== PAGE 6 =====
+How Down
+●
+You need to keep asking “how?” on each end.
+○
+e.g., sleep → bed, pillow, blind, sleep pill, yoga
+○
+e.g., pillow → pillow cover, core, sponge
+bed
+sleep
+refreshed self
+a great day
+pillow
+blind
+sleep pill
+exercise
+accomplished self
+
+===== PAGE 7 =====
+Why Up <> How Down
+●
+You need to keep asking “how?” on each end.
+○
+e.g., sleep → bed, pillow, blind, sleep pill, yoga
+○
+e.g., pillow → pillow cover, core, sponge
+bed
+sleep
+refreshed self
+a great day
+pillow
+blind
+sleep pill
+exercise
+accomplished self
+better neck condition
+neck massager
+
+===== PAGE 8 =====
+FAQ
+●
+What are the benefits of Why Tree?
+○
+By "Why Up," you think deeper on the essence of what you are doing.
+■
+Sometimes, intermediate whys converge into a single why.
+■
+That's often a core value of the system that you deal with.
+○
+By "How Down," you can quickly enumerate other ways to serve the why.
+■
+This slightly differs from random brainstorming. 
+1.
+In Why Tree, you can have more focused brainstorming.
+2.
+In Why Tree, you may have multiple layers of whys.
+○
+By alternating these two, you can deepen your thinking.
+■
+Often, the resulting Why Tree reveal the overall structure of a system.
+■
+Some hows are intuitive instances of your underlying whys. 
+1.
+Yes, the ultimate why will be your core desire, but hows help you realize it.
+
+===== PAGE 9 =====
+FAQ
+●
+Well, are they arbitrary and subjective? 
+○
+Yes, they are.
+○
+But, they capture what you think/believe.
+○
+It also helps break the tendency to generate a solution without properly thinking why we want.
+●
+How high should I ends up?
+○
+Until you ran into a why that appears to have too many hows.
+■
+e.g., happiness
+○
+The number of hows are the scope of your thinking.
+■
+If there are too many hows, you need to lower the level of why.
+○
+Sometimes, you end up realizing that your hows are completely irrelevant.
+■
+Even through you are working on the how.
+
+===== PAGE 10 =====
+FAQ
+●
+Is that it? Just a diagram?
+○
+Yes, it is just a diagram.
+○
+However, your meta understanding of underlying desire and how whys and hows are 
+intertwined are the core outcome.
+
+===== PAGE 11 =====
+FAQ
+●
+How deep should I how down?
+○
+Until you run into the details you care.
+●
+Is it a tree?
+○
+No. It doesn't need to be a tree.
+○
+A how can satisfy multiple whys.

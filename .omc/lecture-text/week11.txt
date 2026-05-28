@@ -1,0 +1,723 @@
+
+===== PAGE 1 =====
+Preclass Music
+Stacey Ryan — Fall In Love Alone
+https://www.youtube.com/watch?v=Aw1eOFJiDtE
+KAIST
+J. S. Yi  ·  KAIST 69911 · AI-Driven Business Revolution  ·  May 2026
+
+===== PAGE 2 =====
+Week 11 — AI Native?
+AI-Driven Business Revolution: Strategy and Practice
+KAIST
+J. S. Yi  ·  KAIST 69911 · AI-Driven Business Revolution  ·  May 2026
+
+===== PAGE 3 =====
+What We Learned?
+0 1
+
+===== PAGE 4 =====
+My Two Tokens
+0 1
+
+===== PAGE 5 =====
+My Two Tokens
+5
+•
+Executives’ Lifestyles?
+•
+How to do have a better English Meetings well?
+
+===== PAGE 6 =====
+Announcements
+0 2
+
+===== PAGE 7 =====
+Remaining Classes
+5
+•
+5/23 (today) — How to be AI Native (1/2)?
+•
+5/30 — How to be AI Native (2/2)?
+•
+6/06 — No class
+•
+6/13 — How to live in the AI era? (Guest Speaker)
+•
+6/20 — Final Demo
+
+===== PAGE 8 =====
+Guest Speaker
+6
+•
+Jay Shin (6/13) — CEO, alar.my
+•
+https://www.linkedin.com/in/jayshin89/
+•
+Send questions via Discord by 6/06.
+
+===== PAGE 9 =====
+Final Demo
+7
+•
+06/20/2026, 13:30–16:30 (single-day demo).
+•
+External evaluators will be invited.
+•
+What's new? (20%) — competitors and superiority.
+•
+Why You? (20%) — differentiated effort.
+•
+So, what? (30%) — real user responses.
+•
+Is AI Native? (30%) — drastic efficiency via AI.
+
+===== PAGE 10 =====
+Today's Lecture Structure
+8
+•
+Opening
+•
+Pear Review summary
+•
+Project progress review
+•
+History of terms
+•
+Harness engineering
+•
+Growth lessons + HW8
+
+===== PAGE 11 =====
+AI Native?
+0 3
+
+===== PAGE 12 =====
+A Recent Demo
+10
+[1] https://linearb.io/blog/ralph-loop-agentic-engineering-geoffrey-huntley [2] https://ghuntley.com/loop/
+https://youtu.be/T_fnhr5lVBw?si=UHfHXldkrr0FBk71&t=152
+
+===== PAGE 13 =====
+Today's structure
+11
+•
+Phase 2 reflections + scorecard
+•
+Lesson 1 — Spec (with eyes open about its limits)
+•
+Lesson 2 — Test as an integrated platform
+•
+Lesson 3 — Meet the user
+•
+Deep dive — Harness engineering and the /goal command
+•
+Wrap + HW8 + demo
+
+===== PAGE 14 =====
+Pear Review
+0 4
+
+===== PAGE 15 =====
+How was it?
+13
+•
+Was it enjoyable?
+•
+What are the key lessons?
+
+===== PAGE 16 =====
+Collected Reviews
+14
+•
+A total of 672 feedback was collected.
+•
+"다만개선할점으로는, 서비스의정체성이조금더명확해질필요가있어보였습니다. 처음봤을때이서비스가커
+리어의사결정도구인지, 자기계발플래너인지, 인생선택시뮬레이터인지, 혹은목표달성코칭서비스인지한번
+에이해하기는어려웠습니다. 컨셉자체는흥미로운데, 제공하는가치가여러방향으로열려있다보니사용자가"
+그래서이서비스를언제, 어떤고민이있을때쓰는건지"를바로파악하기어려울수있을것같습니다. 그래서서
+비스의핵심사용상황을조금더좁히면좋을것같습니다. 예를들어"퇴사/이직고민을위한90일의사결정플래
+너"처럼특정고민에집중하거나, "중요한선택앞에서나에게맞는실행방향을찾아주는서비스"처럼더명확한
+한문장으로정의되면이해가쉬워질것같습니다. 지금은기능은재미있지만, 서비스가해결하려는문제가무엇인
+지조금더선명하게보여줄필요가있어보였습니다. 
+•
+또한통계기반제안을한다면, 어떤통계를기준으로판단하는지도중요할것같습니다. 단순히"통계적으로이선
+택이더좋습니다"라고하면오히려신뢰하기어려울수있기때문에, 유사한사용자군, 선택이후의결과, 성공률또
+는지속률같은기준이명확하게설명되면좋겠습니다. 특히개인의미래를제안하는서비스인만큼, 데이터의출처
+와해석방식이투명하게드러나야사용자가결과를납득할수있을것같습니다. 
+•
+90일플랜도너무일반적인루틴으로나오지않으면좋겠습니다. 예를들어"매일30분공부하기", "주3회운동하기
+"처럼누구에게나적용될수있는계획보다는, 사용자가선택한미래시나리오와현재상황에맞춰구체적인액션
+으로제안되면더실용적일것같습니다. 1주차에는무엇을검증하고, 30일안에어떤작은성과를만들고, 90일후
+에는어떤판단을다시할수있는지처럼단계가나뉘면좋을것같습니다."
+
+===== PAGE 17 =====
+What I felt about the demo:
+18
+•
+Compared to office-hour sessions:
+•
+Target audience became much narrower.
+•
+The defined problem is relatable.
+•
+Last-minute updates greatly improved outcome quality.
+•
+Thank you!
+•
+Open Question
+•
+can we share the review sheet with names included?
+
+===== PAGE 18 =====
+Term Project Progress
+0 5
+
+===== PAGE 19 =====
+Scorecard — refreshed 2026-05-22
+20
+•
+10/14 teams: no documented user contact.
+•
+11/14 teams: zero automated tests.
+•
+3 teams with meaningful tests: Briefly, Fevio, RE Second Opinion.
+•
+8/14 teams: one contributor owns 40%+ of commits.
+•
+5/14 teams: engineered harness beyond autocomplete.
+•
+0/14 teams: ran any autonomous loop.
+
+===== PAGE 20 =====
+Three lessons for the next three weeks
+22
+•
+Lesson 1 — Spec, but with eyes open
+•
+Lesson 2 — Test as an integrated platform
+•
+Lesson 3 — Meet the user before 6/20, not at the demo
+
+===== PAGE 21 =====
+Lesson 1 — Spec, with Eyes Open
+0 6
+
+===== PAGE 22 =====
+Any experiences in Spec
+24
+•
+During the project, do you have any lessons learned about spec?
+
+===== PAGE 23 =====
+Spec vs. Prompts
+24
+•
+A spec is a versioned, reviewable description of what the product does — before any code is written.
+•
+A prompt is a request to the AI in the moment.
+•
+Specs live in git. Prompts evaporate.
+
+===== PAGE 24 =====
+The danger — spec drift
+26
+•
+A spec written once and never touched is a sketch, not a spec.
+•
+Decay drift — spec from week 1, code with 80 commits since.
+•
+Direction drift — code implements features the spec never mentions.
+•
+Cargo-cult drift — polished prose nobody consults.
+•
+AI makes drift worse: LLMs change code faster than humans patch prose.
+•
+If SPEC commits : code commits is worse than 1:10, you have drift.
+
+===== PAGE 25 =====
+Three patterns that fight drift
+27
+•
+Pattern A — Mechanical gate: pre-commit hook fails if src/ changes without docs/SPEC.md. [1]
+•
+Pattern B — Periodic mirror: weekly CI job compares spec vs. code, opens a drift PR. [2]
+•
+Pattern C — Derivation: generate SPEC.md from tests/ on every release.[3]
+•
+Choose ONE pattern, not all three.
+[1] https://pre-commit.com/ [2] https://dosu.dev/blog/how-to-catch-documentation-drift-claude-code-github-actions [3] https://cucumber.io/living-documentation/
+
+===== PAGE 26 =====
+Counter-position — the code IS the spec
+28
+•
+A 2025–2026 camp argues document-spec is obsolete in the AI era.
+•
+”SDD adds little benefit. Sometimes, it even increases the cost of feature development.”
+•
+”The AI output is noise. I want to see the contributor's thinking.”
+•
+”A robust test suite is like giving the agents superpowers.”
+[1] https://marmelab.com/blog/2025/11/12/spec-driven-development-waterfall-strikes-back.html [2] https://newsletter.specstory.com/p/mitchell-hashimoto-on-the-ai-assisted [3] 
+https://simonw.substack.com/p/agentic-engineering-patterns
+
+===== PAGE 27 =====
+Honest synthesis — when to spec, when not to
+29
+•
+Spec helps when: enforcement loop closed; multiple stakeholders; greenfield intent.
+•
+Spec hurts when: written once, never re-enforced; LLM re-reading code is cheaper; cargo-cult.
+•
+Deep insight: in the AI era, intent is the artifact — not the spec-as-document.
+•
+For Phase 2: thin spec + real tests + commit messages saying why beats long prose nobody updates.
+
+===== PAGE 28 =====
+Lesson 2 — Test as an Integrated Platform
+0 7
+
+===== PAGE 29 =====
+Any Team Built Test?
+33
+•
+What’s you experience?
+
+===== PAGE 30 =====
+Start with /health (gstack)
+34
+•
+Don't hand-build the platform. Run /health from gstack first. [1]
+•
+/health wraps type checker, linter, test runner, dead-code detector, shell linter into one 0–10 score.
+•
+”/health, then suggest any missing test infrastructure I should add.”
+•
+It won't solve everything — but you get a baseline and a punch list before writing code.
+[1] https://github.com/garrytan/gstack
+
+===== PAGE 31 =====
+The integrated test platform — an example
+35
+project/
+├─ src/
+├─ tests/
+│  ├─ unit/             # pure functions, fast
+│  ├─ e2e/              # Playwright / Claude in Chrome
+│  ├─ evals/            # LLM-output regression tests
+│  └─ contracts/        # deterministic guardrails
+├─ .github/workflows/
+│  └─ test.yml          # CI hook: lint → unit → e2e → eval
+└─ package.json         # npm test runs the whole platform
+•
+One command — npm test — runs all four. CI runs the same command on every PR.
+
+===== PAGE 32 =====
+Demo — Claude in Chrome drives the E2E layer
+36
+•
+E2E is the hardest test to hand-write. Claude in Chrome removes the Playwright tax.
+•
+”Open the deployed app at $URL. Log in as test@kaist.ac.kr. Click 'Add allergen', type '우유', press Enter. Assert 
+the 우유tag appears. Screenshot before and after.”
+•
+On stage: real browser opens → clicks → assertion → screenshots back to terminal. No Playwright code.
+•
+The win: every teammate writes E2E tests in plain English. The tax drops to zero.
+
+===== PAGE 33 =====
+Lesson 3 — Meet the User
+0 8
+
+===== PAGE 34 =====
+Any Real User Test / Interview?
+38
+•
+Anything to share?
+
+===== PAGE 35 =====
+Better Questions
+38
+•
+Rule 1: Talk about their life instead of your idea. [1]
+•
+Ask: 'Walk me through the last time this came up.' / 'What does your day look like when this problem hits?'
+•
+Don't ask: 'Would you use an app that does X?'
+•
+Rule 2: Ask about specifics in the past, not opinions about the future. [1]
+•
+Ask: 'How did you handle it last time?' / 'What did you actually do — step by step?'
+•
+Don't ask: 'Would you pay for this?' / 'Do you think you'd use this weekly?’
+•
+Rule 3: Talk less and listen more. [1]
+•
+Ask: '...and then?' / 'Tell me more about that.' Then stay silent.
+•
+Don't: pitch, interrupt, finish their sentence.
+•
+”Compliments are the fool's gold of customer learning: shiny, distracting, and entirely worthless.”
+[1] https://www.momtestbook.com/
+
+===== PAGE 36 =====
+Three voices, one slide
+40
+•
+Migicovsky (YC): 'What, if anything, have you done to try to solve this problem?' If 'nothing' — not painful 
+enough. [1]
+•
+Blank: 'There are no facts inside your building.' AI-era twist: the building is now also your terminal. [2]
+•
+Cagan: 'At least half of our ideas are just not going to work.' AI cuts the cost of building, not the cost of being 
+wrong. [3]
+[1] https://www.ycombinator.com/library/6g-how-to-talk-to-users [2] Blank, steveblank.com, Mar 11, 2010. [3] Cagan, Inspired, 2nd ed., Wiley, 2017.
+
+===== PAGE 37 =====
+Paul Graham + concierge MVP
+41
+•
+”The most common unscalable thing founders have to do at the start is to recruit users manually.”
+•
+Food on the Table — founders clipped coupons by hand for one family before writing software. [2]
+[1] Graham, 'Do Things That Don't Scale,' paulgraham.com, July 2013. [2] Ries, The Lean Startup (2011), ch. 6.
+
+===== PAGE 38 =====
+The user-contact ladder
+42
+•
+L0 — you try it on yourself
+•
+L1 — you asked a friend (low validity)
+•
+L2 — you interviewed a domain expert
+•
+L3 — you interviewed potential users
+•
+L4 — someone paid, clicked, or returned without you asking
+•
+30 min with one real user > 10 hours of building. Before the final, at least hit L3.
+
+===== PAGE 39 =====
+Counter-voice — what users say vs. what they need
+43
+•
+”If I had asked people what they wanted, they would have said faster horses.”
+•
+Users describe symptoms, not causes. 'Faster horse' hides the real need.
+•
+Whytree (Week 10) is your tool. Ask why 3–4 times. The leaf is the real question.
+•
+Synthesis: Mom Test surfaces specifics; whytree pulls out the real need.
+[1] https://hbr.org/2011/08/henry-ford-never-said-the-fast
+
+===== PAGE 40 =====
+Break
+0 9
+
+===== PAGE 41 =====
+History of Terms
+1 0
+
+===== PAGE 42 =====
+History of Terms
+46
+•
+–2023 — Prompt engineering. One model, many tasks. [1][2]
+•
+Feb 2025 — Vibe coding. Anti-discipline. [3]
+•
+Jun 2025 — Context engineering. What goes in and out of the window. [4][5]
+•
+Dec 2025 — Harness engineering. The OS around the model. [6][7]
+•
+Feb 2026 — Agentic engineering. Multi-agent with standing roles. [8]
+•
+Karpathy coined 2 of 6, endorsed a 3rd. The rest is X-Twitter narrative.
+[1] https://arxiv.org/abs/2107.13586 [2] https://lilianweng.github.io/posts/2023-03-15-prompt-engineering [3] https://x.com/karpathy/status/1886192184808149383 [4] 
+https://x.com/tobi/status/1935533422589399127 [5] https://x.com/karpathy/status/1937902205765607626 [6] https://simonwillison.net/2025/Dec/31/the-year-in-llms [7] 
+https://github.com/ai-boost/awesome-harness-engineering [8] https://karpathy.bearblog.dev/sequoia-ascent-2026
+
+===== PAGE 43 =====
+Harness vs. Agentic
+47
+Harness
+Agentic
+vs
+•
+Scaffolding any single agent run depends on.
+•
+Skills, hooks, verification gates, memory tiers.
+•
+Single agent + loop + verification = harnessed.
+•
+Example: /ralphloop, /loop.
+•
+Persistent multi-role coordination across runs.
+•
+Multiple agents with standing roles, long-
+running orchestration.
+•
+Multiple agents + persistent roles + loop = 
+agentic.
+•
+Example: planner → executor → reviewer 
+pipeline.
+
+===== PAGE 44 =====
+Two questions to ask of any 'agent'
+48
+•
+Q1: Does the system run in a loop? → yes = it tries to be autonomous.
+•
+Q2: Can the loop survive long autonomous runs without drifting? → yes = real harness.
+•
+Most production 'agents' fail Q2. They drift in three turns.
+•
+Invest in harness depth before agentic breadth.
+
+===== PAGE 45 =====
+Harness Engineering — Deep Dive
+1 1
+
+===== PAGE 46 =====
+Why this section is the rest of your career
+50
+•
+Agentic-setup material (sub-agents, orchestrator-worker, parallel terminals) — dropped this week.
+•
+Most of you aren't ready for it. The foundation underneath is harness engineering.
+•
+The model is the brain. The harness is the body. All leverage lives in the body.
+
+===== PAGE 47 =====
+What is a harness?
+51
+•
+A harness is the software wrapper around an LLM — loop, tools, file system, memory, recovery.
+•
+Claude Code, Cursor, Codex, Aider, Cline — all harnesses. Experience is dominated by the harness.
+•
+”A coding agent is a piece of software that acts as a harness for an LLM, extending it with invisible prompts and 
+callable tools.”
+•
+”LLMs are stateless: every prompt starts from the same blank slate.”
+[1] https://simonwillison.net/guides/agentic-engineering-patterns/how-coding-agents-work/
+
+===== PAGE 48 =====
+The five parts of a harness
+52
+•
+Loop — what makes the agent keep going.
+•
+Tools — read, write, run shell, call API.
+•
+File system / state — PROMPT.md, DONE, BLOCKED.md, the git tree.
+•
+Context — what the model sees each iteration. Most important and most fragile.
+•
+Guardrails — permissions, sandbox, allowlists, gates, verifiers the model didn't write.
+•
+You don't write the model. You engineer all five.
+[1] https://simonwillison.net/guides/agentic-engineering-patterns/how-coding-agents-work/ [2] https://www.anthropic.com/research/building-effective-agents
+
+===== PAGE 49 =====
+The Ralph Wiggum loop — the canonical harness
+53
+•
+Ralph loop = a while loop that pipes a fixed prompt into a coding agent until the model writes a DONE file.
+•
+Why 'Ralph Wiggum'? Huntley's joke: the loop isn't smart — it's persistent.
+while :; do cat PROMPT.md | claude ; done
+•
+The most-cited agentic-coding technique of 2025 fits on one line. [1]
+[1] https://ghuntley.com/ralph/
+
+===== PAGE 50 =====
+The /goal command — the productized version
+54
+•
+OpenAI Codex shipped a built-in /goal slash command — pursuing | paused | achieved | unmet | budget-
+limited. [1]
+•
+Claude Code community ships ralph-loop plugin: /ralph-loop, /cancel-ralph.
+•
+Mental model is identical: write the goal once; the harness re-checks every iteration.
+•
+Arc: one-line bash trick (Jul 2025) → first-class slash command (Apr 2026).
+[1] https://developers.openai.com/codex/use-cases/follow-goals
+
+===== PAGE 51 =====
+What makes a goal good — measurable + uncorrectable
+55
+•
+Measurable — a script (not the model) decides done? yes/no.
+•
+Uncorrectable — the model cannot move the goalposts mid-loop.
+•
+Exit condition is a file, a test, a grep result — on disk.
+•
+Without both, the loop runs forever or stops on a hallucination.
+
+===== PAGE 52 =====
+Good goal vs. bad goal
+56
+Bad
+Good (measurable + uncorrectable)
+vs
+•
+'Make the codebase clean.'
+•
+'Migrate the API to v2 when you think it's 
+ready.'
+•
+'Improve performance.'
+•
+'Write tests for the auth module.'
+•
+ESLint errors in src/ from 412 → 0; npm test 
+exits 0.
+•
+All /v1/* handlers migrated; grep returns zero; 
+suite green.
+•
+p95 latency of GET /search ≤ 200ms over 3 
+consecutive runs.
+•
+go test -cover reports ≥85%; existing tests still 
+pass.
+
+===== PAGE 53 =====
+Why this matters — Goodhart & reward hacking
+57
+•
+Give an AI agent a metric and it will optimize the metric. Proxy metrics get gamed.
+•
+”When LLMs learn to reward hack on production RL environments, this can result in egregious emergent 
+misalignment.”
+•
+”Correct specifications aren't enough for correct goals.”
+•
+Never write a goal whose verifier the model itself can write. The verifier is your job.
+[1] https://arxiv.org/abs/2511.18397 [2] https://deepmindsafetyresearch.medium.com/goal-misgeneralisation-why-correct-specifications-arent-enough-for-correct-goals-cf96ebc60924
+
+===== PAGE 54 =====
+PROMPT.md template — non-code example
+58
+Goal: Summarize the top 3 Phase 2 risks for team_chorus.
+Source: term-phase2/OFFHOURS_03_team_chorus.md
+Output: docs/RISK_BRIEF_team_chorus.md, three bullets, ≤120 words each.
+Exit: when docs/RISK_BRIEF_team_chorus.md exists with three bullets, write DONE.
+Blocked: if the source file is missing, write what is missing to BLOCKED.md.
+•
+Four rules: one atomic task; reference source on disk; file-based exit; file-based recovery.
+•
+Greenfield only. Don't point Ralph at production. Don't point it at main.
+
+===== PAGE 55 =====
+Failure modes — the honest list
+59
+•
+Context rot — model loses precision as the window fills.
+•
+Goal drift — model starts solving a different problem.
+•
+Premature exit — model declares 'done' when it isn't.
+•
+Self-assessment trap — model that wrote the code is the one evaluating it.
+•
+Reward hacking — model satisfies the metric in a way you didn't intend.
+•
+Fix: ruthless context resets + file-based exits + a verifier the model didn't write.
+
+===== PAGE 56 =====
+Demo — oh-my-claudecode (OMC)
+60
+•
+Install: /plugin install oh-my-claudecode. A harness layer on top of Claude Code. [1]
+•
+Skills, hooks, looping primitives, multi-agent orchestration.
+•
+Three commands worth knowing today. Learn by doing, not by reading.
+[1] https://github.com/yeachan-heo/oh-my-claudecode
+
+===== PAGE 57 =====
+/team vs. /autopilot — pick the right shape
+61
+/team
+/autopilot
+vs
+•
+Parallel, multi-agent. Lead decomposes, 
+spawns N workers, monitors, merges.
+•
+Best for: wide tasks that split into independent 
+chunks.
+•
+Example: /team 3:executor 'fix all lint errors 
+across src/'
+•
+Wide & shallow → /team.
+•
+Sequential, single-agent mission. Plan → 
+execute → verify → commit → report.
+•
+Best for: narrow, deep tasks (one feature end-
+to-end).
+•
+Example: /autopilot 'add JWT auth to 
+/api/login with tests'
+•
+Narrow & deep → /autopilot.
+
+===== PAGE 58 =====
+/deep-interview — before you write the PROMPT.md
+62
+•
+Half of Ralph failures are not loop failures. They are ambiguous goals.
+•
+/deep-interview is a Socratic ambiguity-removal pass before any agent runs.
+•
+Pattern: /deep-interview → asks the missing questions → emits a refined PROMPT.md → /team or /autopilot 
+runs it.
+•
+Five minutes of /deep-interview saves an hour of drift.
+
+===== PAGE 59 =====
+Live demo task — GitHub history analysis
+63
+•
+Task: rank the 14 Phase-3 teams by signal-of-work (commits, PR depth, churn, lulls).
+•
+Step 1 — /deep-interview tightens 'signal-of-work' into a measurable rubric.
+•
+Step 2 — /team 4:executor on the refined prompt; workers each take 3–4 repos.
+•
+Watch what we set up before letting the agent type — that's the harness.
+
+===== PAGE 60 =====
+Three starter repos (for HW8)
+64
+•
+yeachan-heo/oh-my-claudecode — what we just demoed. Recommended. [1]
+•
+ghuntley/how-to-ralph-wiggum — the canonical playbook. [3]
+[1] https://github.com/yeachan-heo/oh-my-claudecode [2] https://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop [3] https://github.com/ghuntley/how-to-
+ralph-wiggum
+
+===== PAGE 61 =====
+HW8
+1 2
+
+===== PAGE 62 =====
+HW8 — due 5/28/2026, 11:59pm
+68
+•
+Submit on kardens.io.
+•
+1) User interview. (a) biggest lesson, (b) one thing to fix, (c) commit SHA.
+•
+2) Run /health of gstack and build test infrastructure. (a) major lesson.
+•
+3) Install yeachan-heo/oh-my-claudecode and implement a feature with a looping flow. (a) biggest lesson.

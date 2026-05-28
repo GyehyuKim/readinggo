@@ -1,0 +1,1025 @@
+
+===== PAGE 1 =====
+Week 9 Lecture — How to Build? Part 2
+KAIST 69911
+
+===== PAGE 2 =====
+What We Learned
+
+===== PAGE 3 =====
+What We Learned
+3
+•
+Teams 15, 4
+
+===== PAGE 4 =====
+Announcements
+
+===== PAGE 5 =====
+Midterm
+5
+•
+Thank you for your effort
+•
+How was it?
+•
+Initial grading was done, but some grading should be revisited
+•
+Thus, the final scores will be released on 5/9
+
+===== PAGE 6 =====
+Guest Speakers
+6
+•
+Terry Taewoong Um (5/9)
+•
+AI혁신본부장, VP, https://www.cosmax.com/
+•
+An author of "대학원생때알았더라면좋았을것들"
+•
+https://www.linkedin.com/in/terryum/
+•
+Jay Shin (6/13, TBD)
+•
+CEO, https://alar.my/company
+•
+https://www.linkedin.com/in/jayshin89/
+
+===== PAGE 7 =====
+Online Oﬃce Hour
+7
+•
+https://calendar.app.google/jxA5UKWKRbinsgBW6
+
+===== PAGE 8 =====
+1. What Happened in HW6
+
+===== PAGE 9 =====
+By the numbers
+9
+•
+54 of 57 students submitted a feature branch
+•
+691 commits across 14 repos since April 1
+•
+184 pull requests opened across all teams
+•
+3 students did not submit — please catch up this week
+
+===== PAGE 10 =====
+What tech stacks are teams using?
+10
+•
+Next.js / TypeScript (6 teams: 2, 3, 7, 9, 11, 13) — de-facto class standard
+•
+Python / Streamlit or FastAPI (3 teams: 1, 4, 14) — consistent, fast AI integra_on
+•
+No code on main yet (2 teams: 8, 12) — spec-only or mid-pivot
+•
+Mixed / diverging within team (3 teams: 5, 6, 10)
+
+===== PAGE 11 =====
+2. Common Lessons
+
+===== PAGE 12 =====
+Lesson 1 — Narrow the wedge (18명— most cited lesson)
+12
+•
+”Narrowing the target from 'global travelers' to 'Indians living in Korea who can't read Korean food labels' 
+completely changed how I think about the product.”
+•
+”본프로젝트는이문제의가장좁은조각— 야간의구토증상— 만다룬다. 다른증상/ 다른시간대/ 펫
+등록/ 히스토리같은기능은모두제거한다.”
+•
+Inch Wide, Miles Deep — one intense pain point for one speciﬁc person
+•
+With AI, implementa_on is cheaper — the excuse to build everything at once is gone
+•
+SLC over MVP: Simple, Lovable, Complete beats Minimum Viable Product
+
+===== PAGE 13 =====
+Lesson 2 — Making ≠ Validating (15명)
+13
+•
+”I build to comple_on, not to valida_on. I stopped when it looked done.”
+•
+”'만들기'는끝났지만'검증'은시작도안한상태— 이것이pre-product 단계의전형적인함정이다.”
+•
+"Done" is not the end — it is the trigger to start ques_oning
+•
+AI reduces the cost of execu_on to near zero; it does not reduce the cost of being wrong
+•
+The feeling of "it works" is not evidence the right thing was built
+
+===== PAGE 14 =====
+Lesson 3 — "Code runs" ≠ "I understand" (15명)
+14
+•
+”클로드가코드를만들어줬는데'왜lucide-react 썼어?'라는질문에'클로드가썼어'라고답했다”
+•
+”The biggest meta-cognition lesson: how easy it is to mistake output for understanding”
+•
+The paradox of vibe coding: you can ship things you cannot explain
+•
+The fix: before accepting AI output, ask "why did you do it this way?"
+
+===== PAGE 15 =====
+Lesson 4 — AI as a mirror, not a manager (9명)
+15
+•
+”AI 리뷰는내가못본사각지대를비춰주는거울이지, 내자리에서결정을대신해주는사람이아니다.”
+•
+”The user isn't receiving advice; they're watching themselves admit what they already half-know.”
+•
+/office-hours works because it forces you to hear your own contradictions out loud
+•
+The AI does not tell you what to do — it makes your own reasoning visible
+
+===== PAGE 16 =====
+Lesson 5 — Prompts are wishes; guardrails are contracts (10명)
+16
+•
+”The prompt is the request; the regex is the actual contract. I treat prompts as probabilis_c instruc_ons and 
+write all parsing as if the model is going to misbehave — because eventually it will.”
+•
+LLM outputs are non-determinis_c — the same prompt gives diﬀerent results each _me
+•
+For cri_cal logic: add a determinis_c layer on top of the LLM
+•
+More on this in C6
+
+===== PAGE 17 =====
+3. Important Comments
+
+===== PAGE 18 =====
+"Define what NOT to build" — 이준범(Team 14)
+18
+•
+”무엇을만들까보다어디까지안만들까를먼저정의해야한다.”
+•
+Had four planned features — A1, A2, A3, A4
+•
+Cut A2 before wri_ng any code: auto-detec_ng cogni_ve distor_on violates CBT's "no diagnosis" principle
+•
+Cut A4: anonymous community feature was too large for one week
+•
+Shipped A1 only — cleanly, completely, on _me
+•
+AI will implement everything you describe. You are the one who draws the line.
+•
+Before building anything, ask: "What would I cut if I only had half the 3me?"
+
+===== PAGE 19 =====
+"Test the riskiest assumption before touching the UI" — 황병찬
+(Team 11)
+19
+•
+”The real skill in AI-assisted development is not promp_ng, but having a clear product sense to guide the AI in 
+the right direc_on.”
+•
+Before wri_ng any UI code, measured actual GPT-4o latency on a real device
+•
+Target: under 8 seconds. Actual: 10 seconds — above the threshold
+•
+Forced an architecture rethink before any UI was built
+•
+Valida_ng the hard constraint ﬁrst saved days of wasted work
+•
+The order maPers: validate the riskiest assumpSon ﬁrst. Then design around reality.
+
+===== PAGE 20 =====
+"Three rounds of adversarial review before wriZng a line of code" —
+유지윤(Team 9)
+20
+•
+Had a design doc. Ran it through adversarial review — three rounds — before any implementation
+•
+Caught two demo-blockers before they became demo failures:
+•
+Vercel timeout when persona generation and debate ran in the same request
+•
+Crash when debate turn count was anything other than exactly 6
+•
+Neither would have been caught by code review or manual QA after the fact
+•
+”My default instinct is to reach for new structure when prose could carry the same information if the prompt 
+was good enough.”
+•
+Review the design before you write the code — not after
+
+===== PAGE 21 =====
+4. What Worked Well
+
+===== PAGE 22 =====
+Teams that got the workﬂow right
+22
+•
+Team 8 — InnovAIght: Only team that PRed spec files first
+•
+Each member wrote their spec in a named branch
+•
+PRed the spec file only — no code in those PRs
+•
+Merged all four into SPEC_MERGED on main
+•
+Implementation followed from the agreed spec — exactly the prescribed workflow
+•
+Team 4 — glocalx: Most disciplined Git practice overall
+•
+88 commits spread over 19 days — genuinely iterative
+•
+45 PRs with consistent branch naming and conventional commit format
+•
+Separate branches for docs, code, security, and infrastructure
+
+===== PAGE 23 =====
+Strong spec wriZng
+23
+•
+8 of 14 teams wrote strong specs — better than expected
+•
+Team 4: cited real field data (n=65 survey), named domain experts
+•
+Team 8: 4-member merged spec with regulatory glossary and per-engine failure handling
+•
+Team 10: version-locked spec with forbidden-pattern list
+•
+Team 12: only team to use explicit P0/P1/P2 priority labels
+
+===== PAGE 24 =====
+Good use of `/office-hours`
+24
+•
+~35 of 54 students engaged substan_vely, derived concrete ac_on items
+•
+Some went further:
+•
+박영민→ /plan-ceo-review ("ship-ready with condi_ons" verdict)
+•
+서승연→ /plan-design-review (5.6/10 with speciﬁc ﬁxes)
+•
+조정윤→ /plan-eng-review (found dead schema + a fake feature in their own code)
+•
+김민선→ /qa (found ARIA accessibility issues) [1]
+[1] ARIA: Accessible Rich Internet Application
+
+===== PAGE 25 =====
+What `/office-hours` actually does — in students' words
+25
+•
+”/office-hours 세션이의미있었던이유는, 이세션이'제가스스로던지지않는질문을강제로던지게만
+드는장치'였기때문입니다.”
+•
+”'이제품을실제로기다리고있는사람한명을지목하라'는질문앞에서답할수있는사람이0명이었습니
+다.”
+•
+”AI 리뷰없이코드만봤다면'어디서부터구현해야하지?'라고막막해했을텐데, 시스템전체를한번에조
+망하니막혀있는단한지점을즉시발견할수있었다.”
+•
+”oﬃce-hours의진짜가치는AI가추천한행동을그대로실행하는게아니라, 그권고를듣고다시내의도와
+대조하면서진짜우선순위가뭔지명확해지는것이었다.”
+•
+The patern: /office-hours reads your docs, then asks the ques_ons you avoided asking yourself
+•
+It is not an answer machine — it is a mirror
+
+===== PAGE 26 =====
+5. Concerns
+
+===== PAGE 27 =====
+Seven concerns were identified
+27
+•
+C1 — Git mental model is s_ll missing
+•
+C2 — Claude Code concepts (CLAUDE.md, skills, plugins) are s_ll unclear
+•
+C3 — Team workﬂow: spec-ﬁrst is not happening
+•
+C4 — Tech stack diverging within teams
+•
+C5 — Almost no real user contact
+•
+C6 — Development is too last-minute; no automated tes_ng
+•
+C7 — Security and privacy: not yet a ﬁrst-class concern
+
+===== PAGE 28 =====
+C1 — Git Mental Model
+
+===== PAGE 29 =====
+Git is a time machine
+29
+•
+Your project lives in two places: Local (laptop) and Remote (GitHub)
+•
+Git lets you take snapshots of your work and travel between them
+•
+It lets mul_ple people work in parallel universes (branches) without breaking each other
+
+===== PAGE 30 =====
+What you told us was hard about git (12명)
+30
+•
+”git의구조자체를모르니클로드가시키는대로해도그의미를모르고따라서내가뭘했는지확신이없
+어서비슷한명령을조금씩다르게반복했다.”
+•
+”팀원각자의local 환경에서디렉토리구조가각자다른채로deep diving 하다보니, 디렉토리구조가지속
+적으로충돌되고, 누군가한명은통합merge를해야하는데그부분의이해도와눈높이가다달랐다.”
+•
+The problem: executing commands without a mental model means you can't debug when things go wrong
+•
+The goal of this section: build the model, not just the commands
+
+===== PAGE 31 =====
+The git commands
+31
+•
+git status — See what has changed and what is staged (run this first, always)
+•
+”What files have I changed since my last commit?”
+•
+git commit — Save a snapshot of your current state
+•
+”Commit all my changes in logical clusters with good commit messages.”
+•
+git push — Send your snapshots to GitHub
+•
+”Push my commits to GitHub.”
+•
+git pull — Receive snapshots from GitHub to your laptop
+•
+”Pull the latest changes from the team repo.”
+•
+`origin` = your team's GitHub repo — just a nickname git assigns automatically
+•
+git push origin main = "send my commits to our GitHub repo, main branch"
+•
+Local (laptop) ←→ origin (GitHub)
+•
+You don't need to remember the commands — understand what each one does
+•
+Ask Claude Code:
+•
+> "Show me the git log." "What branch am I on?"
+
+===== PAGE 32 =====
+One commit = one logical idea
+32
+•
+Bad commit message: "App 전체수정", "최종", "최종테스트", "진짜최종"
+•
+Good: one commit per logical change with a clear message
+•
+feat: add subsidy matching by region
+•
+fix: correct null handling in eligibility check
+•
+docs: update SPEC with AI review feedback
+•
+Tip: if your message needs "and", it should be two commits
+•
+Format: <type>: <description> — feat / fix / docs / chore / refactor [1]
+•
+Ask AI to write the commit for you
+•
+”Commit the changes in this session in logical orders”
+[1] https://www.conventionalcommits.org
+
+===== PAGE 33 =====
+revert vs. reset — the short version
+33
+•
+`git revert` — creates a new commit that undoes the old one. History preserved. Safe.
+•
+”Undo my last commit but keep the history.”
+•
+`git reset` — moves the pointer backward. History lost. Dangerous on shared repos.
+•
+Rule: Just do git revert.
+
+===== PAGE 34 =====
+What is a branch?
+34
+•
+main is the shared, oﬃcial version of your project [1]
+•
+A branch is your own parallel copy — changes there don't touch main un_l you merge
+•
+Think of it as: main = the published book; branch = your drax with edits in the margin
+•
+Every team member works on their own branch; main is only updated through a PR
+•
+More deep understanding [2]
+[1] In the past, people use `master`, but it was changed around 2020, https://github.com/basecamp/omarchy/issues/2521 [2] https://learngitbranching.js.org/?locale=ko
+
+===== PAGE 35 =====
+Working on branches
+35
+•
+git switch — Jump to a branch
+•
+”Create a new branch called feat/login and switch to it.”
+•
+”Switch me to the main branch.”
+•
+The branch context indicator in Claude Code (above the input box):
+•
+feat/welcome-popup ← main — you are on a feature branch, based on main ✅
+•
+main ← main — you are working directly on main ⚠create a branch ﬁrst
+
+===== PAGE 36 =====
+"Your local changes would be overwritten" — what this means
+36
+•
+You tried to switch branches, but you have uncommiPed changes git can't safely move
+•
+This is git stash — a temporary clipboard for unﬁnished work
+•
+Git sets your changes aside, lets you switch branches, then restores them when you come back
+•
+You do not need to run this yourself — tell Claude Code:
+•
+”I need to switch to main but I have uncommited changes. Handle it safely.”
+•
+The underlying rule: commit early, commit o^en — stash is an escape hatch, not a workﬂow
+•
+If you stash frequently, your commits are probably too large
+
+===== PAGE 37 =====
+What is a Pull Request?
+37
+•
+A branch is your private workspace. A Pull Request (PR) is the formal moment: "I want to merge my work into 
+main."
+•
+On GitHub, a PR shows everyone what changed — line by line
+•
+Teammates can comment, request changes, or approve before anything merges
+•
+Think of it as: branch = draft, PR = peer review, merge = publish
+•
+The PR also triggers a conversation: "Does this match the spec? Are there side effects?"
+•
+Ask Claude Code:
+•
+”Create a pull request for my current branch.”
+
+===== PAGE 38 =====
+What is "worktree" in Claude Code?
+38
+•
+You may see `worktree` in the Claude Code status bar — with a tooltip: "Work in an isolated copy of the repo"
+•
+A git worktree is a second working directory linked to the same repo
+•
+Your repo, but in a separate folder — so changes there cannot break your current work
+•
+Claude Code creates a worktree automatically when it runs a task that might touch many files
+•
+It works in the isolated copy → finishes → hands you back a branch or a PR to review
+•
+What you need to know:
+•
+worktree in the status bar = Claude is working safely in isolation — that is good
+•
+When it finishes, review the result and merge it back (or ask Claude to merge it)
+•
+You do not create or delete worktrees yourself — Claude Code manages them
+
+===== PAGE 39 =====
+C2 — Claude Code Mental Model
+
+===== PAGE 40 =====
+CLAUDE.md — your AI's memory
+40
+•
+Claude Code starts fresh at the beginning of each session
+•
+Without CLAUDE.md: the AI does not know your project, stack, or conventions
+•
+CLAUDE.md is the onboarding document you write for an AI that forgets everything
+•
+It lives in your repo root and is read automatically at session start
+•
+Run /insights from time to time → paste its suggestions into CLAUDE.md
+
+===== PAGE 41 =====
+One CLAUDE.md per team — shared, not individual
+41
+•
+CLAUDE.md lives at the repo root — all team members' AIs read the same ﬁle
+•
+If each member has a separate AI conﬁg: divergent AI behavior
+•
+Bad Example: One member's AI generates React; another generates Vue; same codebase
+•
+Personal preferences → your own ~/.claude/CLAUDE.md (user-level, not repo)
+•
+Team decisions (stack, conven_ons, branch naming) → repo-level CLAUDE.md
+
+===== PAGE 42 =====
+Commands, skills, and plugins — what is the difference?
+42
+•
+Built-in commands — shipped with Claude Code, triggered with /: /help, /clear, /insights, /compact
+•
+Custom commands — added via plugins, also triggered with /: /office-hours, /slides, /plan-eng-review
+•
+Both kinds use / — the diﬀerence is where they come from
+•
+Skills — the recipe a command runs; Claude can also invoke skills automa_cally without any /
+•
+A skill is a set of instruc_ons Claude follows — the command is just one way to start it
+•
+Plugins — bundles that install custom commands and skills together
+•
+claude plugin add github:garrytan/gstack installs all gstack commands and skills at once
+•
+Claude some_mes invokes skills on its own for big tasks — spawning helper Claudes, reviewing code, etc.
+•
+You do not trigger this; Claude coordinates it automa_cally
+
+===== PAGE 43 =====
+gstack commands — when to use what
+43
+•
+Before building: /office-hours → is this worth building?
+•
+On the spec: /plan-ceo-review scope · /plan-eng-review architecture · /plan-design-review UI/UX
+•
+After building: /review code quality · /qa test coverage · /ship deploy
+•
+/qa and /ship are for after you have working code — not during spec
+•
+New habit: "Challenge my spec. What am I assuming that might be wrong?"
+
+===== PAGE 44 =====
+C3 — Team Workflow
+
+===== PAGE 45 =====
+What we prescribed vs. what we saw
+45
+•
+We said: branch → spec → PR spec only → merge → implement on feature branches → PR to main
+•
+13 of 14 teams shipped code and specs bundled in the same PR
+•
+4 teams made direct commits to main for pivots and rewrites
+•
+Team 1: a PR from main back to main — not a branch at all
+•
+5 teams have open PRs sitting unreviewed (teams 7, 11, 13, 14)
+•
+Almost every team: spec file last touched before any code was written
+•
+Dozens of code commits — near-zero spec commits afterward
+
+===== PAGE 46 =====
+The spec-ﬁrst workﬂow (full cycle)
+46
+•
+0. Pull latest main — start from the most recent shared state
+•
+”Pull the latest changes from main.”
+•
+1. Create your feature branch
+•
+”Create a new branch called feat/my-feature and switch to it.”
+•
+2. Run the cycle: Spec → Review → Implement → Test → Commit
+•
+3. Demo with teammates
+•
+4. Pull Request — spec file only (not the code)
+•
+”Create a pull request for docs/SPEC-my-feature.md only, not the implementation.”
+•
+5. Team merges the specs, agrees on the combined direction
+•
+6. Pull latest main into your feature branch — pick up the agreed spec
+•
+”Pull the latest changes from main into my current branch.”
+•
+7. Implement on your feature branch, PR the code to main when ready
+
+===== PAGE 47 =====
+Is your spec a living document?
+47
+•
+A spec writen once and never touched again is a sketch, not a spec
+•
+What implementa_on always reveals:
+•
+An assump_on that turns out to be wrong
+•
+A feature that is harder than expected → should be cut
+•
+A user behavior that was not an_cipated → should be added
+•
+Every one of these is a spec commit — not a code commit
+•
+Red ﬂag: git log docs/SPEC-*.md shows one commit from week 1, nothing axer
+•
+Green ﬂag: spec and code evolve together — spec commits appear throughout
+•
+When you learn something new: update the spec ﬁrst, then update the code
+•
+”The spec isn't done when you start coding. It's done when you stop.”
+
+===== PAGE 48 =====
+Your spec must have priority labels
+48
+•
+Without priority labels: nobody knows what to cut when _me runs out
+•
+Use P0 / P1 / P2
+•
+P0 = must ship for the demo; P1 = ship if _me allows; P2 = future
+•
+Only Team 12 used explicit labels — every team should adopt this
+•
+Also: name the AI model you use and what happens when it fails
+•
+"AI-powered solu_on" is not a spec — it is a wish
+
+===== PAGE 49 =====
+Naming branches, merge owner, anZ-pagerns
+49
+•
+Branch names: feat/welcome-popup (feature) not yoonsoo-v1 (person)
+•
+Merge owner: one person per sprint reads and merges spec PRs (markdown — no tech skill needed)
+•
+Rule: no spec PR sits open more than 3 days without a comment
+•
+Never use "Add files via upload" — it bypasses git entirely, creates a meaningless blob
+•
+Always: git add → git commit → git push
+
+===== PAGE 50 =====
+Fork or branch?
+50
+•
+Fork — your own copy of someone else's repo; for open-source when you lack write access
+•
+Branch — parallel work inside the same repo; for teammates with shared access
+•
+Team 14: each member forked instead of branching — only 1 PR ever came back to the canonical repo
+•
+Question for Team 14: did you feel you lacked write access?
+•
+Rule: if you can't articulate why you forked, use a branch instead
+
+===== PAGE 51 =====
+C4 — Tech Stack Divergence
+
+===== PAGE 52 =====
+Agree on one tech stack before wriZng a line of code
+52
+•
+Each team has some rationale behind the diversity
+•
+Team 5 — most extreme divergence in the class:
+•
+박수민, 정윤수→ Swift iOS app
+•
+박영환→ TypeScript browser extension
+•
+Team 6 — spec says React + Node; branches have vanilla HTML/JS; no unified code yet
+•
+Team 10 — PROJECT_SPEC.md mandates Toss TDS SDK; actual code uses plain React/Vite
+
+===== PAGE 53 =====
+Lock the stack in CLAUDE.md
+53
+•
+”This project uses Next.js 14 + Supabase + Anthropic SDK. Do not introduce new frameworks.”
+•
+Every team member's AI reads this line and follows it
+•
+If a member's AI suggests a diﬀerent framework: the CLAUDE.md wins
+
+===== PAGE 54 =====
+C5 — Real User Contact
+
+===== PAGE 55 =====
+Have you talked to a real user?
+55
+•
+A spectrum — desk research is not user research:
+•
+Level 0 — you thought about who might use it
+•
+Level 1 — you asked a friend (low validity: they won't say it's bad) [1]
+•
+Level 2 — you observed someone using it without coaching them [3]
+•
+Level 3 — you interviewed a domain expert (target user, not a friend) [2][3]
+•
+Level 4 — someone paid, clicked, or returned without you asking them to [4]
+•
+Most teams are at Level 0–1
+•
+It's OK for now
+•
+However, remember the lessons we discussed.
+[1] Fitzpatrick, R. (2013). The Mom Test — momtestbook.com [2] Blank, S. (2005). The Four Steps to the Epiphany — steveblank.com [3] Migicovsky, E. How to Talk to Users (YC) —
+ycombinator.com/library/6g-how-to-talk-to-users [4] Nielsen Norman Group: Quantitative vs. Qualitative Research — nngroup.com/articles/quant-vs-qual
+
+===== PAGE 56 =====
+The making vs. validating gap (15명)
+56
+•
+”'만들기'는끝났지만'검증'은시작도안한상태— 이것이pre-product 단계의전형적인함정이다.”
+•
+”I build to comple_on, not to valida_on. I stopped when it looked done. Next _me, I want to treat that feeling of 
+'done' as a trigger to start ques_oning — not to ship.”
+•
+AI reduces the cost of building to near zero
+•
+It does not reduce the cost of building the wrong thing
+•
+The spec tells you what to build. Only a real user tells you whether it maters.
+
+===== PAGE 57 =====
+Who reached Level 3
+57
+•
+Team 4 / 이승원— 5 SMB prac__oners with EU export experience; tested UI shell with them
+•
+Team 9 / 유지윤— friends used a Claude Project prompt; collected actual verbal feedback
+•
+Team 13 / 장재원— texted a friend who uses LLMs for pet care; got speciﬁc pain-point data
+
+===== PAGE 58 =====
+The concierge MVP — validate before you build
+58
+•
+우동균(Team10) did something important: no app, just text messages
+•
+Manually checked if users completed their workouts, one by one
+•
+Found: aggressive reminders work short-term, cause churn long-term
+•
+This is a concierge MVP — do the thing manually for one real user first
+•
+The pattern:
+•
+Pick one core user action your product is supposed to enable
+•
+Do it manually for one real person — no code, no UI
+•
+Watch what happens. Note where they get confused or fail
+•
+Cost: zero engineering time. Output: real behavioral data
+•
+Build the feature only after you know the manual version works
+
+===== PAGE 59 =====
+How to run a Level 2 observation
+59
+•
+Find one person who matches your target user (not a teammate, not a close friend)
+•
+Give them your product or prototype. Say: "Try to do X. I'll just watch."
+•
+Do not coach. Do not explain. Do not defend. Just watch and take notes.
+•
+After: ask "What were you expecting to happen?" — not "Did you like it?"
+•
+30 minutes with one real user will tell you more than 10 hours of building
+•
+Phase 3 north star: one person outside this class has used your product without you coaching them
+
+===== PAGE 60 =====
+C6 — Pace and Testing
+
+===== PAGE 61 =====
+The 48-hour crunch is universal
+61
+•
+Every team has the majority of feature code committed Apr 29–May 1
+•
+Large inactive gaps: Teams 6, 7, 10, 12 had 10–21 day gaps between deliverables
+•
+Only Teams 4 and 9 were genuinely iterative across multiple weeks
+•
+The spec-first workflow is the antidote:
+•
+Spec written in week 1 → implementation spread across weeks 2–3 → no crunch
+
+===== PAGE 62 =====
+Three kinds of tests — know the vocabulary
+62
+•
+Lint — checks code style and obvious mistakes before it even runs
+•
+Catches: unused variables, missing semicolons, type errors
+•
+Fast — runs in seconds; add to every commit
+•
+Unit test — tests one func_on in isola_on with controlled inputs
+•
+Catches: logic bugs in a single feature (e.g. subsidy matching returns wrong result)
+•
+Medium speed — runs in seconds to minutes
+•
+End-to-end (E2E) test — simulates a real user clicking through the browser
+•
+Catches: broken ﬂows across pages (e.g. login → dashboard → feature)
+•
+Slow — runs in minutes; use for cri_cal paths
+•
+Claude in Chrome — Claude Code controls a real browser, ﬁlling forms and checking results
+•
+Ask Claude Code: "Open the app, log in as a test user, and check that the subsidy 
+results load correctly."
+•
+Closest to how a real user experiences your product
+
+===== PAGE 63 =====
+Automated testing — the missing piece
+63
+•
+The cycle so far: Spec → Review → Implement → Test (manual) → Commit
+•
+Without tests: Claude Code changes one thing, breaks another — silently
+•
+With tests: breakage is caught immediately, before you even look
+•
+The rule: green before you commit, green a^er you commit
+•
+”Write a unit test for the subsidy matching func_on.”
+•
+”All tests pass. Now add the new feature and make sure exis_ng tests s_ll pass.”
+
+===== PAGE 64 =====
+LLM trust vs. determinisZc guardrails
+64
+Trust the LLM
+Add a deterministic layer
+vs
+•
+Simpler to build
+•
+Flexible — handles edge cases in natural 
+language
+•
+Breaks unpredictably — same prompt, 
+different output
+•
+”No matter how I pushed Claude harder, it kept 
+erroring.”
+•
+More code to write
+•
+Predictable — same input, same output, 
+always
+•
+”allergens-2026.json 파일과백엔드룩업로직
+을구현했습니다. Claude의판정과무관하게
+강제로배지를표시.”
+•
+”The prompt is the request; the regex is the 
+actual contract.”
+
+===== PAGE 65 =====
+When to add a guardrail
+65
+•
+Safety-critical output: dietary restrictions, medical info, compliance rules → always add guardrails
+•
+High-stakes decisions: money, legal, health → deterministic layer required
+•
+Low-stakes output: summaries, suggestions, drafts → LLM alone is fine
+•
+Pattern: LLM generates the answer; rule-based code validates or overrides it
+•
+Ask Claude Code: "Add a deterministic fallback for this parsing step. Assume the LLM will 
+sometimes return malformed output."
+
+===== PAGE 66 =====
+Practical starting point for your stack
+66
+•
+Next.js / React — npm run test (Vitest or Jest)
+•
+Python / FastAPI / Streamlit — pytest
+•
+Ask Claude Code: "Set up the simplest possible test suite. Write one example test."
+•
+Start with one test per feature. That is already beter than zero.
+
+===== PAGE 67 =====
+C7 — Security and Privacy
+
+===== PAGE 68 =====
+Your product handles sensitive data — have you thought about it?
+68
+•
+Look at what these products store:
+•
+Team 12 (RegulMate), Team 14 (걱정인형) — emo_onal states, mental health diary entries
+•
+Team 9 — career anxie_es, personal goals, future plans
+•
+Team 1, Team 10 — real estate ﬁnancial decisions, personal asset data
+•
+Team 8 (BRIDGE) — company regulatory compliance, export documenta_on
+•
+Team 13 — pet health symptoms, veterinary history
+•
+If any of this data leaked or was misused, would your users trust you again?
+•
+Security and privacy are not add-ons — they are product decisions
+
+===== PAGE 69 =====
+API keys — the immediate risk
+69
+•
+4 teams are missing `.gitignore` — add before your next commit:
+•
+Team 7
+•
+Team 8
+•
+Team 10
+•
+Team 11
+•
+Ask Claude Code: "Add a .gitignore for this project. Make sure .env is covered."
+•
+~23.8M secrets leaked on GitHub in 2024 — scrapers run within minutes of a push [1]
+•
+Set a spending cap at your API provider today — even a small leak can become a large bill
+[1] h^ps://www.gitguardian.com/state-of-secrets-sprawl-report-2024
+
+===== PAGE 70 =====
+If a key was already committed
+70
+•
+Step 1: Rotate the key now — revoke it at the provider and generate a new one
+•
+Step 2: DeleSng the ﬁle is not enough — the key is s_ll in your git history
+•
+git log s_ll exposes it; anyone who cloned the repo already has it
+•
+Step 3: Audit downstream — update CI, Vercel env vars, teammates' .env ﬁles
+•
+Assume it is already public — act accordingly
+
+===== PAGE 71 =====
+User data — three quesZons to answer before launch
+71
+•
+What data do you collect? — list every field stored in your database
+•
+Where does it go? — Supabase, Firebase, your own server, the AI API provider's servers
+•
+Data sent to Claude/OpenAI/Gemini goes to their servers — your users should know this
+•
+What happens if it leaks? — is it embarrassing, harmful, or legally consequential?
+•
+Products handling health, financial, or emotional data need at minimum:
+•
+A privacy notice (what you collect and why)
+•
+No logging of sensitive content in plaintext
+•
+Auth before any personal data is shown
+
+===== PAGE 72 =====
+Pear Review
+
+===== PAGE 73 =====
+Prepare for Pear Review
+73
+•
+5/16/2026, 13:30pm
+•
+No kardens.io submission
+•
+No presentation. Let your demo talks.
+•
+All classmates will provide you with their own feedback.
+
+===== PAGE 74 =====
+HW7
+
+===== PAGE 75 =====
+HW7
+75
+•
+5/7/2026, 11:59pm
+•
+https://github.com/yijisoo/whytree
+•
+Answer the following questions on kardens.io
+•
+What is the ultimate goal of your life?
+•
+What is one action you derived from the conversation with why tree?
+•
+What is the biggest learning about yourself?

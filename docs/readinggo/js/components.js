@@ -100,6 +100,150 @@ const AppHeader = ({ streak, xp, level, onStreakTap }) => (
   </div>
 );
 
+// ── 스트릭 마일스톤 카드 공유 모달 (Canvas 다운로드 지원) ──────────────────────
+const StreakShareModal = ({ streak, onClose }) => {
+  const [theme, setTheme] = React.useState('gold'); // gold | dark | neon | mint
+  const canvasRef = React.useRef(null);
+
+  const themeColors = {
+    gold: { bg: '#FAF6F0', text: '#2A2D33', accent: '#FFC233', shadow: '#C8901C', border: '#ECE6DA' },
+    dark: { bg: '#121212', text: '#FFFFFF', accent: '#FF9600', shadow: '#D8651F', border: '#2A2A2A' },
+    neon: { bg: '#0A0015', text: '#CE82FF', accent: '#B690F0', shadow: '#8A3DFF', border: '#1A0033' },
+    mint: { bg: '#EBFBF3', text: '#1E5E3A', accent: '#3FD17F', shadow: '#1F8E4D', border: '#D2F2E1' },
+  };
+
+  const handleDownload = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const colors = themeColors[theme];
+
+    canvas.width = 1080;
+    canvas.height = 1080;
+
+    // 배경
+    ctx.fillStyle = colors.bg;
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // 테두리
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = colors.border;
+    ctx.strokeRect(40, 40, 1000, 1000);
+
+    // 앱 이름
+    ctx.fillStyle = colors.accent;
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText('🐦 ReadingGo', 100, 130);
+
+    // 축하 텍스트
+    ctx.fillStyle = colors.text;
+    ctx.font = '900 68px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('독서 마일스톤 달성! 🎉', 540, 320);
+
+    // 스트릭 원 & 불꽃 그리기
+    const centerX = 540;
+    const centerY = 580;
+    const radius = 160;
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    ctx.fillStyle = colors.bg;
+    ctx.fill();
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = colors.accent;
+    ctx.stroke();
+
+    // 불꽃 에모지
+    ctx.font = '140px sans-serif';
+    ctx.fillText('🔥', centerX, centerY - 20);
+
+    // 연속 일수 텍스트
+    ctx.fillStyle = colors.text;
+    ctx.font = '900 72px sans-serif';
+    ctx.fillText(`${streak}일 연속`, centerX, centerY + 80);
+
+    // 격려 메시지
+    ctx.textAlign = 'center';
+    ctx.fillStyle = colors.text;
+    ctx.font = '800 36px sans-serif';
+    ctx.fillText('하루 한 페이지, 참새의 성을 짓는 중 🏰', 540, 840);
+
+    ctx.fillStyle = colors.accent;
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText('습관이 인성을 만들고, 독서가 사피엔스를 깨운다.', 540, 900);
+
+    // 워터마크
+    ctx.fillStyle = colors.text;
+    ctx.font = '700 28px sans-serif';
+    ctx.fillText('hb.link/readinggo', 540, 990);
+
+    // 다운로드 실행
+    const link = document.createElement('a');
+    link.download = `ReadingGo_Streak_${streak}Days.png`;
+    link.href = canvas.toDataURL();
+    link.click();
+    window._showToast && window._showToast('🎨 연속 독서 마일스톤 카드가 저장되었습니다!');
+  };
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 120, background: 'rgba(0,0,0,.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} className="fade-in">
+      <div style={{ width: '100%', background: '#fff', borderRadius: 24, padding: 20, maxWidth: 360 }} className="pop-in">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <p style={{ fontWeight: 900, fontSize: 16, color: '#1F1F1F', margin: 0 }}>🔥 스트릭 마일스톤 카드</p>
+          <button onClick={onClose} className="rg-btn-icon"><XIcon s={20}/></button>
+        </div>
+
+        {/* 프리뷰 카드 */}
+        <div style={{
+          width: '100%', aspectRatio: '1/1', borderRadius: 16, padding: 24,
+          background: themeColors[theme].bg, color: themeColors[theme].text,
+          border: `2px solid ${themeColors[theme].border}`, display: 'flex', flexDirection: 'column',
+          justifyContent: 'space-between', alignItems: 'center', position: 'relative', overflow: 'hidden'
+        }}>
+          <span style={{ position: 'absolute', left: 20, top: 18, fontSize: 11, fontWeight: 900, color: themeColors[theme].accent }}>🐦 ReadingGo</span>
+          
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
+            <p style={{ fontSize: 18, fontWeight: 900, margin: '0 0 4px' }}>마일스톤 달성! 🎉</p>
+            <p style={{ fontSize: 11, color: themeColors[theme].text, opacity: 0.6, margin: 0 }}>꾸준한 참새의 눈부신 결실</p>
+          </div>
+
+          <div style={{
+            width: 140, height: 140, borderRadius: '50%', border: `4px solid ${themeColors[theme].accent}`,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2
+          }}>
+            <span style={{ fontSize: 44 }}>🔥</span>
+            <span style={{ fontSize: 18, fontWeight: 900 }}>{streak}일 연속</span>
+          </div>
+
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: 12, fontWeight: 800, margin: '0 0 4px' }}>하루 한 페이지 독서 습관 🏰</p>
+            <p style={{ fontSize: 9, color: themeColors[theme].accent, fontWeight: 700, margin: 0 }}>hb.link/readinggo</p>
+          </div>
+        </div>
+
+        {/* 테마 셀렉터 */}
+        <div style={{ display: 'flex', gap: 6, margin: '14px 0' }}>
+          {['gold', 'dark', 'neon', 'mint'].map(t => (
+            <button key={t} onClick={() => setTheme(t)} style={{
+              flex: 1, height: 26, borderRadius: 8, border: theme === t ? '2px solid #58CC02' : '1.5px solid #E5E5E5',
+              background: themeColors[t].bg, cursor: 'pointer', outline: 'none'
+            }}/>
+          ))}
+        </div>
+
+        <canvas ref={canvasRef} style={{ display: 'none' }}/>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} className="btn-duo btn-white" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>취소</button>
+          <button onClick={handleDownload} className="btn-duo btn-green" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>💾 카드 다운로드</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── StreakCalendar (이달 불꽃 달력) ───────────────────────────────────────────
 const StreakCalendar = ({ userBooks, simDate, onClose }) => {
   const activeDate = simDate || todayISO();
@@ -109,6 +253,10 @@ const StreakCalendar = ({ userBooks, simDate, onClose }) => {
   const daysInMonth = new Date(year, month, 0).getDate();
   const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
   const pad = n => String(n).padStart(2, '0');
+
+  // 마일스톤 공유 상태
+  const [showMilestoneShare, setShowMilestoneShare] = React.useState(false);
+  const currentStreak = window.LS.get('rg_v42', {}).user?.streak || 21; // 데모 스트릭 디폴트 21
 
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(0,0,0,.5)',
@@ -126,7 +274,7 @@ const StreakCalendar = ({ userBooks, simDate, onClose }) => {
             <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#AFAFAF', padding: '4px 0' }}>{d}</div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 16 }}>
           {cells.map((day, i) => {
             if (!day) return <div key={`e${i}`}/>;
             const iso = `${year}-${pad(month)}-${pad(day)}`;
@@ -144,10 +292,26 @@ const StreakCalendar = ({ userBooks, simDate, onClose }) => {
             );
           })}
         </div>
-        <p style={{ fontSize: 12, color: '#AFAFAF', textAlign: 'center', margin: '12px 0 0', fontWeight: 600 }}>
+        <p style={{ fontSize: 12, color: '#AFAFAF', textAlign: 'center', margin: '0 0 16px', fontWeight: 600 }}>
           이번 달 {Array.from(sessionDates).filter(d => d.startsWith(`${year}-${pad(month)}`)).length}일 독서
         </p>
+
+        {/* 스트릭 마일스톤 카드 공유 버튼 */}
+        <button
+          onClick={() => setShowMilestoneShare(true)}
+          className="btn-duo btn-green"
+          style={{ width: '100%', padding: '12px 0', fontSize: 13, display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <span>🔥</span> 연속 {currentStreak}일 마일스톤 공유 카드 만들기
+        </button>
       </div>
+
+      {showMilestoneShare && (
+        <StreakShareModal
+          streak={currentStreak}
+          onClose={() => setShowMilestoneShare(false)}
+        />
+      )}
     </div>
   );
 };
@@ -195,10 +359,10 @@ const NestBanner = ({ userBook, onTap }) => {
 // ── BottomNav (하단 4탭) ──────────────────────────────────────────────────────
 const BottomNav = ({ active, onChange }) => {
   const tabs = [
-    { id: 'nest',    label: '둥지',   IC: HomeIcon  },
-    { id: 'social',  label: '소셜',   IC: UsersIcon },
-    { id: 'village', label: '마을',   IC: MapIcon   },
-    { id: 'library', label: '내서재', IC: BookIcon  },
+    { id: 'nest',    label: '둥지',     IC: HomeIcon  },
+    { id: 'social',  label: '소셜',     IC: UsersIcon },
+    { id: 'village', label: '독서모임', IC: MapIcon   },
+    { id: 'library', label: '내서재',   IC: BookIcon  },
   ];
   return (
     <div style={{ display: 'flex', background: '#fff', borderTop: '2px solid #E5E5E5',

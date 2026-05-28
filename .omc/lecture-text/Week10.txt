@@ -1,0 +1,538 @@
+
+===== PAGE 1 =====
+Week 10 Lecture — Why You?
+KAIST 69911
+KAIST
+AI-Driven Business Revolution: Strategy and Practice  ·  May 2026
+
+===== PAGE 2 =====
+Announcements
+0 1
+
+===== PAGE 3 =====
+Midterm
+3
+•
+Final scores released today (5/9)
+•
+Mean: 84.06
+•
+Median: 85.25
+•
+Std Dev: 8.73
+•
+Office hour available for individual review right after the class
+•
+5/9, 5/16
+
+===== PAGE 4 =====
+Pear Review — one week away
+4
+•
+5/16/2026, 13:30pm
+•
+No kardens.io submission.
+•
+No presentation.
+•
+Let your demo speak.
+•
+All classmates will give you their own feedback.
+
+===== PAGE 5 =====
+Guest Speaker — today, end of class
+5
+•
+Terry Taewoong Um
+•
+AI혁신본부장, VP, https://www.cosmax.com/
+•
+Author of "대학원생때알았더라면좋았을것들"
+•
+https://www.linkedin.com/in/terryum/
+
+===== PAGE 6 =====
+Today's Lecture Structure
+6
+•
+Purpose of Life?
+•
+HW7
+•
+Why does why matter now?
+•
+Wrap up
+•
+Terry's presentation
+•
+(Optional) whytree
+
+===== PAGE 7 =====
+Purpose of Life?
+0 2
+
+===== PAGE 8 =====
+What's the purpose of a life?
+8
+•
+https://www.youtube.com/watch?v=b17xnxHBFCI
+
+===== PAGE 9 =====
+What’s the purpose of your life?
+8
+
+===== PAGE 10 =====
+The purpose of life – An old question
+9
+•
+The oldest question humans ask
+•
+”What does man gain by all the toil at which he toils under the sun? — Ecclesiastes 1:3 [1]”
+•
+”What has been will be again … there is nothing new under the sun. — Ecclesiastes 1:9 [1]”
+[1] *The Holy Bible*, Ecclesiastes 1:3, 1:9 (ESV).
+
+===== PAGE 11 =====
+Three approaches
+10
+•
+Humanity has offered three lasting answers:
+•
+Find it — purpose is already there, waiting to be discovered
+•
+Build it — purpose is what you construct over time
+•
+Choose it — purpose is what you declare matters
+
+===== PAGE 12 =====
+Find It — Purpose waits to be discovered
+11
+•
+Purpose is not invented; it is discovered
+•
+”He who has a why to live for can bear with almost any how. — Friedrich Nietzsche [1]”
+•
+Three sources of meaning, verbatim from Frankl: [2]
+•
+"(1) by creating a work or doing a deed"
+•
+"(2) by experiencing something or encountering someone"
+•
+"(3) by the attitude we take toward unavoidable suffering"
+•
+”everything can be taken from a man but one thing: the last of the human freedoms — to choose one's attitude 
+in any given set of circumstances, to choose one's own way. — Frankl [2]”
+•
+Frankl's school of therapy: Logotherapy (의미치료)
+[1] Friedrich Nietzsche, *Twilight of the Idols* (1889), "Maxims and Arrows," §12. Quoted by Frankl. [2] Viktor Frankl, *Man's Search for Meaning* (Beacon Press, 1959/2006), Part Two: 
+"Logotherapy in a Nutshell." Original German: *…trotzdem Ja zum Leben sagen* ("Say Yes to Life Nonetheless").
+
+===== PAGE 13 =====
+Build It — Purpose is constructed
+12
+•
+Purpose is not stumbled upon — it is constructed
+•
+”Caminante, no hay camino, se hace camino al andar. — Antonio Machado [1]”
+•
+”Wanderer, there is no path; the path is made by walking.”
+•
+Built through:
+•
+Long commitment to a craft
+•
+Loyalties to people and causes that outlast your moods
+•
+Small experiments, repeated, accumulated over a lifetime
+•
+The cathedral isn't found in a clearing — you lay one stone at a time [2]
+[1] Antonio Machado, "Proverbios y cantares XXIX," in *Campos de Castilla* (1912). [2] John W. Gardner, *Self-Renewal: The Individual and the Innovative Society* (Harper & Row, 1963).
+
+===== PAGE 14 =====
+Choose It — Purpose is what you declare
+13
+•
+The universe is silent — purpose is what you declare
+matters
+•
+”그래봤자바둑, 그래도바둑. — 조치훈9단[1]”
+•
+The full move:
+•
+Acknowledge the absurdity (it's just a game, just 
+a job, just a life)
+•
+Dedicate yourself to it anyway
+•
+The freedom — and the weight — of saying "this is 
+mine" [2]
+[1] Cho Chikun (조치훈) 9단, professional Go player. Widely attributed in Korean Go literature. [2] Jean-Paul Sartre, *L'existentialisme est un humanisme* (1946); Albert Camus, *Le Mythe de 
+Sisyphe* (1942).
+
+===== PAGE 15 =====
+Three Threads, One Rope — How they weave together
+14
+•
+These are not rival camps — they form a cycle:
+•
+You find a spark
+•
+You build through commitment
+•
+You choose to call it meaningful — again and again
+•
+Strip any one, and the others collapse:
+•
+Pure searching → aimless wandering
+•
+Pure building → mechanical labor
+•
+Pure choosing → hollow assertion
+•
+Echoed across cultures — Ikigai (生き甲斐): literally "reason for being" — whatever, however small, makes 
+today worth waking up for. [1]
+[1] Mieko Kamiya, *生きがいについて* (Misuzu Shobo, 1966). The popular four-circle Venn diagram (love + good at + world needs + paid for) is a Western reinterpretation by Marc Winn 
+(2014), not the original concept.
+
+===== PAGE 16 =====
+The AI Challenge
+15
+•
+AI can now do much of the building for us — code, write, analyze, decide
+•
+If purpose is forged in struggle, what happens when struggle becomes optional?
+•
+The new question: which work do you keep doing yourself, even when AI could do it for you?
+•
+That answer is who you are.
+
+===== PAGE 17 =====
+Practical Path 1 — Naval's Algorithm for Happiness
+16
+[1] Eric Jorgenson, *The Almanack of Naval Ravikant: A Guide to Wealth and Happiness* (Magrathea, 2020), p. 223. Naval's original note dated 2008.
+
+===== PAGE 18 =====
+Practical Path 2 — Tiny Experiments
+17
+•
+Don't try to design the perfect life. Run small experiments and let your life teach you what you actually want. [1]
+•
+The protocol:
+•
+Pick a curiosity, not a goal
+•
+Run it as a fixed-duration experiment ("for 14 days, I'll write 200 words every morning")
+•
+At the end, decide: persist, pivot, or pause — based on data, not feelings
+•
+Why it works: lowers the cost of starting; kills the perfectionism that prevents action
+•
+Loops back to Build it — you don't know your path until you walk a few steps
+[1] Anne-Laure Le Cunff, *Tiny Experiments: How to Live Freely in a Goal-Obsessed World* (Avery, 2025).
+
+===== PAGE 19 =====
+Practical Path 3 - whytree
+18
+•
+You used whytree for HW7 (web version was launched on 5/6) [1][2]
+•
+The three primitives map directly to today's three approaches:
+•
+Why Up 
+Find it — each "why?" drills down to surface what was already there. You don't invent the 
+answer; you uncover it.
+•
+How Down 
+Build it — each "how?" branches out, enumerates alternatives, constructs paths. Tiny 
+experiments fit here.
+•
+Choose it 
+the weight inside both moves — every Why-Up answer demands "yes, this is the deeper 
+truth — this is mine." Every How-Down branch demands "yes, I commit to this one."
+•
+The alternation between Up and Down is the engine: discover → build → commit → discover deeper → build 
+new alternatives → commit again.
+•
+whytree forces all three moves at once — even when you didn't realize you were making them. That's why HW7 
+surfaced the roots, the actions, and the reframings it did.
+[1] https://github.com/yijisoo/whytree [2] https://whytree.io
+
+===== PAGE 20 =====
+Pale Blue Dot
+19
+•
+And remember — across all the cosmos, we are improbably here:
+•
+”Look again at that dot. That's here. That's home. That's us. … the only home we've ever known. … underscores 
+our responsibility to deal more kindly with one another, and to preserve and cherish the pale blue dot. — Carl 
+Sagan [1]”
+•
+The cosmic perspective doesn't shrink us — it shows us how lucky we are to be on this small, precious planet, 
+doing anything at all.
+[1] Carl Sagan, *Pale Blue Dot: A Vision of the Human Future in Space* (Random House, 1994), opening reflection.
+
+===== PAGE 21 =====
+Pale Blue Dot
+19
+•
+And remember — across all the cosmos, we are improbably here:
+•
+”Look again at that dot. That's here. That's home. That's us. … the only home we've ever known. … underscores 
+our responsibility to deal more kindly with one another, and to preserve and cherish the pale blue dot. — Carl 
+Sagan [1]”
+•
+The cosmic perspective doesn't shrink us — it shows us how lucky we are to be on this small, precious planet, 
+doing anything at all.
+[1] Carl Sagan, *Pale Blue Dot: A Vision of the Human Future in Space* (Random House, 1994), opening reflection.
+
+===== PAGE 22 =====
+WH7
+0 3
+
+===== PAGE 23 =====
+Pair Discussion
+21
+•
+Find a person (or two persons) who you can discuss with
+•
+Share what you learned from a whytree session
+•
+I will give you 10 minutes
+
+===== PAGE 24 =====
+Anything you would like to share?
+22
+
+===== PAGE 25 =====
+Some patterns
+23
+•
+The root underneath the goal
+•
+The action shrinks dramatically once the root is named
+•
+Most of you found something genuinely new
+•
+For some, nothing new came up — but articulation was the value
+•
+The question you arrive with is rarely the question you leave with
+
+===== PAGE 26 =====
+Lesson 1 — The root underneath the goal (~42명, three flavors)
+24
+•
+The visible answer to "what is the ultimate goal of your life?" is rarely the actual root. After 3-4 why-ups, 
+students landed on one of three roots: recognition, autonomy, or family/presence.
+•
+Recognition (~17명): "I want to feel that my existence matters." Career complaint = recognition complaint in 
+disguise.
+•
+Composite: I thought I wanted to switch jobs. Three whys in, it was: I want to be the person other people 
+come to, and I'm not.
+•
+Autonomy (~11명): not validation, control. Same outward complaint, different root.
+•
+Composite: I told myself I wanted to start a company. What I actually wanted was to make decisions without 
+asking permission.
+•
+Family / presence (~14명): family named literally as the answer to Q1, not as a "balance" qualifier.
+•
+Composite: My ultimate goal is not to miss the small moments — the laundry, the bedtime story, the laugh 
+at dinner.
+•
+The diagnostic that matters:
+•
+recognition-seekers want better mirrors
+•
+autonomy-seekers want fewer constraints
+•
+family-seekers want presence.
+•
+They look identical from outside ("I want to leave my job") but require different actions.
+
+===== PAGE 27 =====
+Lesson 2 — The action shrinks once the root is named (~22명)
+25
+•
+Goal: "live a life of meaning."
+•
+Action: eat dinner with one specific friend this week.
+•
+Goal: "build a brand that proves taste and commercial success aren't opposed."
+•
+Action: scroll Olive Young reviews tonight, write down what bothers you.
+•
+Goal: "be more present at home."
+•
+Action: go home and help with laundry.
+•
+Several students wrote that they almost dismissed their own action as too small to count.
+•
+Any thought?
+•
+That dismissal is the lesson. The failure mode of ambition is non-action.
+•
+The smallest reversible step is the one that actually moves.
+
+===== PAGE 28 =====
+Lesson 3a — Many found something genuinely new (~38명, 70%)
+26
+•
+Why-Up surfaced things you didn't already know:
+•
+A root reframe — the surface answer hid what you actually wanted
+•
+A hidden motive — "growth" turned out to be "proving worth"
+•
+A surprising connection — two unrelated worries shared one root
+•
+Composite: What I thought was a fear of AI turned out to be a fear that I no longer matter to people.
+•
+This is Why-Up doing its job: the surface answer isn't the real answer.
+
+===== PAGE 29 =====
+Lesson 3b —For some, nothing new came up. Still OK (~10명)
+27
+•
+Same tool, different result: not new content, but new clarity
+•
+Composite: Most of what came up, I already knew. But seeing it in plain words made it impossible to keep 
+avoiding.
+•
+The medium has independent value — you can know something and still not be able to act on it because you 
+can't say it
+•
+Discovery and articulation are different jobs. Why Tree did the second for these students. "I already knew this"
+isn't failure — it's the data that articulation worked.
+•
+Only 2 of 54 treated "nothing new" as failure. The right test isn't "did I learn something new?" — it's "can I now 
+do something I couldn't do before?"
+
+===== PAGE 30 =====
+Lesson 4 — The last question != The first question
+28
+•
+In your Q3 answers (biggest learning), almost no one's learning matched their Q1 (ultimate goal).
+•
+Students who arrived with "career success" reported learnings about completion-anxiety, fear of being unseen, 
+needing rest — none of which were career.
+•
+This is the single most teachable point about Why-Up:
+•
+”처음시작한질문은진짜질문이아니다.”
+•
+Practical implication: don't trust the first frame. Whether you're using whytree on yourself or designing a 
+product for users, the framing they hand you is probably not the real one.
+
+===== PAGE 31 =====
+The real outcome: metacognition
+29
+•
+The whytree diagram is a byproduct.
+•
+The real outcome is the metacognition you build while building it — articulating the implicit reasoning about 
+why your activities matter to you.
+•
+The four lessons aren't findings about you — they're evidence that the building did the work.
+•
+Outcome quality depends on the depth of articulation, not the visual completeness of the diagram.[1]
+[1] Yi (2026), *The Why Tree: A Structured Technique for Discovering Personal Purpose*, white paper, §3.4 and Proposition 1.
+
+===== PAGE 32 =====
+Why does why matter now?
+0 4
+
+===== PAGE 33 =====
+The big claim
+31
+•
+If one person with AI can do what a team of ten did before, the bottleneck is no longer execution — it is 
+knowing which company should be yours to start.
+•
+Your why is your moat. In a world where AI commoditizes execution, the only durable advantage is doing 
+something only you would do.
+
+===== PAGE 34 =====
+Power and Prediction — the thesis in one slide
+32
+•
+AI is a prediction machine. The cost of prediction is collapsing.
+•
+When the cost of an input collapses, the value of its complements rises.
+•
+Cheap electricity → expensive electric appliances
+•
+Cheap prediction → expensive judgment about what to predict, data to predict from, and action based on 
+the prediction
+•
+For solopreneurs: AI handles the prediction-heavy work (writing, summarizing, generating, classifying). What's 
+left is judgment, data access, and action — and those are personal, not technical.
+[1] Agrawal, Gans, Goldfarb. *Power and Prediction: The Disruptive Economics of Artificial Intelligence* (2022). Ch 1-5.
+
+===== PAGE 35 =====
+Transaction cost economics — why firms get smaller
+33
+•
+Coase (1937): firms exist because coordinating inside a firm is cheaper than buying every transaction in a 
+market.
+•
+When AI lowers the cost of internal coordination AND the cost of buying services in the market, the boundary of 
+the firm shrinks.
+•
+Solopreneurs are the limit case: a one-person firm that buys every other function in the market (or generates it 
+with AI).
+•
+This is not a prediction of the future — it's already happening. Many seven- and eight-figure businesses now run 
+with 1-3 people.
+
+===== PAGE 36 =====
+Why your whytree work is the prerequisite, not the addition
+34
+•
+Without a why, the solopreneur becomes the cheapest replaceable laborer in their own one-person company.
+•
+The economics work, but you spent your life solving the wrong problem efficiently.
+•
+With a why, the solopreneur picks a problem only they would pick, serves users only they have access to, and 
+builds with judgment that doesn't generalize.
+•
+The honest counterpoint: not everything can be a solopreneur business. Capital-intensive, regulated, network-
+effect, or trust-heavy domains still need teams. Pick accordingly.
+
+===== PAGE 37 =====
+Wrap
+0 5
+
+===== PAGE 38 =====
+Pear Review — 5/16, 13:30pm
+36
+•
+Bring your Phase 2 problem statement
+•
+Bring whatever you've shipped — let the demo do the talking
+•
+No kardens.io submission, no slides
+
+===== PAGE 39 =====
+No new HW this week
+37
+•
+Re-run a session at https://whytree.io if you want to go deeper
+
+===== PAGE 40 =====
+Guest Speaker — Terry Taewoong Um
+0 6
+
+===== PAGE 41 =====
+Terry Taewoong Um
+39
+•
+AI혁신본부장at Cosmax (https://www.cosmax.com/)
+•
+Author of "대학원생때알았더라면좋았을것들"
+•
+https://www.linkedin.com/in/terryum/
+•
+Has been writing his own whytree this past week
+•
+Korean lecture, Q&A welcome

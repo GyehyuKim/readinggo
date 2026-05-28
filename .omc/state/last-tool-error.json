@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"mkdir -p tests/data tests/e2e 2>&1; sleep 2; ls -1A tests/ 2>&1; echo \\\"---\\\"; ls -1A qa/ 2>&1; rmdir qa/data qa/e2e qa 2>&1\",\"description\":\"Retry tests/ after cleanup\"}",
+  "error": "Exit code 1\ndata/\ne2e/\n---\ndata/\ndesktop.ini\ne2e/\nrmdir: failed to remove 'qa/data': Directory not empty\nrmdir: failed to remove 'qa/e2e': Directory not empty\nrmdir: failed to remove 'qa': Directory not empty",
+  "timestamp": "2026-05-28T07:32:34.195Z",
+  "retry_count": 1
+}

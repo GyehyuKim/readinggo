@@ -1,0 +1,426 @@
+
+===== PAGE 1 =====
+Week 3: How to Learn?
+KAIST BIZ.699911
+
+===== PAGE 2 =====
+Key Question
+“If AI can teach you anything, what changes 
+about how you invest your learning time — and 
+what becomes more important, not less?”
+
+===== PAGE 3 =====
+Announcements
+
+===== PAGE 4 =====
+Project Teams
+•
+TA posts/will post the group
+•
+Mostly based on the priorities
+2
+
+===== PAGE 5 =====
+We Learn One Thing
+•
+Two teams share one discovery, tool, or insight they encountered
+•
+If the learning is about what they actually tried, even better
+•
+Over 16 weeks, every team presents one time
+•
+Quality of contributions counts toward participation
+•
+Each team has 5 minutes at the beginning of class
+•
+Evaluation:
+•
+1) Does it help? — How useful for daily life and/or project? (1–5)
+•
+2) Is it new? — How timely or different from other sessions? (1–5)
+3
+
+===== PAGE 6 =====
+Let’s select the orders.
+
+===== PAGE 7 =====
+Attendance Policy Updated
+•
+Each subsequent absence → one-letter grade reduction
+•
+e.g., A+ with four absences → C+
+•
+Absences beyond two may be submitted for review
+•
+Waivers may be granted for verifiable, unavoidable work obligations
+•
+Client commitments, business travel, professional emergencies
+•
+Issued at instructor’s discretion; not guaranteed
+5
+
+===== PAGE 8 =====
+June 6, 2026 - 현충일
+•
+No class
+6
+
+===== PAGE 9 =====
+HW2
+
+===== PAGE 10 =====
+Jigged Frontier
+•
+Q: How was it?
+7
+
+===== PAGE 11 =====
+Jigged Frontier —
+Categorization
+
+===== PAGE 12 =====
+Inside the Frontier
+•
+Drafting business emails, translating professional documents, summarizing meeting minutes, 
+writing boilerplate code (SQL, Python, HTML)
+•
+Reliable, and the output is easily verifiable
+9
+
+===== PAGE 13 =====
+Outside of the Frontier
+•
+High-stakes decision-making, navigating organizational politics, stakeholder negotiation, 
+handling confidential or niche data
+•
+Tasks requiring ‘human intuition’ and ‘accountability’ that AI lacks
+•
+Particularly when synthesizing conflicting qualitative insights
+10
+
+===== PAGE 14 =====
+On/Around the Frontier
+•
+PRDs, designing UX workflows, market analysis requiring local cultural nuance
+•
+AI can ‘scaffold’ the structure, but the ‘final 10%’ of strategic alignment must be human-led
+11
+
+===== PAGE 15 =====
+Centaur vs. Cyborg Model
+•
+Anybody who can tell the differences between the two models?
+•
+How do you want on each model?
+12
+
+===== PAGE 16 =====
+Machines of Loving Grace
+•
+Core ideas?
+13
+
+===== PAGE 17 =====
+ChatGPT cure Dog’s Cancer?
+•
+The Story [1]
+•
+Skeptics [2]
+•
+Any thought?
+[1] https://www.youtube.com/watch?v=USEhHrY5ZEU
+[2] https://decrypt.co/361303/chatgpt-cure-dogs-cancer-complicated
+14
+
+===== PAGE 18 =====
+ChatGPT cure Dog’s Cancer? — Hype vs. Core
+•
+Hype
+•
+It’s not a cure — more like a slowdown
+•
+ChatGPT didn’t generate the cure; it worked as a research assistant
+•
+Lots of human labor involved
+•
+Co-administered with traditional cures
+•
+Core
+•
+Navigating through all of this was possible through the help of AI
+•
+Tackling something that seemed impossible
+15
+
+===== PAGE 19 =====
+How to Learn in the AI Era?
+
+===== PAGE 20 =====
+Reflection
+•
+How have you changed in learning after you started using AI? [1]
+•
+What are the biggest gains?
+•
+What are the biggest problems?
+•
+Any strategies you have adopted to learn better with AI?
+[1] AI = techniques/tools developed after the advent of LLM-based AI services (e.g., ChatGPT).
+16
+
+===== PAGE 21 =====
+Personalized Tutoring
+•
+Benjamin Bloom’s Two Sigma Problem [2]
+•
+Gap between 1-on-1 tutoring and classroom = 2 sigma
+•
+AI makes personalized tutoring possible
+•
+Instant, personalized (memory feature), and adjusting
+•
+Tips
+•
+Help AI understand your situation (motivation, level of understanding)
+•
+Allow AI to interview you
+•
+e.g., "I would like to build a personal website with GitHub. Please interview me first to better 
+understand my level of understanding and coach me step by step."
+[1] Mollick, "Co-Intelligence"
+[2] Bloom (1984). https://web.mit.edu/5.95/readings/bloom-two-sigma.pdf
+17
+
+===== PAGE 22 =====
+Deliberate Practice
+•
+"Highly structured activity, the explicit goal of which is to improve performance" [2]
+•
+Key elements:
+•
+Clear Goal
+•
+Highly Effortful
+•
+Immediate Feedback
+•
+Repetition with Refinement
+•
+Simple repetition is not deliberate practice
+•
+How long have you brushed your teeth? Are you an expert?
+•
+AI can make deliberate practice more effective
+[1] Mollick, "Co-Intelligence"
+[2] Ericsson, Krampe & Tesch-Römer (1993). Psychological Review, 100(3), 363–406.
+18
+
+===== PAGE 23 =====
+Empowering "Impossible" Ambition
+•
+AI can bridge the gap in the unknown
+•
+e.g., ChatGPT cures the Dog’s cancer
+•
+e.g., kardens.io?
+•
+Q: Have you ever solved an impossible mission via AI?
+[1] Mollick, "Co-Intelligence"
+19
+
+===== PAGE 24 =====
+Other Gains
+•
+Search & Summarize tasks become very trivial
+•
+"Deep Research" feature
+•
+Just-on-time learning
+•
+"What are the key things I need to know before xxx meeting?"
+•
+Help guide the next step
+•
+"Based on what you know about me, what are the next things I need to learn?"
+•
+Q: Anything else?
+20
+
+===== PAGE 25 =====
+Homework Apocalypse
+•
+Many professors I interviewed [2] treat "homework" as an elephant in the room
+•
+Solution?
+•
+Q to Professors:
+•
+kardens.io
+[1] Mollick, "Co-Intelligence"
+[2] Interviews at Purdue Univ, KAIST CoC, Yonsei Univ.
+21
+
+===== PAGE 26 =====
+Hallucination
+•
+AI makes plausible but entirely fake facts
+•
+Why? Incentives drive guessing [1]
+•
+What is a good task taker’s strategy?
+•
+Recent research: zero hallucination → measurable reliability [2]
+•
+More discussion after we understand how LLMs are built
+•
+Solutions?
+•
+Tons of research, but model improvements are faster
+•
+CoT, CoV, Source-Grounding, Output constraints, uncertainty acknowledgement…
+•
+Three personal takes:
+•
+Multi-model cross validation
+•
+Limit the source (e.g., Notebook LM)
+•
+The bottom line is human-in-the-loop
+[1] https://arxiv.org/abs/2509.04664
+[2] https://www.lakera.ai/blog/guide-to-hallucinations-in-large-language-models
+22
+
+===== PAGE 27 =====
+Skill Atrophy due to Cognitive Offloading
+•
+“Once men turned their thinking over to machines in the hope that this would set them free. But that 
+only permitted other men with machines to enslave them.” — Frank Herbert, Dune, 1965
+•
+LLM Impacts on Brain [1]:
+•
+Brain Activation: Brain Only > Search Engine > LLM
+•
+Brain-to-LLM > LLM-to-Brain
+•
+Brain-to-LLM over Brain:
+•
+A Network-Wide Spike in Neural Connectivity
+•
+Reconciling internal vs. external thoughts
+•
+Brain-to-LLM over LLM: Different Prompting Strategies
+•
+Solutions?
+•
+https://www.youtube.com/watch?v=5kw0e_EA03w
+•
+kardens.io’s Mel
+[1] "Your Brain on ChatGPT" — https://arxiv.org/pdf/2506.08872v1
+23
+
+===== PAGE 28 =====
+Ji Soo’s Attempts
+•
+Quick and Dirty Review [1]
+•
+Crucible
+•
+Gemini: gemini.google.com/gem/13jrzUQvdL7W6...
+•
+ChatGPT: chatgpt.com/g/g-695cb2aa09e0...
+•
+Mel in kardens.io
+•
+Mel is honey in Latin — AI bee that pollinates different ideas from kardens
+•
+https://kardens.io/k/yijisoo/insights
+•
+Cognitive Capacity Framework (WIP)
+[1] https://www.slideshare.net/slideshow/qndreview-read-100-chi-papers-in-7-hours/38302070
+24
+
+===== PAGE 29 =====
+Note
+•
+We only talked about the learning, but there are other issues while using AI, which we will 
+discuss later:
+•
+Scope Creep
+•
+AI Burnout
+•
+Sycophancy
+•
+Privacy
+•
+Ethics
+25
+
+===== PAGE 30 =====
+Building
+
+===== PAGE 31 =====
+Building
+
+===== PAGE 32 =====
+Personal Growth Note
+
+===== PAGE 33 =====
+Regrets?
+•
+Interviewed several executives who recently retired
+•
+Common regrets:
+•
+Didn’t have any record of my accomplishments
+•
+How to solve?
+•
+Journaling. Daily if possible.
+https://n.news.naver.com/article/005/0001835268
+27
+
+===== PAGE 34 =====
+Lessons I Had with My Journaling
+•
+For me, it’s difficult to do journaling at night
+•
+Adopting Tim Ferriss’ 5MJ (Five-Minute Journal)
+•
+/journal template on kardens.io or other tools will help
+•
+Be very specific (especially names, peculiar emotion, why?)
+28
+
+===== PAGE 35 =====
+HW3
+
+===== PAGE 36 =====
+Learning a Seemingly Impossible Thing with AI
+•
+Read the “Attention Is All You Need” paper (arxiv.org/abs/1706.03762)
+•
+Summarize what you learned and key questions
+•
+Discuss the strategies you adopted — what worked and what didn’t?
+•
+Why this homework?
+•
+Utilize the strategies we discussed today to learn something very foreign to you
+29
+
+===== PAGE 37 =====
+Build Your Personal Website on GitHub Pages
+•
+Provide your URL (e.g., https://yijisoo.github.io/)
+•
+What is your understanding of GitHub and GitHub Pages?
+•
+Discuss the strategies you adopted — what worked and what didn’t?
+•
+Why this homework?
+•
+GitHub is fundamental infrastructure for working with tech stacks, especially in a team
+•
+Familiarize yourself with GitHub and build something you haven’t been able to do before
+30

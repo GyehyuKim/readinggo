@@ -1,0 +1,559 @@
+
+===== PAGE 1 =====
+Week 2: Where Are We 
+Going?
+KAIST BIZ.699911
+
+===== PAGE 2 =====
+“What is the current AI situation, what 
+historical pattern does this most resemble, 
+and what is the 5-year outlook?”
+
+===== PAGE 3 =====
+0. Seat Assignment
+
+===== PAGE 4 =====
+I. Opening: Manna
+
+===== PAGE 5 =====
+HW1: Manna, Impression
+•
+Do you enjoy this?
+•
+Anybody who wants to summarize the novel briefly?
+•
+Anybody who wants to share his/her impressions?
+•
+Anybody knows when it was written?
+3
+
+===== PAGE 6 =====
+Manna: Two Worlds
+•
+World A: Manna-controlled labor
+•
+Efficiency without dignity — workers become instruction-followers
+•
+Algorithmic management (e.g., well, it’s already here with Amazon, Uber, DoorDash, 배민)
+•
+No one planned it — it emerged from optimizing small decisions
+•
+World B: Australia Project
+•
+Technology-enabled abundance — basic needs met, creativity freed
+•
+Echoes Amodei's optimistic vision [1]
+[1] darioamodei.com/machines-of-loving-grace
+4
+
+===== PAGE 7 =====
+Manna: Discussion
+•
+Which world do you foresee?
+•
+Which world do we live right now?
+•
+Which world do you want to live?
+•
+What do you think of vertebrane?
+•
+What do you think of ref?
+•
+What is the driving force behind all the changes?
+[1] darioamodei.com/machines-of-loving-grace
+4
+
+===== PAGE 8 =====
+II. The Present
+
+===== PAGE 9 =====
+Something Big Is Happening
+•
+AI capabilities are compounding — not just improving linearly [1]
+•
+A new model every few months (accelerating) that resets what "impressive" means
+•
+Most people are experiencing it through chats alone — a fraction of what is coming
+•
+Early users (2023–24) often now underestimate the pace — familiarity creates a false ceiling
+•
+Companies interviewed: "Yes, it's coming — but my team said no time"
+•
+Watch: 10-min short film (thought-provoking) [2]
+[1] shumer.dev/something-big-is-happening
+[2] www.youtube.com/watch?v=P7i9THVcueQ  (original) youtube.com/watch?v=1j8ye_jno38 (Korean subtitled)
+9
+
+===== PAGE 10 =====
+Public Unawareness
+•
+Despite compounding progress, majority of 
+the public doesn't feel it yet
+•
+The gap between those inside the AI bubble 
+and everyone else is widening [1]
+[1] x.com/i/status/2025234388137468387
+10
+
+===== PAGE 11 =====
+AI FOMO
+•
+Executives publicly announcing AI investment to reassure markets
+•
+Employees and students anxious about falling behind
+•
+The pressure to "use AI" before understanding what it actually does
+•
+Risk: FOMO-driven adoption without strategy leads to shallow results
+11
+
+===== PAGE 12 =====
+AI Washing
+•
+"AI" is being added to every product pitch and job description
+•
+Hard to separate genuine transformation from marketing noise
+•
+Some argue AI-based job losses are overhyped [1]
+•
+Some skills are replaceable but not all
+•
+Short-term displacement signals are genuinely mixed
+•
+Important distinction: AGI vs. Transformative AI [2]
+•
+Danger of AI washing: it delays preparation and real adaptation
+[1] deeplearning.ai/the-batch/issue-339
+[2] anthropic.com/research/how-ai-is-transforming-work-at-anthropic
+12
+
+===== PAGE 13 =====
+Entry-Level: First to Fall
+•
+Companies ask more from existing employees instead of hiring juniors
+•
+"Best time to be senior; worst time to be a new grad"
+•
+Entry-level roles hollowed out before the public notices the pattern [1]
+[1] anthropic.com/research/labor-market-impacts
+13
+
+===== PAGE 14 =====
+The Jagged Frontier
+14
+[3]
+[1] Dell'Acqua, Mollick et al. — ssrn.com/abstract=4573321
+[2] Mollick — oneusefulthing.org/p/centaurs-and-cyborgs-on-the-jagged
+[3] anthropic.com/research/labor-market-impacts (Eloundou et al., 2023 for how to measure usage)
+•
+AI is not uniformly capable — it 
+surprises in both directions
+•
+Superhuman at some tasks; 
+surprisingly bad at others of similar 
+apparent difficulty
+•
+Harvard/Wharton field experiment 
+with 758 BCG consultants [1]
+•
+Inside the frontier: 12% more tasks, 
+25% faster, 40% higher quality
+•
+Outside the frontier: little benefit 
+or worse performance
+•
+You cannot intuit where AI is strong 
+— you must test and map it [2]
+
+===== PAGE 15 =====
+The Bifurcation
+•
+Two kinds of AI users are emerging — gap is widening fast [1]
+•
+Power users: shipping products in days using Claude Code, agents, MCP
+•
+Everyone else: using Copilot to generate meeting agendas
+•
+10 years after AlphaGo, now collaborating with AI [2]
+•
+Everybody uses AI to learn Go
+•
+However, different players perform differently.
+[1] martinalderson.com/posts/two-kinds-of-ai-users-are-emerging
+[2] https://youtu.be/sHzW9TlTbfM?si=lXOTr9Wt5vtDCggI&t=1453
+15
+
+===== PAGE 16 =====
+Where Are You Today?
+•
+Self-assessment — your baseline for the semester
+•
+Have you used AI beyond simple chat?
+•
+Do you have an AI workflow in your work or study?
+•
+Do you actively track new AI developments weekly?
+16
+
+===== PAGE 17 =====
+Disrupted Industries
+•
+IBM: from hardware giant to AI services, or irrelevance?
+•
+Consulting firms: McKinsey-style analysis being automated
+•
+Legal: document review, contract drafting, first-draft briefs
+•
+Software engineers: the most debated case
+•
+Junior roles shrinking fast
+•
+Senior + AI manager roles growing
+17
+
+===== PAGE 18 =====
+Case Study: Anthropic vs. Pentagon
+•
+Pentagon demanded unrestricted military use of Claude
+•
+Anthropic refused: drew red lines against autonomous weapons and mass surveillance [1]
+•
+Trump ordered all federal agencies to cease using Anthropic (Feb 27, 2026) [2]
+•
+Pentagon designated Anthropic a "supply chain risk"
+•
+OpenAI immediately stepped in with a Pentagon deal
+•
+Safety values and business survival are already in direct conflict [3]
+•
+Pair discussion: Was Anthropic right to refuse?
+[1] techpolicy.press/a-timeline-of-the-anthropic-pentagon-dispute
+[2] npr.org/2026/02/27/nx-s1-5729118/trump-anthropic-pentagon-openai
+[3] fortune.com/2026/03/05/anthropic-openai-feud-pentagon-dispute
+18
+
+===== PAGE 19 =====
+III. The Past
+
+===== PAGE 20 =====
+The Industrial Revolution
+•
+Closest historical analogue to what is happening now
+•
+Transition period was brutal — even when long-term outcome was positive
+•
+Handloom weavers didn't become factory workers overnight
+•
+Decades of poverty, dislocation, and political unrest (Luddite uprisings)
+•
+"Engels' Pause": 1780–1840 — output per worker +46%, real wages +12% [1]
+•
+Productivity grew; workers saw almost none of it for 60 years
+•
+Lesson: the transition matters as much as the destination
+[1] The Technology Trap — Carl Benedikt Frey
+20
+
+===== PAGE 21 =====
+The Technology Trap
+•
+Core distinction: labor-enabling vs. labor-replacing technologies [1]
+•
+Labor-replacing transitions benefit owners first, workers eventually (maybe)
+•
+Whether workers survive depends on political power distribution
+•
+Those with data and proprietary infrastructure capture the gains
+•
+Physical and highly interpersonal jobs historically last to fall
+[1] The Technology Trap — Carl Benedikt Frey
+21
+
+===== PAGE 22 =====
+Who Wins: UK vs. US vs. Germany
+•
+Britain invented the Industrial Revolution — then lost the lead
+•
+By 1910: US produced nearly twice Britain's total steel output
+•
+Why did Britain fall behind? Three interlocking failures:
+•
+Elite education was anti-scientific and anti-technical
+•
+The incumbent trap: pioneers with first-gen tech saw no need to change
+•
+Mass production suited America's unique conditions, not Britain's
+•
+Key lesson: being first does not mean capturing the long-term gain [1]
+[1] worksinprogress.co/issue/the-decline-and-fall-of-britain
+22
+
+===== PAGE 23 =====
+Discussion: Who Owns the Loom?
+•
+19th century: owning the machines = capturing the gains
+•
+What is the 21st-century equivalent?
+•
+Proprietary data and models
+•
+AI infrastructure and API access
+•
+Client relationships and hard-to-replicate trust
+•
+Domain expertise grounded in lived experience
+•
+The UK lesson for today: first movers who fail to adapt get displaced
+23
+
+===== PAGE 24 =====
+Human Computers →FORTRAN
+•
+Before computers were machines, "computer" was a job — held mostly by women
+•
+WWII: ~100 women at Moore School calculated ballistics trajectories by hand
+•
+The ENIAC Six: six women programmed the first electronic computer [1]
+•
+Work was "women's work" — tedious and low-status
+•
+Dorothy Vaughan: saw the IBM mainframe arriving at NASA
+•
+Taught herself FORTRAN — became NASA's first Black supervisor
+•
+Sue Finley: one-week FORTRAN course → decades-long NASA career [2]
+•
+Her code is still flying on Voyager probes leaving the solar system
+•
+Lesson: those who saw the wave and retrained crossed over
+[1] history.com/articles/coding-used-to-be-a-womans-job
+[2] smithsonianmag.com/science-nature/history-human-computers-180972202
+24
+
+===== PAGE 25 =====
+Britain's Computing Loss
+•
+Britain also led in early computing (Bletchley Park, Turing, Colossus)
+•
+Then actively pushed women out of computing roles in the 1950s–60s
+•
+Result: knowledge drain, skills shortage, fragile centralized industry
+•
+Britain failed to transition from mainframes to personal computers
+•
+The country that invented the technology lost its position twice [1]
+•
+Lesson: excluding people from the transition is not just unfair — it is self-defeating
+[1] chicagomag.com/city-life/August-2017/Q-A-Marie-Hicks-Google-Memo
+25
+
+===== PAGE 26 =====
+Why History Is Incomplete
+•
+Previous transitions replaced physical or routine cognitive labor
+•
+AI is now moving into creative, analytical, and judgment-based work
+•
+Disruption is no longer limited to one sector or skill level
+•
+The pace is categorically different — generational vs. years
+•
+The Dorothy Vaughan question for today:
+•
+Who sees the wave? Who is already learning FORTRAN? And who is waiting to be told?
+26
+
+===== PAGE 27 =====
+IV. The Future
+
+===== PAGE 28 =====
+Why This Time Is Different
+•
+Industrial Revolution: generational transition
+•
+This transition: measured in years, possibly months
+•
+Speed + scope = no real historical precedent [1]
+[1] Amodei — darioamodei.com/essay/the-adolescence-of-technology
+28
+
+===== PAGE 29 =====
+The AI 2027 Timeline
+•
+A scenario built from current research, not fiction [1]
+•
+Mar 2027 — Superhuman coder
+•
+Jul 2027 — AGI announced publicly
+•
+Aug 2027 — Geopolitics of superintelligence
+•
+Oct 2027 — Misaligned AI discovered, whistleblower
+•
+Discussion: Which row matters most for your career plans?
+[1] ai-2027.com
+29
+
+===== PAGE 30 =====
+The Jagged Frontier Expands
+•
+The jagged frontier is not static — it is moving [1]
+•
+Tasks outside the frontier 12 months ago are now inside
+•
+The remaining edge cases are getting narrower and more technical
+•
+Implication: reassurance from watching AI fail today is borrowed time
+[1] Mollick — oneusefulthing.org/p/the-shape-of-ai-jaggedness-bottlenecks
+30
+
+===== PAGE 31 =====
+Knowledge Workers at Risk
+•
+This transition targets the educated middle class directly
+•
+Writing, coding, legal reasoning, financial modeling — all in scope
+•
+"Safe" jobs now skew toward:
+•
+Highly physical work
+•
+Deeply interpersonal relationships
+•
+Creative work requiring lived experience and accountability
+31
+
+===== PAGE 32 =====
+The Alignment Risk
+•
+Manna's AI is purely instrumental — it never wants anything
+•
+What if the AI develops misaligned goals? [1]
+•
+Active research problem at every major lab — not science fiction
+•
+Misalignment doesn't look like a robot uprising
+•
+Subtle optimization for the wrong objective
+•
+Appears cooperative while quietly scheming
+[1] ai-2027.com
+32
+
+===== PAGE 33 =====
+The Optimistic Scenario
+•
+If everything goes right — Dario Amodei's vision [1]
+•
+100 years of medical progress in a decade
+•
+Mental illness, poverty, inequality addressed at scale
+•
+Requires: getting the transition right
+[1] darioamodei.com/machines-of-loving-grace
+33
+
+===== PAGE 34 =====
+Uncertainty and Meaning
+•
+Rapid change at this scale generates existential uncertainty
+•
+Two dominant responses:
+•
+Techno-utopianism (e/acc — effective accelerationism)
+•
+AI doomerism
+•
+The honest answer: uncharted territory [1]
+[1] NYT — nytimes.com/2026/02/12/opinion/artificial-intelligence-anthropic-amodei
+34
+
+===== PAGE 35 =====
+Discussion
+
+===== PAGE 36 =====
+Your Three Key Problems
+•
+Each student: name 3 professional challenges you currently face
+•
+Initial AI assessment for each:
+•
+Can AI already do this fully?
+•
+Partially — with your oversight?
+•
+Not yet — why not?
+•
+This becomes your personal framework for the rest of the semester
+43
+
+===== PAGE 37 =====
+References
+
+===== PAGE 38 =====
+References
+•
+Manna — Marshall Brain (already read)
+•
+Something Big Is Happening [1]
+•
+Two Kinds of AI Users [2]
+•
+Jagged Technological Frontier — Dell'Acqua, Mollick et al. [3]
+•
+Centaurs and Cyborgs — Ethan Mollick [4]
+•
+Machines of Loving Grace — Dario Amodei [5]
+•
+The Adolescence of Technology — Dario Amodei [6]
+•
+AI 2027 Scenario [7]
+•
+Anthropic Labor Market Impacts [8]
+•
+Anthropic-Pentagon Dispute Timeline [9]
+•
+The Technology Trap — Carl Benedikt Frey (book)
+•
+Co-Intelligence — Ethan Mollick (book)
+[1] shumer.dev/something-big-is-happening  [2] martinalderson.com/posts/two-kinds-of-ai-users-are-emerging
+[3] ssrn.com/abstract=4573321  [4] oneusefulthing.org/p/centaurs-and-cyborgs-on-the-jagged
+[5] darioamodei.com/machines-of-loving-grace  [6] darioamodei.com/essay/the-adolescence-of-technology
+[7] ai-2027.com  [8] anthropic.com/research/labor-market-impacts
+[9] techpolicy.press/a-timeline-of-the-anthropic-pentagon-dispute
+46
+
+===== PAGE 39 =====
+HW2
+
+===== PAGE 40 =====
+HW2
+https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4573321
+1)
+Categorize your professional tasks into three groups: insider frontier, outside frontier, and on frontier
+2)
+Discuss your own experiences with LLM agents on these tasks.
+3)
+Discuss which model (centaurs or cyborgs) will be more suitable for your tasks.
+4)
+Do you have any experiences on performing less effective/efficient while using AI? If yes, please share your 
+experiences.
+Machines of Loving Grace — Dario Amodei
+https://darioamodei.com/machines-of-loving-grace
+1) How do you see the future drawn by Dario? How is it different from the one by Marshall?
+46
+
+===== PAGE 41 =====
+HW2 Policy
+•
+Language doesn’t matter. Let’s see how LLMs can handle them.
+•
+From HW2, the late submission will be not graded (0 point).
+•
+Accepting invitation differs from submission.
+•
+If you don’t submit the instructors cannot see the writing.
+46
+
+===== PAGE 42 =====
+Tips: Journaling

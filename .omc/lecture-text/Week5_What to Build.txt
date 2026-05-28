@@ -1,0 +1,372 @@
+
+===== PAGE 1 =====
+Week 5: What to Build?
+KAIST BIZ 699911
+
+===== PAGE 2 =====
+Key Question
+•
+"If you can build a working product in an afternoon, what should you build?"
+2
+
+===== PAGE 3 =====
+What We Learned
+
+===== PAGE 4 =====
+What We Learned
+•
+Team 14
+•
+Team 1
+4
+
+===== PAGE 5 =====
+Announcements
+
+===== PAGE 6 =====
+Evaluation Rubric: In-Class Participation
+•
+총점: 12%
+•
+In-Class Participation = 6 × ln(1 + 질문/답변/코멘트횟수)
+•
+0회: 0%
+•
+1회: 4.158%
+•
+2회: 6.592%
+•
+3회: 8.318%
+•
+4회: 9.656%
+•
+5회: 10.746%
+•
+6회: 11.675%
+•
+7회+: 12.00%
+6
+
+===== PAGE 7 =====
+Evaluation Rubric: "What We Learned"
+•
+(A) Was it timely? (1-5)
+•
+(B) Will it help other teams? (1-5)
+•
+(C) Have the team had a first-hand experience? (1-5)
+•
+(D) Have the team handle questions properly? (1-5)
+7
+
+===== PAGE 8 =====
+HW4
+
+===== PAGE 9 =====
+How to Do Great Work?
+•
+What do you think?
+•
+Was it too long?
+•
+paulgraham.com/articles.html
+•
+"If you're not sure which to read, try How to Do Great Work, Having Kids, or How to Lose Time and 
+Money."
+9
+
+===== PAGE 10 =====
+Common Views (1/2)
+•
+Curiosity as the primary compass
+•
+"결론부에서위대한업적의비밀을묻는신탁(Oracle)에대한대답으로단하나의단어, "호기심
+(Curiosity)"을꼽은점...은독자에게강렬한지적자극을주었습니다."
+•
+Shift from Execution to Problem Definition
+•
+"무엇을어떻게하느냐보다는어떤걸하느냐가더욱중요한시대이다."
+•
+Starting Small and Iterating
+•
+"초기결과물이'장난감'처럼허술하다는비판을두려워하지않고, 위험(Risk)을감수하며연속적
+인피드백과수정을통해프로젝트를진화시키겠습니다."
+10
+
+===== PAGE 11 =====
+Common Views (2/2)
+•
+Per-project Procrastination
+•
+"우리는보통미루기를작은할일단위로생각하는데, Graham은프로젝트단위의미루기가훨씬위험하다
+고지적한다."
+•
+Intellectual Honesty / Earnestness
+•
+"Graham's concept of earnestness... is increasingly the quality that distinguishes human creative work from 
+competent generation."
+•
+패션근육
+•
+Trick Me to overcome friction
+•
+"접시의맨윗장만닦자."
+•
+Weird Obsession in details
+•
+"캐릭터의디테일이나화장품의텍스처, 말로설명하기어려운분위기차이같은것에유난히오래머무를
+때가많습니다."
+11
+
+===== PAGE 12 =====
+Contrasting Views (1/2)
+•
+(A) Practical Manual vs. (B) Elitist Manifesto
+•
+(A) "위대한일이거창한목표나사회적으로그럴듯해보이는문제에서만시작되는것이아니라, 
+개인적이고집요한질문에서출발한다."
+•
+(A) "천재들의전유물로여겨지던'위대한업적'을호기심, 지적정직성, 그리고실행력이라는실용
+적인영역으로끌어내렸다."
+•
+(B) "생계문제나교육기회의불평등같은사회적제약조건을완전히배제한결론입니다."
+•
+(B) "The dataset excludes everyone who followed curiosity faithfully... and still never produced 
+something."
+12
+
+===== PAGE 13 =====
+Contrasting Views (2/2)
+•
+(A) Deep Domain Focus vs. (B) Horizontal Synthesis
+•
+(A) "저자는무언가를깊게파고드는수직적호기심이중요하다고말하고있습니다."
+•
+(B) "AI 도구를활용하여불가능해보였던분야에대해학습하고직접구현하는게가능하기때문에
+여러분야를연결하고확장하는능력이점점더중요해지고있다."
+•
+(B) "이런시대에는오히려여러분야를알고잘연결할수있는수평적연결력이더중요할수있다
+고생각합니다."
+13
+
+===== PAGE 14 =====
+What is "Great Work"?
+•
+[1] “Doing great work means doing something important so well that you expand people's 
+ideas of what's possible. There's no threshold for importance. It's a matter of degree, and 
+often hard to judge at the time anyway. I'd rather people focused on developing their interests 
+rather than worrying about whether they're important or not. Just try to do something 
+amazing, and leave it to future generations to say if you succeeded.”
+14
+
+===== PAGE 15 =====
+Do I have to do "Great Work"?
+•
+"Believe it or not, I tried to make this essay as short as I could. But its length at least means it 
+acts as a filter. If you made it this far, you must be interested in doing great work."
+15
+
+===== PAGE 16 =====
+How to be Lucky
+•
+4 kinds of luck (Naval Ravikant) [1]
+•
+Blind Luck
+•
+Luck from hustling
+•
+Luck from preparation
+•
+"시노코는전쟁전몇주동안초대형유조선을매입하거나임대하며선대를빠르게확대해왔다."
+•
+Luck from the unique character
+•
+Having a search keyword on you helps.
+16
+
+===== PAGE 17 =====
+AI's Impact on his Essay
+•
+What do you want to share?
+•
+Shift of the focus
+•
+"The locus of originality is moving from generation toward selection.”
+•
+Easy to be in the frontier
+•
+Distraction could be dangerous
+•
+"옆에서석유가펑펑터지는데, 지금파고있는것을계속파고있기쉽지않다."
+•
+”창업자들사이에일주일안에제품을pivot하는경우를보고있다.”
+17
+
+===== PAGE 18 =====
+Any Changes in Your Life?
+•
+Anything to share?
+•
+Rethinking Curiosity
+•
+It's compass, but it is also a filter.
+•
+If you don't use everyday, no one will use everyday.
+•
+Even if you use everyday, it doesn't guarantee others will use everyday.
+•
+If you use everyday, you can at least work on it.
+18
+
+===== PAGE 19 =====
+Deep Dive into LLMs like ChatGPT
+•
+How was it?
+19
+
+===== PAGE 20 =====
+Common Views
+•
+LLM as a Statistical Predictor, Not a Sentient Being
+•
+"AI의답변이논리적진실(Truth)이아니라통계적개연성(Likelihood)에가깝다는비판적시각을갖
+게하며, AI 사용시꾸준히의심해야겠다는마음가짐을갖게합니다."
+•
+The Strategic Use of the Context Window
+•
+"모델의파라미터는흐릿한장기기억에불과하고, 컨텍스트창에직접입력되는정보가훨씬강
+력하게출력에반영된다."
+20
+
+===== PAGE 21 =====
+Unique Voice
+•
+"What if there are emergent behaviors that have already appeared but we simply cannot 
+interpret them because they fall outside the frame of what humans recognize?"
+•
+"할루시네이션때문에AI를일할때쓰는건어렵다고하는사람들이많은데, 사실인간이
+더할루시네이션이많지않은가?"
+21
+
+===== PAGE 22 =====
+One Comment
+•
+Andrej’s Video is a quite recent one.
+•
+It’s posted on 2/6/2025.
+•
+Don’t underestimate the power of the video.
+21
+
+===== PAGE 23 =====
+Strategy Changes
+
+===== PAGE 24 =====
+What to Build?
+
+===== PAGE 25 =====
+Paul Graham's Questions
+•
+"Something you have a natural aptitude for, that you have a deep interest, and that offers 
+scope to do great work."
+•
+Will I use everyday?
+24
+
+===== PAGE 26 =====
+DARPA Question
+•
+Three questions adopted from Heilmeier Catechism:
+•
+So what?
+•
+What's new?
+•
+Why you?
+25
+https://www.darpa.mil/about/heilmeier-catechism
+
+===== PAGE 27 =====
+신수정님의불가능한미래
+•
+2026년창조하고싶은불가능한미래는?
+•
+불가능한미래(impossible future)란:
+•
+1) 가슴뛰고원하지만
+•
+2) 달성이거의불가능해보이고
+•
+3) 방법이당장생각나지않은미래이다.
+26
+
+===== PAGE 28 =====
+Why Tree
+
+===== PAGE 29 =====
+How to Build?
+
+===== PAGE 30 =====
+HW 5
+
+===== PAGE 31 =====
+HW5: Initial Commits
+•
+Due: 3/9/2026, 11:50pm
+•
+Submit the GitHub URL for your group project on kardens.io
+•
+Expected:
+•
+A public GitHub repo (invite instruction team if private)
+•
+All members should have at least one pull request
+•
+docs/MANIFEST.md — core values/principles of the project
+•
+docs/WHYTREE.md — why tree results
+•
+docs/PREMORTEM.md — premortem results
+•
+Optional:
+•
+Any prototype or working demo
+30
+
+===== PAGE 32 =====
+Next Week
+•
+Each team will have 10 minute review with instructors and TAs.
+•
+Bring your notebook to show the progress.
+•
+If you have any questions, please ask the questions.
+31
+
+===== PAGE 33 =====
+Term Project Evaluation Criteria (Draft)
+•
+Is AI-Native?
+•
+1: AI is cosmetic; the product works fine without it.
+•
+5: The product was impossible before LLMs; AI is the reason it exists.
+•
+So What?
+•
+1: No evidence anyone outside the team cares.
+•
+5: Users actively return to it; expands what people think is possible.
+•
+What's New?
+•
+1: A clone of an existing product.
+•
+5: Opens up a problem space no one was addressing.
+•
+Why You?
+•
+1: The team picked this because it seemed easy or safe.
+•
+5: The team's unique background or weird obsession makes them the best team.
+32
