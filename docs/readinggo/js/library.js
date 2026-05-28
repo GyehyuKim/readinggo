@@ -1,11 +1,277 @@
 // library.js — 내서재 탭 (§5.7: 책 목록 + 책 상세 + Markdown export + 설정)
 // 의존: data.js, components.js
 
-// ── 책 상세 화면 ───────────────────────────────────────────────────────────────
+// ── SNS 공유 카드 모달 (Canvas 이미지 다운로드 지원) ──────────────────────────
+const SNSCardModal = ({ book, sentence, page, onClose }) => {
+  const [theme, setTheme] = React.useState('cream'); // cream | dark | mint | warm
+  const canvasRef = React.useRef(null);
+
+  const themeColors = {
+    cream: { bg: '#FAF6F0', text: '#2A2D33', sub: '#9097A0', accent: '#3FD17F', border: '#ECE6DA' },
+    dark: { bg: '#1F1F1F', text: '#FAF6F0', sub: '#AFAFAF', accent: '#58CC02', border: '#2A2D33' },
+    mint: { bg: '#EBFBF3', text: '#1E5E3A', sub: '#629E7D', accent: '#3FD17F', border: '#D2F2E1' },
+    warm: { bg: '#FFF5F5', text: '#5E2B2B', sub: '#9E6E6E', accent: '#FF8A9A', border: '#FCDCDC' },
+  };
+
+  const handleDownload = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const colors = themeColors[theme];
+
+    // 고해상도 1080x1080 스케일링
+    canvas.width = 1080;
+    canvas.height = 1080;
+
+    // 배경색 채우기
+    ctx.fillStyle = colors.bg;
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // 테두리 선
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = colors.border;
+    ctx.strokeRect(40, 40, 1000, 1000);
+
+    // 앱 이름
+    ctx.fillStyle = colors.accent;
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText('🐦 ReadingGo', 100, 130);
+
+    // D-Day / 스트릭 배지
+    ctx.fillStyle = colors.text;
+    ctx.font = '800 32px sans-serif';
+    ctx.fillText('🔥 21일 연속 독서 중', 750, 130);
+
+    // 구분선
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(100, 180);
+    ctx.lineTo(980, 180);
+    ctx.stroke();
+
+    // 책 제목
+    ctx.fillStyle = colors.text;
+    ctx.font = '900 64px sans-serif';
+    ctx.fillText(`《${book.title}》`, 100, 290);
+
+    ctx.fillStyle = colors.sub;
+    ctx.font = '700 36px sans-serif';
+    ctx.fillText(`${book.author} · p.${page}`, 110, 350);
+
+    // 따옴표 마크
+    ctx.fillStyle = colors.accent;
+    ctx.font = '900 240px sans-serif';
+    ctx.fillText('“', 100, 580);
+
+    // 문장 텍스트 래핑 렌더링
+    ctx.fillStyle = colors.text;
+    ctx.font = 'italic 700 44px sans-serif';
+    const text = sentence;
+    const words = text.split('');
+    let line = '';
+    let y = 620;
+    const maxWidth = 880;
+    const lineHeight = 70;
+
+    for (let n = 0; n < words.length; n++) {
+      let testLine = line + words[n];
+      let metrics = ctx.measureText(testLine);
+      let testWidth = metrics.width;
+      if (testWidth > maxWidth && n > 0) {
+        ctx.fillText(line, 100, y);
+        line = words[n];
+        y += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, 100, y);
+
+    // 닫는 따옴표
+    ctx.fillStyle = colors.accent;
+    ctx.font = '900 240px sans-serif';
+    ctx.fillText('”', 880, y + 160);
+
+    // 하단 카피라이트
+    ctx.fillStyle = colors.sub;
+    ctx.font = '700 30px sans-serif';
+    ctx.fillText('하루 한 페이지, 독서 습관 리딩고', 100, 970);
+    ctx.fillText('@gyehyu', 850, 970);
+
+    // 실제 다운로드 링크 생성
+    const link = document.createElement('a');
+    link.download = `ReadingGo_Card_${book.title.replace(/\s+/g, '_')}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
+    window._showToast && window._showToast('🎨 고해상도 PNG 이미지를 저장했습니다!');
+  };
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 120, background: 'rgba(0,0,0,.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} className="fade-in">
+      <div style={{ width: '100%', background: '#fff', borderRadius: 24, padding: 20, maxWidth: 360 }} className="pop-in">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <p style={{ fontWeight: 900, fontSize: 16, color: '#1F1F1F', margin: 0 }}>🎨 인스타그램 공유 카드</p>
+          <button onClick={onClose} className="rg-btn-icon"><XIcon s={20}/></button>
+        </div>
+
+        {/* 프리뷰 카드 카드 */}
+        <div style={{
+          width: '100%', aspectRatio: '1/1', borderRadius: 16, padding: 20,
+          background: themeColors[theme].bg, color: themeColors[theme].text,
+          border: `2px solid ${themeColors[theme].border}`, display: 'flex', flexDirection: 'column',
+          justifyContent: 'space-between', position: 'relative', overflow: 'hidden'
+        }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 900, color: themeColors[theme].accent }}>🐦 ReadingGo</span>
+              <span style={{ fontSize: 10, fontWeight: 800 }}>🔥 21일 연속</span>
+            </div>
+            <p style={{ fontSize: 15, fontWeight: 900, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>《{book.title}》</p>
+            <p style={{ fontSize: 11, color: themeColors[theme].sub, margin: 0 }}>{book.author} · p.{page}</p>
+          </div>
+
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px', position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 0, top: 0, fontSize: 50, color: themeColors[theme].accent, opacity: 0.3 }}>“</span>
+            <p style={{ fontSize: 13, fontWeight: 700, fontStyle: 'italic', lineHeight: 1.5, textAlign: 'center', margin: 0 }}>
+              {sentence}
+            </p>
+            <span style={{ position: 'absolute', right: 0, bottom: 0, fontSize: 50, color: themeColors[theme].accent, opacity: 0.3 }}>”</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: themeColors[theme].sub, fontWeight: 700 }}>
+            <span>하루 한 페이지 독서 리딩고</span>
+            <span>@gyehyu</span>
+          </div>
+        </div>
+
+        {/* 테마 셀렉터 */}
+        <div style={{ display: 'flex', gap: 6, margin: '14px 0' }}>
+          {['cream', 'dark', 'mint', 'warm'].map(t => (
+            <button key={t} onClick={() => setTheme(t)} style={{
+              flex: 1, height: 26, borderRadius: 8, border: theme === t ? '2px solid #58CC02' : '1.5px solid #E5E5E5',
+              background: themeColors[t].bg, cursor: 'pointer', outline: 'none'
+            }}/>
+          ))}
+        </div>
+
+        {/* 렌더링용 숨겨진 Canvas */}
+        <canvas ref={canvasRef} style={{ display: 'none' }}/>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} className="btn-duo btn-white" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>취소</button>
+          <button onClick={handleDownload} className="btn-duo btn-green" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>💾 이미지 저장</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── AI 추출책(Extracted Book) 모달 ──────────────────────────────────────────
+const AIExtractedBookModal = ({ book, sentences, onClose }) => {
+  const [activeChapter, setActiveChapter] = React.useState(0);
+
+  // 시드 추출 책 내용 (Phase 0 데모용 사피엔스 기준)
+  const sampleChapters = [
+    {
+      title: '제 1장: 상상의 질서와 인지혁명',
+      summary: '사피엔스가 지구를 지배하게 된 근본 힘은 존재하지 않는 대상을 믿는 "상상력"과 "공동의 신화"입니다. 종교, 국가, 돈 모두 상상의 질서 위에서 작동합니다.',
+      quotes: sentences.slice(0, 2),
+      action: '나의 믿음 중 당연하다고 여겨온 사회적 상상물(예: 브랜드 가치, 화폐 가치)이 무엇인지 되돌아보기.'
+    },
+    {
+      title: '제 2장: 농업혁명이라는 거대한 덫',
+      summary: '농업혁명은 인류 전체를 풍요롭게 만들기보다, 소수 지배 계급의 번영과 개별 사피엔스의 과도한 노동 시간 증가를 불러왔습니다. 인류는 밀을 길들인 것이 아니라 밀에 길들여졌습니다.',
+      quotes: sentences.slice(2, 4),
+      action: '효율성을 극대화하기 위해 나 자신을 도구화하여 오히려 자유를 잃고 있지 않은지 성찰하기.'
+    },
+    {
+      title: '제 3장: 과학혁명과 제국의 결합',
+      summary: '사피엔스가 다른 생명체와 구별되는 과학혁명의 원동력은 "우리가 무지하다는 것을 인정하는 태도"였습니다. 과학은 제국주의, 자본주의와 강력히 결합하며 세계를 팽창시켰습니다.',
+      quotes: sentences.slice(4),
+      action: '나의 한계를 인정하고 새로운 배움과 호기심을 두려워하지 않는 자세 확립하기.'
+    }
+  ];
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 120, background: 'rgba(0,0,0,.75)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} className="fade-in">
+      <div style={{ width: '100%', background: '#FAF6F0', borderRadius: 24, padding: 20, maxHeight: '85%', overflowY: 'auto', border: '6px double #C49A4A' }}
+        className="pop-in" onClick={e => e.stopPropagation()}>
+        
+        {/* 북 커버 느낌의 헤더 */}
+        <div style={{ borderBottom: '2px solid #C49A4A', paddingBottom: 12, marginBottom: 16, textAlign: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, fontWeight: 900, color: '#C49A4A', letterSpacing: 1 }}>🤖 AI EXTRACTED BOOK</span>
+            <button onClick={onClose} className="rg-btn-icon" style={{ color: '#C49A4A' }}><XIcon s={20}/></button>
+          </div>
+          <p style={{ fontWeight: 900, fontSize: 18, color: '#2A2D33', margin: '10px 0 2px' }}>《{book.title}》 추출책</p>
+          <p style={{ fontSize: 11, color: '#9097A0', margin: 0 }}>나의 {sentences.length}개 모이로 컴파일된 단 하나의 텍스트</p>
+        </div>
+
+        {/* 장 선택 탭 */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #ECE6DA', paddingBottom: 6 }}>
+          {sampleChapters.map((ch, idx) => (
+            <button key={idx} onClick={() => setActiveChapter(idx)} style={{
+              flex: 1, padding: '6px 0', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 11, fontWeight: 800, fontFamily: 'inherit',
+              color: activeChapter === idx ? '#C49A4A' : '#9097A0',
+              borderBottom: activeChapter === idx ? '3px solid #C49A4A' : '3px solid transparent',
+            }}>
+              {idx + 1}장
+            </button>
+          ))}
+        </div>
+
+        {/* 챕터 요약 내용 */}
+        <div style={{ background: '#fff', borderRadius: 16, padding: 16, border: '1.5px solid #ECE6DA', marginBottom: 14 }}>
+          <p style={{ fontWeight: 900, fontSize: 14, color: '#2A2D33', margin: '0 0 10px' }}>{sampleChapters[activeChapter].title}</p>
+          <p style={{ fontSize: 13, color: '#5A5F69', lineHeight: 1.6, margin: '0 0 14px' }}>
+            {sampleChapters[activeChapter].summary}
+          </p>
+
+          {/* 수집된 문장 매핑 */}
+          {sampleChapters[activeChapter].quotes.length > 0 && (
+            <div style={{ borderTop: '1px dashed #ECE6DA', paddingTop: 12, marginBottom: 12 }}>
+              <p style={{ fontSize: 11, fontWeight: 800, color: '#C49A4A', marginBottom: 8 }}>📌 내가 수집한 문장</p>
+              {sampleChapters[activeChapter].quotes.map(q => (
+                <div key={q.id} style={{ fontStyle: 'italic', fontSize: 12, color: '#2A2D33', marginBottom: 6, paddingLeft: 8, borderLeft: '2.5px solid #C49A4A', lineHeight: 1.4 }}>
+                  "{q.text}" <span style={{ fontSize: 10, color: '#9097A0', fontStyle: 'normal' }}>(p.{q.page})</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* AI 추천 액션 아이템 */}
+          <div style={{ background: '#FFF9F0', borderRadius: 10, padding: 10, border: '1px solid #FFE0A0' }}>
+            <p style={{ fontSize: 11, fontWeight: 800, color: '#C8901C', margin: '0 0 4px' }}>💡 AI가 추천하는 실천 액션</p>
+            <p style={{ fontSize: 11, color: '#8A6234', margin: 0, lineHeight: 1.4 }}>
+              {sampleChapters[activeChapter].action}
+            </p>
+          </div>
+        </div>
+
+        <button onClick={() => {
+          window.print();
+        }} className="btn-duo btn-yellow" style={{ width: '100%', padding: '12px 0', background: '#C49A4A', boxShadow: '0 4px 0 #8B6234' }}>
+          📄 PDF 책자로 내보내기 (인쇄)
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── BookDetail ──────────────────────────────────────────────────────────────────
 const BookDetail = ({ userBook, onBack, onDelete }) => {
   const { book, currentPage, sessions = [], sentences = [] } = userBook;
   const pct = Math.min(100, Math.round((currentPage / book.total_pages) * 100));
   const st  = getNestStage(pct);
+  const isCompleted = userBook.status === 'completed' || pct === 100;
+
+  // 모달 상태
+  const [activeShareSentence, setActiveShareSentence] = React.useState(null);
+  const [showExtractedBook, setShowExtractedBook] = React.useState(false);
 
   // §5.7 Markdown export
   const handleExport = () => {
@@ -26,7 +292,7 @@ const BookDetail = ({ userBook, onBack, onDelete }) => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {/* 상단 바 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px',
         borderBottom: '2px solid #E5E5E5', background: '#fff' }}>
@@ -43,7 +309,7 @@ const BookDetail = ({ userBook, onBack, onDelete }) => {
 
       <div className="rg-scroll">
         {/* 표지 + 진척 바 */}
-        <div className="rg-card" style={{ padding: 20, marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center' }}>
+        <div className="rg-card" style={{ padding: 20, marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center', background: '#fff' }}>
           <BookCover book={book} size={80} radius={14}/>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontWeight: 900, fontSize: 15, color: '#1F1F1F', margin: '0 0 4px',
@@ -61,6 +327,59 @@ const BookDetail = ({ userBook, onBack, onDelete }) => {
           </div>
         </div>
 
+        {/* 완독 세레머니 및 AI 추출책 & AI 도서 추천 기능 */}
+        {isCompleted && (
+          <div className="rg-card" style={{ padding: 16, background: '#F0FDF4', borderColor: '#D7F0BF', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 20 }}>🎉</span>
+              <p style={{ fontWeight: 900, fontSize: 14, color: '#1F8E4D', margin: 0 }}>축하합니다! 완독에 성공하셨습니다.</p>
+            </div>
+            <p style={{ fontSize: 12, color: '#5A5F69', fontWeight: 600, margin: '0 0 12px', lineHeight: 1.4 }}>
+              완독 후 나의 한 문장 모이들을 인공지능이 테마별로 컴파일하여 탄생한 단 하나의 책자를 읽어보세요!
+            </p>
+            
+            {/* AI 추출책 버튼 */}
+            <button
+              onClick={() => setShowExtractedBook(true)}
+              className="btn-duo btn-green"
+              style={{ width: '100%', padding: '10px 0', fontSize: 13, marginBottom: 12 }}
+            >
+              📖 나만의 Extracted Book 보기
+            </button>
+
+            {/* AI 도서 추천 섹션 (§5.8) */}
+            <div style={{ background: '#fff', borderRadius: 14, padding: 12, border: '1.5px solid #D7F0BF', marginTop: 8 }}>
+              <p style={{ fontSize: 11, fontWeight: 800, color: '#1F8E4D', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>🤖</span> Gemini 추천 다음 읽을 책 3선
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  { title: '호모 데우스', author: '유발 하라리', reason: '사피엔스의 후속작으로 인류가 신이 되려 할 때 마주할 미래를 전망합니다.', isbn: '9788934979920' },
+                  { title: '총, 균, 쇠', author: '제러드 다이아몬드', reason: '지리적 요인이 인류 역사에 미친 장기적 영향의 궤적을 심층 추적합니다.', isbn: '9788947520027' },
+                  { title: '도파민네이션', author: '애나 렘키', reason: '현대 문명 속 사피엔스가 마주한 쾌락과 고통의 저울 메커니즘을 밝힙니다.', isbn: '9788950997486' }
+                ].map((rec, i) => (
+                  <div key={i} style={{ borderBottom: i < 2 ? '1px dashed #E5E5E5' : 'none', paddingBottom: i < 2 ? 8 : 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
+                      <p style={{ fontWeight: 800, fontSize: 12, color: '#1F1F1F', margin: 0 }}>{rec.title}</p>
+                      <a
+                        href={`https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(rec.isbn)}&partner=readinggo`} // 파트너 키 파라미터 (§5.8)
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: 10, color: '#58CC02', fontWeight: 800, textDecoration: 'none' }}
+                      >
+                        구매 🛒
+                      </a>
+                    </div>
+                    <p style={{ fontSize: 10, color: '#AFAFAF', margin: '0 0 4px' }}>{rec.author}</p>
+                    <p style={{ fontSize: 10, color: '#5A5F69', margin: 0, lineHeight: 1.3 }}>"{rec.reason}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 오늘의 문장 타임라인 (§5.7: 날짜 desc) */}
         <p style={{ fontWeight: 800, fontSize: 14, color: '#1F1F1F', marginBottom: 10 }}>📝 기록한 문장</p>
         {sentences.length === 0 ? (
@@ -75,13 +394,22 @@ const BookDetail = ({ userBook, onBack, onDelete }) => {
               const d = new Date(s.createdAt);
               const dateStr = `${d.getMonth()+1}/${d.getDate()}`;
               return (
-                <div key={s.id} className="rg-card" style={{ borderRadius: 16, padding: '14px 16px' }}>
+                <div key={s.id} className="rg-card" style={{ borderRadius: 16, padding: '14px 16px', background: '#fff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#58CC02' }}>{dateStr}</span>
                     <span style={{ fontSize: 12, color: '#AFAFAF', fontWeight: 700 }}>p.{s.page}</span>
                   </div>
-                  <p style={{ fontSize: 14, color: '#1F1F1F', lineHeight: 1.6, margin: 0,
+                  <p style={{ fontSize: 14, color: '#1F1F1F', lineHeight: 1.6, margin: '0 0 10px',
                     fontStyle: 'italic' }}>{s.text}</p>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setActiveShareSentence(s)}
+                      className="btn-duo btn-white"
+                      style={{ padding: '6px 12px', fontSize: 11, borderRadius: 8 }}
+                    >
+                      🎨 SNS 공유 카드
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -89,7 +417,7 @@ const BookDetail = ({ userBook, onBack, onDelete }) => {
         )}
 
         {/* 교보문고 링크 (§5.7) */}
-        <a href={KYOBO_URLS[book.isbn] || `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn || book.title)}`}
+        <a href={KYOBO_URLS[book.isbn] || `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn || book.title)}&partner=readinggo`}
           target="_blank" rel="noopener noreferrer"
           style={{ display: 'block', textAlign: 'center', marginTop: 16, padding: '12px 0',
             background: '#FFF9F0', border: '1.5px solid #FFE0A0', borderRadius: 14,
@@ -105,6 +433,24 @@ const BookDetail = ({ userBook, onBack, onDelete }) => {
           책 삭제 (기록 보존)
         </button>
       </div>
+
+      {/* 팝업 모달 */}
+      {activeShareSentence && (
+        <SNSCardModal
+          book={book}
+          sentence={activeShareSentence.text}
+          page={activeShareSentence.page}
+          onClose={() => setActiveShareSentence(null)}
+        />
+      )}
+
+      {showExtractedBook && (
+        <AIExtractedBookModal
+          book={book}
+          sentences={sentences}
+          onClose={() => setShowExtractedBook(null)}
+        />
+      )}
     </div>
   );
 };

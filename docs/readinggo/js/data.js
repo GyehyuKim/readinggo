@@ -39,6 +39,89 @@ const SEED_BOARD_POSTS = [
     text: '오늘부터 호밀밭의 파수꾼 시작! 홀든 콜필드 이름이 왜 이렇게 귀엽지' },
 ];
 
+// ── 독서모임 탭 시드 데이터 (§5.5 신설) ───────────────────────────────────────
+const SEED_MEGA_STREAMS = [
+  { id: 'mega1', title: '사피엔스', isbn: '9788934972464', membersCount: 42, todayPages: 154, emoji: '🐒' },
+  { id: 'mega2', title: '어린 왕자', isbn: '9788937460449', membersCount: 18, todayPages: 45, emoji: '🌹' },
+  { id: 'mega3', title: '1984', isbn: '9788937460319', membersCount: 29, todayPages: 82, emoji: '👁️' },
+  { id: 'mega4', title: '데미안', isbn: '9788937460647', membersCount: 22, todayPages: 38, emoji: '🥚' },
+];
+
+const SEED_SUB_GROUPS = [
+  {
+    id: 'sub1',
+    name: '🔥 사피엔스 30일 완독 레이스',
+    bookTitle: '사피엔스',
+    isbn: '9788934972464',
+    type: 'public', // 누구나 가입 신청 후 즉시 가입 또는 신청제
+    privacy: 'open',
+    targetDate: '2026-06-25',
+    membersCount: 5,
+    maxMembers: 10,
+    targetPages: 460,
+    description: '사피엔스를 매일 읽고 하루 한 줄 문장을 기록하는 끝장 레이스 모임입니다! 완독 가자!',
+    host: 'gyehyu',
+    members: [
+      { id: 'f1', handle: 'gyehyu', name: '계휴', stage: 4, isLit: true, sentence: '"별은 아름답다, 모래들이 아름답듯이."' },
+      { id: 'npc1', handle: 'book_bear', name: '책읽는곰돌이', stage: 3, isLit: true, sentence: '"역사는 언제나 승자의 기록이다."', isNpc: true },
+      { id: 'npc2', handle: 'activist_raccoon', name: '활자라쿤', stage: 4, isLit: true, sentence: '"빅브라더는 당신을 지켜보고 있다. 그것도 당신 안에서."', isNpc: true },
+      { id: 'f2', handle: 'seungwon', name: '승원', stage: 2, isLit: false, sentence: '' },
+      { id: 'me', handle: 'me', name: '나', stage: 1, isLit: false, sentence: '' }
+    ]
+  },
+  {
+    id: 'sub2',
+    name: '🔒 도파민 인류 극복 모임 (2주 집중)',
+    bookTitle: '도파민네이션',
+    isbn: '9788950997486',
+    type: 'private', // 비공개
+    privacy: 'code',
+    entryCode: 'DOPAMINE',
+    targetDate: '2026-06-10',
+    membersCount: 3,
+    maxMembers: 8,
+    targetPages: 312,
+    description: '도파민 중독에서 벗어나기 위해 도파민네이션을 치열하게 읽는 소수정예 비밀 모임.',
+    host: 'reading_owl',
+    members: [
+      { id: 'npc3', handle: 'reading_owl', name: '독서올빼미', stage: 2, isLit: false, sentence: '"밤에 읽는 책이 더 깊이 스며든다."', isNpc: true },
+      { id: 'npc4', handle: 'page_fox', name: '한페이지여우', stage: 1, isLit: true, sentence: '"한 문장이 삶을 바꿀 수 있다."', isNpc: true },
+      { id: 'f1', handle: 'gyehyu', name: '계휴', stage: 3, isLit: true, sentence: '"몰입의 기쁨을 찾아서."' }
+    ]
+  },
+  {
+    id: 'sub3',
+    name: '👑 IT경영 AI 비즈니스 스터디',
+    bookTitle: 'AI 경영학',
+    isbn: '9788934988779',
+    type: 'approve', // 승인제
+    privacy: 'approve',
+    targetDate: '2026-06-20',
+    membersCount: 4,
+    maxMembers: 15,
+    targetPages: 380,
+    description: '비즈니스에 어떻게 AI를 적용할지, 전략 사례를 깊이 파고들며 공유하는 학구적인 모임입니다.',
+    host: 'activist_raccoon',
+    members: [
+      { id: 'npc2', handle: 'activist_raccoon', name: '활자라쿤', stage: 4, isLit: true, sentence: '"인공지능 비즈니스는 전략의 게임이다."', isNpc: true },
+      { id: 'npc1', handle: 'book_bear', name: '책읽는곰돌이', stage: 3, isLit: true, sentence: '"데이터 플라이휠이 비즈니스를 주도한다."', isNpc: true },
+      { id: 'f2', handle: 'seungwon', name: '승원', stage: 2, isLit: false, sentence: '' }
+    ]
+  }
+];
+
+const SEED_GROUP_FEEDS = {
+  'sub1': [
+    { id: 'gf1', handle: 'gyehyu', name: '계휴', page: 120, sentence: '역사는 단지 한 줌의 지배자들이 만든 이야기일 뿐이다.', time: '2시간 전' },
+    { id: 'gf2', handle: 'book_bear', name: '책읽는곰돌이', page: 85, sentence: '인류가 지구를 지배하게 된 원동력은 오직 허구의 믿음이다.', time: '5시간 전' },
+    { id: 'gf3', handle: 'activist_raccoon', name: '활자라쿤', page: 198, sentence: '돈은 상호 신뢰 시스템 중 가장 위대하고 효율적인 발명품이다.', time: '어제' }
+  ],
+  'sub2': [
+    { id: 'gf4', handle: 'page_fox', name: '한페이지여우', page: 45, sentence: '우리가 느끼는 쾌락과 고통은 저울의 양팔 저울과 같다.', time: '3시간 전' },
+    { id: 'gf5', handle: 'reading_owl', name: '독서올빼미', page: 92, sentence: '끊임없는 자극은 우리 뇌의 도파민 수용체를 마비시킨다.', time: '어제' }
+  ]
+};
+
 // ── Seed data (Phase 0 시뮬레이션) ────────────────────────────────────────────
 const SEED_FRIENDS = [
   { id: 'npc1', handle: 'book_bear',        name: '책읽는곰돌이', stage: 3, isLit: true,
@@ -149,6 +232,8 @@ const INITIAL_STATE = {
   wishBooks: [],            // [{bookTitle,isbn,addedAt}]
   pokes: {},                // friendId -> bool (오늘 보냈는지)
   simDate: null,            // 날짜 시뮬레이터 (null = 오늘)
+  joinedGroupIds: ['sub1'], // 사용자가 이미 가입한 서브 모임 ID 목록 (§5.5 신설)
+  pendingGroupIds: [],      // 가입 신청 대기 중인 모임 ID 목록 (§5.5 신설)
 };
 
 function loadAppState() {
@@ -165,6 +250,8 @@ function loadAppState() {
     jaekFeed:  s.jaekFeed  || {},
     bookmarks: s.bookmarks || [],
     wishBooks: s.wishBooks || [],
+    joinedGroupIds: s.joinedGroupIds || ['sub1'],
+    pendingGroupIds: s.pendingGroupIds || [],
   };
 }
 
@@ -219,3 +306,7 @@ window.getActiveBook      = getActiveBook;
 window.hasDoneToday       = hasDoneToday;
 window.getSessionDates    = getSessionDates;
 window.advanceSimDate     = advanceSimDate;
+window.SEED_MEGA_STREAMS  = SEED_MEGA_STREAMS;
+window.SEED_SUB_GROUPS    = SEED_SUB_GROUPS;
+window.SEED_GROUP_FEEDS   = SEED_GROUP_FEEDS;
+
