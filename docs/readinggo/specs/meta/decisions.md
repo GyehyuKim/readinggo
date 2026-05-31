@@ -5,6 +5,74 @@
 
 ## 8. 미결 → 확정 사항
 
+### 8.0 v7 결정 (2026-06-01, web-first 롤백 — 아래 v5/v6 표보다 **우선**)
+
+> 충돌하는 v5/v6 행(운영자 짹·둥지 가속·독서모임·모이·주간 리그·Capacitor 등)은 v7로 **대체**됨. 기각 보존은 [rejected.md §14.2](./rejected.md).
+
+**게임 메카닉 / 화면**
+
+| 이슈 | v7 결정 | 담당 |
+|---|---|---|
+| 둥지 진화 기준 | **활성 책 진척률** 5단계 (누적 XP 아님) | nest (승원) |
+| 누적 성취 | **성(🏰) 컬렉션** — 완독 1권 = 🏰 1개. `user_books(status='completed')` 파생. 둥지+프로필 양쪽 전시 | nest→profile |
+| 둥지 시각화 | **"둥지가 자란다"**. The Path(세션 노드) **제거** | nest |
+| 첫 7일 둥지 가속 | **제거** | nest |
+| XP 차감 | **폐지**. 미기록 = 스트릭만 깨짐, 둥지·XP 존속. 1차 KPI = "하루 1회 방문" | systems |
+| 친구 짹 → XP | **채택** (+1). XP 수치 SSOT = `systems.md` | systems |
+| 챕터 완료 XP + 공유 카드 | 채택하되 **후순위** | systems |
+| 휴식코스 (Pause) | **채택** (장기출장/시험기간용). 기간·빈도·스트릭 동결 **상세 미정** | systems (승원) |
+| 그룹 기능 | **마을** (파트 마일스톤·파트별 랭킹). 독서모임·메가스트림·서브모임 **폐기** | village (윤지) |
+| 마을 공동자산 (도서관/세계수) | **삭제** | village |
+| 운영자 짹 | **제거** | — |
+| 소셜 피드 범위 | **전체 공개** (팔로워 한정은 향후) | social (계휴) |
+| 리액션 | **짹** 1종 + 책갈피 (👏🥹🔖 폐기) | social |
+| 스포일러 | **페이지 기반 블라인드** — 읽는 책의 내 현재페이지 이후 가림 + **전역 토글**. 완독·미독서 책 전체공개. `is_private` 폐기 | social |
+| 주간 리그 | **기능 삭제** | — |
+| 완독 별점 + 소감 | **채택** (`user_books.rating`/`review_text`) | profile |
+| 책장 구경 | **전체 공개** | profile |
+| AI 도서 추천 | **나↔책 fit** (친구 매칭 아님). Gemini Flash 무료 + 서버리스 프록시. Phase 0 하드코딩. 개발=계휴 | profile/backend |
+| AI 추출 책 | 유지 (Gemini, Phase 2 고도화) | profile |
+| `sentences.my_note` | **유지** (높은 우선순위) | backend |
+| `chapter_id` 자동매핑 | **제거** | backend |
+| `claps` 타깃 | `to_session_id` → **`to_sentence_id`** (짹 = 한 문장 좋아요) | backend |
+| 알림 다양성 | **후순위** (Phase 2 PWA 웹푸시 이후) | onboarding |
+| 락인 정당화 카드 | **제거** | profile |
+| 날짜 시뮬레이터 | **채택** (발표용, Phase 0) | nest |
+
+**용어 (정본: [README §0.5](../README.md))**
+
+| 개념 | v7 명칭 | 폐기어 |
+|---|---|---|
+| 일일 기록 콘텐츠 | **한 문장** (오늘 작성분 = "오늘의 문장") | 모이 |
+| 좋아요 | **짹** | 박수 / 👏🥹🔖 |
+| 독려 넛지 | **콕찌르기** (🪱) | 모이 보내기 |
+| 결정 마찰 카피 | **제거** ("그냥 펴진 페이지 한 줄도") | — |
+
+**스택 / 플랫폼 ([CLAUDE.md Stack Lock] · [backend.md §7](../backend.md))**
+
+| 이슈 | v7 결정 |
+|---|---|
+| 형태 | **web-first** — Phase 0 정적 웹(반응형) / Phase 1 Supabase. PWA·네이티브 보류 |
+| Capacitor | **보류** (Phase 3 재검토). OCR·STT 함께 보류 → 입력 마찰은 **OS 키보드 음성입력**으로 대체 |
+| 빌드 | 현행 **React 18 CDN** 유지. Vite는 PWA 전환 시 재검토 |
+| 백엔드 | Phase 0 `localStorage` / Phase 1+ **Supabase**. **DataStore 계약**으로 추상화 (어댑터 교체) |
+| AI | **Gemini Flash 무료 티어** + 서버리스 프록시. 클라 키 노출 금지 |
+| 배포 | **Netlify** (`resilient-licorice-f4b889`). GitHub Pages 폐기 |
+| 푸시 알림 | **Phase 2 PWA 웹푸시** 이후 |
+| Phase | 0 정적웹 / 1 Supabase(반드시 도달) / 2 PWA+AI고도화 / 3 native 재검토 |
+
+**작업 분배 (3인)**
+
+| owner | 파일 |
+|---|---|
+| **gyehyu** | `social.md` · `profile.md` · `backend.md` · `onboarding.md` · `meta/*` · `README.md` |
+| **seungwon** | `nest.md` · `systems.md` · `design.md` |
+| **yunji** | `book-club.md` → `village.md` (rename + 마을 재작성) |
+
+---
+
+### v5/v6 결정 이력 (참고 — 충돌 시 §8.0 우선)
+
 | 이슈 | 결정 |
 |---|---|
 | "오늘의 문장" 강제/선택 | 강제 |
