@@ -1,27 +1,105 @@
-# 백엔드 스펙 (플랫폼·인증·데이터 모델)
+# 백엔드 스펙 (플랫폼·인증·DataStore 계약·데이터 모델)
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §7. 변경 이력은 git log 참조.
+> **Split from** `docs/2. specifications/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §7.
+> **v7 갱신 (2026-06-01)**: web-first 재정의. Capacitor 보류 → 순수 웹(Phase 0/1). 운영자 짹·스포일러 컬럼(`is_private`)·`chapter_id` 자동매핑 제거, 완독 별점·소감·마을 테이블 추가, **DataStore 계약(§7.2) 신설**. 변경 이력은 git log 참조.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
 
 ### 7.1 플랫폼
 
-**Supabase** (Phase 1+). Auth + PostgreSQL + Storage + pg_cron.
+**web-first.** Phase 0 은 백엔드 없이 정적 웹으로, Phase 1 부터 Supabase 를 붙인다. 두 단계는 **DataStore 계약(§7.2)** 으로 추상화되어, 피처 코드는 어느 Phase 인지 모른 채 동일 인터페이스만 호출한다.
 
-| 역할 | 컴포넌트 |
-|---|---|
-| 인증 | Supabase Auth (Google OAuth) |
-| DB | PostgreSQL + RLS |
-| 표지 | Storage 또는 외부 URL (`books.cover_url`) |
-| 배치 | pg_cron (UTC 15:00 일일, 월 00:00 주간) |
-| 풀텍스트 보조 | `pg_trgm` extension |
+| 항목 | Phase 0 (정적 웹 데모) | Phase 1+ (Supabase) |
+|---|---|---|
+| 데이터 저장 | `localStorage` (키 `rg_v41`) + 정적 TSV (`data/books.tsv`) | PostgreSQL + RLS |
+| 인증 | 없음 (가짜 세션 localStorage) | Supabase Auth (Google OAuth) |
+| 배치 | 없음 (날짜 시뮬레이터로 대체, §발표용) | pg_cron (UTC 15:00 일일, 월 00:00 주간) |
+| AI 도서 추천 | 하드코딩 추천 시뮬 | **Gemini Flash 무료 티어** + 서버리스 프록시 (§7.9) |
+| 표지 이미지 | 알라딘 CDN URL (`books.cover_url`) | 동일 + Storage 옵션 |
+| 풀텍스트 보조 | 클라이언트 fuzzy (Fuse.js + 자모 분해) | + `pg_trgm` 서버 보조 |
 
-### 7.2 인증
+**플랫폼 결정 (v7):**
 
-Supabase Auth Google Provider. Phase 0은 가짜 세션 localStorage.
+- **빌드**: 현행 React 18 CDN + Babel standalone 유지 (빌드 도구 없음). Vite 전환은 **PWA 전환 시 재검토** (현재 보류).
+- **배포**: **Netlify** — 사이트 `resilient-licorice-f4b889`, `https://resilient-licorice-f4b889.netlify.app`. (GitHub Pages 폐기.) 재배포: `npx netlify-cli deploy --dir=docs/readinggo` (프로덕션 `--prod`).
+- **모바일/네이티브**: **Capacitor 보류** — OCR·STT·앱스토어가 필요한 Phase 3 에서 재도입 검토. 그전까지 한 줄 입력 마찰은 **OS 키보드 음성입력**(폰 키보드 마이크 = OS STT, 비용 0)으로 대체 안내.
+- **푸시 알림**: Phase 2 **PWA 전환(웹푸시)** 이후로 후순위. Phase 0/1 은 알림 없음(인앱 토스트 시뮬).
 
-### 7.3 데이터 모델 (관계형)
+### 7.2 DataStore 계약 (Phase 0 ↔ Phase 1 이음매) — v7 신설
+
+**목적**: 백엔드 오염 방지. 모든 데이터 접근을 **한 모듈(`DataStore`)로 가둔다.** 피처 코드(nest·village·social·profile·onboarding)는 `localStorage` 나 `supabase` 를 직접 호출하지 않고, 아래 인터페이스만 호출한다.
+
+```
+피처/컴포넌트  ──(DataStore.* 호출)──▶  DataStore 계약
+                                          ├─ Phase 0: localStorageAdapter  (rg_v41 + 시드/시뮬)
+                                          └─ Phase 1: supabaseAdapter        (Auth · Postgres · RLS)
+```
+
+- **Phase 0 → 1 이행 = 어댑터 교체 한 줄.** 피처 코드는 한 줄도 바뀌지 않는다.
+- 버려지는 것은 `localStorageAdapter` 하나뿐. 컴포넌트·UX·상태 로직은 100% 재사용.
+- **규율**: 피처 파일에서 `localStorage.getItem` / `supabase.from(...)` 직접 호출 금지. 위반 시 Phase 1 마이그레이션이 깨진다. auto 구현(Ralph loop) 시에도 이 계약을 SSOT 로 강제.
+
+**인터페이스 (메서드 표면, 도메인별 그룹):**
+
+```
+// 인증 / 프로필 / 설정
+auth.currentUser()                         → User | null
+auth.signInWithGoogle()                    → User           // Phase 0: 가짜 세션
+profile.get(userId?)                       → User
+profile.update({display_name, avatar_url, bio})
+settings.get() / settings.update({reminder_hour, ...})
+
+// 책 / 검색
+books.search(query)                        → Book[]          // 클라 fuzzy (Phase 0/1 공통)
+books.get(bookId)                          → Book
+myBooks.list()                             → UserBook[]      // 읽는 중 + 완독 + 보관
+myBooks.add({book, current_page})          → UserBook
+activeBook.get()                           → UserBook | null
+activeBook.set(userBookId)                                  // = users.active_user_book_id UPDATE
+
+// 일일 기록 (세션 + 한 문장)
+sessions.addToday({userBookId, page})      → Session         // 하루 첫 기록: 세션 생성 + 스트릭/XP
+sessions.list(userBookId)                  → Session[]
+sentences.add({userBookId, sessionId, page, text, my_note?}) → Sentence
+sentences.listByBook(userBookId)           → Sentence[]
+sentences.feed({cursor})                   → Sentence[]      // 전체 공개 피드 (§social)
+sentences.listMine()                       → Sentence[]
+
+// 스트릭 / XP / 성(완독)
+streak.get()                               → Streak
+streak.bumpOnCheckIn()                                      // 입력 즉시 호출
+xp.get() / xp.add(amount, reason)
+books.complete(userBookId, {rating?, review_text?})         // 완독 → 🏰 1개 (성 = 파생)
+castles.list()                             → UserBook[]      // status='completed' (성 컬렉션)
+
+// 소셜 (짹 / 책갈피 / 관심책 / 콕찌르기 / 팔로우)
+claps.toggle(sentenceId)                                    // 짹 = 한 문장 좋아요
+bookmarks.toggle(sentenceId) / bookmarks.list()             // 책갈피
+wishBooks.add(bookId) / wishBooks.list() / wishBooks.remove(bookId)
+pokes.send(toUserId) / pokes.listReceived()                 // 콕찌르기 🪱 (일 1회)
+friends.list() / friends.follow(userId) / users.search(query)
+
+// 스포일러 (read-side 계산, 저장 컬럼 없음)
+spoiler.myCurrentPage(bookId)              → int             // 블라인드 판정용 (§social)
+
+// 마을
+villages.create({bookId, name, visibility, parts[]}) → Village
+villages.join(villageId, {code?})
+villages.listMine() / villages.get(villageId)
+villages.members(villageId)                → VillageMember[]
+villages.ranking(villageId)                → 누적 페이지 순위
+
+// AI (Phase 0 하드코딩 / Phase 1+ Gemini 프록시 §7.9)
+ai.recommendBooks(userBookId)              → {title, reason}[]   // 나↔책 fit
+ai.extractBook(userBookId)                 → 추출 책 요약
+```
+
+> 휴식코스(Pause) 관련 메서드(`pause.start(days)` 등)는 **상세 미정** — `systems.md`(승원)에서 기간·빈도·스트릭 동결 규칙 확정 후 본 계약에 추가.
+
+### 7.3 데이터 모델 (관계형 — Phase 1 기준)
+
+> Phase 0 은 아래 구조를 localStorage JSON 으로 미러링(§7.8). 컬럼명·관계 동일하게 유지해 Phase 1 이관 시 1:1 매핑.
 
 ```
 users
@@ -29,14 +107,16 @@ users
   handle                text UNIQUE
   display_name          text
   avatar_url            text
+  bio                   text NULL
   timezone              text                 -- "Asia/Seoul"
   is_npc                bool DEFAULT false
-  is_operator           bool DEFAULT false   -- v5 신설. 운영자 권한
   daily_pace            int  NULL            -- NPC 전용
   active_user_book_id   uuid NULL FK user_books.id   -- 현재 활성 책
-  settings              jsonb DEFAULT '{}'   -- 알림 시간, 비공개 모드 등
+  settings              jsonb DEFAULT '{}'   -- 알림 시간 등
   xp                    int  DEFAULT 0
   created_at            timestamptz
+  -- v7 제거: is_operator (운영자 짹 폐기)
+  -- 성(🏰) 개수는 user_books(status='completed') 에서 파생 — 별도 컬럼 없음
 
 books
   id            uuid PK
@@ -50,7 +130,7 @@ books
   rank_steady   int  NULL
   created_at    timestamptz
 
-chapters
+chapters                                    -- Phase 후순위, 현재 미사용 (챕터 XP 후순위)
   id            uuid PK
   book_id       uuid FK books.id
   title         text
@@ -64,6 +144,8 @@ user_books
   book_id       uuid FK books.id
   status        text                 -- 'reading' | 'completed' | 'archived'
   current_page  int  DEFAULT 0
+  rating        int  NULL            -- v7 신설. 완독 별점 1~5 (선택)
+  review_text   text NULL            -- v7 신설. 완독 소감 (선택)
   started_at    timestamptz
   completed_at  timestamptz NULL
   UNIQUE(user_id, book_id)
@@ -79,17 +161,17 @@ reading_sessions
   created_at       timestamptz
   UNIQUE(user_book_id, session_date)
 
-sentences
+sentences                                   -- "한 문장" (DB 테이블명 유지, 앱 용어는 "한 문장")
   id            uuid PK
   user_id       uuid FK users.id
   user_book_id  uuid FK user_books.id
   session_id    uuid FK reading_sessions.id NULL
-  page          int
+  page          int                  -- 스포일러 블라인드 판정 기준 (§social)
   text          text                 -- 원문 인용. 200자 이내 (클라이언트 검증)
-  my_note       text NULL            -- v5 신설. 내 감상·코멘트 (선택). 길이 제한 없음 (UI 권장 500자)
-  chapter_id    uuid NULL FK chapters.id  -- v5 신설. 인용된 페이지가 속한 챕터 (자동 매핑)
-  is_private    bool DEFAULT false
+  my_note       text NULL            -- 내 감상·코멘트 (선택). UI 권장 500자
   created_at    timestamptz
+  -- v7 제거: is_private (스포일러 → 페이지 기반 블라인드로 일원화, §social)
+  -- v7 제거: chapter_id (챕터 자동매핑 폐기)
 
 streak
   user_id              uuid PK FK users.id
@@ -111,14 +193,14 @@ follows
   created_at    timestamptz
   PRIMARY KEY (follower_id, following_id)
 
-claps
+claps                                       -- "짹" = 한 문장 좋아요
   id              uuid PK
   from_user_id    uuid FK users.id
-  to_session_id   uuid FK reading_sessions.id
+  to_sentence_id  uuid FK sentences.id      -- v7 변경: to_session_id → to_sentence_id
   created_at      timestamptz
-  UNIQUE(from_user_id, to_session_id)
+  UNIQUE(from_user_id, to_sentence_id)
 
-pokes
+pokes                                       -- "콕찌르기" 🪱 (미기록 친구 독려)
   id              uuid PK
   from_user_id    uuid FK users.id
   to_user_id      uuid FK users.id
@@ -132,32 +214,52 @@ npc_sentence_seeds
   text      text
   weight    int DEFAULT 1
 
-wish_books
+wish_books                                  -- 관심 책
   id          uuid PK
   user_id     uuid FK users.id
   book_id     uuid FK books.id
   created_at  timestamptz
   UNIQUE(user_id, book_id)
 
-sentence_bookmarks
+sentence_bookmarks                          -- 책갈피 (관심 한 문장)
   id           uuid PK
   user_id      uuid FK users.id
   sentence_id  uuid FK sentences.id
   created_at   timestamptz
   UNIQUE(user_id, sentence_id)
 
-operator_replies                            -- v5 신설
-  id              uuid PK
-  to_sentence_id  uuid FK sentences.id      -- 사용자가 입력한 모이
-  from_user_id    uuid FK users.id          -- 운영자 (is_operator=true)
-  text            text                       -- 200자 이내
-  reply_kind      text                       -- 'welcome'|'daily'|'graduation'|'comeback'|'manual'
-  created_at      timestamptz
-  UNIQUE(to_sentence_id, from_user_id)
+villages                                    -- v7 신설. 마을 = 책 1권 단위 그룹
+  id            uuid PK
+  book_id       uuid FK books.id
+  name          text
+  description   text NULL
+  visibility    text                 -- 'public' | 'private'
+  invite_code   text NULL            -- 비공개 입장 코드
+  created_by    uuid FK users.id
+  created_at    timestamptz
+
+village_parts                               -- v7 신설. 마일스톤 (책을 N파트로 분할)
+  id            uuid PK
+  village_id    uuid FK villages.id
+  part_order    int
+  title         text NULL
+  end_page      int                  -- 이 파트의 끝 페이지
+  due_date      date
+  UNIQUE(village_id, part_order)
+
+village_members                             -- v7 신설
+  village_id    uuid FK villages.id
+  user_id       uuid FK users.id
+  joined_at     timestamptz
+  PRIMARY KEY (village_id, user_id)
+
+-- v7 제거: operator_replies 테이블 전체 (운영자 짹 폐기)
 ```
 
+> **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md`(승원) 확정 후 `pause_log` 류 테이블을 본 절에 추가.
+
 JSONB 사용:
-- `users.settings` — `{"reminder_hour": 21, "private_mode": false}`
+- `users.settings` — `{"reminder_hour": 21}` (알림은 Phase 2 PWA 이후 실동작)
 - 그 외 관계형 컬럼. JSON 남발 금지.
 
 ### 7.4 인덱스
@@ -166,26 +268,30 @@ JSONB 사용:
 follows(follower_id), follows(following_id)
 sentences(user_id, created_at desc), sentences(user_book_id, created_at)
 reading_sessions(user_id, session_date desc)
-reading_sessions(user_id, session_date) where session_date >= date_trunc('week', current_date)  -- 리그 쿼리 보조
 books(rank_recent), books(rank_steady)
+claps(to_sentence_id)                          -- v7 변경 (구 to_session_id)
 pokes(to_user_id, day)
 users using gin (handle gin_trgm_ops)
 books using gin (title gin_trgm_ops)
 wish_books(user_id, created_at desc)
 sentence_bookmarks(user_id, created_at desc)
-operator_replies(to_sentence_id), operator_replies(from_user_id, created_at desc)
+village_members(user_id), village_members(village_id)   -- v7 신설
+village_parts(village_id, part_order)                    -- v7 신설
+-- v7 제거: operator_replies 인덱스, 리그 보조 인덱스(리그 기능 삭제)
 ```
 
 ### 7.5 RLS 정책 (요약)
 
 - `users`: 본인 row update. 다른 유저 select 가능 (피드용 공개 정보)
-- `sentences`: `is_private=true`면 본인만 select. 그 외 모두 select. insert는 본인만
-- `reading_sessions`, `streak`, `user_books`: insert/update 본인. select 모두
+- `sentences`: 모두 select (스포일러는 클라이언트 페이지 블라인드로 처리, §social). insert/update 본인만
+- `reading_sessions`, `streak`, `user_books`: insert/update 본인. select 모두 (마을 그리드·완독 별점 공개)
 - `follows`: follower_id가 본인인 행만 insert/delete
 - `claps`: from_user_id가 본인인 행만 insert
 - `pokes`: from_user_id가 본인인 행만 insert. to_user_id가 본인이면 select (수신 확인용)
-- `operator_replies`: insert는 `is_operator=true` 사용자만. select 는 to_sentence 의 작성자와 모든 사용자(공개 카드용)
-- `users.is_operator`: 직접 update 불가. Supabase admin 또는 service role 만 토글 가능
+- `wish_books`, `sentence_bookmarks`: 본인만 insert/select/delete
+- `villages`: 누구나 공개 마을 목록 select. insert는 로그인 사용자. `village_members` 의 멤버만 피드/멤버 현황 select (구경 불가는 §village 에서 규정)
+- `village_members`: 본인 가입/탈퇴만 insert/delete
+- v7 제거: `operator_replies` RLS (운영자 짹 폐기)
 
 ### 7.6 닉네임 RPC
 
@@ -194,9 +300,11 @@ POST /rpc/check_handle  { handle }
 → { ok: true } | { ok: false, reason: 'taken' | 'format' | 'banned' }
 ```
 
-### 7.7 가입 전 데이터 동기화
+### 7.7 가입 전 데이터 동기화 (DataStore 어댑터 전환점)
 
-Phase 1: 클라이언트는 가입 전 입력을 localStorage 보관:
+가입 전 첫 책 등록 wedge 는 **Phase 1 에서도 로컬 계층을 요구**한다 (온보딩 §C → OAuth → 동기화). DataStore 관점에서 이는 *localStorageAdapter 가 보관한 pending 데이터를 supabaseAdapter 가 흡수*하는 1회성 흐름.
+
+클라이언트는 가입 전 입력을 localStorage 보관:
 
 ```json
 {
@@ -218,21 +326,29 @@ OAuth 콜백 직후 동기화 → localStorage 비움:
 
 - `user_books` 다수 행 보유 가능 (status='reading' 여러 권)
 - `users.active_user_book_id`가 현재 활성 책 가리킴 (NULL 가능: 책 없을 때)
-- 활성 책 전환 = `users.active_user_book_id` UPDATE만으로 끝
-- The Path 쿼리: `reading_sessions where user_book_id = users.active_user_book_id order by session_date asc`
+- 활성 책 전환 = `users.active_user_book_id` UPDATE만으로 끝 (`DataStore.activeBook.set`)
+- 둥지 진화 배너는 활성 책 진척률(`current_page/total_pages`)을 그린다 ([§5.2](./nest.md))
 - **각 책의 진척·세션·문장은 `user_book_id` 단위로 분리 저장되므로 책 전환 시 데이터 손실 없음**
 
-Phase 0 (localStorage):
+Phase 0 (localStorage, `rg_v41`):
 
 ```json
 {
   "user_books": [
-    { "id": "uuid", "book": { ... }, "current_page": 72, "sessions": [...], "sentences": [...] },
-    { "id": "uuid", "book": { ... }, "current_page": 5,  "sessions": [...], "sentences": [...] }
+    { "id": "uuid", "book": { ... }, "current_page": 72, "rating": null, "sessions": [...], "sentences": [...] },
+    { "id": "uuid", "book": { ... }, "current_page": 5,  "rating": null, "sessions": [...], "sentences": [...] }
   ],
   "active_user_book_id": "uuid"
 }
 ```
 
----
+### 7.9 AI 도서 추천 — 호출 경로 (Phase 1+)
 
+나↔책 fit 기반 추천 ([§5.8](./profile.md)). 비용·보안 주의:
+
+- **모델**: Gemini Flash **무료 티어** (Google AI Studio 키). 완독 1회당 1호출 → 무료 한도 내. 비용 0 이므로 "외부 API 비용 기각" 정책과 충돌 없음.
+- **API 키 보호**: 클라이언트 JS 에 키 노출 금지. **서버리스 프록시**(Supabase Edge Function 또는 Netlify Functions)가 키를 쥐고 호출.
+- **Phase 0**: 카테고리별 하드코딩 추천 3권 시뮬 (실 호출 없음).
+- **프라이버시**: 무료 티어는 입력이 학습에 쓰일 수 있음 — 데모 범위 무방. 유료 전환 시 해제.
+
+---
