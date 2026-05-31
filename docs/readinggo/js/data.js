@@ -92,12 +92,13 @@ const INITIAL_STATE = {
   },
   streak: 12,
   xp: 340,
+  shield: 2,
   nest: { lv: 3, progress: 62 },
   nestHealth: 80,
   daysSinceRead: 0,
   myQuotes: [
-    { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제" },
-    { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전" },
+    { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제", isSpoiler: false },
+    { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전", isSpoiler: false },
   ],
   league: [
     { rank: 1, name: "@book_bear · NPC",       avatar: "🐻", xp: 920 },
@@ -123,7 +124,100 @@ const INITIAL_STATE = {
     { type: "today", label: "★", title: "오늘! 짹"    },
     { type: "ghost", label: "＋", title: "내일"       },
   ],
+  towns: [
+    {
+      id: "town_001",
+      bookId: "b001",
+      name: "사피엔스 읽고 생각하기",
+      memberCount: 7,
+      currentPart: 2,
+      totalParts: 5,
+      dday: -4,
+      isOpen: true,
+      leader: "@book_bear",
+      milestones: [
+        { part: 1, dueDate: "5/15", completed: true },
+        { part: 2, dueDate: "5/28", completed: false },
+        { part: 3, dueDate: "6/10", completed: false },
+        { part: 4, dueDate: "6/22", completed: false },
+        { part: 5, dueDate: "7/5", completed: false },
+      ],
+      members: [
+        { name: "book_bear",      nest: "🏰", avatar: "🐻", todayRecorded: true,  quote: "역사의 진실을 아는 것의 중요성", cumulativePage: 412, streak: 64, xp: 920 },
+        { name: "jerome",         nest: "🏠", avatar: "🐦", todayRecorded: true,  quote: "인간이 정말 이렇게 변했나?", cumulativePage: 87, streak: 12, xp: 340 },
+        { name: "quiet_rabbit",   nest: "🏡", avatar: "🐰", todayRecorded: false, quote: "", cumulativePage: 245, streak: 21, xp: 740 },
+        { name: "curious_fox",    nest: "🏠", avatar: "🦊", todayRecorded: true,  quote: "문명의 발전 과정이 흥미로워", cumulativePage: 198, streak: 9, xp: 510 },
+        { name: "owl_n",          nest: "🏰", avatar: "🦉", todayRecorded: true,  quote: "과학혁명이 정말 인상적이었다", cumulativePage: 340, streak: 88, xp: 620 },
+        { name: "deer_s",         nest: "🪵", avatar: "🦌", todayRecorded: false, quote: "", cumulativePage: 45, streak: 0, xp: 120 },
+        { name: "raccoon_a",      nest: "🪹", avatar: "🦝", todayRecorded: true,  quote: "인지혁명 부분이 제일 좋아", cumulativePage: 156, streak: 15, xp: 380 },
+      ],
+    },
+    {
+      id: "town_002",
+      bookId: "b010",
+      name: "1984 북클럽",
+      memberCount: 12,
+      currentPart: 3,
+      totalParts: 4,
+      dday: 1,
+      isOpen: true,
+      leader: "@quiet_rabbit",
+      milestones: [
+        { part: 1, dueDate: "5/10", completed: true },
+        { part: 2, dueDate: "5/20", completed: true },
+        { part: 3, dueDate: "5/30", completed: false },
+        { part: 4, dueDate: "6/8", completed: false },
+      ],
+      members: [
+        { name: "quiet_rabbit",   nest: "🏡", avatar: "🐰", todayRecorded: true,  quote: "빅브라더의 감시 시스템이 소름끼쳤다", cumulativePage: 310, streak: 21, xp: 740 },
+        { name: "book_bear",      nest: "🏰", avatar: "🐻", todayRecorded: true,  quote: "미래는 이렇지 않길 바란다", cumulativePage: 298, streak: 64, xp: 920 },
+        { name: "curious_fox",    nest: "🏠", avatar: "🦊", todayRecorded: false, quote: "", cumulativePage: 201, streak: 9, xp: 510 },
+        { name: "owl_n",          nest: "🏰", avatar: "🦉", todayRecorded: true,  quote: "인간의 자유란 무엇인가 생각해보게 된다", cumulativePage: 280, streak: 88, xp: 620 },
+        { name: "activist_raccoon", nest: "🪹", avatar: "🦝", todayRecorded: true, quote: "독재체제에 대한 경고", cumulativePage: 215, streak: 10, xp: 280 },
+        { name: "deer_s",         nest: "🪵", avatar: "🦌", todayRecorded: false, quote: "", cumulativePage: 78, streak: 0, xp: 140 },
+        { name: "fox_c",          nest: "🏠", avatar: "🦊", todayRecorded: true,  quote: "이야기 속 세계가 너무 압박감 있어", cumulativePage: 190, streak: 9, xp: 420 },
+      ],
+    },
+    {
+      id: "town_003",
+      bookId: "b008",
+      name: "데미안으로 알아가기",
+      memberCount: 5,
+      currentPart: 1,
+      totalParts: 8,
+      dday: -10,
+      isOpen: false,
+      leader: "@fox_c",
+      milestones: [
+        { part: 1, dueDate: "5/15", completed: true },
+        { part: 2, dueDate: "5/22", completed: true },
+        { part: 3, dueDate: "5/29", completed: false },
+        { part: 4, dueDate: "6/5", completed: false },
+        { part: 5, dueDate: "6/12", completed: false },
+        { part: 6, dueDate: "6/19", completed: false },
+        { part: 7, dueDate: "6/26", completed: false },
+        { part: 8, dueDate: "7/3", completed: false },
+      ],
+      members: [
+        { name: "fox_c",          nest: "🏠", avatar: "🦊", todayRecorded: true,  quote: "진정한 자아를 찾는 여정이 시작된다", cumulativePage: 88, streak: 9, xp: 510 },
+        { name: "jerome",         nest: "🏠", avatar: "🐦", todayRecorded: true,  quote: "두 세계의 경계를 느낀다", cumulativePage: 102, streak: 12, xp: 340 },
+        { name: "activist_raccoon", nest: "🪹", avatar: "🦝", todayRecorded: true, quote: "새는 알에서 나오려고 투쟁한다", cumulativePage: 120, streak: 15, xp: 380 },
+        { name: "quiet_rabbit",   nest: "🏡", avatar: "🐰", todayRecorded: false, quote: "", cumulativePage: 72, streak: 21, xp: 740 },
+        { name: "owl_n",          nest: "🏰", avatar: "🦉", todayRecorded: true,  quote: "흥미롭고 깊이 있는 소설이다", cumulativePage: 95, streak: 88, xp: 620 },
+      ],
+    },
+  ],
 };
+
+/* ── 완독 기록 (책장) ─────────────────────────── */
+const INITIAL_BOOKSHELF = {
+  "b008": { rating: 5, comment: "나의 성장을 보는 듯한 경험. 삶의 의미를 생각하게 해준 책.", completedDate: "2026-05-20" },
+  "b105": { rating: 4, comment: "사회 비판의 대표작. 간결하면서도 강력한 메시지.", completedDate: "2026-05-18" },
+  "b037": { rating: 5, comment: "청춘의 방황과 성장. 모든 세대의 공감을 받을 책.", completedDate: "2026-05-15" },
+};
+
+/* ── 찜 목록 (읽고 싶은 책) ──────────────────────── */
+const WISHLIST = ["b002", "b010", "b093"];
 
 /* ── NEST_TWIGS 사전 계산 ─────────────────────── */
 const NEST_GEO = { cx: 110, cy: 132, rx: 60, ry: 22, irx: 44, iry: 13 };
@@ -291,9 +385,22 @@ function fuzzySearch(books, query) {
   );
 }
 
+// 검색용 ALL_BOOKS: books.tsv 형식으로 변환
+const ALL_BOOKS = RG_BOOKS.map(b => ({
+  book_id: b.id,
+  isbn: b.isbn,
+  title: b.title,
+  author: b.author,
+  publisher: b.pub,
+  total_pages: b.total,
+  cover_url: b.cover,
+}));
+
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
 window.INITIAL_PROGRESS=INITIAL_PROGRESS; window.NEST_LADDER=NEST_LADDER;
 window.NPC_QUOTES=NPC_QUOTES; window.INITIAL_STATE=INITIAL_STATE;
+window.INITIAL_BOOKSHELF=INITIAL_BOOKSHELF; window.WISHLIST=WISHLIST;
+window.ALL_BOOKS=ALL_BOOKS;
 window.NEST_TWIGS=NEST_TWIGS; window.NEST_GEO=NEST_GEO;
 window.twigCountFromState=twigCountFromState; window.healthClass=healthClass;
 window.healthCopy=healthCopy; window.nestInfo=nestInfo; window.drawNest=drawNest;

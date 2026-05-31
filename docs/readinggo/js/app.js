@@ -6,6 +6,8 @@
 function App() {
   const { useState, useCallback } = React;
   const [activeTab, setActiveTab] = useState('nest');
+  const [selectedTownId, setSelectedTownId] = useState(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [appState, setAppState] = useState(() => ({
     ...INITIAL_STATE,
     // village sent 상태는 로컬 복사
@@ -14,9 +16,18 @@ function App() {
 
   const switchTab = useCallback((tab) => {
     setActiveTab(tab);
+    setSelectedTownId(null);
     // 스크롤 맨위로
     const main = document.querySelector('.main');
     if (main) main.scrollTop = 0;
+  }, []);
+
+  const handleSelectTown = useCallback((townId) => {
+    setSelectedTownId(townId);
+  }, []);
+
+  const handleBackToVillage = useCallback(() => {
+    setSelectedTownId(null);
   }, []);
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화
@@ -78,6 +89,11 @@ function App() {
     switchTab('nest');
   }, [switchTab]);
 
+  const handleSearchSelectBook = useCallback((book) => {
+    setIsSearchOpen(false);
+    handleSetActiveBook(book.book_id);
+  }, [handleSetActiveBook]);
+
   // 리그 XP 업데이트 (체크인 후 나(jerome) XP 동기화)
   const league = appState.league.map(p =>
     p.me ? { ...p, xp: appState.xp } : p
@@ -102,13 +118,27 @@ function App() {
                 <span>{appState.streak}</span>
               </span>
               <span className="stat gold" title="이번 주 XP">
-                <span className="ico">⭐</span>
+                <span className="ico">⚡</span>
                 <span>{appState.xp}</span>
               </span>
-              <span className="stat league" title="주간 리그">
-                <span className="ico">🏆</span>
-                {myRank ? myRank.rank + '위' : '4위'}
+              <span className="stat shield" title="방패 개수">
+                <span className="ico">🪶</span>
+                <span>{appState.shield}</span>
               </span>
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                style={{
+                  background:'transparent',
+                  border:'none',
+                  fontSize:20,
+                  cursor:'pointer',
+                  padding:'4px 8px',
+                  marginLeft:8,
+                }}
+                title="도서 검색"
+              >
+                🔍
+              </button>
             </div>
           </div>
         </header>
@@ -125,11 +155,19 @@ function App() {
               onGoSocial={() => switchTab('social')}
             />
           )}
-          {activeTab === 'village' && (
+          {activeTab === 'village' && !selectedTownId && (
             <VillageView
               key="village"
               state={appState}
-              onSendSeed={handleSendSeed}
+              onSelectTown={handleSelectTown}
+            />
+          )}
+          {activeTab === 'village' && selectedTownId && (
+            <TownDetailView
+              key={`town_${selectedTownId}`}
+              state={appState}
+              townId={selectedTownId}
+              onBack={handleBackToVillage}
             />
           )}
           {activeTab === 'social' && (
@@ -138,7 +176,7 @@ function App() {
               state={{ ...appState, league }}
             />
           )}
-          {activeTab === 'library' && (
+          {activeTab === 'profile' && (
             <LibraryView
               key="library"
               state={appState}
@@ -153,7 +191,7 @@ function App() {
             { id: 'nest',    ico: '🏠', label: '둥지'   },
             { id: 'village', ico: '🌳', label: '마을'   },
             { id: 'social',  ico: '🏆', label: '소셜'   },
-            { id: 'library', ico: '📚', label: '내서재' },
+            { id: 'profile', ico: '👤', label: '프로필' },
           ].map(t => (
             <button
               key={t.id}
@@ -168,6 +206,15 @@ function App() {
 
         {/* 전역 Toast */}
         <Toast />
+
+        {/* 도서 검색 모달 */}
+        <SearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          books={ALL_BOOKS}
+          onSelectBook={handleSearchSelectBook}
+          topRecommendations={ALL_BOOKS.slice(0, 8)}
+        />
 
       </div>
     </div>

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1779695762972,
-  "projectRoot": "G:\\내 드라이브\\20. KAIST-IMMS\\2026 Spring\\21. BIZ.69911_IT경영 특수논제 - AI 기반 비즈니스 진화, 전략 및 실습_이지수\\41. Project",
+  "lastScanned": 1779977004163,
+  "projectRoot": "C:\\Users\\gangs\\Documents\\정윤지\\claude\\glocalx",
   "techStack": {
     "languages": [],
     "frameworks": [],
@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "gh issue edit 100 --body \"$(cat <<'EOF'\n## 배경\nBIZ.69911 (KAIST IMMS 2026 Spring, J.S. Yi) Week 1-11 강의에서 97개 프레임워크를 [`docs/lecture-frameworks.md`](./docs/lecture-frameworks.md)로 정본화 (PR #98 → #104 보강). 이 이슈는 추출된 프레임워크를 ReadingGo 프로젝트에 *실제 적용*하는 작업을 추적한다.\n\n## 진척 (2026-05-28 기준)\n\n### ✅ 완료 — 문서 기반 (Layer 1)\n- [x] **LF 정본 작성** — PR #98 (93 cards)\n- [x] **LF Week 11 재추출** — PR #104 (+ 4 cards, + 각 주차 핵심 처방 11개)\n- [x] **CLAUDE.md** Stack Lock·SLC·/insights — PR #101\n- [x] **CONTRIBUTING.md** §4.1 Spec/code PR 분리 + §9 #15·#16 LLM 룰 — PR #102\n\n### 🔴 폐기 — 재학습 사례\n- ~~spec §0.1-§0.4 (자평·Why=Moat·Riskiest·Living)~~ — PR #99 머지 후 PR #103로 revert\n  - **이유**: (a) 자평 점수·팀 묘사·데드라인을 팀 합의 없이 단독 결정 (b) 진짜 처방 (피처별 spec 분할)이 누락된 채 spec을 51줄 *더 키움* (c) Week 11 *thin spec* 처방과 정반대\n  - **교훈**: 카드 인용만으론 부족. *각 주차 핵심 처방*을 먼저 정리한 뒤 적용해야 (PR #104로 보완)\n\n### ⬜ 미실시 — 진짜 처방 적용 (Layer 2)\n\n각 트랙은 LF 처방 절을 근거로 함.\n\n#### Track A — Spec 처방 (Week 11 Lesson 1)\n> 긴 산문 spec은 죽었다. thin spec + feature별 분할 + real tests + 왜를 담은 커밋 메시지.\n\n- [ ] **A1**: `docs/readinggo-spec.md` (1,533줄)을 `docs/readinggo/specs/` 피처별로 분할\n  - 분할안: nest / village / social / profile / onboarding / streak-shield / xp-economy / data-model\n  - meta: scorecard / why-moat / risks / living\n  - 종속성: **윤지님 `yunji/readinggo-village` 활성 브랜치와 동기화 필요**\n- [ ] **A2**: `docs/readinggo-feature-spec.md` (330줄, 윤지) 와 통합 결정\n- [ ] **A3**: BACKLOG.md 37건에 P0/P1/P2 라벨 부여 (CONTRIBUTING §5.5 기준)\n- [ ] **A4**: Spec drift 방어 1패턴 선택 (LF: pre-commit hook 권장)\n\n#### Track B — Test 처방 (Week 11 Lesson 2)\n> 테스트 인프라는 협상 대상 아니다. /health → 4계층 → npm test 한 명령. E2E는 Claude in Chrome.\n\n- [ ] **B1**: `/health` 베이스라인 실행 (HW8 결합)\n- [ ] **B2**: Claude in Chrome E2E 1개 작성 — 데모 핵심 경로 (둥지 탭 로딩 → 한 문장 입력 → 등록)\n- [ ] **B3**: `.github/workflows/test.yml` 최소 형태\n- [ ] **B4** (Phase 1 진입 시): unit + evals + contracts 4계층 확장\n\n#### Track C — Meet User 처방 (Week 11 Lesson 3)\n> 데모 전 L3 도달. Mom Test 3원칙 — 과거 행동만 묻기.\n\n- [ ] **C1**: Mom Test 스크립트 작성 (`docs/research/interview-script.md`)\n- [ ] **C2**: 운영자 짹 사용자 7명 인터뷰 (L3 도달 목표)\n- [ ] **C3**: 인터뷰 결과를 whytree·spec에 재투입\n\n#### Track D — Phase 2 Scorecard 자가 진단\n> 14팀 함정: 10/14 사용자 접촉 0, 11/14 자동 테스트 0, 8/14 한 명이 40% 커밋, 0/14 자율 루프.\n\n- [ ] **D1**: 우리 팀 6지표 자가 진단표 작성\n- [ ] **D2**: ✗을 ✓로 만들 데드라인 (데모 6/20 역산)\n\n#### Track E — 데모 임박 작업\n- [ ] **E1**: Premortem 세션 (6/13 팀 미팅 후보) — LF: Premortem\n- [ ] **E2**: 데모 발표 시나리오 — DARPA 3축 (So what / What's new / Why you) + AI Native 답\n\n## 닫기 조건\n- Track A·B·C·D 체크박스 모두 완료\n- 6/20 데모 종료 후 회고 PR에 결과 기록\n\n## 활성 외부 변수\n- **윤지님 `yunji/readinggo-village` 브랜치** — 마을 탭 대규모 작업 진행 중 (+1,131줄, PR 미개설). Track A 시작 전 동기화 필수.\n- **PR #59** — GlocalX 아카이브용 잔재. 의도적 보존 (피벗 기록).\n\n## 참고\n- LF 정본: [`docs/lecture-frameworks.md`](./docs/lecture-frameworks.md) (97 cards + 11 처방)\n- Notion DB (검색·필터 뷰): https://www.notion.so/f545922118d5412fb494c355a274460c (sync 차이 있음, MD가 정본)\n- 머지 이력: PR #98, #101, #102, #103, #104\nEOF\n)\" 2>&1 | tail -2",
+    "testCommand": null,
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -25,7 +25,8 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
-      "docs"
+      "docs",
+      "tests"
     ],
     "gitBranches": {
       "defaultBranch": "main",
@@ -34,34 +35,72 @@
   },
   "customNotes": [],
   "directoryMap": {
+    "40. Development": {
+      "path": "40. Development",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779977004076,
+      "keyFiles": []
+    },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 8,
-      "lastAccessed": 1779695762795,
+      "fileCount": 0,
+      "lastAccessed": 1779977004079,
+      "keyFiles": []
+    },
+    "loop": {
+      "path": "loop",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1779977004080,
       "keyFiles": [
-        "MANIFESTO.md",
-        "whytree.md",
-        "pitch.md",
-        "readinggo-discussion.md",
-        "협동-기반-독서-루틴-조사.md"
+        "README.md"
       ]
     },
     "old": {
       "path": "old",
       "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779977004080,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
       "fileCount": 1,
-      "lastAccessed": 1779695762842,
+      "lastAccessed": 1779977004081,
       "keyFiles": [
-        "desktop.ini"
+        "README.md"
+      ]
+    },
+    "tests\\data": {
+      "path": "tests\\data",
+      "purpose": "Data files",
+      "fileCount": 1,
+      "lastAccessed": 1779977004090,
+      "keyFiles": [
+        "validate-books.py"
       ]
     }
   },
   "hotPaths": [
     {
+      "path": "docs\\readinggo\\demo-index.html",
+      "accessCount": 14,
+      "lastAccessed": 1779977039250,
+      "type": "file"
+    },
+    {
       "path": "docs\\lecture-frameworks.md",
       "accessCount": 11,
       "lastAccessed": 1779780336158,
+      "type": "file"
+    },
+    {
+      "path": "docs\\readinggo\\index.html",
+      "accessCount": 9,
+      "lastAccessed": 1779977744799,
       "type": "file"
     },
     {
@@ -71,9 +110,27 @@
       "type": "file"
     },
     {
+      "path": "docs\\readinggo\\js\\data.js",
+      "accessCount": 6,
+      "lastAccessed": 1779979550200,
+      "type": "file"
+    },
+    {
+      "path": "docs\\readinggo\\js\\nest.js",
+      "accessCount": 5,
+      "lastAccessed": 1779978854511,
+      "type": "file"
+    },
+    {
       "path": "CLAUDE.md",
       "accessCount": 3,
       "lastAccessed": 1779765829853,
+      "type": "file"
+    },
+    {
+      "path": "docs\\readinggo\\js\\app.js",
+      "accessCount": 3,
+      "lastAccessed": 1779978285884,
       "type": "file"
     },
     {
@@ -89,6 +146,30 @@
       "type": "file"
     },
     {
+      "path": "docs\\readinggo\\js\\components.js",
+      "accessCount": 2,
+      "lastAccessed": 1779978134748,
+      "type": "file"
+    },
+    {
+      "path": "docs\\readinggo\\js\\village.js",
+      "accessCount": 2,
+      "lastAccessed": 1779978147418,
+      "type": "file"
+    },
+    {
+      "path": "docs\\readinggo\\js\\social.js",
+      "accessCount": 2,
+      "lastAccessed": 1779978156588,
+      "type": "file"
+    },
+    {
+      "path": "docs\\readinggo\\js\\library.js",
+      "accessCount": 2,
+      "lastAccessed": 1779978168211,
+      "type": "file"
+    },
+    {
       "path": "tests\\README.md",
       "accessCount": 1,
       "lastAccessed": 1779952831422,
@@ -98,6 +179,12 @@
       "path": "tests\\e2e\\scenario-nest-load.md",
       "accessCount": 1,
       "lastAccessed": 1779953006024,
+      "type": "file"
+    },
+    {
+      "path": "docs\\readinggo\\data\\books.tsv",
+      "accessCount": 1,
+      "lastAccessed": 1779979067065,
       "type": "file"
     }
   ],

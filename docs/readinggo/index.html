@@ -563,6 +563,17 @@ input,textarea{font-family:inherit;}
   font-size: 14px; line-height: 1.55; color: var(--ink);
   letter-spacing: -0.1px; font-weight: 400;
 }
+.my-q-card .quote.spoiler,
+.sentence-card .quote.spoiler {
+  filter: blur(5px);
+  cursor: pointer;
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+.my-q-card .quote.spoiler:hover,
+.sentence-card .quote.spoiler:hover {
+  filter: blur(3px);
+}
 .my-q-empty{
   background: var(--card);
   border: 1.5px dashed var(--brand-soft);
@@ -1113,6 +1124,8 @@ input,textarea{font-family:inherit;}
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <!-- Babel standalone (JSX 변환) -->
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Fuse.js (Fuzzy search) -->
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
 
 <script>
 const _RG_V = '50';
@@ -1132,8 +1145,10 @@ async function loadBabel(src) {
   try {
     await loadBabel('js/data.js');
     await loadBabel('js/components.js');
+    await loadBabel('js/search.js');
     await loadBabel('js/nest.js');
     await loadBabel('js/village.js');
+    await loadBabel('js/town.js');
     await loadBabel('js/social.js');
     await loadBabel('js/library.js');
     await loadBabel('js/app.js');
