@@ -1,5 +1,13 @@
 # ReadingGo iOS + Android 출시 계획
 
+> ## ⛔ 보류 동결 (v7, 2026-06-01)
+> **이 문서 전체는 보류 상태다.** v7에서 **web-first** 결정으로 **Capacitor·앱스토어 출시를 Phase 3으로 보류**했다.
+> 아래 내용(Capacitor 셸·App Store·Play Store·OCR·STT·위젯·개발자 계정 결제)은 **현재 실행하지 않는다.**
+> **개발자 계정($99 + $25)은 결제하지 않는다.** Capacitor 재도입을 결정하는 Phase 3에서 본 계획을 재활성화·갱신한다.
+> 현행 스택은 `CLAUDE.md` Stack Lock + [`specs/README.md` §3](./specs/README.md) 참조.
+>
+> ---
+>
 > 상태: **v5.1 기준 재작성** (2026-05-23). v4의 *학기말 1주 압축 모델* 폐기.
 > 모델: **Capacitor 처음부터 — Phase 0/1/2 점진**. 같은 `src/`로 웹·iOS·Android 동시 빌드.
 > 출시 목표: 학기말(Phase 2) App Store + Play Store 정식 트랙.

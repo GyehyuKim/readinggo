@@ -1,5 +1,16 @@
 # ReadingGo Roadmap — 북모리 전체 벤치마크 × Phase 매트릭스
 
+> ## ⚠️ v7 갱신 필요 (2026-06-01)
+> 아래 매트릭스는 **v5.1 기준이라 다수 항목이 폐기/이동**됐다. v7 변경 요지:
+> - **Capacitor·앱스토어·OCR·STT·위젯·푸시 → Phase 3 보류** (web-first 전환). Phase 0/1은 순수 웹.
+> - **폐기**: 운영자 짹(전 단계), 첫 7일 둥지 가속, 주간 리그, 결정 마찰 카피, 메가스트림/서브모임, chapter_id 자동매핑.
+> - **복귀**: 마을(파트 마일스톤). **신규**: AI 도서 추천(Gemini 무료), 성 컬렉션, 페이지 블라인드, 휴식코스, DataStore 계약.
+> - Phase 정의·스택은 [`specs/README.md` §3](./specs/README.md), 결정 근거는 [`specs/meta/decisions.md`](./specs/meta/decisions.md)를 정본으로 본다.
+>
+> *매트릭스 전면 재작성은 후속 작업. 현재는 위 요지가 우선.*
+>
+> ---
+>
 > 작성: 2026-05-23
 > 상태: v5.1 결정 기준. *모든 항목은 가역적*, 분기마다 재검토.
 > 입력: `docs/readinggo-spec.md` (v5.1), `docs/readinggo/COMPETITIVE-ANALYSIS.md`, `docs/readinggo/BACKLOG.md`, 북모리 정밀 조사 (2026-05-22)
