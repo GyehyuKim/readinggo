@@ -1,6 +1,6 @@
 /* =========================================================
    ReadingGo — data.js
-   책 데이터, NEST_TWIGS, 초기 상태, 헬퍼 함수
+   책 데이터, NEST_STAGES(진척률 5단계), 초기 상태, 헬퍼 함수
    window.* 으로 export → 다음 파일에서 참조 가능
    ========================================================= */
 
@@ -29,55 +29,76 @@ const INITIAL_PROGRESS = {
   "b001": { cur: 21,  days: 8  },
 };
 
-const NEST_LADDER = [
-  { lv: 1, name: "시작",         short: "🪵" },
-  { lv: 2, name: "가지 수집",    short: "🪹" },
-  { lv: 3, name: "둥지 확장",    short: "🏠" },
-  { lv: 4, name: "바닥 보강",    short: "✨" },
-  { lv: 5, name: "벽체 완성",    short: "🏡" },
-  { lv: 6, name: "지붕 구조",    short: "🛖" },
-  { lv: 7, name: "지붕 완성",    short: "🌿" },
-  { lv: 8, name: "우리 집 완성!", short: "🏰" },
+/* ── 둥지 진화 5단계 (nest.md §5.2) ───────────────
+   단계 = 활성 책 진척률(current_page/total_pages*100), XP·스트릭 무관.
+   진척률 임계값(상한, 이하 포함): 20 / 50 / 80 / 99 / 100. lv 1-based. */
+const NEST_STAGES = [
+  { lv: 1, max: 20,  name: "나뭇가지 자리", short: "🪵", color: "#AFAFAF", bg: "#f3f4f6" },
+  { lv: 2, max: 50,  name: "빈 둥지",       short: "🪹", color: "#F59E0B", bg: "#FEF3C7" },
+  { lv: 3, max: 80,  name: "따뜻한 둥지",   short: "🏠", color: "#58CC02", bg: "#F0FDF4" },
+  { lv: 4, max: 99,  name: "다정한 집",     short: "🏡", color: "#1CB0F6", bg: "#EFF6FF" },
+  { lv: 5, max: 100, name: "참새의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
 ];
+// 진척률(0~100) → 단계 객체. 경계 포함(<=).
+function getNestStage(progressPct){
+  const p = Math.max(0, Math.min(100, progressPct || 0));
+  return NEST_STAGES.find(s => p <= s.max) || NEST_STAGES[NEST_STAGES.length - 1];
+}
+
+/* ── 진화 마이크로카피 4종 (nest.md §5.2) ─────────
+   단계 상승 시 toast. from/to 는 NEST_STAGES.lv (1-based). */
+const NEST_STAGE_TRANSITIONS = [
+  { from: 1, to: 2, text: "참새가 자리를 잡았어요!" },
+  { from: 2, to: 3, text: "참새가 살림을 차렸어요!" },
+  { from: 3, to: 4, text: "다정한 이웃이 되었어요!" },
+  { from: 4, to: 5, text: "전설의 참새 성주!" },
+];
+// fromLv < toLv 일 때 가장 높은 도달 단계의 카피 반환(여러 단계 점프 시 최종 단계).
+function getEvolutionCopy(fromLv, toLv){
+  if (toLv <= fromLv) return null;
+  const t = NEST_STAGE_TRANSITIONS.find(x => x.to === toLv) ||
+            [...NEST_STAGE_TRANSITIONS].reverse().find(x => x.to > fromLv && x.to <= toLv);
+  return t ? t.text : null;
+}
 
 const NPC_QUOTES = {
   "b008": [
-    { nick:"@activist_raccoon", avatar:"🦝", page:120, q:"새는 알에서 나오려고 투쟁한다. 알은 세계다. 태어나려는 자는 한 세계를 깨뜨려야 한다.", time:"2시간 전", claps:34, tears:8, marks:21 },
-    { nick:"@fox_c", avatar:"🦊", page:88, q:"우리가 한 인간을 미워한다면, 우리는 그의 모습 속에서 우리 자신 안에 들어앉아 있는 무엇인가를 보고 미워하는 것이다.", time:"어제", claps:18, tears:3, marks:9 },
-    { nick:"@quiet_rabbit", avatar:"🐰", page:152, q:"운명과 마음은 같은 개념의 두 이름이다.", time:"이틀 전", claps:11, tears:1, marks:5 },
+    { nick:"@activist_raccoon", avatar:"🦝", page:120, q:"새는 알에서 나오려고 투쟁한다. 알은 세계다. 태어나려는 자는 한 세계를 깨뜨려야 한다.", time:"2시간 전", claps:34 },
+    { nick:"@fox_c", avatar:"🦊", page:88, q:"우리가 한 인간을 미워한다면, 우리는 그의 모습 속에서 우리 자신 안에 들어앉아 있는 무엇인가를 보고 미워하는 것이다.", time:"어제", claps:18 },
+    { nick:"@quiet_rabbit", avatar:"🐰", page:152, q:"운명과 마음은 같은 개념의 두 이름이다.", time:"이틀 전", claps:11 },
   ],
   "b001": [
-    { nick:"@book_bear", avatar:"🐻", page:412, q:"역사는 한 가지 철칙을 따른다 — 사후에 보면 모든 것이 필연이지만, 그 순간에는 우연이었다.", time:"3시간 전", claps:21, tears:0, marks:14 },
+    { nick:"@book_bear", avatar:"🐻", page:412, q:"역사는 한 가지 철칙을 따른다 — 사후에 보면 모든 것이 필연이지만, 그 순간에는 우연이었다.", time:"3시간 전", claps:21 },
   ],
   "b002": [
-    { nick:"@owl_n", avatar:"🦉", page:540, q:"우리는 별의 먼지로 만들어져 있다. 우주가 자기 자신을 들여다보는 한 방식이다.", time:"5시간 전", claps:29, tears:6, marks:18 },
+    { nick:"@owl_n", avatar:"🦉", page:540, q:"우리는 별의 먼지로 만들어져 있다. 우주가 자기 자신을 들여다보는 한 방식이다.", time:"5시간 전", claps:29 },
   ],
   "b010": [
-    { nick:"@quiet_rabbit", avatar:"🐰", page:120, q:"누가 과거를 지배하는가가 미래를 지배한다. 누가 현재를 지배하는가가 과거를 지배한다.", time:"어제", claps:24, tears:2, marks:13 },
+    { nick:"@quiet_rabbit", avatar:"🐰", page:120, q:"누가 과거를 지배하는가가 미래를 지배한다. 누가 현재를 지배하는가가 과거를 지배한다.", time:"어제", claps:24 },
   ],
   "b105": [
-    { nick:"@raccoon_a", avatar:"🦝", page:22, q:"모든 동물은 평등하다. 그러나 어떤 동물은 더 평등하다.", time:"이틀 전", claps:42, tears:1, marks:25 },
+    { nick:"@raccoon_a", avatar:"🦝", page:22, q:"모든 동물은 평등하다. 그러나 어떤 동물은 더 평등하다.", time:"이틀 전", claps:42 },
   ],
   "b093": [
-    { nick:"@curious_fox", avatar:"🦊", page:156, q:"그래서 우리는 더 앞으로 나아간다, 흐름을 거슬러 끊임없이 과거로 떠밀려 가면서.", time:"4시간 전", claps:33, tears:9, marks:20 },
+    { nick:"@curious_fox", avatar:"🦊", page:156, q:"그래서 우리는 더 앞으로 나아간다, 흐름을 거슬러 끊임없이 과거로 떠밀려 가면서.", time:"4시간 전", claps:33 },
   ],
   "b337": [
-    { nick:"@deer_s", avatar:"🦌", page:88, q:"인간은 파괴될 수는 있어도, 패배할 수는 없다.", time:"오늘 아침", claps:45, tears:2, marks:28 },
+    { nick:"@deer_s", avatar:"🦌", page:88, q:"인간은 파괴될 수는 있어도, 패배할 수는 없다.", time:"오늘 아침", claps:45 },
   ],
   "b325": [
-    { nick:"@fox_c", avatar:"🦊", page:140, q:"오늘 엄마가 죽었다. 아니, 어쩌면 어제. 잘 모르겠다.", time:"3일 전", claps:19, tears:7, marks:11 },
+    { nick:"@fox_c", avatar:"🦊", page:140, q:"오늘 엄마가 죽었다. 아니, 어쩌면 어제. 잘 모르겠다.", time:"3일 전", claps:19 },
   ],
   "b103": [
-    { nick:"@book_bear", avatar:"🐻", page:88, q:"죽느냐 사느냐, 그것이 문제로다.", time:"오늘", claps:55, tears:3, marks:32 },
+    { nick:"@book_bear", avatar:"🐻", page:88, q:"죽느냐 사느냐, 그것이 문제로다.", time:"오늘", claps:55 },
   ],
   "b104": [
-    { nick:"@activist_raccoon", avatar:"🦝", page:42, q:"어느 날 아침 그레고르 잠자가 불안한 꿈에서 깨어났을 때, 자신이 침대에서 한 마리 거대한 해충으로 변해 있음을 발견했다.", time:"어제", claps:27, tears:4, marks:16 },
+    { nick:"@activist_raccoon", avatar:"🦝", page:42, q:"어느 날 아침 그레고르 잠자가 불안한 꿈에서 깨어났을 때, 자신이 침대에서 한 마리 거대한 해충으로 변해 있음을 발견했다.", time:"어제", claps:27 },
   ],
   "b037": [
-    { nick:"@curious_fox", avatar:"🦊", page:198, q:"미성숙한 인간의 특징은 어떤 명분을 위해 고결하게 죽으려 하는 것이고, 성숙한 인간의 특징은 그 명분을 위해 비겁하게 살아가려 하는 것이다.", time:"이틀 전", claps:22, tears:5, marks:14 },
+    { nick:"@curious_fox", avatar:"🦊", page:198, q:"미성숙한 인간의 특징은 어떤 명분을 위해 고결하게 죽으려 하는 것이고, 성숙한 인간의 특징은 그 명분을 위해 비겁하게 살아가려 하는 것이다.", time:"이틀 전", claps:22 },
   ],
   "b172": [
-    { nick:"@quiet_rabbit", avatar:"🐰", page:240, q:"나는 그 자존심을 미워할 정도로 마음에 두지 않았다. 그것은 또한 정당한 자존심이었으므로.", time:"3일 전", claps:14, tears:1, marks:8 },
+    { nick:"@quiet_rabbit", avatar:"🐰", page:240, q:"나는 그 자존심을 미워할 정도로 마음에 두지 않았다. 그것은 또한 정당한 자존심이었으므로.", time:"3일 전", claps:14 },
   ],
 };
 
@@ -93,19 +114,11 @@ const INITIAL_STATE = {
   streak: 12,
   xp: 340,
   shield: 2,
-  nest: { lv: 3, progress: 62 },
-  nestHealth: 80,
-  daysSinceRead: 0,
+  // 둥지 단계는 활성 책 진척률에서 파생 (§5.2). cur/total 로 초기 단계 계산.
+  nest: { lv: getNestStage(Math.round(_ap.cur / _ab.total * 100)).lv },
   myQuotes: [
-    { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제", isSpoiler: false },
-    { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전", isSpoiler: false },
-  ],
-  league: [
-    { rank: 1, name: "@book_bear · NPC",       avatar: "🐻", xp: 920 },
-    { rank: 2, name: "@quiet_rabbit",           avatar: "🐰", xp: 740 },
-    { rank: 3, name: "@curious_fox",            avatar: "🦊", xp: 510 },
-    { rank: 4, name: "나 (jerome)",             avatar: "🐦", xp: 340, me: true },
-    { rank: 5, name: "@activist_raccoon · NPC", avatar: "🦝", xp: 280 },
+    { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제" },
+    { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전" },
   ],
   village: [
     { name: "book_bear", nest: "🏰", on: true,  streak: 64, sent: false, bookId: "b001", page: 412 },
@@ -114,15 +127,6 @@ const INITIAL_STATE = {
     { name: "raccoon_a", nest: "🪹", on: false, streak: 0,  sent: false, bookId: "b105", page: 22  },
     { name: "owl_n",     nest: "🏰", on: true,  streak: 88, sent: true,  bookId: "b002", page: 540 },
     { name: "deer_s",    nest: "🪵", on: false, streak: 0,  sent: false, bookId: "b337", page: 12  },
-  ],
-  pathNodes: [
-    { type: "done",  label: "✓", title: "5/7 · 14p"  },
-    { type: "done",  label: "✓", title: "5/8 · 22p"  },
-    { type: "done",  label: "✓", title: "5/9 · 8p"   },
-    { type: "done",  label: "✓", title: "5/10 · 30p" },
-    { type: "done",  label: "✓", title: "5/12 · 18p" },
-    { type: "today", label: "★", title: "오늘! 짹"    },
-    { type: "ghost", label: "＋", title: "내일"       },
   ],
   towns: [
     {
@@ -210,8 +214,8 @@ const INITIAL_STATE = {
 };
 
 /* ── 완독 기록 (책장) ─────────────────────────── */
+// 완독 책(성 컬렉션). 활성 책(_ab=b008, 읽는 중)은 제외 — 같은 책이 읽는 중·완독 양쪽에 뜨지 않도록.
 const INITIAL_BOOKSHELF = {
-  "b008": { rating: 5, comment: "나의 성장을 보는 듯한 경험. 삶의 의미를 생각하게 해준 책.", completedDate: "2026-05-20" },
   "b105": { rating: 4, comment: "사회 비판의 대표작. 간결하면서도 강력한 메시지.", completedDate: "2026-05-18" },
   "b037": { rating: 5, comment: "청춘의 방황과 성장. 모든 세대의 공감을 받을 책.", completedDate: "2026-05-15" },
 };
@@ -256,44 +260,35 @@ const NEST_TWIGS = (function(){
 })();
 
 /* ── 헬퍼 함수 ──────────────────────────────── */
-function twigCountFromState(lv, health){
-  const ranges=[[4,14],[15,28],[29,55],[56,85],[86,115],[116,135],[136,155],[156,164]];
-  const r=ranges[Math.min(7,Math.max(0,lv-1))];
-  return r[0]+Math.round((health/100)*(r[1]-r[0]));
+// 진척률(0~100) → 둥지 일러스트에 쌓을 가지 수. 단계가 오를수록 둥지가 자란다.
+function twigsForProgress(progressPct){
+  const p = Math.max(0, Math.min(100, progressPct || 0));
+  return Math.round((p / 100) * NEST_TWIGS.length);
 }
-function healthClass(h){ if(h>=70)return'h-strong'; if(h>=40)return'h-shaky'; if(h>=20)return'h-cracked'; return'h-ruin'; }
-function healthCopy(h){
-  if(h>=85)return{cls:'',      text:'💪 둥지가 단단해요. 오늘 한 쪽이면 +14 체력.'};
-  if(h>=70)return{cls:'',      text:'🌿 따뜻해요. 오늘도 한 쪽으로 둥지를 더 키워봐요.'};
-  if(h>=55)return{cls:'warn',  text:'🍃 가지 한두 개가 흔들려요. 짧게라도 짹.'};
-  if(h>=40)return{cls:'warn',  text:'🍂 둥지가 헐거워졌어요. 한 쪽으로 다시 단단해져요.'};
-  if(h>=25)return{cls:'danger',text:'⚠️ 가지들이 떨어지고 있어요. 오늘은 꼭 한 쪽!'};
-  if(h>=10)return{cls:'danger',text:'🚨 둥지에 균열이 생겼어요. 한 쪽이면 살릴 수 있어요.'};
-  if(h>0)  return{cls:'crisis',text:'💔 둥지가 무너지기 직전이에요. 짹 한 번에 +14.'};
-  return         {cls:'crisis',text:'💔 둥지가 무너졌어요. 다시 가지 한 개부터 쌓아봐요.'};
-}
+// 현재/다음 단계 객체 (다음 단계 없으면 next=null).
 function nestInfo(lv){
-  const cur =NEST_LADDER[Math.max(0,Math.min(NEST_LADDER.length-1,lv-1))];
-  const next=NEST_LADDER[Math.min(NEST_LADDER.length-1,lv)];
-  return{cur,next};
+  const i = Math.max(0, Math.min(NEST_STAGES.length - 1, lv - 1));
+  const cur = NEST_STAGES[i];
+  const next = lv < NEST_STAGES.length ? NEST_STAGES[i + 1] : null;
+  return { cur, next };
 }
 
-function drawNest(twigCount, nestLv, prevTwigCount){
-  prevTwigCount = prevTwigCount||0;
-  twigCount=Math.max(0,Math.min(NEST_TWIGS.length,twigCount));
+function drawNest(twigs, nestLv, prevTwigs){
+  prevTwigs = prevTwigs||0;
+  twigs=Math.max(0,Math.min(NEST_TWIGS.length,twigs));
   const G=NEST_GEO, lvNow=nestLv;
-  const visible=NEST_TWIGS.slice(0,twigCount).map((t,i)=>({...t,_origIdx:i}));
+  const visible=NEST_TWIGS.slice(0,twigs).map((t,i)=>({...t,_origIdx:i}));
   const backTwigs=visible.filter(t=>!t.front);
   const frontTwigs=visible.filter(t=>t.front);
-  function rt(t){const isNew=t._origIdx>=prevTwigCount,ni=isNew?(t._origIdx-prevTwigCount):0,cls=isNew?'twig twig-new':'twig';return`<path class="${cls}" style="--i:${t._origIdx};--new-i:${ni}" d="${t.path}" stroke="${t.col}" stroke-width="${t.sw.toFixed(2)}" fill="none" stroke-linecap="round" opacity="${t.op.toFixed(2)}"/>`;}
+  function rt(t){const isNew=t._origIdx>=prevTwigs,ni=isNew?(t._origIdx-prevTwigs):0,cls=isNew?'twig twig-new':'twig';return`<path class="${cls}" style="--i:${t._origIdx};--new-i:${ni}" d="${t.path}" stroke="${t.col}" stroke-width="${t.sw.toFixed(2)}" fill="none" stroke-linecap="round" opacity="${t.op.toFixed(2)}"/>`;}
   function rimPt(a,rs){const t=a*Math.PI/180;return{x:G.cx+G.rx*rs*Math.cos(t),y:G.cy+G.ry*rs*Math.sin(t)};}
   const defs=`<defs><radialGradient id="g_sun" cx="50%" cy="30%" r="55%"><stop offset="0%" stop-color="#FFE9A8"/><stop offset="100%" stop-color="#FFFCEF" stop-opacity="0"/></radialGradient><radialGradient id="g_inner" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#1A0E06"/><stop offset="45%" stop-color="#3A2410"/><stop offset="100%" stop-color="#6B4423" stop-opacity="0"/></radialGradient></defs>`;
   const sky=`<circle cx="110" cy="36" r="55" fill="url(#g_sun)"/>`;
   const ground=`<ellipse cx="${G.cx}" cy="${G.cy+G.ry+18}" rx="${G.rx*1.1}" ry="7" fill="rgba(30,15,5,.32)"/>`;
-  const bowlOutline=twigCount>=8?`<ellipse cx="${G.cx}" cy="${G.cy+2}" rx="${G.rx+2}" ry="${G.ry+3}" fill="none" stroke="#3A2410" stroke-width="2.5" opacity="0.18"/>`:'';
-  const cavity=twigCount>=25?`<ellipse cx="${G.cx}" cy="${G.cy+2}" rx="${G.irx}" ry="${G.iry}" fill="url(#g_inner)"/>`:'';
-  const rim=twigCount>=30?`<ellipse cx="${G.cx}" cy="${G.cy}" rx="${G.rx}" ry="${G.ry}" fill="none" stroke="#2A1810" stroke-width="0.5" opacity="0.20"/>`:'';
-  const holdingTwig=lvNow===2,winking=lvNow===8,cheekHi=lvNow>=3;
+  const bowlOutline=twigs>=8?`<ellipse cx="${G.cx}" cy="${G.cy+2}" rx="${G.rx+2}" ry="${G.ry+3}" fill="none" stroke="#3A2410" stroke-width="2.5" opacity="0.18"/>`:'';
+  const cavity=twigs>=25?`<ellipse cx="${G.cx}" cy="${G.cy+2}" rx="${G.irx}" ry="${G.iry}" fill="url(#g_inner)"/>`:'';
+  const rim=twigs>=30?`<ellipse cx="${G.cx}" cy="${G.cy}" rx="${G.rx}" ry="${G.ry}" fill="none" stroke="#2A1810" stroke-width="0.5" opacity="0.20"/>`:'';
+  const holdingTwig=lvNow===2,winking=lvNow===5,cheekHi=lvNow>=3;
   const sparrowBody=`<g class="sparrow-body"><ellipse cx="110" cy="128" rx="24" ry="16" fill="#F3CD9E" stroke="#C49460" stroke-width="1.2"/><ellipse cx="110" cy="133" rx="15" ry="10" fill="#FBE7C8"/><ellipse cx="90" cy="128" rx="6.5" ry="9.5" fill="#A07043" transform="rotate(-14 90 128)"/><ellipse cx="130" cy="128" rx="6.5" ry="9.5" fill="#A07043" transform="rotate(14 130 128)"/></g>`;
   const leftEye=winking?`<path d="M 99 102 Q 103 100 105 102" stroke="#2A2D33" stroke-width="1.8" fill="none" stroke-linecap="round"/>`:`<circle cx="102" cy="101" r="2.6" fill="#2A2D33"/><circle cx="103" cy="100" r="0.9" fill="#FFF"/>`;
   const rightEye=`<circle cx="118" cy="101" r="2.6" fill="#2A2D33"/><circle cx="119" cy="100" r="0.9" fill="#FFF"/>`;
@@ -302,12 +297,11 @@ function drawNest(twigCount, nestLv, prevTwigCount){
   const leafAccents=lvNow>=4?`<g><ellipse cx="56" cy="138" rx="4" ry="2" fill="#5FAB5C" transform="rotate(-30 56 138)"/><ellipse cx="68" cy="148" rx="3" ry="1.6" fill="#3E7C3B" transform="rotate(-15 68 148)"/><ellipse cx="164" cy="138" rx="4" ry="2" fill="#5FAB5C" transform="rotate(30 164 138)"/><ellipse cx="152" cy="148" rx="3" ry="1.6" fill="#3E7C3B" transform="rotate(15 152 148)"/></g>`:'';
   let sparkles='';
   if(lvNow>=4)sparkles+=`<g fill="#FFD66B"><polygon points="178,84 180,90 186,90 181,93 183,99 178,95 173,99 175,93 170,90 176,90"/></g>`;
-  if(lvNow>=7)sparkles+=`<g fill="#FFD66B"><polygon points="40,90 42,96 48,96 43,99 45,105 40,101 35,105 37,99 32,96 38,96"/></g>`;
-  if(lvNow>=8)sparkles+=`<g fill="#FFD66B" opacity="0.9"><polygon points="195,128 197,134 203,134 198,137 200,143 195,139 190,143 192,137 187,134 193,134"/><polygon points="22,128 24,134 30,134 25,137 27,143 22,139 17,143 19,137 14,134 20,134"/></g>`;
-  const roofFrame=lvNow===6?`<g><line x1="64" y1="118" x2="110" y2="64" stroke="#7A4F2C" stroke-width="3.5" stroke-linecap="round"/><line x1="156" y1="118" x2="110" y2="64" stroke="#7A4F2C" stroke-width="3.5" stroke-linecap="round"/><line x1="80" y1="100" x2="140" y2="100" stroke="#7A4F2C" stroke-width="2.5" stroke-linecap="round"/><circle cx="110" cy="64" r="3.5" fill="#5A3A1F"/></g>`:'';
-  const leafyRoof=lvNow>=7?`<g><path d="M 54 102 Q 76 60 110 54 Q 144 60 166 102 Q 110 92 54 102 Z" fill="#6BB562" stroke="#3E7C3B" stroke-width="1.5"/><ellipse cx="76" cy="92" rx="5" ry="3" fill="#7CBF7A" transform="rotate(-22 76 92)"/><ellipse cx="110" cy="68" rx="6" ry="3.5" fill="#7CBF7A"/><ellipse cx="144" cy="92" rx="5" ry="3" fill="#7CBF7A" transform="rotate(22 144 92)"/><g><circle cx="78" cy="80" r="2" fill="#fff" opacity="0.92"/><circle cx="74" cy="78" r="1.8" fill="#fff" opacity="0.92"/><circle cx="82" cy="78" r="1.8" fill="#fff" opacity="0.92"/><circle cx="74" cy="82" r="1.8" fill="#fff" opacity="0.92"/><circle cx="82" cy="82" r="1.8" fill="#fff" opacity="0.92"/><circle cx="78" cy="80" r="1.3" fill="#FFD66B"/></g></g>`:'';
-  const chimney=lvNow===8?`<g><rect x="130" y="56" width="9" height="14" fill="#7A4F2C" stroke="#5A3A1F" stroke-width="0.8" rx="1"/><ellipse cx="134.5" cy="56" rx="5" ry="1.2" fill="#3E7C3B"/></g>`:'';
-  const branchBase=lvNow===8?`<g><path d="M 28 174 Q 110 170 202 176" stroke="#6B4423" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M 30 172 Q 110 168 200 174" stroke="#A87544" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/></g>`:'';
+  if(lvNow>=4)sparkles+=`<g fill="#FFD66B"><polygon points="40,90 42,96 48,96 43,99 45,105 40,101 35,105 37,99 32,96 38,96"/></g>`;
+  if(lvNow>=5)sparkles+=`<g fill="#FFD66B" opacity="0.9"><polygon points="195,128 197,134 203,134 198,137 200,143 195,139 190,143 192,137 187,134 193,134"/><polygon points="22,128 24,134 30,134 25,137 27,143 22,139 17,143 19,137 14,134 20,134"/></g>`;
+  const leafyRoof=lvNow>=4?`<g><path d="M 54 102 Q 76 60 110 54 Q 144 60 166 102 Q 110 92 54 102 Z" fill="#6BB562" stroke="#3E7C3B" stroke-width="1.5"/><ellipse cx="76" cy="92" rx="5" ry="3" fill="#7CBF7A" transform="rotate(-22 76 92)"/><ellipse cx="110" cy="68" rx="6" ry="3.5" fill="#7CBF7A"/><ellipse cx="144" cy="92" rx="5" ry="3" fill="#7CBF7A" transform="rotate(22 144 92)"/><g><circle cx="78" cy="80" r="2" fill="#fff" opacity="0.92"/><circle cx="74" cy="78" r="1.8" fill="#fff" opacity="0.92"/><circle cx="82" cy="78" r="1.8" fill="#fff" opacity="0.92"/><circle cx="74" cy="82" r="1.8" fill="#fff" opacity="0.92"/><circle cx="82" cy="82" r="1.8" fill="#fff" opacity="0.92"/><circle cx="78" cy="80" r="1.3" fill="#FFD66B"/></g></g>`:'';
+  const chimney=lvNow===5?`<g><rect x="130" y="56" width="9" height="14" fill="#7A4F2C" stroke="#5A3A1F" stroke-width="0.8" rx="1"/><ellipse cx="134.5" cy="56" rx="5" ry="1.2" fill="#3E7C3B"/></g>`:'';
+  const branchBase=lvNow===5?`<g><path d="M 28 174 Q 110 170 202 176" stroke="#6B4423" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M 30 172 Q 110 168 200 174" stroke="#A87544" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/></g>`:'';
   const standMode=lvNow<=2,birdY=lvNow===1?20:(lvNow===2?12:0),birdT=standMode?`transform="translate(0 ${birdY})"`:'';
   const feet=standMode?`<g ${birdT}><ellipse cx="102" cy="146" rx="2.6" ry="1.4" fill="#F4B400" stroke="#C8901C" stroke-width="0.5"/><ellipse cx="118" cy="146" rx="2.6" ry="1.4" fill="#F4B400" stroke="#C8901C" stroke-width="0.5"/><line x1="100" y1="146" x2="102" y2="148.5" stroke="#C8901C" stroke-width="0.6"/><line x1="104" y1="146" x2="102" y2="148.5" stroke="#C8901C" stroke-width="0.6"/><line x1="116" y1="146" x2="118" y2="148.5" stroke="#C8901C" stroke-width="0.6"/><line x1="120" y1="146" x2="118" y2="148.5" stroke="#C8901C" stroke-width="0.6"/></g>`:'';
   const motionMarks=lvNow===1?`<g stroke="#7A4F2C" stroke-width="2" stroke-linecap="round" fill="none"><line x1="48" y1="118" x2="40" y2="110"/><line x1="44" y1="126" x2="34" y2="124"/></g>`:'';
@@ -316,7 +310,7 @@ function drawNest(twigCount, nestLv, prevTwigCount){
   const wrap=(c)=>standMode?`<g ${birdT}>${c}</g>`:c;
   const bodyLayer=wrap(sparrowBody);
   const headW=wrap(sparrowHead);
-  let dec=lvNow>=7?(leafAccents+headW+leafyRoof+chimney+sparkles):lvNow===6?(leafAccents+headW+roofFrame+sparkles):(leafAccents+headW+sparkles+motionMarks);
+  let dec=lvNow>=4?(leafAccents+headW+leafyRoof+chimney+sparkles):(leafAccents+headW+sparkles+motionMarks);
   return `<svg class="nest-art" viewBox="0 0 220 200" xmlns="http://www.w3.org/2000/svg">${defs}${sky}${ground}${branchBase}${useTwigRing?twigRing:`${bowlOutline}<g class="twig-layer back">${backTwigs.map(rt).join('')}</g>${cavity}`}${bodyLayer}${feet}${useTwigRing?'':`${rim}<g class="twig-layer front">${frontTwigs.map(rt).join('')}</g>`}${dec}</svg>`;
 }
 
@@ -397,11 +391,12 @@ const ALL_BOOKS = RG_BOOKS.map(b => ({
 }));
 
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
-window.INITIAL_PROGRESS=INITIAL_PROGRESS; window.NEST_LADDER=NEST_LADDER;
+window.INITIAL_PROGRESS=INITIAL_PROGRESS;
+window.NEST_STAGES=NEST_STAGES; window.getNestStage=getNestStage;
+window.NEST_STAGE_TRANSITIONS=NEST_STAGE_TRANSITIONS; window.getEvolutionCopy=getEvolutionCopy;
 window.NPC_QUOTES=NPC_QUOTES; window.INITIAL_STATE=INITIAL_STATE;
 window.INITIAL_BOOKSHELF=INITIAL_BOOKSHELF; window.WISHLIST=WISHLIST;
 window.ALL_BOOKS=ALL_BOOKS;
 window.NEST_TWIGS=NEST_TWIGS; window.NEST_GEO=NEST_GEO;
-window.twigCountFromState=twigCountFromState; window.healthClass=healthClass;
-window.healthCopy=healthCopy; window.nestInfo=nestInfo; window.drawNest=drawNest;
+window.twigsForProgress=twigsForProgress; window.nestInfo=nestInfo; window.drawNest=drawNest;
 window.loadBooks=loadBooks; window.fuzzySearch=fuzzySearch;

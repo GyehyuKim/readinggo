@@ -9,6 +9,9 @@ function TownDetailView({ state, townId, onBack }) {
 
   // poke(콕찌르기) 로컬 상태: 멤버 name → sent 여부
   const [poked, setPoked] = useState({});
+  // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
+  const revealAll = React.useContext(SpoilerContext);
+  const [revealed, setRevealed] = useState({});
 
   if (!town) {
     return (
@@ -69,8 +72,8 @@ function TownDetailView({ state, townId, onBack }) {
       </div>
 
       {/* 마일스톤 진행 바 */}
-      <div className="path-wrap" style={{ marginTop: 0 }}>
-        <div className="path-label">
+      <div className="town-milestone" style={{ marginTop: 0 }}>
+        <div className="town-milestone-label">
           <span>📖 파트 {town.currentPart}/{town.totalParts}</span>
           <span style={{ marginLeft: 'auto', color: 'var(--brand-3)' }}>{ddayText}</span>
         </div>
@@ -113,17 +116,27 @@ function TownDetailView({ state, townId, onBack }) {
         <h3>📚 오늘의 한 문장</h3>
       </div>
       {todayQuotes.length > 0 ? (
-        todayQuotes.map((m) => (
-          <div key={m.name} className="my-q-card">
-            <div className="meta">
-              <span>{m.avatar}</span>
-              <span className="bk">@{m.name}</span>
-              <span className="dot">·</span>
-              <span>p{m.cumulativePage}</span>
+        todayQuotes.map((m) => {
+          const blinded = !revealAll && !revealed[m.name] &&
+            isSentenceBlinded(town.bookId, m.cumulativePage);
+          return (
+            <div key={m.name} className="my-q-card">
+              <div className="meta">
+                <span>{m.avatar}</span>
+                <span className="bk">@{m.name}</span>
+                <span className="dot">·</span>
+                <span>p{m.cumulativePage}</span>
+              </div>
+              {blinded ? (
+                <div className="spoiler-blind" onClick={() => setRevealed(r => ({ ...r, [m.name]: true }))}>
+                  ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
+                </div>
+              ) : (
+                <div className="quote">"{m.quote}"</div>
+              )}
             </div>
-            <div className="quote">"{m.quote}"</div>
-          </div>
-        ))
+          );
+        })
       ) : (
         <div className="my-q-empty">
           <span className="ico">🐦</span>
@@ -135,16 +148,16 @@ function TownDetailView({ state, townId, onBack }) {
       <div className="section-head">
         <h3>🏅 파트 랭킹</h3>
       </div>
-      <div className="league-list">
+      <div className="trank-list">
         {ranking.map((m, i) => {
           const done = m.cumulativePage >= book.total;
           const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
           return (
-            <div key={m.name} className={'league-row' + (m.name === 'jerome' ? ' me' : '')}>
-              <span className={'league-rank' + (rankClass ? ' ' + rankClass : '')}>{done ? '🏆' : i + 1}</span>
-              <span className="league-avatar">{m.avatar}</span>
-              <span className="league-name">@{m.name}</span>
-              <span className="league-xp">{m.cumulativePage}p</span>
+            <div key={m.name} className={'trank-row' + (m.name === 'jerome' ? ' me' : '')}>
+              <span className={'trank-rank' + (rankClass ? ' ' + rankClass : '')}>{done ? '🏆' : i + 1}</span>
+              <span className="trank-avatar">{m.avatar}</span>
+              <span className="trank-name">@{m.name}</span>
+              <span className="trank-page">{m.cumulativePage}p</span>
             </div>
           );
         })}

@@ -89,6 +89,8 @@ input,textarea{font-family:inherit;}
 .reward-card .lbl,
 .league-rank,
 .league-xp,
+.trank-rank,
+.trank-page,
 .friend-nest .streakmini,
 .shelf-prog,
 .sentence-card .meta{
@@ -101,6 +103,8 @@ input,textarea{font-family:inherit;}
 .reward-card .lbl{ font-weight: 400; letter-spacing: 1.2px; }
 .league-rank{ font-weight: 400; letter-spacing: 1px; }
 .league-xp{ font-weight: 400; letter-spacing: 1px; }
+.trank-rank{ font-weight: 400; letter-spacing: 1px; }
+.trank-page{ font-weight: 400; letter-spacing: 1px; }
 .nest-stage{ letter-spacing: 1px; }
 .page-num{ font-weight: 400; letter-spacing: 1.5px; }
 
@@ -293,6 +297,21 @@ input,textarea{font-family:inherit;}
 .path .node:nth-child(even){ transform: translateY(10px); }
 .path .node.today:nth-child(odd){ transform: translateY(-12px); }
 .path .node.today:nth-child(even){ transform: translateY(10px); }
+
+/* 마을 마일스톤 진행 바 (S3: 구 path-wrap에서 분리) */
+.town-milestone{
+  margin-top: 16px;
+  background: var(--brand-tint);
+  border: 1.5px solid var(--brand-soft);
+  border-radius: var(--r-md);
+  padding: 14px 12px 10px;
+}
+.town-milestone-label{
+  font-size: 11px; font-weight: 800; color: var(--brand-3);
+  letter-spacing: .4px; text-transform: uppercase;
+  margin-bottom: 8px;
+  display:flex; align-items:center; gap:6px;
+}
 
 @keyframes bounce{
   0%,100%{ transform: translateY(-12px); }
@@ -574,6 +593,18 @@ input,textarea{font-family:inherit;}
 .sentence-card .quote.spoiler:hover {
   filter: blur(3px);
 }
+/* 페이지 기반 스포일러 블라인드 (§5.7.1): 안 읽은 부분 → 탭하면 공개 */
+.spoiler-blind{
+  display:flex; align-items:center; justify-content:center;
+  gap:6px; text-align:center;
+  font-size: 13px; font-weight: 800; color: var(--ink-3);
+  background: var(--paper-2); border: 1.5px dashed var(--line);
+  border-radius: var(--r-md);
+  padding: 16px 12px; margin: 4px 0 8px;
+  cursor: pointer; user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.spoiler-blind:hover{ background: var(--brand-tint); color: var(--brand-3); }
 .my-q-empty{
   background: var(--card);
   border: 1.5px dashed var(--brand-soft);
@@ -782,6 +813,27 @@ input,textarea{font-family:inherit;}
 .league-name{ flex:1; font-weight: 800; font-size: 14px; }
 .league-xp{ font-weight: 900; color: var(--gold-shadow); font-size: 13px; }
 .league-xp::before{ content:"★ "; }
+
+/* 마을 파트 랭킹 (S3: 구 league-* 클래스에서 분리) */
+.trank-list{ display: flex; flex-direction: column; gap: 6px; }
+.trank-row{
+  display:flex; align-items:center; gap:10px;
+  padding: 10px 12px; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.trank-row.me{ border-color: var(--brand); background: var(--brand-tint); }
+.trank-rank{ font-weight: 900; color: var(--ink-2); width: 22px; text-align:center; }
+.trank-rank.gold{ color: var(--gold-shadow); }
+.trank-rank.silver{ color: #8E939B; }
+.trank-rank.bronze{ color: #B17142; }
+.trank-avatar{
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--brand-soft);
+  display:flex; align-items:center; justify-content:center;
+  font-size: 14px;
+}
+.trank-name{ flex:1; font-weight: 800; font-size: 14px; }
+.trank-page{ font-weight: 900; color: var(--gold-shadow); font-size: 13px; }
 
 .shelf-row{
   display:flex; align-items:center; gap: 12px;
@@ -1045,6 +1097,36 @@ input,textarea{font-family:inherit;}
 .nest-up .em{ font-size: 28px; }
 .nest-up .text{ font-size: 13px; font-weight: 800; color: var(--ink); }
 .nest-up .text small{ display:block; font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+
+.complete-review{
+  background: var(--paper-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px; margin-bottom: 16px;
+  text-align: center;
+  animation: rcPop .4s ease .5s both;
+}
+.complete-review .complete-head{
+  font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 10px;
+}
+.complete-review .rating-stars{
+  display: flex; justify-content: center; gap: 4px; margin-bottom: 12px;
+}
+.complete-review .star{
+  background: none; border: none; cursor: pointer; padding: 2px;
+  font-size: 28px; line-height: 1; color: var(--line);
+  transition: transform .08s ease, color .12s ease;
+}
+.complete-review .star.on{ color: #F5B301; }
+.complete-review .star:active{ transform: scale(1.2); }
+.complete-review .review-area{
+  width: 100%; box-sizing: border-box;
+  min-height: 60px; resize: vertical;
+  border: 1.5px solid var(--line); border-radius: var(--r-sm);
+  padding: 10px 12px; font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--card);
+}
+.complete-review .review-area:focus{ outline: none; border-color: var(--brand); }
 
 .ceremony .next-btn{
   width: 100%;

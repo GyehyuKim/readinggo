@@ -4,6 +4,21 @@
    ========================================================= */
 const { useState, useEffect, useRef, useCallback } = React;
 
+/* ── 스포일러 블라인드 (페이지 기반, social.md §5.7.1 SSOT) ──
+   전역 토글 컨텍스트: revealAll=true 면 모든 블라인드 해제. */
+const SpoilerContext = React.createContext(false);
+
+// 블라인드 여부: 내가 *읽고 있는* 책의 한 문장 중 내 현재 페이지보다
+// 뒤 페이지면 가린다. 판정 데이터는 DataStore.spoiler.myCurrentPage(bookId).
+// 내가 안 읽는 책(myPage 0) · 완독 책(current_page=total) · 현재 페이지 이하 → 노출.
+function isSentenceBlinded(bookId, page) {
+  if (typeof page !== 'number') return false;
+  let myPage = 0;
+  try { myPage = DataStore.spoiler.myCurrentPage(bookId); } catch (e) { myPage = 0; }
+  if (!myPage) return false;          // 안 읽는 책 → 전체 공개
+  return page > myPage;               // 내 현재 페이지보다 뒤 → 블라인드
+}
+
 /* ── Toast (전역 싱글턴) ──────────────────────────────── */
 let _toastTimer = null;
 let _setToastFn = null;
@@ -52,18 +67,26 @@ function Confetti({ active, nestUp }) {
 
 /* ── SentenceCard ─────────────────────────────────────── */
 function SentenceCard({ item, bookId }) {
-  const [reactions, setReactions] = useState({
-    claps: item.claps, tears: item.tears, marks: item.marks,
-    clapActive: false, tearActive: false, markActive: false,
-  });
+  const sentenceId = `${bookId}:${item.page}:${item.nick}`;
+  // 본인 카드(짹·책갈피 비활성) — 현재 사용자 jerome(🐦) 판정 (social.md §5.7)
+  const isMine = item.nick === '@jerome' || item.nick === 'jerome';
+  const [liked, setLiked] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
   const bk = getBook(bookId);
-  const toggle = (key, activeKey) => {
-    setReactions(r => ({
-      ...r,
-      [key]: r[activeKey] ? r[key] - 1 : r[key] + 1,
-      [activeKey]: !r[activeKey],
-    }));
+  const likeCount = (item.claps || 0) + (liked ? 1 : 0);
+  const toggleLike = () => {
+    if (isMine) return;
+    setLiked(DataStore.claps.toggle(sentenceId));
   };
+  const toggleBookmark = () => {
+    if (isMine) return;
+    setBookmarked(DataStore.bookmarks.toggle(sentenceId));
+  };
+  const mineStyle = isMine ? { opacity: 0.4, pointerEvents: 'none' } : undefined;
+  // 스포일러 블라인드: 전역 토글(revealAll) 또는 카드별 탭 공개 시 해제 (§5.7.1).
+  const revealAll = React.useContext(SpoilerContext);
+  const [revealed, setRevealed] = useState(false);
+  const blinded = !revealAll && !revealed && isSentenceBlinded(bookId, item.page);
   return (
     <div className="sentence-card">
       <div className="who">
@@ -71,16 +94,19 @@ function SentenceCard({ item, bookId }) {
         <div className="nick">{item.nick}</div>
         <div className="meta">{bk ? bk.title + ' · ' : ''}{item.page}p · {item.time}</div>
       </div>
-      <div className="quote">"{item.q}"</div>
+      {blinded ? (
+        <div className="spoiler-blind" onClick={() => setRevealed(true)}>
+          ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
+        </div>
+      ) : (
+        <div className="quote">"{item.q}"</div>
+      )}
       <div className="react">
-        <span className={'chip' + (reactions.clapActive ? ' active' : '')} onClick={() => toggle('claps','clapActive')}>
-          👏 {reactions.claps}
+        <span className={'chip' + (liked ? ' active' : '')} style={mineStyle} onClick={toggleLike}>
+          짹 {likeCount}
         </span>
-        <span className={'chip' + (reactions.tearActive ? ' active' : '')} onClick={() => toggle('tears','tearActive')}>
-          🥹 {reactions.tears}
-        </span>
-        <span className={'chip' + (reactions.markActive ? ' active' : '')} onClick={() => toggle('marks','markActive')}>
-          🔖 {reactions.marks}
+        <span className={'chip' + (bookmarked ? ' active' : '')} style={mineStyle} onClick={toggleBookmark}>
+          🔖
         </span>
       </div>
     </div>
@@ -91,3 +117,5 @@ window.showToast = showToast;
 window.Toast = Toast;
 window.Confetti = Confetti;
 window.SentenceCard = SentenceCard;
+window.SpoilerContext = SpoilerContext;
+window.isSentenceBlinded = isSentenceBlinded;

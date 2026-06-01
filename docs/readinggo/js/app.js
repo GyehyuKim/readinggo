@@ -4,15 +4,22 @@
    ========================================================= */
 
 function App() {
-  const { useState, useCallback } = React;
+  const { useState, useCallback, useMemo } = React;
   const [activeTab, setActiveTab] = useState('nest');
   const [selectedTownId, setSelectedTownId] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // 스포일러 전역 토글 (§5.7.1): true 면 모든 페이지 블라인드 해제.
+  const [spoilerReveal, setSpoilerReveal] = useState(false);
   const [appState, setAppState] = useState(() => ({
     ...INITIAL_STATE,
     // village sent 상태는 로컬 복사
     village: INITIAL_STATE.village.map(v => ({ ...v })),
   }));
+
+  // 성(🏰) 개수 = 완독 권수. 별도 카운터 없이 DataStore.castles.list 에서 파생 (§5.2.1).
+  const castleCount = useMemo(() => {
+    try { return DataStore.castles.list().length; } catch { return 0; }
+  }, []);
 
   const switchTab = useCallback((tab) => {
     setActiveTab(tab);
@@ -30,28 +37,24 @@ function App() {
     setSelectedTownId(null);
   }, []);
 
-  // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화
-  const handleCheckin = useCallback((ns) => {
+  // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
+  // 둥지 단계(nest.lv)는 활성 책 진척률에서 파생 → NestView가 계산해 넘긴다(§5.2).
+  const handleCheckin = useCallback((ns, nestLv) => {
     setAppState(s => ({
       ...s,
       book: ns.book,
       streak: ns.streak,
       xp: ns.xp,
-      nest: { ...s.nest, lv: ns.nestLv },
-      nestHealth: ns.nestHealth,
-      daysSinceRead: ns.daysSinceRead,
+      nest: { ...s.nest, lv: nestLv },
       myQuotes: ns.myQuotes,
-      pathNodes: ns.pathNodes,
     }));
   }, []);
 
+  // 하루 거르기: 둥지·XP·성은 존속, 스트릭만 영향 (§5.4).
   const handleSimSkip = useCallback((ns) => {
     setAppState(s => ({
       ...s,
       streak: ns.streak,
-      nest: { ...s.nest, lv: ns.nestLv },
-      nestHealth: ns.nestHealth,
-      daysSinceRead: ns.daysSinceRead,
     }));
   }, []);
 
@@ -63,7 +66,7 @@ function App() {
         return s;
       }
       village[idx].sent = true;
-      showToast(`@${village[idx].name}에게 🪱 모이를 보냈어요!`);
+      showToast(`@${village[idx].name}에게 🪱 콕찌르기를 보냈어요!`);
       return { ...s, village };
     });
   }, []);
@@ -75,6 +78,8 @@ function App() {
       // 현재 책 진도 저장
       INITIAL_PROGRESS[s.book.id] = { cur: s.book.cur, days: s.book.days };
       const prog = INITIAL_PROGRESS[bookId] || { cur: 1, days: 1 };
+      // 둥지 단계는 새 활성 책 진척률로 재계산 (§5.2/§5.3).
+      const nestLv = getNestStage(bk.total ? Math.round(prog.cur / bk.total * 100) : 0).lv;
       return {
         ...s,
         book: {
@@ -83,6 +88,7 @@ function App() {
           cur: prog.cur, total: bk.total, days: prog.days,
           cover: bk.cover, fb: bk.fb, toc: bk.toc,
         },
+        nest: { ...s.nest, lv: nestLv },
       };
     });
     showToast(`📖 ${bk.title} — 활성 책으로 설정`);
@@ -93,13 +99,6 @@ function App() {
     setIsSearchOpen(false);
     handleSetActiveBook(book.book_id);
   }, [handleSetActiveBook]);
-
-  // 리그 XP 업데이트 (체크인 후 나(jerome) XP 동기화)
-  const league = appState.league.map(p =>
-    p.me ? { ...p, xp: appState.xp } : p
-  ).sort((a, b) => b.xp - a.xp).map((p, i) => ({ ...p, rank: i + 1 }));
-
-  const myRank = league.find(p => p.me);
 
   return (
     <div className="stage">
@@ -113,6 +112,21 @@ function App() {
               <span>reading<span className="go">GO</span></span>
             </div>
             <div className="topbar-stats">
+              <button
+                onClick={() => switchTab('profile')}
+                className="stat"
+                title="성 컬렉션 (완독 권수)"
+                style={{
+                  background:'transparent',
+                  border:'none',
+                  cursor:'pointer',
+                  padding:0,
+                  font:'inherit',
+                }}
+              >
+                <span className="ico">🏰</span>
+                <span>×{castleCount}</span>
+              </button>
               <span className="stat fire" title="연속 출석">
                 <span className="ico">🔥</span>
                 <span>{appState.streak}</span>
@@ -125,6 +139,25 @@ function App() {
                 <span className="ico">🪶</span>
                 <span>{appState.shield}</span>
               </span>
+              <button
+                onClick={() => setSpoilerReveal(v => !v)}
+                aria-pressed={spoilerReveal}
+                title="스포일러 그냥 보기 — 안 읽은 부분도 모두 표시"
+                style={{
+                  background: spoilerReveal ? 'var(--brand-tint)' : 'transparent',
+                  border: spoilerReveal ? '1.5px solid var(--brand)' : '1.5px solid transparent',
+                  borderRadius:14,
+                  color: spoilerReveal ? 'var(--brand-3)' : 'var(--ink-2)',
+                  fontSize:11,
+                  fontWeight:800,
+                  cursor:'pointer',
+                  padding:'4px 8px',
+                  marginLeft:8,
+                  whiteSpace:'nowrap',
+                }}
+              >
+                🔓 스포일러 그냥 보기
+              </button>
               <button
                 onClick={() => setIsSearchOpen(true)}
                 style={{
@@ -143,12 +176,13 @@ function App() {
           </div>
         </header>
 
-        {/* 메인 스크롤 영역 */}
+        {/* 메인 스크롤 영역 — 스포일러 전역 토글을 4영역 공통 제공 (§5.7.1) */}
         <main className="main">
+          <SpoilerContext.Provider value={spoilerReveal}>
           {activeTab === 'nest' && (
             <NestView
               key="nest"
-              state={{ ...appState, league }}
+              state={appState}
               onCheckin={handleCheckin}
               onSimSkip={handleSimSkip}
               onGoLibrary={() => switchTab('library')}
@@ -173,7 +207,7 @@ function App() {
           {activeTab === 'social' && (
             <SocialView
               key="social"
-              state={{ ...appState, league }}
+              state={appState}
             />
           )}
           {activeTab === 'profile' && (
@@ -183,6 +217,7 @@ function App() {
               onSetActiveBook={handleSetActiveBook}
             />
           )}
+          </SpoilerContext.Provider>
         </main>
 
         {/* 하단 탭바 */}

@@ -10,6 +10,9 @@ function BookDetailModal({ book, allQuotes, onClose, onSetActive }) {
   const progressPct = Math.round((prog.cur / book.total) * 100);
   const bookQuotes = allQuotes.filter(q => q.bookId === book.id);
   const bookshelfEntry = INITIAL_BOOKSHELF[book.id];
+  // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
+  const revealAll = React.useContext(SpoilerContext);
+  const [revealed, setRevealed] = _useState({});
   
   const kyoboUrl = book.isbn 
     ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn)}`
@@ -79,16 +82,26 @@ function BookDetailModal({ book, allQuotes, onClose, onSetActive }) {
               <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:10}}>
                 📖 내 한 문장 {bookQuotes.length}개
               </div>
-              {bookQuotes.map((q, i) => (
-                <div key={i} style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:'8px', padding:12, marginBottom:10}}>
-                  <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6}}>
-                    {q.page}p · {q.when}
+              {bookQuotes.map((q, i) => {
+                const blinded = !revealAll && !revealed[i] &&
+                  isSentenceBlinded(book.id, q.page);
+                return (
+                  <div key={i} style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:'8px', padding:12, marginBottom:10}}>
+                    <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6}}>
+                      {q.page}p · {q.when}
+                    </div>
+                    {blinded ? (
+                      <div className="spoiler-blind" onClick={() => setRevealed(r => ({ ...r, [i]: true }))}>
+                        ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
+                      </div>
+                    ) : (
+                      <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
+                        "{q.text}"
+                      </div>
+                    )}
                   </div>
-                  <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
-                    "{q.text}"
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </div>
@@ -140,6 +153,25 @@ function LibraryView({ state, onSetActiveBook }) {
     return Object.keys(INITIAL_BOOKSHELF).map(id => getBook(id));
   }, []);
 
+  // 성(🏰) 컬렉션 = 완독 책 집합. 별도 카운터 없이 DataStore.castles.list
+  // (status==='completed') 에서 파생 (§5.2.1/§5.8.1). 카드 = 표지+별점+완독일.
+  const castles = _useMemo(() => {
+    let rows = [];
+    try { rows = DataStore.castles.list(); } catch { rows = []; }
+    return rows.map(ub => {
+      const bk = getBook(ub.book_id);
+      return {
+        bookId: ub.book_id,
+        title: (ub.book && ub.book.title) || bk.title,
+        cover: (ub.book && ub.book.cover_url) || bk.cover,
+        fb: bk.fb,
+        rating: ub.rating,
+        reviewText: ub.review_text,
+        completedAt: ub.completed_at,
+      };
+    });
+  }, []);
+
   const tabsData = [
     { id: 'wishlist', label: '❤️ 읽고 싶은 책', books: wishlistBooks },
     { id: 'reading', label: '📖 읽고 있는 책', books: readingBooks },
@@ -178,6 +210,54 @@ function LibraryView({ state, onSetActiveBook }) {
           </div>
         </div>
       </div>
+
+      {/* 성(🏰) 컬렉션 선반 — 완독 파생 (§5.8.1). 둥지 상단 🏰×N 배지가 여기로 연결. */}
+      {castles.length > 0 && (
+        <div style={{padding:'0 12px', marginBottom:20}}>
+          <div style={{fontSize:18, fontWeight:900, marginBottom:12, paddingLeft:4}}>
+            🏰 성 컬렉션 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>(완독 {castles.length}권)</span>
+          </div>
+          <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:8, paddingLeft:4, scrollBehavior:'smooth'}}>
+            {castles.map(c => (
+              <div
+                key={c.bookId}
+                onClick={() => setSelectedBookId(c.bookId)}
+                style={{flex:'0 0 auto', width:96, cursor:'pointer'}}
+              >
+                <div
+                  className="book-cover"
+                  style={{
+                    width:96,
+                    height:134,
+                    background:`linear-gradient(135deg,${c.fb[0]},${c.fb[1]})`,
+                    borderRadius:'8px',
+                    overflow:'hidden',
+                    marginBottom:6,
+                    position:'relative',
+                    boxShadow:'0 2px 6px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  <img src={c.cover} alt={c.title} loading="lazy" referrerPolicy="no-referrer"
+                       onError={e => e.target.style.display='none'}
+                       style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                  <span style={{position:'absolute', top:4, right:4, fontSize:16, filter:'drop-shadow(0 1px 1px rgba(0,0,0,0.4))'}} aria-hidden="true">🏰</span>
+                </div>
+                {typeof c.rating === 'number' && (
+                  <div style={{fontSize:11, fontWeight:800, color:'var(--ink)'}}>⭐ {c.rating}</div>
+                )}
+                {c.reviewText && (
+                  <div style={{fontSize:10, color:'var(--ink-2)', fontWeight:600, lineHeight:'1.35', marginTop:2, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden'}}>
+                    {c.reviewText}
+                  </div>
+                )}
+                {c.completedAt && (
+                  <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2}}>{c.completedAt}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 내 서재 섹션 */}
       <div style={{padding:'0 12px', marginBottom:20}}>

@@ -1,6 +1,6 @@
 /* =========================================================
    ReadingGo — nest.js
-   둥지 탭: 책 카드, The Path, NestTheatre, 체크인 CTA,
+   둥지 탭: 책 카드, NestTheatre, 체크인 CTA,
             내 한 문장, 같은 책 피드, CheckinModal, Ceremony
    ========================================================= */
 const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _useMemo } = React;
@@ -81,19 +81,21 @@ function CheckinModal({ book, onClose, onSubmit }) {
 }
 
 /* ── Ceremony ─────────────────────────────────────────── */
-function Ceremony({ data, onClose }) {
+function Ceremony({ data, onClose, onComplete }) {
+  const [rating, setRating] = _useState(0);
+  const [reviewText, setReviewText] = _useState('');
   if (!data) return null;
-  const { xpGain, streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay, wasReset } = data;
+  const { xpGain, streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay, wasReset, isComplete } = data;
   let leadText;
   if (!isNewDay && !wasReset) {
-    leadText = `+${pagesAdded}쪽 추가 기록 · +14 둥지 체력 · 오늘은 이미 짹 완료 🐦`;
+    leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료 🐦`;
   } else if (wasReset) {
     leadText = `+${pagesAdded}쪽 · ${streak}일 — 다시 시작이에요!`;
   } else {
-    leadText = `+${pagesAdded}쪽 읽었어요 · +14 둥지 체력 · ${streak}일 연속!`;
+    leadText = `+${pagesAdded}쪽 읽었어요 · ${streak}일 연속!`;
   }
-  const prevLadder = nestUp ? NEST_LADDER[prevLv - 1] : null;
-  const nowLadder  = nestUp ? NEST_LADDER[newLv  - 1] : null;
+  const prevStage = nestUp ? NEST_STAGES[prevLv - 1] : null;
+  const nowStage  = nestUp ? NEST_STAGES[newLv  - 1] : null;
   return (
     <div className="ceremony show">
       <div className="inner">
@@ -124,83 +126,109 @@ function Ceremony({ data, onClose }) {
           </div>
         )}
 
-        {nestUp && prevLadder && nowLadder && (
+        {nestUp && prevStage && nowStage && (
           <div className="nest-up">
-            <span className="em">{nowLadder.short}</span>
+            <span className="em">{nowStage.short}</span>
             <div className="text">
               둥지가 진화했어요!
-              <small>{prevLadder.short} {prevLadder.name} → {nowLadder.short} {nowLadder.name}</small>
+              <small>{prevStage.short} {prevStage.name} → {nowStage.short} {nowStage.name}</small>
             </div>
           </div>
         )}
 
-        <button className="next-btn" onClick={onClose}>내일도 짹 →</button>
+        {isComplete && (
+          <div className="complete-review">
+            <div className="complete-head">🏰 완독을 축하해요! 이 책, 어땠나요?</div>
+            <div className="rating-stars" role="radiogroup" aria-label="별점 (선택)">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  className={'star' + (n <= rating ? ' on' : '')}
+                  aria-label={`${n}점`}
+                  aria-pressed={n <= rating}
+                  onClick={() => setRating(n === rating ? 0 : n)}
+                >★</button>
+              ))}
+            </div>
+            <textarea
+              className="review-area"
+              placeholder="완독 소감을 한 줄 남겨보세요. (선택)"
+              value={reviewText}
+              maxLength={300}
+              onChange={e => setReviewText(e.target.value)}
+            />
+          </div>
+        )}
+
+        <button
+          className="next-btn"
+          onClick={() => {
+            if (isComplete && onComplete) {
+              onComplete({ rating: rating || null, review_text: reviewText.trim() || null });
+            }
+            onClose();
+          }}
+        >
+          {isComplete ? '성에 기록 남기기 →' : '내일도 짹 →'}
+        </button>
       </div>
     </div>
   );
 }
 
-/* ── NestTheatre ──────────────────────────────────────── */
-function NestTheatre({ nestLv, nestHealth, streak, prevTwigCount }) {
-  const h = Math.max(0, Math.min(100, nestHealth));
-  const decay = (1 - h / 100).toFixed(3);
-  const hCls = healthClass(h);
-  const { cur, next } = nestInfo(nestLv);
-  const copy = healthCopy(h);
-  const twigCount = twigCountFromState(nestLv, h);
+/* ── NestTheatre — 활성 책 진척률 5단계 (§5.2) ──────────── */
+// 진척률 단계별 격려 카피 (health 무관, 이 책 진도만 반영).
+function stageMicrocopy(pct, stage) {
+  if (pct >= 100) return `🏰 ${stage.name} — 완독! 성이 컬렉션에 남았어요.`;
+  if (pct >= 81)  return `🏡 ${stage.name} — 곧 완독이에요. 마지막 장까지 함께해요.`;
+  if (pct >= 51)  return `🏠 ${stage.name} — 둥지가 따뜻해졌어요. 오늘도 한 쪽 더!`;
+  if (pct >= 21)  return `🪹 ${stage.name} — 둥지가 모양을 갖춰가요. 계속 쌓아봐요.`;
+  return `🪵 ${stage.name} — 첫 가지를 놓았어요. 한 쪽이면 둥지가 자라요.`;
+}
+
+function NestTheatre({ progressPct, streak, prevTwigs }) {
+  const pct = Math.max(0, Math.min(100, Math.round(progressPct)));
+  const stage = getNestStage(pct);
+  const { cur, next } = nestInfo(stage.lv);
+  const twigs = twigsForProgress(pct);
   const nestSvg = _useMemo(
-    () => drawNest(twigCount, nestLv, prevTwigCount),
-    [twigCount, nestLv, prevTwigCount]
+    () => drawNest(twigs, stage.lv, prevTwigs),
+    [twigs, stage.lv, prevTwigs]
   );
 
   return (
     <div
-      className={`nest-theatre ${hCls}`}
-      style={{'--health': h, '--decay': decay}}
+      className="nest-theatre h-strong"
+      style={{'--health': pct, '--decay': 0, '--stage-color': stage.color, background: stage.bg}}
     >
       <div className="nest-stagebar">
         <span className="nest-stage-pill">
           <span className="lv">LV.{cur.lv}</span>
-          <span>{cur.name}</span>
+          <span>{cur.short} {cur.name}</span>
         </span>
         <span className="nest-day-chip">🔥 {streak}일</span>
       </div>
 
       <div className="nest-svg-wrap">
-        <div className="fall-layer" aria-hidden="true">
-          <span className="fall-twig">🍂</span>
-          <span className="fall-twig">·</span>
-          <span className="fall-twig">🍃</span>
-          <span className="fall-twig">·</span>
-          <span className="fall-twig">🍂</span>
-        </div>
         <div dangerouslySetInnerHTML={{ __html: nestSvg }} />
-        <svg className="crack-overlay" viewBox="0 0 230 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <g stroke="rgba(60,40,20,.55)" strokeWidth="1.4" fill="none" strokeLinecap="round">
-            <path d="M 60 70 L 78 88 L 70 102 L 92 116" />
-            <path d="M 150 80 L 138 96 L 152 110 L 142 124" />
-            <path d="M 110 90 L 108 110 L 118 122" />
-            <path d="M 30 130 L 50 138" />
-            <path d="M 180 132 L 200 142" />
-          </g>
-        </svg>
       </div>
 
       <div className="nest-meta">
         <div className="nest-name-row">
           <div className="nest-name">
-            <span>{cur.name}</span>
-            {next && next.lv > cur.lv && (
+            <span>{cur.short} {cur.name}</span>
+            {next && (
               <span className="next-arrow">→ {next.short} {next.name}</span>
             )}
           </div>
-          <div className="nest-health-num">체력 <b>{h}</b>/100</div>
+          <div className="nest-health-num">진척 <b>{pct}</b>%</div>
         </div>
         <div className="nest-health-bar">
           <div className="nest-health-fill" />
         </div>
-        <div className={'nest-microcopy' + (copy.cls ? ' ' + copy.cls : '')}>
-          {copy.text}
+        <div className="nest-microcopy">
+          {stageMicrocopy(pct, stage)}
         </div>
       </div>
     </div>
@@ -212,107 +240,97 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [ceremony, setCeremony] = _useState(null);
   const [showConfetti, setShowConfetti] = _useState(false);
+  // 둥지 단계 = 활성 책 진척률(book.cur/book.total). 체력/days 추적 없음.
+  const _pctOf = (bk) => bk && bk.total ? Math.round(bk.cur / bk.total * 100) : 0;
   const [nestState, setNestState] = _useState({
-    nestLv: state.nest.lv,
-    nestHealth: state.nestHealth,
     streak: state.streak,
     xp: state.xp,
-    pathNodes: state.pathNodes,
     myQuotes: state.myQuotes,
     book: state.book,
-    daysSinceRead: state.daysSinceRead,
+    skipStreakRisk: false,   // 데모 '하루 거르기' — 방패 1회 흡수 후 다음 거르기에 스트릭 리셋
   });
-  const prevTwigCountRef = _useRef(
-    twigCountFromState(state.nest.lv, state.nestHealth)
-  );
+  // 직전 진척률 가지 수 — 새 가지 stack 애니메이션 기준.
+  const prevTwigsRef = _useRef(twigsForProgress(_pctOf(state.book)));
 
-  // sync from parent state on mount
+  // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드 → 둥지는 새 책 진척률로 재계산.
   _useEffect(() => {
+    prevTwigsRef.current = twigsForProgress(_pctOf(state.book));
     setNestState({
-      nestLv: state.nest.lv,
-      nestHealth: state.nestHealth,
       streak: state.streak,
       xp: state.xp,
-      pathNodes: state.pathNodes,
       myQuotes: state.myQuotes,
       book: state.book,
-      daysSinceRead: state.daysSinceRead,
+      skipStreakRisk: false,
     });
-  }, []);
-
-  const HEALTH_GAIN = 14;
-  const HEALTH_LOSS = 15;
+  }, [state.book.id]);
 
   const handleCheckin = ({ page, sentence }) => {
     setModalOpen(false);
     const ns = { ...nestState };
-    const delta = page - ns.book.cur;
-    const pagesAdded = Math.max(0, delta);
+    const pagesAdded = Math.max(0, page - ns.book.cur);
     const xpGain = Math.max(15, Math.min(60, 15 + pagesAdded));
-    const isNewDay = ns.daysSinceRead >= 1;
     const wasReset = ns.streak === 0;
-    const prevLv = ns.nestLv;
+    const prevPct = _pctOf(ns.book);
+    const prevLv = getNestStage(prevPct).lv;
 
     ns.book = { ...ns.book, cur: page };
     ns.xp += xpGain;
     if (wasReset) ns.streak = 1;
-    else if (isNewDay) ns.streak += 1;
-    ns.daysSinceRead = 0;
+    else ns.streak += 1;
+    ns.skipStreakRisk = false;
 
-    const newHealth = Math.min(100, ns.nestHealth + HEALTH_GAIN);
-    let nestUp = false;
-    if (newHealth >= 100 && ns.nestLv < NEST_LADDER.length) {
-      nestUp = true;
-      ns.nestLv += 1;
-      ns.nestHealth = 40;
-    } else {
-      ns.nestHealth = newHealth;
-    }
+    const newPct = _pctOf(ns.book);
+    const newLv = getNestStage(newPct).lv;
+    const nestUp = newLv > prevLv;
+    // 완독: 마지막 장 도달 (이번 체크인에 100% 처음 도달).
+    const isComplete = newPct >= 100 && prevPct < 100;
 
     if (sentence) {
       ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금' }, ...ns.myQuotes];
     }
 
-    // advance The Path: today → done, ghost → today
-    const nodes = ns.pathNodes.map(n => ({ ...n }));
-    const todayIdx = nodes.findIndex(n => n.type === 'today');
-    if (todayIdx >= 0) { nodes[todayIdx].type = 'done'; nodes[todayIdx].label = '✓'; }
-    const ghostIdx = nodes.findIndex(n => n.type === 'ghost');
-    if (ghostIdx >= 0) { nodes[ghostIdx].type = 'today'; nodes[ghostIdx].label = '★'; }
-    ns.pathNodes = nodes;
-
-    prevTwigCountRef.current = twigCountFromState(prevLv, nestState.nestHealth);
+    prevTwigsRef.current = twigsForProgress(prevPct);
     setNestState(ns);
-    onCheckin(ns);
+    onCheckin(ns, newLv);
 
-    setCeremony({ xpGain, streak: ns.streak, sentence, nestUp, prevLv, newLv: ns.nestLv, pagesAdded, isNewDay, wasReset });
+    // 단계 상승 시 진화 마이크로카피 toast (§5.2)
+    if (nestUp) {
+      const copy = getEvolutionCopy(prevLv, newLv);
+      if (copy) showToast(`${getNestStage(newPct).short} ${copy}`);
+    }
+
+    setCeremony({ xpGain, streak: ns.streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
   };
 
+  // 데모: 하루 거르기 — 둥지·XP·성은 존속, 스트릭만 위기 (§5.4)
   const handleSimSkip = () => {
     const ns = { ...nestState };
-    const prev = ns.nestHealth;
-    ns.nestHealth = Math.max(0, ns.nestHealth - HEALTH_LOSS);
-    ns.daysSinceRead += 1;
-    const streakBroke = ns.daysSinceRead >= 2 && ns.streak > 0;
-    if (ns.daysSinceRead >= 2) ns.streak = 0;
-
-    if (ns.nestHealth <= 0 && ns.nestLv > 1) {
-      ns.nestLv -= 1;
-      ns.nestHealth = 60;
-      showToast(`💔 둥지 한 단계 강등 → ${NEST_LADDER[ns.nestLv - 1].name}`);
-    } else if (ns.nestHealth <= 0) {
-      showToast('💔 둥지가 무너졌어요. 오늘 한 쪽이면 되살릴 수 있어요.');
-    } else if (streakBroke) {
-      showToast('💔 연속 출석이 끊겼어요. 다시 1일부터…');
-    } else if (ns.daysSinceRead === 1) {
+    if (!ns.skipStreakRisk && ns.streak > 0) {
+      ns.skipStreakRisk = true;
       showToast(`🛡️ 방패가 막았어요. 오늘 짹하면 ${ns.streak}일 유지!`);
+    } else if (ns.streak > 0) {
+      ns.streak = 0;
+      ns.skipStreakRisk = false;
+      showToast('💔 연속 출석이 끊겼어요. 다시 1일부터…');
     } else {
-      showToast(`🍂 −${prev - ns.nestHealth} 체력. 둥지가 흔들려요.`);
+      showToast('🐦 오늘 한 쪽이면 다시 시작이에요.');
     }
     setNestState(ns);
     onSimSkip(ns);
+  };
+
+  // 완독 세리머니에서 받은 별점/소감을 영속 (§5.8.3).
+  // 활성 책의 user_book 을 status='completed' + rating/review_text 로 마감.
+  const handleComplete = ({ rating, review_text }) => {
+    try {
+      const ub = DataStore.activeBook.get();
+      if (ub) DataStore.books.complete(ub.id, { rating, review_text });
+    } catch (e) {
+      console.warn('[nest] 완독 기록 저장 실패:', e.message);
+    }
+    showToast('🏰 성 컬렉션에 기록이 남았어요!');
   };
 
   const sameBookFeed = (NPC_QUOTES[nestState.book.id] || []).slice(0, 3);
@@ -345,32 +363,18 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
             </div>
           </div>
         </div>
-
-        {/* The Path */}
-        <div className="path-wrap">
-          <div className="path-label">
-            <span>🌿 The Path</span>
-            <span style={{marginLeft:'auto', color:'var(--ink-3)', fontWeight:700, textTransform:'none'}}>최근 7일</span>
-          </div>
-          <div className="path">
-            {nestState.pathNodes.map((n, i) => (
-              <div key={i} className={`node ${n.type}`} title={n.title}>{n.label}</div>
-            ))}
-          </div>
-        </div>
       </div>
 
-      {/* 둥지 시어터 */}
+      {/* 둥지 시어터 — 활성 책 진척률 5단계 */}
       <NestTheatre
-        nestLv={nestState.nestLv}
-        nestHealth={nestState.nestHealth}
+        progressPct={nestState.book.total ? (nestState.book.cur / nestState.book.total * 100) : 0}
         streak={nestState.streak}
-        prevTwigCount={prevTwigCountRef.current}
+        prevTwigs={prevTwigsRef.current}
       />
 
       {/* 데모 거르기 */}
       <div className="demo-decay">
-        <button onClick={handleSimSkip}>⏩ 데모: 하루 거르기 (−15)</button>
+        <button onClick={handleSimSkip}>⏩ 데모: 하루 거르기 (스트릭 위기)</button>
       </div>
 
       {/* 체크인 CTA */}
@@ -446,6 +450,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
         <Ceremony
           data={ceremony}
           onClose={() => setCeremony(null)}
+          onComplete={handleComplete}
         />,
         document.body
       )}
