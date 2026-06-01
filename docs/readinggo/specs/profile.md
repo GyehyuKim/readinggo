@@ -85,6 +85,13 @@
   - Export: 이미지 카드(Phase 2) or Markdown
   - Phase 0: 한 문장 나열 + 고정 카피 시뮬
 
+#### 5.8.7 무작위 한 문장 회상 (v7 신설)
+
+- 프로필/내서재 상단에 **과거 내 한 문장 1개를 무작위로 다시 노출** ("그때 이런 문장을 남겼어요")
+- 출처: 내 `sentences` 전체에서 무작위 1개 (`DataStore.sentences.random`). 책 제목·페이지·날짜 함께
+- 탭 → 해당 책 상세. 기억·감성 강화 (북모리 "무작위 노트" 벤치마크, [ROADMAP](../ROADMAP.md) v7 채택 A)
+- Phase 0: 로컬 `sentences` 무작위 / Phase 1: 서버 랜덤
+
 ### 5.9 닉네임 규칙 — [§4](./onboarding.md) E-1 참조
 
 서버 검증 (Phase 1+):
