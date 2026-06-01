@@ -64,7 +64,7 @@ git checkout -b gyehyu/example-topic
 git add <files>
 git commit -m "docs: 왜 바꿨는지 한 문장"
 
-# 4. main이 움직였다면 rebase
+# 4. push 전 항상 (조건 없이 — 그 사이 머지된 PR이 있을 수 있다. CONTRIBUTING §3.0)
 git fetch origin && git rebase origin/main
 
 # 5. 푸시 + PR (머지는 계휴가 GitHub 웹에서)

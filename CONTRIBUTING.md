@@ -50,12 +50,22 @@
 
 ## 3. 동시 작업과 충돌 방지 (핵심)
 
-파일 소유권을 나누지 않는다. 대신 **"머지 전 base 최신화"** 규칙으로 충돌을 물리적으로 차단한다.
+충돌·무음 덮어쓰기를 막는 3중 방어: **(1) 동기화 규칙(§3.0)** · **(2) 주요 파일 오너십(§3.5)** · **(3) 머지 전 diff 리뷰(§3.3·§7)**. 오너 없는 일반 파일은 *base 최신화(rebase)* 로 충돌을 차단한다.
+
+### 3.0 동기화 규칙 (필수)
+
+git **충돌**은 *같은 줄을 양쪽이 고쳤을 때만* 잡힌다. **다른 줄에서 내 작업을 되돌리는 "무음 덮어쓰기"는 충돌로 안 잡히므로**, 아래를 함께 지킨다.
+
+1. **push 전 항상** `git fetch origin && git rebase origin/main`. main이 움직였으면 겹침을 해소한 뒤 push. **작업 시작 시점이 아니라 push 직전 기준** — 그 사이 다른 PR이 머지됐을 수 있다.
+2. **세션(작업) 시작 시** `git pull`. 특히 한동안 안 했거나, 팀원이 같은 영역을 활발히 푸시 중일 때.
+3. **머지 전** PR diff를 *main 기준으로* 읽어 **충돌 + 무음 덮어쓰기**(내/남의 작업이 삭제·되돌려졌는지)를 눈으로 확인한다. `Require branches up to date` 보호 규칙(§7) 유지.
+
+> 근거: stale-base로 윤지 마을 PR 충돌 + AGENTS 무음 되돌림 사고(2026-06). *충돌만 보고 무음 덮어쓰기를 놓친* 케이스가 이 규칙의 동기.
 
 ### 3.1 작업 시작 시
 ```bash
 git checkout main
-git pull origin main
+git pull origin main           # §3.0-2: 세션 시작 시 항상
 git checkout -b <owner>/<topic-slug>
 ```
 
@@ -88,6 +98,20 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 4. 헷갈리면 저장하지 말고 팀에 물어본다.
 
 **CLI가 익숙하지 않으면 Claude Code/Cursor에게 시키는 것이 웹 에디터보다 훨씬 안전하다.**
+
+### 3.5 파일 오너십 (주요 파일)
+
+주요 파일은 **오너**를 둔다. **다른 사람 오너 파일을 편집하려면 그 오너와 먼저 조율**하고, 불가피하면 PR 설명에 *왜* 건드렸는지 명시한다. (오너 없는 일반 파일은 rebase로 충돌만 차단.)
+
+| 파일 | 오너 | 비고 |
+|---|---|---|
+| `CLAUDE.md` · `AGENTS.md` · `CONTRIBUTING.md` | **gyehyu** | governance·머지 담당. 타인은 조율 후 |
+| `specs/backend.md` · `social.md` · `profile.md` · `onboarding.md` · `meta/*` · `specs/README.md` | **gyehyu** | 백엔드·소셜·내서재·온보딩 |
+| `specs/nest.md` · `systems.md` · `design.md` | **seungwon** | 둥지·XP·디자인 |
+| `specs/village.md` | **yunji** | 마을 |
+| 데모 코드 `docs/readinggo/js/*` · `index.html` | 해당 피처 오너 | 공용 `data.js`·`components.js`·`app.js` 변경 시 조율 |
+
+> 피처 spec 상세는 [`specs/README.md` 파일 소유권](./docs/readinggo/specs/README.md). 이 표는 *governance·공용 파일* 까지 포함한 상위 기준.
 
 ---
 
@@ -219,8 +243,7 @@ git fetch --prune
    임의로 `feat/`, `fix/` 등 type prefix를 쓰지 않는다.
 2. **`main`에 직접 커밋/푸시하지 않는다.** 항상 feature 브랜치 → PR 경유.
 3. **브랜치를 생성하기 전에 `git pull origin main`으로 최신화**한다.
-4. **PR 생성 전에 `git fetch origin && git rebase origin/main`**을 시도한다. 충돌이 발생하면
-   사용자에게 보고하고 임의로 해결하지 않는다.
+4. **push/PR 전에 항상 `git fetch origin && git rebase origin/main`** (§3.0). *작업 시작 때 한 번이 아니라 push 직전마다* — 그 사이 머지된 PR이 있을 수 있다. 충돌은 사용자에게 보고하고 임의로 해결하지 않는다. **머지 전 diff에서 무음 덮어쓰기**(내/남 작업이 삭제·되돌려짐)도 함께 확인한다.
 5. **`git push --force` 금지.** 필요 시 `--force-with-lease` 사용. main에는 어떤 force도 금지.
 6. **`--no-verify`, `--no-gpg-sign`, hook bypass 금지.** 훅 실패는 근본 원인을 고친다.
 7. **PR 단위는 §4를 따른다.** 변경 파일이 5개를 넘거나 순증 300줄을 넘으면 사용자에게 분할
@@ -230,8 +253,7 @@ git fetch --prune
    선제 실행한다. 에러 메시지에 `desktop.ini`가 보이면 먼저 이 정리부터 한다.
 10. **비밀정보**: `.env`, API 키, 점주/고객 개인정보를 절대 커밋하지 않는다. 사용자가 채팅에
     실수로 붙여넣은 경우에도 파일에 쓰지 않는다.
-11. **파일 소유권은 없지만**, 동일 파일을 편집하는 타인의 open PR이 있는지 `gh pr list`로
-    먼저 확인한다. 충돌 가능성이 보이면 사용자에게 보고.
+11. **주요 파일 오너십(§3.5) 준수.** 다른 사람 오너 파일(특히 `CLAUDE`/`AGENTS`/`CONTRIBUTING`·타 피처 spec)을 편집하려면 사용자에게 먼저 확인한다. 동일 파일을 편집하는 타인의 open PR이 있는지 `gh pr list`로 확인하고, 충돌 가능성이 보이면 보고한다.
 12. **과거 사고 패턴**: 웹 에디터 stale-base로 인한 회귀 사고가 과거 2회 발생(§3.4). 큰 spec 파일(`backend.md`, `specs/README.md`)이나 여러 파일 동시 편집 시 편집 전후 diff를 특히 주의 깊게 검토한다.
 13. **`git checkout --orphan` 절대 금지.** 세션 시작 시 `git log --oneline -1`로 현재 브랜치가
     정상 커밋을 갖는지 확인한다. 실패하면 즉시 사용자에게 보고하고 임의로 수정하지 않는다.
