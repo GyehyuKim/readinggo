@@ -1086,6 +1086,36 @@ input,textarea{font-family:inherit;}
 .nest-up .text{ font-size: 13px; font-weight: 800; color: var(--ink); }
 .nest-up .text small{ display:block; font-weight: 700; color: var(--ink-2); margin-top: 2px; }
 
+.complete-review{
+  background: var(--paper-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px; margin-bottom: 16px;
+  text-align: center;
+  animation: rcPop .4s ease .5s both;
+}
+.complete-review .complete-head{
+  font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 10px;
+}
+.complete-review .rating-stars{
+  display: flex; justify-content: center; gap: 4px; margin-bottom: 12px;
+}
+.complete-review .star{
+  background: none; border: none; cursor: pointer; padding: 2px;
+  font-size: 28px; line-height: 1; color: var(--line);
+  transition: transform .08s ease, color .12s ease;
+}
+.complete-review .star.on{ color: #F5B301; }
+.complete-review .star:active{ transform: scale(1.2); }
+.complete-review .review-area{
+  width: 100%; box-sizing: border-box;
+  min-height: 60px; resize: vertical;
+  border: 1.5px solid var(--line); border-radius: var(--r-sm);
+  padding: 10px 12px; font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--card);
+}
+.complete-review .review-area:focus{ outline: none; border-color: var(--brand); }
+
 .ceremony .next-btn{
   width: 100%;
   background: var(--brand);

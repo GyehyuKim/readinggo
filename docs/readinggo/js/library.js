@@ -153,6 +153,7 @@ function LibraryView({ state, onSetActiveBook }) {
         cover: (ub.book && ub.book.cover_url) || bk.cover,
         fb: bk.fb,
         rating: ub.rating,
+        reviewText: ub.review_text,
         completedAt: ub.completed_at,
       };
     });
@@ -231,8 +232,13 @@ function LibraryView({ state, onSetActiveBook }) {
                 {typeof c.rating === 'number' && (
                   <div style={{fontSize:11, fontWeight:800, color:'var(--ink)'}}>⭐ {c.rating}</div>
                 )}
+                {c.reviewText && (
+                  <div style={{fontSize:10, color:'var(--ink-2)', fontWeight:600, lineHeight:'1.35', marginTop:2, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden'}}>
+                    {c.reviewText}
+                  </div>
+                )}
                 {c.completedAt && (
-                  <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700}}>{c.completedAt}</div>
+                  <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2}}>{c.completedAt}</div>
                 )}
               </div>
             ))}

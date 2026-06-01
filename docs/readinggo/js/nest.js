@@ -81,9 +81,11 @@ function CheckinModal({ book, onClose, onSubmit }) {
 }
 
 /* ── Ceremony ─────────────────────────────────────────── */
-function Ceremony({ data, onClose }) {
+function Ceremony({ data, onClose, onComplete }) {
+  const [rating, setRating] = _useState(0);
+  const [reviewText, setReviewText] = _useState('');
   if (!data) return null;
-  const { xpGain, streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay, wasReset } = data;
+  const { xpGain, streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay, wasReset, isComplete } = data;
   let leadText;
   if (!isNewDay && !wasReset) {
     leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료 🐦`;
@@ -134,7 +136,42 @@ function Ceremony({ data, onClose }) {
           </div>
         )}
 
-        <button className="next-btn" onClick={onClose}>내일도 짹 →</button>
+        {isComplete && (
+          <div className="complete-review">
+            <div className="complete-head">🏰 완독을 축하해요! 이 책, 어땠나요?</div>
+            <div className="rating-stars" role="radiogroup" aria-label="별점 (선택)">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  className={'star' + (n <= rating ? ' on' : '')}
+                  aria-label={`${n}점`}
+                  aria-pressed={n <= rating}
+                  onClick={() => setRating(n === rating ? 0 : n)}
+                >★</button>
+              ))}
+            </div>
+            <textarea
+              className="review-area"
+              placeholder="완독 소감을 한 줄 남겨보세요. (선택)"
+              value={reviewText}
+              maxLength={300}
+              onChange={e => setReviewText(e.target.value)}
+            />
+          </div>
+        )}
+
+        <button
+          className="next-btn"
+          onClick={() => {
+            if (isComplete && onComplete) {
+              onComplete({ rating: rating || null, review_text: reviewText.trim() || null });
+            }
+            onClose();
+          }}
+        >
+          {isComplete ? '성에 기록 남기기 →' : '내일도 짹 →'}
+        </button>
       </div>
     </div>
   );
@@ -245,6 +282,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
     const newPct = _pctOf(ns.book);
     const newLv = getNestStage(newPct).lv;
     const nestUp = newLv > prevLv;
+    // 완독: 마지막 장 도달 (이번 체크인에 100% 처음 도달).
+    const isComplete = newPct >= 100 && prevPct < 100;
 
     if (sentence) {
       ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금' }, ...ns.myQuotes];
@@ -260,7 +299,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
       if (copy) showToast(`${getNestStage(newPct).short} ${copy}`);
     }
 
-    setCeremony({ xpGain, streak: ns.streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay: true, wasReset });
+    setCeremony({ xpGain, streak: ns.streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
   };
@@ -280,6 +319,18 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
     }
     setNestState(ns);
     onSimSkip(ns);
+  };
+
+  // 완독 세리머니에서 받은 별점/소감을 영속 (§5.8.3).
+  // 활성 책의 user_book 을 status='completed' + rating/review_text 로 마감.
+  const handleComplete = ({ rating, review_text }) => {
+    try {
+      const ub = DataStore.activeBook.get();
+      if (ub) DataStore.books.complete(ub.id, { rating, review_text });
+    } catch (e) {
+      console.warn('[nest] 완독 기록 저장 실패:', e.message);
+    }
+    showToast('🏰 성 컬렉션에 기록이 남았어요!');
   };
 
   const sameBookFeed = (NPC_QUOTES[nestState.book.id] || []).slice(0, 3);
@@ -399,6 +450,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
         <Ceremony
           data={ceremony}
           onClose={() => setCeremony(null)}
+          onComplete={handleComplete}
         />,
         document.body
       )}
