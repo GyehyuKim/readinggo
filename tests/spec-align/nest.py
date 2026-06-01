@@ -28,19 +28,10 @@ def find(pattern: str, text: str, flags: int = 0) -> bool:
 
 
 # spec section -> (description, file, regex pattern)
+# v7 (2026-06-01): The Path(DynamicPath/ZIGZAG)·첫 7일 가속 invariant 제거 —
+# v7은 The Path와 가속을 폐기하고 "둥지가 자란다"(진척률 5단계)로 대체. 부재 검증은
+# align_v7.py(S3/S4)가 담당. 이 파일은 v7 둥지 *존재* invariant만 남긴다.
 INVARIANTS = [
-    (
-        "§5.1",
-        "DynamicPath 컴포넌트",
-        "nest.js",
-        r"const\s+DynamicPath\s*=",
-    ),
-    (
-        "§5.1",
-        "ZIGZAG 지그재그 레이아웃 상수",
-        "nest.js",
-        r"const\s+ZIGZAG\s*=\s*\[",
-    ),
     (
         "§5.2",
         "NEST_STAGES 정의 (5단계 진화)",
@@ -64,13 +55,6 @@ INVARIANTS = [
         "getNestStage 함수",
         "data.js",
         r"const\s+getNestStage\s*=",
-    ),
-    (
-        "§5.2 v5",
-        "첫 7일 가속 모드 (D3/D7 트리거)",
-        # accept presence in nest.js or data.js
-        "nest.js|data.js",
-        r"(가속|D3|D7|일자 기반|first.{0,10}week|accelerat)",
     ),
     (
         "§5.2",

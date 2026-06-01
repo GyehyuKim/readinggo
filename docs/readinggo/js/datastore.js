@@ -1,0 +1,368 @@
+/* =========================================================
+   ReadingGo — datastore.js  (issue #124 · S1)
+   backend.md §7.2 DataStore 계약 + localStorageAdapter.
+
+   목적: 모든 데이터 접근을 한 모듈로 가둔다. 피처 코드는
+   localStorage/supabase 를 직접 호출하지 않고 DataStore.* 만 부른다.
+   Phase 0 → 1 이행 = 어댑터 교체 한 줄 (§7.2).
+
+   백킹: localStorageAdapter 가 rg_v41 키 read/write.
+   형상은 §7.8 (user_books[] · active_user_book_id). 최초 로드 시
+   INITIAL_STATE/ALL_BOOKS 에서 시드.
+
+   주의 (S1 경계): 이 모듈은 계약·어댑터를 *수립*만 한다. 기존
+   appState(useState) 렌더링은 마이그레이션하지 않는다 — 신규 피처
+   (S5 성/S6 별점/S7 스포일러)가 이후 이걸 쓰도록 토대만 깐다.
+   ========================================================= */
+
+const RG_V41_KEY = 'rg_v41';
+
+/* ── id / 날짜 헬퍼 ─────────────────────────────── */
+function _dsId(prefix) {
+  return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function _today() {
+  // 로컬 날짜 (YYYY-MM-DD). 세션/스트릭 일자 키.
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+function _dayDiff(fromDate, toDate) {
+  // YYYY-MM-DD 두 날짜의 일수 차 (to - from).
+  const a = new Date(fromDate + 'T00:00:00');
+  const b = new Date(toDate + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+
+/* ── localStorageAdapter ────────────────────────────────
+   rg_v41 키 하나에 §7.8 JSON 미러를 보관. 최초 로드 시 시드.
+   Phase 1 에서는 이 객체를 supabaseAdapter 로 교체. */
+const localStorageAdapter = (function () {
+  let _cache = null;
+
+  function _seed() {
+    // INITIAL_STATE 의 단일 활성 책을 user_books[] 한 행으로 시드.
+    const seedBook = (window.INITIAL_STATE && window.INITIAL_STATE.book) || null;
+    const user_books = [];
+    let active_user_book_id = null;
+
+    if (seedBook) {
+      const id = _dsId('ub');
+      active_user_book_id = id;
+      user_books.push({
+        id,
+        book_id: seedBook.id,
+        book: {
+          id: seedBook.id,
+          title: seedBook.title,
+          author: seedBook.author,
+          total_pages: seedBook.total,
+          cover_url: seedBook.cover,
+        },
+        status: 'reading',
+        current_page: seedBook.cur || 0,
+        rating: null,
+        review_text: null,
+        started_at: _today(),
+        completed_at: null,
+        sessions: [],
+        sentences: [],
+      });
+    }
+
+    return {
+      user_books,
+      active_user_book_id,
+      streak: {
+        current: (window.INITIAL_STATE && window.INITIAL_STATE.streak) || 0,
+        longest: (window.INITIAL_STATE && window.INITIAL_STATE.streak) || 0,
+        last_check_in_date: null,
+      },
+      xp: (window.INITIAL_STATE && window.INITIAL_STATE.xp) || 0,
+      claps: {},      // sentenceId -> true
+      bookmarks: {},  // sentenceId -> true
+      wish_books: Array.isArray(window.WISHLIST) ? window.WISHLIST.slice() : [],
+      pending: {},    // 가입 전 임시 (rg_pending_*)
+    };
+  }
+
+  function read() {
+    if (_cache) return _cache;
+    try {
+      const raw = localStorage.getItem(RG_V41_KEY);
+      if (raw) {
+        _cache = JSON.parse(raw);
+        return _cache;
+      }
+    } catch (e) {
+      console.warn('[DataStore] rg_v41 파싱 실패, 재시드:', e.message);
+    }
+    _cache = _seed();
+    write(_cache);
+    return _cache;
+  }
+
+  function write(state) {
+    _cache = state;
+    try {
+      localStorage.setItem(RG_V41_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.warn('[DataStore] rg_v41 저장 실패:', e.message);
+    }
+    return state;
+  }
+
+  // mutate(fn): 현재 상태를 fn 으로 수정 후 저장. fn 의 반환값을 그대로 돌려준다.
+  function mutate(fn) {
+    const state = read();
+    const out = fn(state);
+    write(state);
+    return out;
+  }
+
+  return { read, write, mutate };
+})();
+
+/* ── 내부 조회 헬퍼 ──────────────────────────────── */
+function _activeUB(s) {
+  if (!s.active_user_book_id) return null;
+  return s.user_books.find(ub => ub.id === s.active_user_book_id) || null;
+}
+function _ubById(s, userBookId) {
+  return s.user_books.find(ub => ub.id === userBookId) || null;
+}
+function _allSentences(s) {
+  const out = [];
+  s.user_books.forEach(ub => {
+    (ub.sentences || []).forEach(se => out.push(se));
+  });
+  return out;
+}
+function _findSentence(s, sentenceId) {
+  return _allSentences(s).find(se => se.id === sentenceId) || null;
+}
+
+/* ── DataStore 계약 (§7.2) ───────────────────────────────
+   localStorageAdapter 백킹의 실제 동작 구현 (스텁 아님). */
+const DataStore = {
+
+  /* 책 / 활성 책 ──────────────────────────────── */
+  activeBook: {
+    get() {
+      return localStorageAdapter.mutate(s => _activeUB(s));
+    },
+    set(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        if (_ubById(s, userBookId)) s.active_user_book_id = userBookId;
+        return s.active_user_book_id;
+      });
+    },
+  },
+
+  /* 일일 기록 (세션) ──────────────────────────────
+     sessions.addToday: 그날 세션 1행 생성(같은 날 재호출 중복 방지)
+     + streak.bumpOnCheckIn 연동. */
+  sessions: {
+    addToday({ userBookId, page }) {
+      const today = _today();
+      const session = localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId) || _activeUB(s);
+        if (!ub) return null;
+        if (typeof page === 'number') ub.current_page = page;
+        ub.sessions = ub.sessions || [];
+        let row = ub.sessions.find(se => se.session_date === today);
+        if (!row) {
+          row = {
+            id: _dsId('sess'),
+            user_book_id: ub.id,
+            session_date: today,
+            current_page: ub.current_page,
+            created_at: Date.now(),
+          };
+          ub.sessions.push(row);
+        } else if (typeof page === 'number') {
+          row.current_page = page;
+        }
+        return row;
+      });
+      // 입력 즉시 스트릭 갱신 (§7.2: streak.bumpOnCheckIn 연동).
+      DataStore.streak.bumpOnCheckIn();
+      return session;
+    },
+    list(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId) || _activeUB(s);
+        return ub ? (ub.sessions || []).slice() : [];
+      });
+    },
+  },
+
+  /* 한 문장 (sentences) ───────────────────────────── */
+  sentences: {
+    add({ userBookId, sessionId, page, text, my_note }) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId) || _activeUB(s);
+        if (!ub) return null;
+        ub.sentences = ub.sentences || [];
+        const row = {
+          id: _dsId('se'),
+          user_book_id: ub.id,
+          book_id: ub.book_id,
+          session_id: sessionId || null,
+          page: typeof page === 'number' ? page : (ub.current_page || 0),
+          text: text || '',
+          my_note: my_note || null,
+          created_at: Date.now(),
+        };
+        ub.sentences.push(row);
+        return row;
+      });
+    },
+    listByBook(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId) || _activeUB(s);
+        return ub ? (ub.sentences || []).slice() : [];
+      });
+    },
+    listMine() {
+      return localStorageAdapter.mutate(s => _allSentences(s).slice());
+    },
+    feed() {
+      // 전체 공개 피드 — 최신순 (§social). Phase 0 은 내 문장만 보유.
+      return localStorageAdapter.mutate(s =>
+        _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+      );
+    },
+  },
+
+  /* 스트릭 ──────────────────────────────────────── */
+  streak: {
+    get() {
+      return localStorageAdapter.mutate(s => ({ ...s.streak }));
+    },
+    bumpOnCheckIn() {
+      const today = _today();
+      return localStorageAdapter.mutate(s => {
+        const st = s.streak;
+        if (st.last_check_in_date === today) return { ...st }; // 하루 1회만 증가
+        if (st.last_check_in_date && _dayDiff(st.last_check_in_date, today) === 1) {
+          st.current = (st.current || 0) + 1;
+        } else {
+          st.current = 1; // 끊겼거나 첫 체크인
+        }
+        if (st.current > (st.longest || 0)) st.longest = st.current;
+        st.last_check_in_date = today;
+        return { ...st };
+      });
+    },
+  },
+
+  /* XP ──────────────────────────────────────────── */
+  xp: {
+    get() {
+      return localStorageAdapter.mutate(s => s.xp || 0);
+    },
+    add(amount, reason) {
+      return localStorageAdapter.mutate(s => {
+        s.xp = (s.xp || 0) + (amount || 0);
+        return s.xp;
+      });
+    },
+  },
+
+  /* 완독 / 성(🏰) ─────────────────────────────────
+     books.complete → status='completed' + completed_at.
+     castles.list → status==='completed' user_books 파생 (별도 카운터 금지). */
+  books: {
+    complete(userBookId, opts) {
+      opts = opts || {};
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) return null;
+        ub.status = 'completed';
+        ub.completed_at = _today();
+        if (typeof opts.rating !== 'undefined') ub.rating = opts.rating;
+        if (typeof opts.review_text !== 'undefined') ub.review_text = opts.review_text;
+        return ub;
+      });
+    },
+  },
+  castles: {
+    list() {
+      return localStorageAdapter.mutate(s =>
+        s.user_books.filter(ub => ub.status === 'completed')
+      );
+    },
+  },
+
+  /* 소셜 (짹 / 책갈피 / 관심책) ─────────────────────
+     claps.toggle = 짹 (한 문장 좋아요) 토글. */
+  claps: {
+    toggle(sentenceId) {
+      return localStorageAdapter.mutate(s => {
+        if (s.claps[sentenceId]) delete s.claps[sentenceId];
+        else s.claps[sentenceId] = true;
+        return !!s.claps[sentenceId];
+      });
+    },
+  },
+  bookmarks: {
+    toggle(sentenceId) {
+      return localStorageAdapter.mutate(s => {
+        if (s.bookmarks[sentenceId]) delete s.bookmarks[sentenceId];
+        else s.bookmarks[sentenceId] = true;
+        return !!s.bookmarks[sentenceId];
+      });
+    },
+  },
+  wishBooks: {
+    add(bookId) {
+      return localStorageAdapter.mutate(s => {
+        if (!s.wish_books.includes(bookId)) s.wish_books.push(bookId);
+        return s.wish_books.slice();
+      });
+    },
+    list() {
+      return localStorageAdapter.mutate(s => s.wish_books.slice());
+    },
+    remove(bookId) {
+      return localStorageAdapter.mutate(s => {
+        s.wish_books = s.wish_books.filter(id => id !== bookId);
+        return s.wish_books.slice();
+      });
+    },
+  },
+
+  /* 스포일러 (read-side 계산, 저장 컬럼 없음) ─────────
+     spoiler.myCurrentPage: 활성/지정 책의 내 현재 페이지 → 블라인드 판정용. */
+  spoiler: {
+    myCurrentPage(bookId) {
+      return localStorageAdapter.mutate(s => {
+        const ub = bookId
+          ? s.user_books.find(u => u.book_id === bookId)
+          : _activeUB(s);
+        return ub ? (ub.current_page || 0) : 0;
+      });
+    },
+  },
+
+  /* 가입 전 임시 (pending) ─────────────────────────
+     onboarding 의 rg_pending_sentence 등을 흡수 (§7.7). */
+  pending: {
+    get(key) {
+      return localStorageAdapter.mutate(s =>
+        typeof s.pending[key] === 'undefined' ? null : s.pending[key]
+      );
+    },
+    set(key, value) {
+      return localStorageAdapter.mutate(s => {
+        s.pending[key] = value;
+        return value;
+      });
+    },
+  },
+};
+
+window.DataStore = DataStore;
+window.localStorageAdapter = localStorageAdapter;
