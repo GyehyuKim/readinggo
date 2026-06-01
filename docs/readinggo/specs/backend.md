@@ -144,7 +144,7 @@ user_books
   book_id       uuid FK books.id
   status        text                 -- 'reading' | 'completed' | 'archived'
   current_page  int  DEFAULT 0
-  rating        int  NULL            -- v7 신설. 완독 별점 1~5 (선택)
+  rating        numeric(2,1) NULL    -- v7 신설. 완독 별점 0.5~5, 0.5 단위(반별점) (선택)
   review_text   text NULL            -- v7 신설. 완독 소감 (선택)
   started_at    timestamptz
   completed_at  timestamptz NULL
