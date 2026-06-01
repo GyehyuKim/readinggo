@@ -145,7 +145,7 @@ const ScreenC1 = ({ onSelect, onManual }) => {
   );
 };
 
-// ── Screen C-2: 확인 / 직접 등록 + 오늘의 모이 입력 ───────────────────────────
+// ── Screen C-2: 확인 / 직접 등록 + 오늘의 한 문장 입력 ───────────────────────────
 const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
   const [page,         setPage]         = React.useState('0');
   const [sentencePage, setSentencePage] = React.useState('');
@@ -217,9 +217,9 @@ const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
           min={0} max={isManual ? parseInt(totalPages) || 9999 : book.total_pages}
           className="rg-input" style={iStyle} onFocus={focus} onBlur={blur}/>
 
-        {/* 오늘의 모이 */}
+        {/* 오늘의 한 문장 */}
         <div style={{ height: 1, background: '#E5E5E5', margin: '8px 0 16px' }}/>
-        <p style={{ fontWeight: 900, fontSize: 15, color: '#1F1F1F', margin: '0 0 4px' }}>오늘의 모이 🐦</p>
+        <p style={{ fontWeight: 900, fontSize: 15, color: '#1F1F1F', margin: '0 0 4px' }}>오늘의 한 문장 🐦</p>
         <p style={{ fontSize: 12, color: '#AFAFAF', fontWeight: 600, marginBottom: 14 }}>
           오늘 읽은 내용 중 마음에 남는 한 문장
         </p>
