@@ -49,8 +49,8 @@
 ### Cross-file 참조 규칙
 다른 spec 파일을 가리킬 때:
 ```markdown
-[§5.6](./book-club.md)        ← 일반 참조
-[book-club.md §5.6.5](./book-club.md#565-자동화-점진-계획)  ← 정확한 앵커
+[§5.5](./village.md)        ← 일반 참조
+[village.md §5.5.4](./village.md#554-마을-내부-화면)  ← 정확한 앵커
 ```
 같은 파일 내 참조는 `§X.Y` 그대로 둔다. 헤더 anchor는 GitHub 규칙 (한글 그대로, 공백 → `-`, 점·괄호 제거).
 

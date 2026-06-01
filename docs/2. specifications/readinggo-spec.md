@@ -15,7 +15,7 @@
 |---|---|---|
 | 온보딩 | [`readinggo/specs/onboarding.md`](../readinggo/specs/onboarding.md) | §4 |
 | 둥지 탭 | [`readinggo/specs/nest.md`](../readinggo/specs/nest.md) | §5.1-5.4 |
-| 독서모임 + 운영자 짹 | [`readinggo/specs/book-club.md`](../readinggo/specs/book-club.md) | §5.5-5.6 |
+| 마을 | [`readinggo/specs/village.md`](../readinggo/specs/village.md) | §5.5 |
 | 소셜 탭 | [`readinggo/specs/social.md`](../readinggo/specs/social.md) | §5.7 |
 | 내서재(프로필) | [`readinggo/specs/profile.md`](../readinggo/specs/profile.md) | §5.8-5.9 |
 | 시스템 로직 | [`readinggo/specs/systems.md`](../readinggo/specs/systems.md) | §6 |

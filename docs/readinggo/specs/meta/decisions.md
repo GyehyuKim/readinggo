@@ -67,7 +67,7 @@
 |---|---|
 | **gyehyu** | `social.md` · `profile.md` · `backend.md` · `onboarding.md` · `meta/*` · `README.md` |
 | **seungwon** | `nest.md` · `systems.md` · `design.md` |
-| **yunji** | `book-club.md` → `village.md` (rename + 마을 재작성) |
+| **yunji** | `village.md` (마을) |
 
 ---
 
@@ -107,12 +107,12 @@
 | 피드 리액션 | 짹(좋아요) 1종 + 책갈피(🔖) 분리. v4.3까지의 👏🥹🔖 3종 칩 폐기 |
 | 관심 책 리스트 | 내서재 내 별도 섹션. 소셜 피드 책 상세에서 "관심 책에 추가" 로 저장. DB: `wish_books` |
 | 책갈피 | 소셜 피드 모이 카드 우측 상단 🔖 → 관심 문장 저장. DB: `sentence_bookmarks` |
-| ~~마을 탭 설계~~ | **v6 해소** — 독서모임 탭으로 전면 대체 ([§5.5](../book-club.md)) |
+| ~~마을 탭 설계~~ | **v6 해소** — 독서모임 탭으로 전면 대체 ([§5.5](../village.md)) |
 | 외부 노출 슬로건 | "하루 한 페이지, 한 문장에서 시작해요." (내부 Duolingo 레퍼런스 외부 비노출) |
 | DB | 관계형 + `users.settings` JSONB |
 | Phase 분리 | 0 데모 / 1 Supabase 웹 / 2 Android+FCM |
 | **v5 — 결정 마찰 카피** | 모이 입력 화면 하단에 "그냥 펴진 페이지 한 줄도 좋아요. 좋은 문장을 고를 필요 없어요." 상시 표시 |
-| **v5 — 첫 7일 보호 주축** | [§5.6](../book-club.md) 운영자 짹 (Y Combinator do-things-that-don't-scale 패턴) |
+| **v5 — 첫 7일 보호 주축** | [§5.6](../village.md) 운영자 짹 (Y Combinator do-things-that-don't-scale 패턴) |
 | **v5 — 첫 7일 둥지 진화 가속** | 첫 책에 한해 D1/D3/D7 일자 트리거로 🪵→🪹→🏠 진화. 8일차+는 페이지 기반 |
 | **v5 — 친구 짹 = +1 XP** | XP를 *사회적 화폐* 로 감각시키는 즉시 보상 메카닉 |
 | **v5 — 컷오프** | 자정 KST 유지. 새벽 3-4시 유예 채택 안 함 (사용자 행동 모순) |
@@ -121,8 +121,8 @@
 | **v5 — Duolingo 벤치마킹** | 게이미피케이션 세부 설계 시 의도적으로 인용 끊고 ReadingGo 고유 컨텍스트에서 발상 ([§14](../meta/rejected.md)) |
 | **v5 — 운영자 정의** | `users.is_operator` 신설. ✨ 표식. NPC와 분리 |
 | **v5 — XP destination** | 미해결, 별도 안건으로 보존 ([§13](../meta/open-issues.md)) |
-| ~~**v5 — T2 mini**~~ | **v6 해소** — 독서모임 탭 메가 스트림으로 흡수 ([§5.5](../book-club.md)) |
-| ~~**v5 — T2 좀비 사용자 처리**~~ | **v6 해소** — 독서모임 가입자 전용 공개 원칙으로 대체 ([§5.5](../book-club.md)) |
+| ~~**v5 — T2 mini**~~ | **v6 해소** — 독서모임 탭 메가 스트림으로 흡수 ([§5.5](../village.md)) |
+| ~~**v5 — T2 좀비 사용자 처리**~~ | **v6 해소** — 독서모임 가입자 전용 공개 원칙으로 대체 ([§5.5](../village.md)) |
 | **v5.1 — Phase 재정의** | Capacitor 처음부터 단일 코드베이스. Phase 0/1/2/3 모두 같은 `src/` 위에서 진행 |
 | **v5.1 — 모이 확장 필드 (`sentences.my_note`)** | 짧은 한 문장 강제(`text`) 유지 + *내 감상* 선택 필드(`my_note`) 분리. Rich Text 자유 노트 별도 타입은 [§13.5](../meta/open-issues.md) 학기 후 결정 |
 | **v5.1 — 챕터 ID 자동 매핑** | `sentences.chapter_id` 신설. 모이 작성 시 페이지로 챕터 자동 식별 (`books_toc.csv` 기준) |
@@ -136,7 +136,7 @@
 | **v5.1 — 위젯·자동백업·다크모드·PIN 채택** | Phase 2 P1~P2 |
 | **v5.1 — 수익 모델 검토** | 학기 후 별도 안건 ([§13.6](../meta/open-issues.md)). 어필리에이트(교보문고)만 Phase 1 파라미터 추가로 즉시 적용 |
 | **v5.1 — Rich Text 자유 노트** | *별도 타입 신설은 보류*. 모이 확장 필드(`my_note`)로 흡수. 별도 타입 채택 여부는 학기 후 ([§13.5](../meta/open-issues.md)) |
-| **v6 — 독서모임 탭** | 마을 탭 대체. 메가 스트림(자동) + 서브 모임(공개/비공개). 구경 불가. ([§5.5](../book-club.md)) |
+| **v6 — 독서모임 탭** | 마을 탭 대체. 메가 스트림(자동) + 서브 모임(공개/비공개). 구경 불가. ([§5.5](../village.md)) |
 | **v6 — AI 도서 추천** | 완독 후 Gemini 기반 다음 책 3권 + 한 줄 이유. 교보문고 어필리에이트 연결. Phase 2 |
 | **v6 — AI 추출 책** | 완독 모이를 AI가 재구성 → 나만의 추출 책. 이미지/Markdown export. Phase 2 |
 | **v6 — SNS 이미지 카드 세부 스펙** | [§5.10](../profile.md) 신설. 모이 카드 + 마일스톤 카드. Phase 1 P1 |
