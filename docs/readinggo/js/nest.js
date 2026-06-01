@@ -9,6 +9,7 @@ const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _u
 function CheckinModal({ book, onClose, onSubmit }) {
   const [page, setPage] = _useState(book.cur);
   const [sentence, setSentence] = _useState('');
+  const [isSpoiler, setIsSpoiler] = _useState(false);
 
   const adjustPage = (delta) => {
     setPage(p => Math.max(0, Math.min(book.total, p + delta)));
@@ -26,7 +27,7 @@ function CheckinModal({ book, onClose, onSubmit }) {
       showToast('한 쪽도 OK! +1만 눌러봐요 🐦');
       return;
     }
-    onSubmit({ page, sentence: sentence.trim() });
+    onSubmit({ page, sentence: sentence.trim(), isSpoiler });
   };
 
   return (
@@ -69,6 +70,23 @@ function CheckinModal({ book, onClose, onSubmit }) {
             onChange={handleSentence}
           />
           <div className="sentence-counter">{sentence.length} / 200</div>
+        </div>
+
+        <div className="sheet-section">
+          <label style={{display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', userSelect:'none'}}>
+            <input
+              type="checkbox"
+              checked={isSpoiler}
+              onChange={(e) => setIsSpoiler(e.target.checked)}
+              style={{width:20, height:20, cursor:'pointer'}}
+            />
+            <span style={{fontSize:14, fontWeight:700, color:'var(--ink)'}}>
+              🚨 스포일러 처리하기
+            </span>
+            <span style={{fontSize:12, fontWeight:600, color:'var(--ink-3)'}}>
+              (다른 독자 보호)
+            </span>
+          </label>
         </div>
 
         <button className="submit-btn" onClick={handleSubmit}>✨ 짹 등록하기</button>
@@ -212,6 +230,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [ceremony, setCeremony] = _useState(null);
   const [showConfetti, setShowConfetti] = _useState(false);
+  const [revealedQuotes, setRevealedQuotes] = _useState({});
   const [nestState, setNestState] = _useState({
     nestLv: state.nest.lv,
     nestHealth: state.nestHealth,
@@ -226,7 +245,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
     twigCountFromState(state.nest.lv, state.nestHealth)
   );
 
-  // sync from parent state on mount
+  // sync from parent state on mount and when state changes
   _useEffect(() => {
     setNestState({
       nestLv: state.nest.lv,
@@ -238,12 +257,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
       book: state.book,
       daysSinceRead: state.daysSinceRead,
     });
-  }, []);
+  }, [state.book.id]);
 
   const HEALTH_GAIN = 14;
   const HEALTH_LOSS = 15;
 
-  const handleCheckin = ({ page, sentence }) => {
+  const handleCheckin = ({ page, sentence, isSpoiler }) => {
     setModalOpen(false);
     const ns = { ...nestState };
     const delta = page - ns.book.cur;
@@ -270,7 +289,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
     }
 
     if (sentence) {
-      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금' }, ...ns.myQuotes];
+      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금', isSpoiler: isSpoiler || false }, ...ns.myQuotes];
     }
 
     // advance The Path: today → done, ghost → today
@@ -313,6 +332,13 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
     }
     setNestState(ns);
     onSimSkip(ns);
+  };
+
+  const toggleQuoteSpoiler = (quoteId) => {
+    setRevealedQuotes(prev => ({
+      ...prev,
+      [quoteId]: !prev[quoteId],
+    }));
   };
 
   const sameBookFeed = (NPC_QUOTES[nestState.book.id] || []).slice(0, 3);
@@ -400,6 +426,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
       ) : (
         nestState.myQuotes.slice(0, 3).map((q, i) => {
           const bk = getBook(q.bookId);
+          const quoteId = `my_${i}`;
+          const isRevealed = revealedQuotes[quoteId] || !q.isSpoiler;
           return (
             <div key={i} className="my-q-card">
               <div className="meta">
@@ -409,7 +437,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
                 <span className="dot">·</span>
                 <span>{q.when}</span>
               </div>
-              <div className="quote">"{q.text}"</div>
+              <div className={'quote' + (isRevealed ? '' : ' spoiler')} onClick={() => toggleQuoteSpoiler(quoteId)} title="클릭하여 스포일러 표시">
+                "{q.text}"
+              </div>
             </div>
           );
         })

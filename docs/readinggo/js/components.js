@@ -56,6 +56,7 @@ function SentenceCard({ item, bookId }) {
     claps: item.claps, tears: item.tears, marks: item.marks,
     clapActive: false, tearActive: false, markActive: false,
   });
+  const [revealed, setRevealed] = useState(false);
   const bk = getBook(bookId);
   const toggle = (key, activeKey) => {
     setReactions(r => ({
@@ -71,7 +72,9 @@ function SentenceCard({ item, bookId }) {
         <div className="nick">{item.nick}</div>
         <div className="meta">{bk ? bk.title + ' · ' : ''}{item.page}p · {item.time}</div>
       </div>
-      <div className="quote">"{item.q}"</div>
+      <div className={'quote' + (revealed ? '' : ' spoiler')} onClick={() => setRevealed(!revealed)} title="클릭하여 스포일러 표시">
+        "{item.q}"
+      </div>
       <div className="react">
         <span className={'chip' + (reactions.clapActive ? ' active' : '')} onClick={() => toggle('claps','clapActive')}>
           👏 {reactions.claps}

@@ -3,17 +3,11 @@
    마을 탭: 마을 목록 화면 + [마을 만들기] 버튼
    ========================================================= */
 
-function VillageView({ state }) {
+function VillageView({ state, onSelectTown }) {
   const getDday = (dday) => {
     if (dday === 0) return '오늘';
     if (dday > 0) return `D+${dday}`;
     return `D${dday}`;
-  };
-
-  const getTownBook = (bookId) => {
-    return state.towns?.find(t => t.bookId === bookId)?.bookId === bookId
-      ? getBook(bookId)
-      : RG_BOOKS[0];
   };
 
   const handleCreateTown = () => {
@@ -67,6 +61,7 @@ function VillageView({ state }) {
               <div
                 key={town.id}
                 className="card"
+                onClick={() => onSelectTown(town.id)}
                 style={{
                   marginBottom:16,
                   padding:14,

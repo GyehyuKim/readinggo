@@ -1,102 +1,119 @@
-# AGENTS.md — AI Agent Instructions for ReadingGo
+# AGENTS.md — AI Agent Instructions for ReadingGo / GlocalX
 
-이 파일은 **Cursor, Continue, Aider, Windsurf** 등 AGENTS.md 표준을 따르는 코딩 에이전트를 위한
-진입점이다. Claude Code는 `CLAUDE.md`를 우선 로드하지만, 동일 규범을 참조하도록 이 파일도
-동기화되어 있다.
-
-> repo 이름은 역사적 이유로 `GyehyuKim/glocalx` (이전 프로젝트 GlocalX에서 피벗). **현재 프로젝트는 ReadingGo.**
+> **Source-of-truth**: [`CLAUDE.md`](./CLAUDE.md) — Claude Code가 로드하는 주 파일.
+> Cursor, Gemini CLI, Aider, Continue 등 다른 툴은 이 파일을 통해 진입하되,
+> 상세 규칙은 모두 CLAUDE.md를 따른다. 두 파일이 충돌하면 CLAUDE.md가 이긴다.
 
 ---
 
-## 필수 준수 문서
+## 프로젝트 개요
 
-이 프로젝트에서 작업하는 모든 AI 에이전트는 **작업을 시작하기 전에** 다음 문서를 읽고 준수해야 한다:
-
-1. **[`CONTRIBUTING.md`](./CONTRIBUTING.md)** — 브랜치 네이밍, PR 규칙, 커밋 메시지, 금지 사항,
-   LLM 행동 규칙(§9). **이것이 단일 진실 소스.**
-2. **[`CLAUDE.md`](./CLAUDE.md)** — Claude Code 전용 보조 지침 + Stack Lock + Pages. 다른 에이전트도 참고.
-3. **[`docs/readinggo/specs/README.md`](./docs/readinggo/specs/README.md)** — ReadingGo 스펙 인덱스 (v7). 용어 사전(§0.5)·Phase(§3)·파일 소유권.
-
-우선순위 (모순이 있을 때): `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타 문서.
+- **코스**: KAIST IMMS BIZ.69911 — AI 기반 비즈니스 진화, 전략 및 실습 (2026 Spring, 이지수 교수)
+- **현재 서브프로젝트**: **ReadingGo** — 독서 습관 앱. Duolingo처럼 매일 읽게 만드는
+  스트릭·XP·소셜 게이미피케이션. 데모 진입점: `docs/readinggo/index.html`
+- **팀**: 4명 (김계휴 Dev/Tech, 김경문 GTM, 이승원 Marketing, 정윤지 AX)
+- **언어**: 한국어 기본. 코드 식별자만 영어.
 
 ---
 
-## 프로젝트 개요 (1분 요약)
+## 필수 준수 문서 (우선순위 순)
 
-- **코스**: KAIST IMMS BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습 (2026 Spring, 이지수 교수)
-- **프로젝트**: **ReadingGo** — 독서 습관 앱. "하루 한 페이지, 한 문장"을 게이미피케이션(스트릭·XP·둥지 진화·성 컬렉션)과
-  소셜(마을·전체 공개 피드·짹·NPC)로 매일 읽게 만든다. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
-- **형태**: **web-first** — Phase 0 정적 웹(데모) / Phase 1 Supabase. **Capacitor·네이티브 앱은 Phase 3으로 보류** (`CLAUDE.md` Stack Lock).
-- **팀 (dev 3인)**: 김계휴(`gyehyu`, 백엔드·소셜·내서재), 이승원(`seungwon`, 둥지·XP·디자인), 정윤지(`yunji`, 마을).
-- **주요 산출물**: `docs/readinggo/` (Phase 0 데모), `docs/readinggo/specs/` (피처별 spec, v7).
-- **언어**: 모든 커뮤니케이션과 문서는 **한국어**가 기본. 코드 식별자만 영어.
+1. **[`CONTRIBUTING.md`](./CONTRIBUTING.md)** — 브랜치 네이밍, PR 규칙, 커밋 메시지,
+   금지 사항, LLM 행동 규칙(§9). **단일 진실 소스.**
+2. **[`CLAUDE.md`](./CLAUDE.md)** — Stack Lock, SLC 원칙, Health Stack, 데모 아키텍처.
+3. **[`docs/readinggo/CLAUDE.md`](./docs/readinggo/CLAUDE.md)** — 데모 디렉토리 전용
+   가이드. TSV 스키마, 파일 구조, 아키텍처 메모.
+
+우선순위 (충돌 시): `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타
+
+---
+
+## 컴파운드 루프 — 이 프로젝트의 작업 방식
+
+에이전트는 단발 실행이 아니라 **루프**로 작동한다. 매 작업은 다음 작업을 더 스마트하게 만든다.
+
+```
+Plan  →  Work  →  Review  →  Compound
+ ↑                               |
+ └───────────────────────────────┘
+```
+
+| 단계 | 에이전트의 역할 |
+|------|----------------|
+| **Plan** | 컨텍스트 수집 → 상세 계획 작성. "지금 모델 창에 무엇이 필요한가?" 를 묻는다. |
+| **Work** | 계획 실행 + 테스트 작성. 계획 외 변경은 사용자에게 묻는다. |
+| **Review** | 결과물 검증. 오류·예외 케이스·스펙 미정렬을 기록. |
+| **Compound** | **고장 → 파일 업데이트.** 같은 실수가 반복되면 이 파일 또는 CLAUDE.md에 규칙으로 추가. |
+
+> **핵심 습관**: 에이전트가 잘못된 가정으로 실수했다면, 대화 종료 전에 해당 교훈을
+> CLAUDE.md 또는 이 파일에 한 줄 규칙으로 남긴다. 같은 실수는 두 번 없다.
 
 ---
 
 ## 자주 하는 작업과 출발점
 
 | 작업 | 시작 파일 |
-|---|---|
-| 스펙 전체 지도 | `docs/readinggo/specs/README.md` |
-| 데이터 모델 · DataStore 계약 | `docs/readinggo/specs/backend.md` |
-| 둥지·XP·스트릭 규칙 | `docs/readinggo/specs/nest.md`, `systems.md` |
-| 마을 | `docs/readinggo/specs/village.md` |
-| 소셜·내서재 | `docs/readinggo/specs/social.md`, `profile.md` |
-| 데모 코드 | `docs/readinggo/index.html` + `docs/readinggo/js/*` |
-| 도서 데이터 | `docs/readinggo/data/books.tsv` (유일 소스, 하드코딩 금지) |
-| 결정 이력 | `docs/readinggo/specs/meta/decisions.md` |
+|------|-----------|
+| 데모 UI 수정 | `docs/readinggo/index.html`, `docs/readinggo/js/*.js` |
+| 책 데이터 추가 | `docs/readinggo/data/books.tsv` — 코드 수정 불필요 |
+| 스펙 작성/수정 | `docs/readinggo/specs/<feature>.md` (코드 PR 전에 먼저) |
+| 스펙 정합성 검사 | `python tests/spec-align/nest.py` |
+| Markdown 린트 | `npx -y markdownlint-cli2` |
+| 서버 실행 (로컬) | `python -m http.server 3000` (docs/readinggo/ 에서) |
 
 ---
 
-## 워크플로 최소 요구사항 (상세는 CONTRIBUTING.md)
+## 워크플로 최소 요구사항
 
 ```bash
-# 0. (Google Drive) git 명령 전 항상
+# Google Drive 이슈 선제 처리 (필수 — git 명령 전 항상)
 find .git -name "desktop.ini" -type f -delete
 
-# 1. 최신화
-git checkout main && git pull origin main
+# 브랜치: <owner>/<topic-slug>  (owner ∈ {gyehyu, seungwon, yunji})
+git checkout -b yunji/feature-name
 
-# 2. 브랜치 생성 (규칙: <owner>/<topic-slug>, owner ∈ {gyehyu, seungwon, yunji})
-git checkout -b gyehyu/example-topic
+# 커밋 (Conventional Commits)
+git commit -m "feat: 무엇을 왜"
 
-# 3. 편집 및 커밋 (Conventional Commits)
-git add <files>
-git commit -m "docs: 왜 바꿨는지 한 문장"
-
-# 4. main이 움직였다면 rebase
-git fetch origin && git rebase origin/main
-
-# 5. 푸시 + PR (머지는 계휴가 GitHub 웹에서)
-git push -u origin gyehyu/example-topic
+# PR 생성 (머지는 gyehyu가 GitHub 웹에서)
 gh pr create --title "..." --body "..."
 ```
 
-**금지**: `main` 직접 push · `git push --force` · `--no-verify` · `.env`/API 키 커밋 ·
-임의 `feat/`·`fix/` type-prefix 브랜치 · **spec과 코드를 한 PR에 묶기** (CONTRIBUTING §4.1).
-
-**Stack Lock**: 새 프레임워크/라이브러리 도입(Capacitor 재도입, Vite 전환 등) 제안 시 사용자에게 먼저 확인. 임의 도입 금지.
+**금지**: `main` 직접 push · `--force` · `--no-verify` · 시크릿 커밋 ·
+새 프레임워크/라이브러리 무단 도입 (Stack Lock 위반)
 
 ---
 
-## 환경 특이사항
+## 스택 & 아키텍처 (Phase 0)
 
-- **플랫폼**: Windows 11, bash shell, repo는 **Google Drive 동기화 폴더 안**에 있다.
-- **Google Drive 이슈**: `.git/` 내부에 `desktop.ini`가 자동 생성되어 `git pull`/`fetch`를
-  깨뜨리는 문제가 반복된다. git 명령 실행 **전에 항상** `find .git -name "desktop.ini" -type f -delete`.
-- **경로 공백**: 폴더명에 한글과 공백이 많다 (`20. KAIST-IMMS`, `41. Project` 등).
-  반드시 따옴표로 감싸라.
+- **프론트엔드**: 정적 HTML/JS + React 18 CDN + Babel standalone. 빌드 도구 없음.
+- **크로스 파일 공유**: `window.X = X` 패턴. ES modules 없음.
+- **책 데이터**: `data/books.tsv` (542권, TSV, UTF-8). 코드 하드코딩 금지.
+- **배포**: GitHub Pages (`main /docs`).
+- **Stack Lock**: Swift, React Native, Vite, TypeScript 등 신규 도입 금지.
+  제안 시 spec PR 먼저, 코드 PR 나중.
 
 ---
 
-## 에이전트 작업 스타일
+## 에이전트 행동 규칙
 
-- **과분할 금지**: 관련된 변경을 과도하게 쪼개 PR 여러 개를 만들지 말 것. 1 PR = 1 논리 단위.
-- **단정하지 말 것**: 프로젝트 맥락이 불충분하면 사용자에게 묻는다. 특히 제품 의사결정,
-  게임 메카닉(XP·둥지·성), 페르소나, 숫자 추산은 임의로 채우지 않는다.
-- **SLC > MVP**: 새 기능은 *Simple·Lovable·Complete* 기준. "다듬은 한 기능 > 반쯤 만든 다섯 개."
+- **단정하지 말 것**: 비즈니스 의사결정·숫자 추산은 임의로 채우지 않고 묻는다.
+- **SLC 기준 적용**: 새 기능은 "lovable한가? 이번 주에 complete할 수 있나?" 로 평가.
+  ugly but functional(MVP)보다 small but delightful(SLC).
+- **스펙 PR 먼저**: 코드보다 설계가 먼저. `specs/<feature>.md` 없이 큰 기능 구현 금지.
 - **한국어 응답**: 사용자가 영어로 쓰지 않는 한 한국어로 답한다.
+- **과분할 금지**: 1 PR = 1 논리 단위. 관련 변경을 여러 PR로 쪼개지 않는다.
+- **고장 → 파일 업데이트**: 새 quirk·실수 패턴 발견 시 이 파일 또는 CLAUDE.md에 기록.
 
 ---
 
-자세한 규칙·예시·과거 사고 기록은 `CONTRIBUTING.md`를 참조.
+## 환경 특이사항 (Windows + Google Drive)
+
+- **플랫폼**: Windows 11, bash shell, repo가 **Google Drive 동기화 폴더** 안에 있다.
+- **desktop.ini 문제**: Drive가 `.git/` 내부에 자동 생성 → `git pull`/`fetch` 깨짐.
+  **git 명령 전 반드시**: `find .git -name "desktop.ini" -type f -delete`
+- **경로 공백·한글**: 폴더명에 한글·공백 있음. 경로는 항상 따옴표로 감싼다.
+
+---
+
+자세한 규칙·예시·과거 사고 기록은 [`CONTRIBUTING.md`](./CONTRIBUTING.md) 참조.

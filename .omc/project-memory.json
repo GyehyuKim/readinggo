@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1779977004163,
+  "lastScanned": 1780225025247,
   "projectRoot": "C:\\Users\\gangs\\Documents\\정윤지\\claude\\glocalx",
   "techStack": {
     "languages": [],
@@ -39,21 +39,21 @@
       "path": "40. Development",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1779977004076,
+      "lastAccessed": 1780225024465,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1779977004079,
+      "lastAccessed": 1780225024466,
       "keyFiles": []
     },
     "loop": {
       "path": "loop",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1779977004080,
+      "lastAccessed": 1780225024467,
       "keyFiles": [
         "README.md"
       ]
@@ -62,14 +62,14 @@
       "path": "old",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1779977004080,
+      "lastAccessed": 1780225024531,
       "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 1,
-      "lastAccessed": 1779977004081,
+      "lastAccessed": 1780225024653,
       "keyFiles": [
         "README.md"
       ]
@@ -78,7 +78,7 @@
       "path": "tests\\data",
       "purpose": "Data files",
       "fileCount": 1,
-      "lastAccessed": 1779977004090,
+      "lastAccessed": 1780225024661,
       "keyFiles": [
         "validate-books.py"
       ]
@@ -167,6 +167,12 @@
       "path": "docs\\readinggo\\js\\library.js",
       "accessCount": 2,
       "lastAccessed": 1779978168211,
+      "type": "file"
+    },
+    {
+      "path": "AGENTS.md",
+      "accessCount": 2,
+      "lastAccessed": 1780236875957,
       "type": "file"
     },
     {
