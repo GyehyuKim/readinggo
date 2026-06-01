@@ -214,8 +214,8 @@ const INITIAL_STATE = {
 };
 
 /* ── 완독 기록 (책장) ─────────────────────────── */
+// 완독 책(성 컬렉션). 활성 책(_ab=b008, 읽는 중)은 제외 — 같은 책이 읽는 중·완독 양쪽에 뜨지 않도록.
 const INITIAL_BOOKSHELF = {
-  "b008": { rating: 5, comment: "나의 성장을 보는 듯한 경험. 삶의 의미를 생각하게 해준 책.", completedDate: "2026-05-20" },
   "b105": { rating: 4, comment: "사회 비판의 대표작. 간결하면서도 강력한 메시지.", completedDate: "2026-05-18" },
   "b037": { rating: 5, comment: "청춘의 방황과 성장. 모든 세대의 공감을 받을 책.", completedDate: "2026-05-15" },
 };

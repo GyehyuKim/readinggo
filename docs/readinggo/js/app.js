@@ -4,7 +4,7 @@
    ========================================================= */
 
 function App() {
-  const { useState, useCallback } = React;
+  const { useState, useCallback, useMemo } = React;
   const [activeTab, setActiveTab] = useState('nest');
   const [selectedTownId, setSelectedTownId] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -13,6 +13,11 @@ function App() {
     // village sent 상태는 로컬 복사
     village: INITIAL_STATE.village.map(v => ({ ...v })),
   }));
+
+  // 성(🏰) 개수 = 완독 권수. 별도 카운터 없이 DataStore.castles.list 에서 파생 (§5.2.1).
+  const castleCount = useMemo(() => {
+    try { return DataStore.castles.list().length; } catch { return 0; }
+  }, []);
 
   const switchTab = useCallback((tab) => {
     setActiveTab(tab);
@@ -105,6 +110,21 @@ function App() {
               <span>reading<span className="go">GO</span></span>
             </div>
             <div className="topbar-stats">
+              <button
+                onClick={() => switchTab('profile')}
+                className="stat"
+                title="성 컬렉션 (완독 권수)"
+                style={{
+                  background:'transparent',
+                  border:'none',
+                  cursor:'pointer',
+                  padding:0,
+                  font:'inherit',
+                }}
+              >
+                <span className="ico">🏰</span>
+                <span>×{castleCount}</span>
+              </button>
               <span className="stat fire" title="연속 출석">
                 <span className="ico">🔥</span>
                 <span>{appState.streak}</span>

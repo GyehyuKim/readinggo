@@ -71,6 +71,34 @@ const localStorageAdapter = (function () {
       });
     }
 
+    // 완독 책(성 컬렉션)을 INITIAL_BOOKSHELF 에서 시드 → castles.list 가
+    // 데모의 실제 완독 집합(프로필 "완독" 목록과 동일)을 반영. 별도 카운터 없이
+    // status==='completed' 행에서 파생(§5.2.1). 활성 책과 별개 행.
+    const shelf = window.INITIAL_BOOKSHELF || {};
+    Object.keys(shelf).forEach(bookId => {
+      const entry = shelf[bookId];
+      const bk = (typeof window.getBook === 'function') ? window.getBook(bookId) : null;
+      user_books.push({
+        id: _dsId('ub'),
+        book_id: bookId,
+        book: bk ? {
+          id: bk.id,
+          title: bk.title,
+          author: bk.author,
+          total_pages: bk.total,
+          cover_url: bk.cover,
+        } : { id: bookId },
+        status: 'completed',
+        current_page: bk ? bk.total : 0,
+        rating: typeof entry.rating === 'number' ? entry.rating : null,
+        review_text: entry.comment || null,
+        started_at: null,
+        completed_at: entry.completedDate || _today(),
+        sessions: [],
+        sentences: [],
+      });
+    });
+
     return {
       user_books,
       active_user_book_id,
