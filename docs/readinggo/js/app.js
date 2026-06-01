@@ -30,27 +30,24 @@ function App() {
     setSelectedTownId(null);
   }, []);
 
-  // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화
-  const handleCheckin = useCallback((ns) => {
+  // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
+  // 둥지 단계(nest.lv)는 활성 책 진척률에서 파생 → NestView가 계산해 넘긴다(§5.2).
+  const handleCheckin = useCallback((ns, nestLv) => {
     setAppState(s => ({
       ...s,
       book: ns.book,
       streak: ns.streak,
       xp: ns.xp,
-      nest: { ...s.nest, lv: ns.nestLv },
-      nestHealth: ns.nestHealth,
-      daysSinceRead: ns.daysSinceRead,
+      nest: { ...s.nest, lv: nestLv },
       myQuotes: ns.myQuotes,
     }));
   }, []);
 
+  // 하루 거르기: 둥지·XP·성은 존속, 스트릭만 영향 (§5.4).
   const handleSimSkip = useCallback((ns) => {
     setAppState(s => ({
       ...s,
       streak: ns.streak,
-      nest: { ...s.nest, lv: ns.nestLv },
-      nestHealth: ns.nestHealth,
-      daysSinceRead: ns.daysSinceRead,
     }));
   }, []);
 
@@ -74,6 +71,8 @@ function App() {
       // 현재 책 진도 저장
       INITIAL_PROGRESS[s.book.id] = { cur: s.book.cur, days: s.book.days };
       const prog = INITIAL_PROGRESS[bookId] || { cur: 1, days: 1 };
+      // 둥지 단계는 새 활성 책 진척률로 재계산 (§5.2/§5.3).
+      const nestLv = getNestStage(bk.total ? Math.round(prog.cur / bk.total * 100) : 0).lv;
       return {
         ...s,
         book: {
@@ -82,6 +81,7 @@ function App() {
           cur: prog.cur, total: bk.total, days: prog.days,
           cover: bk.cover, fb: bk.fb, toc: bk.toc,
         },
+        nest: { ...s.nest, lv: nestLv },
       };
     });
     showToast(`📖 ${bk.title} — 활성 책으로 설정`);
