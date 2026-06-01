@@ -6,6 +6,13 @@
 > 원칙: SLC (Simple · Lovable · Complete)
 > 매트릭스 항목 단위: 카드/액션. ≤80 cap.
 
+> ## ⚠️ v7 이전 매트릭스 (재동기화 필요, 2026-06-01)
+> 이 분석은 **v6 분할본 기준**이라 v7(PR #123)과 어긋난다:
+> - "book-club/독서모임" → **마을(`village.md`)** 명칭·구조 변경 (메가스트림/서브모임 폐기)
+> - **운영자 짹·주간 리그**(❌ 행) → v7 **기능 폐기** (미구현 아님, 제거됨 — [rejected.md §14.2](../readinggo/specs/meta/rejected.md))
+> - 둥지 자람·성(🏰) 컬렉션·페이지 블라인드 등 v7 신규 미반영
+> → 매트릭스 전면 재동기화는 별도 작업. 현재 정본은 [decisions.md §8.0](../readinggo/specs/meta/decisions.md).
+
 ## 요약
 
 - **Total: 67개** | ✅ Done: **30** | ⚠️ Partial: **17** | ❌ Missing: **20**
