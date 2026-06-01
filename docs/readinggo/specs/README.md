@@ -13,7 +13,7 @@
 |---|---|---|
 | **온보딩** | [`onboarding.md`](./onboarding.md) | [§4](./onboarding.md) 가입 여정 A~H |
 | **둥지 탭** | [`nest.md`](./nest.md) | §5.1-5.4 둥지 진화·활성책·일일미션·성 컬렉션 |
-| **마을** | [`book-club.md`](./book-club.md) | §5.5 마을 — v7 독서모임→마을 복귀 (`village.md` rename + 재작성 예정: yunji) |
+| **마을** | [`village.md`](./village.md) | §5.5 마을 (v7: 독서모임 폐기 → 책 단위 + 파트 마일스톤 복귀) |
 | **소셜 탭** | [`social.md`](./social.md) | [§5.7](./social.md) |
 | **내서재(프로필)** | [`profile.md`](./profile.md) | [§5.8](./profile.md)-5.9 (v6: AI 도서 추천 포함) |
 | **시스템 로직** | [`systems.md`](./systems.md) | §6 스트릭·방패·XP·NPC·휴식코스 |
@@ -31,7 +31,7 @@
 ### 어디를 고치나
 | 변경 종류 | 대상 파일 |
 |---|---|
-| 화면 스펙 (둥지·마을·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `book-club.md`→`village.md`, `social.md`, `profile.md`) |
+| 화면 스펙 (둥지·마을·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `village.md`, `social.md`, `profile.md`) |
 | 가입 여정 | `onboarding.md` |
 | 시스템 로직 (스트릭·방패·XP·NPC·휴식코스) | `systems.md` |
 | 데이터 모델·플랫폼 | `backend.md` |
@@ -61,7 +61,7 @@
 
 | 피처 파일 | owner | 비고 |
 |---|---|---|
-| `book-club.md` → `village.md` (마을) | **yunji** | `village.js` 동기화. rename + 재작성 |
+| `village.md` (마을) | **yunji** | `village.js` 동기화 |
 | `nest.md` · `systems.md` · `design.md` | **seungwon** | 둥지·XP 보상체계·디자인 |
 | `social.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 소셜·내서재·백엔드·로그인 |
 | `meta/*` · `README.md` | **gyehyu** | 결정 기록·통합 (머지 담당) |
