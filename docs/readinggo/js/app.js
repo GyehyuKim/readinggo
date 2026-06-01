@@ -8,6 +8,8 @@ function App() {
   const [activeTab, setActiveTab] = useState('nest');
   const [selectedTownId, setSelectedTownId] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // 스포일러 전역 토글 (§5.7.1): true 면 모든 페이지 블라인드 해제.
+  const [spoilerReveal, setSpoilerReveal] = useState(false);
   const [appState, setAppState] = useState(() => ({
     ...INITIAL_STATE,
     // village sent 상태는 로컬 복사
@@ -138,6 +140,25 @@ function App() {
                 <span>{appState.shield}</span>
               </span>
               <button
+                onClick={() => setSpoilerReveal(v => !v)}
+                aria-pressed={spoilerReveal}
+                title="스포일러 그냥 보기 — 안 읽은 부분도 모두 표시"
+                style={{
+                  background: spoilerReveal ? 'var(--brand-tint)' : 'transparent',
+                  border: spoilerReveal ? '1.5px solid var(--brand)' : '1.5px solid transparent',
+                  borderRadius:14,
+                  color: spoilerReveal ? 'var(--brand-3)' : 'var(--ink-2)',
+                  fontSize:11,
+                  fontWeight:800,
+                  cursor:'pointer',
+                  padding:'4px 8px',
+                  marginLeft:8,
+                  whiteSpace:'nowrap',
+                }}
+              >
+                🔓 스포일러 그냥 보기
+              </button>
+              <button
                 onClick={() => setIsSearchOpen(true)}
                 style={{
                   background:'transparent',
@@ -155,8 +176,9 @@ function App() {
           </div>
         </header>
 
-        {/* 메인 스크롤 영역 */}
+        {/* 메인 스크롤 영역 — 스포일러 전역 토글을 4영역 공통 제공 (§5.7.1) */}
         <main className="main">
+          <SpoilerContext.Provider value={spoilerReveal}>
           {activeTab === 'nest' && (
             <NestView
               key="nest"
@@ -195,6 +217,7 @@ function App() {
               onSetActiveBook={handleSetActiveBook}
             />
           )}
+          </SpoilerContext.Provider>
         </main>
 
         {/* 하단 탭바 */}

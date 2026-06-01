@@ -117,8 +117,8 @@ const INITIAL_STATE = {
   // 둥지 단계는 활성 책 진척률에서 파생 (§5.2). cur/total 로 초기 단계 계산.
   nest: { lv: getNestStage(Math.round(_ap.cur / _ab.total * 100)).lv },
   myQuotes: [
-    { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제", isSpoiler: false },
-    { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전", isSpoiler: false },
+    { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제" },
+    { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전" },
   ],
   village: [
     { name: "book_bear", nest: "🏰", on: true,  streak: 64, sent: false, bookId: "b001", page: 412 },

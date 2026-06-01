@@ -4,6 +4,21 @@
    ========================================================= */
 const { useState, useEffect, useRef, useCallback } = React;
 
+/* ── 스포일러 블라인드 (페이지 기반, social.md §5.7.1 SSOT) ──
+   전역 토글 컨텍스트: revealAll=true 면 모든 블라인드 해제. */
+const SpoilerContext = React.createContext(false);
+
+// 블라인드 여부: 내가 *읽고 있는* 책의 한 문장 중 내 현재 페이지보다
+// 뒤 페이지면 가린다. 판정 데이터는 DataStore.spoiler.myCurrentPage(bookId).
+// 내가 안 읽는 책(myPage 0) · 완독 책(current_page=total) · 현재 페이지 이하 → 노출.
+function isSentenceBlinded(bookId, page) {
+  if (typeof page !== 'number') return false;
+  let myPage = 0;
+  try { myPage = DataStore.spoiler.myCurrentPage(bookId); } catch (e) { myPage = 0; }
+  if (!myPage) return false;          // 안 읽는 책 → 전체 공개
+  return page > myPage;               // 내 현재 페이지보다 뒤 → 블라인드
+}
+
 /* ── Toast (전역 싱글턴) ──────────────────────────────── */
 let _toastTimer = null;
 let _setToastFn = null;
@@ -68,6 +83,10 @@ function SentenceCard({ item, bookId }) {
     setBookmarked(DataStore.bookmarks.toggle(sentenceId));
   };
   const mineStyle = isMine ? { opacity: 0.4, pointerEvents: 'none' } : undefined;
+  // 스포일러 블라인드: 전역 토글(revealAll) 또는 카드별 탭 공개 시 해제 (§5.7.1).
+  const revealAll = React.useContext(SpoilerContext);
+  const [revealed, setRevealed] = useState(false);
+  const blinded = !revealAll && !revealed && isSentenceBlinded(bookId, item.page);
   return (
     <div className="sentence-card">
       <div className="who">
@@ -75,7 +94,13 @@ function SentenceCard({ item, bookId }) {
         <div className="nick">{item.nick}</div>
         <div className="meta">{bk ? bk.title + ' · ' : ''}{item.page}p · {item.time}</div>
       </div>
-      <div className="quote">"{item.q}"</div>
+      {blinded ? (
+        <div className="spoiler-blind" onClick={() => setRevealed(true)}>
+          ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
+        </div>
+      ) : (
+        <div className="quote">"{item.q}"</div>
+      )}
       <div className="react">
         <span className={'chip' + (liked ? ' active' : '')} style={mineStyle} onClick={toggleLike}>
           짹 {likeCount}
@@ -92,3 +117,5 @@ window.showToast = showToast;
 window.Toast = Toast;
 window.Confetti = Confetti;
 window.SentenceCard = SentenceCard;
+window.SpoilerContext = SpoilerContext;
+window.isSentenceBlinded = isSentenceBlinded;

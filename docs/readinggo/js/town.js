@@ -9,6 +9,9 @@ function TownDetailView({ state, townId, onBack }) {
 
   // poke(콕찌르기) 로컬 상태: 멤버 name → sent 여부
   const [poked, setPoked] = useState({});
+  // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
+  const revealAll = React.useContext(SpoilerContext);
+  const [revealed, setRevealed] = useState({});
 
   if (!town) {
     return (
@@ -113,17 +116,27 @@ function TownDetailView({ state, townId, onBack }) {
         <h3>📚 오늘의 한 문장</h3>
       </div>
       {todayQuotes.length > 0 ? (
-        todayQuotes.map((m) => (
-          <div key={m.name} className="my-q-card">
-            <div className="meta">
-              <span>{m.avatar}</span>
-              <span className="bk">@{m.name}</span>
-              <span className="dot">·</span>
-              <span>p{m.cumulativePage}</span>
+        todayQuotes.map((m) => {
+          const blinded = !revealAll && !revealed[m.name] &&
+            isSentenceBlinded(town.bookId, m.cumulativePage);
+          return (
+            <div key={m.name} className="my-q-card">
+              <div className="meta">
+                <span>{m.avatar}</span>
+                <span className="bk">@{m.name}</span>
+                <span className="dot">·</span>
+                <span>p{m.cumulativePage}</span>
+              </div>
+              {blinded ? (
+                <div className="spoiler-blind" onClick={() => setRevealed(r => ({ ...r, [m.name]: true }))}>
+                  ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
+                </div>
+              ) : (
+                <div className="quote">"{m.quote}"</div>
+              )}
             </div>
-            <div className="quote">"{m.quote}"</div>
-          </div>
-        ))
+          );
+        })
       ) : (
         <div className="my-q-empty">
           <span className="ico">🐦</span>

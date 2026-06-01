@@ -10,6 +10,9 @@ function BookDetailModal({ book, allQuotes, onClose, onSetActive }) {
   const progressPct = Math.round((prog.cur / book.total) * 100);
   const bookQuotes = allQuotes.filter(q => q.bookId === book.id);
   const bookshelfEntry = INITIAL_BOOKSHELF[book.id];
+  // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
+  const revealAll = React.useContext(SpoilerContext);
+  const [revealed, setRevealed] = _useState({});
   
   const kyoboUrl = book.isbn 
     ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn)}`
@@ -79,16 +82,26 @@ function BookDetailModal({ book, allQuotes, onClose, onSetActive }) {
               <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:10}}>
                 📖 내 한 문장 {bookQuotes.length}개
               </div>
-              {bookQuotes.map((q, i) => (
-                <div key={i} style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:'8px', padding:12, marginBottom:10}}>
-                  <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6}}>
-                    {q.page}p · {q.when}
+              {bookQuotes.map((q, i) => {
+                const blinded = !revealAll && !revealed[i] &&
+                  isSentenceBlinded(book.id, q.page);
+                return (
+                  <div key={i} style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:'8px', padding:12, marginBottom:10}}>
+                    <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6}}>
+                      {q.page}p · {q.when}
+                    </div>
+                    {blinded ? (
+                      <div className="spoiler-blind" onClick={() => setRevealed(r => ({ ...r, [i]: true }))}>
+                        ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
+                      </div>
+                    ) : (
+                      <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
+                        "{q.text}"
+                      </div>
+                    )}
                   </div>
-                  <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
-                    "{q.text}"
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </div>

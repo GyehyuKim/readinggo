@@ -593,6 +593,18 @@ input,textarea{font-family:inherit;}
 .sentence-card .quote.spoiler:hover {
   filter: blur(3px);
 }
+/* 페이지 기반 스포일러 블라인드 (§5.7.1): 안 읽은 부분 → 탭하면 공개 */
+.spoiler-blind{
+  display:flex; align-items:center; justify-content:center;
+  gap:6px; text-align:center;
+  font-size: 13px; font-weight: 800; color: var(--ink-3);
+  background: var(--paper-2); border: 1.5px dashed var(--line);
+  border-radius: var(--r-md);
+  padding: 16px 12px; margin: 4px 0 8px;
+  cursor: pointer; user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.spoiler-blind:hover{ background: var(--brand-tint); color: var(--brand-3); }
 .my-q-empty{
   background: var(--card);
   border: 1.5px dashed var(--brand-soft);
