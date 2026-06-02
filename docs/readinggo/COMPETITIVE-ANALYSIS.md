@@ -4,6 +4,7 @@
 > 목적: 학기말 출시(Phase 2) 메시징·기능 우선순위·중기 로드맵의 입력 문서
 > 입력: 웹 검색 + 공식 사이트 + 앱스토어 리뷰 + 사용자 인터뷰 글
 > 결정 결론: §7 — **옵션 C (T2 mini) 채택 + 의도된 임시그룹은 중기 과제로 보관**
+> **추가 (2026-06-02)**: 실사용 55컷 정밀 분석 → [bookmory-capture-analysis.md](./bookmory-capture-analysis.md)
 
 ## 0. 요약 (Executive Summary)
 
