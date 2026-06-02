@@ -1,0 +1,11 @@
+# ReadingGo — Netlify 배포 설정 (Phase 1)
+# 정적 데모 publish + 서버리스 함수(알라딘 프록시) 동시 배포.
+# 배포: npx netlify-cli deploy --prod   (이 toml 자동 적용)
+#   기존 `--dir=docs/readinggo` 도 publish 와 동일해 호환.
+
+[build]
+  publish = "docs/readinggo"
+  functions = "netlify/functions"
+
+# 함수 URL: https://<site>/.netlify/functions/aladin
+# 필요한 환경변수(Netlify 대시보드): ALADIN_TTB_KEY
