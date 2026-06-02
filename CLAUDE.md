@@ -17,6 +17,7 @@ Before making any git/PR operation, read and follow **[`CONTRIBUTING.md`](./CONT
 - Conventional Commits message format
 - Forbidden operations (direct push to main, --force, --no-verify, committing secrets)
 - Concurrent work and rebase protocol (web editor stale-base sacrifice zone — §3.4)
+- Issue sync — every PR links/creates issues, milestone triage (§4.2–4.3)
 - LLM-specific behavior rules (§9)
 
 **Priority on conflict**: `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > other docs.

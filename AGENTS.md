@@ -68,6 +68,8 @@ git commit -m "docs: 왜 바꿨는지 한 문장"
 git fetch origin && git rebase origin/main
 
 # 5. 푸시 + PR (머지는 계휴가 GitHub 웹에서)
+#    PR 본문에 관련 이슈 연결: Closes #N(완료) / Refs #N(관련) — CONTRIBUTING §4.2
+#    작업 중 발견한 새 일은 이슈로 (§4.3 형식)
 git push -u origin gyehyu/example-topic
 gh pr create --title "..." --body "..."
 ```
@@ -76,6 +78,8 @@ gh pr create --title "..." --body "..."
 임의 `feat/`·`fix/` type-prefix 브랜치 · **spec과 코드를 한 PR에 묶기** (CONTRIBUTING §4.1).
 
 **Stack Lock**: 새 프레임워크/라이브러리 도입(Capacitor 재도입, Vite 전환 등) 제안 시 사용자에게 먼저 확인. 임의 도입 금지.
+
+**이슈 동기화**: PR은 관련 이슈를 연결(`Closes #N` 완료 / `Refs #N` 관련)하고, 작업 중 발견한 새 일은 이슈로 만든다 (CONTRIBUTING §4.2–4.3).
 
 ---
 

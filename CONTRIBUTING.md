@@ -133,6 +133,60 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 
 **살아있는 spec 의무**: 구현 중 가정이 틀렸음·예상보다 어려움·예측 못 한 사용자 행동을 발견하면 *spec commit*으로 먼저 반영. 코드 commit이 아니다. 근거: [LF: Living Document](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-living-document).
 
+### 4.2 이슈 동기화 (필수)
+
+작업과 GitHub Issues를 어긋나지 않게 유지한다. **PR이 이슈를 움직인다.**
+
+1. **PR은 관련 이슈를 연결한다.** 완료하는 이슈는 본문에 `Closes #N`(머지 시 자동 닫힘), 부분 관련은 `Refs #N`.
+2. **작업 중 새로 발견한 일은 이슈로 만든다** — 그 PR에서 다 못 하면 §4.3 형식으로 이슈를 열고 연결. "나중에 하자"를 머릿속·주석에만 두지 않는다.
+3. **연결할 이슈가 없으면**: (a) 사소하면 PR 설명에 1줄 사유, (b) 의미 있는 작업이면 이슈부터 만들고 연결.
+4. **주기적 점검(cadence)**:
+   - **PR 트리거** — 머지 시 `Closes`로 자동 닫힘 + 새 발견 즉시 이슈화 (상시)
+   - **마일스톤 전 트리아지** — 데모/베타/Phase 전환 전, open 이슈를 우선순위(§5.5 P0/P1/P2)로 정리하고 완료·무효(stale) 이슈를 닫는다
+
+### 4.3 이슈 작성 가이드
+
+**제목**: 커밋과 같은 `<type>(<area>): <한 줄>` (예: `feat(profile): 무작위 한 문장 회상 카드`, `fix(nest): 완독 시 둥지 단계 미갱신`).
+
+**본문 섹션** (이 프로젝트 톤 — 한국어·간결·근거+담당+수용기준+링크):
+
+| 섹션 | 내용 |
+|---|---|
+| **무엇/왜** | 한두 줄. 배경·근거(스펙·분석 문서 링크) |
+| **범위** | IN(이 이슈가 다루는 것) / OUT(안 다루는 것·다른 이슈) |
+| **담당 / Phase** | owner(gyehyu/seungwon/yunji) · Phase(0/1/2) · 우선순위(P0/P1/P2, §5.5) |
+| **수용 기준** | `- [ ]` 체크박스. *검증 가능하게* (모호한 "구현 완료" 금지) |
+| **링크** | 관련 스펙 절·PR·분석 문서 |
+
+**라벨**: `owner:gyehyu\|seungwon\|yunji` · `type:feat\|fix\|docs\|chore` · `phase:0\|1\|2` · 우선순위 `P0\|P1\|P2`. (`.github/ISSUE_TEMPLATE/` feature·bug 템플릿이 기본 라벨을 자동 적용.)
+
+**버그**는 bug 템플릿: 재현 절차 · 기대 vs 실제 · 심각도 · 환경(브라우저/기기).
+
+**예시**:
+
+```text
+feat(profile): 무작위 한 문장 회상 카드
+
+## 무엇/왜
+프로필 상단에 과거 내 한 문장 1개를 무작위 노출("그때 이런 문장을 남겼어요").
+기억·감성 강화. 근거: bookmory-capture-analysis.md, profile.md §5.8.7.
+
+## 범위
+- IN: 프로필 회상 카드 + DataStore.sentences.random
+- OUT: 홈(둥지=승원), 위젯(Phase 2)
+
+## 담당 / Phase
+gyehyu · Phase 1 · P1
+
+## 수용 기준
+- [ ] DataStore.sentences.random() 구현
+- [ ] 프로필 상단 회상 카드(책 제목·페이지·날짜)
+- [ ] 카드 탭 → 책 상세 이동
+
+## 링크
+profile.md §5.8.7 · ROADMAP v7 채택 §A · bookmory-capture-analysis.md
+```
+
 ---
 
 ## 5. 커밋 메시지
@@ -261,6 +315,7 @@ git fetch --prune
 15. **v5급 결정 전 적대적 리뷰 — 권장 (강제 아님).** spec 메이저 개편·아키텍처 결정·데모 차단 가능성 있는 변경 전에는 *적대적 리뷰*를 **사용자에게 제안**한다. 가용 도구가 있으면 codex/gemini 3회 리뷰 (`/codex challenge`, `/ccg` 등), 없으면 Claude 자체 self-critique 또는 팀 동료 리뷰로 대체 가능. 팀원마다 LLM 구독이 다르므로 도구를 강요하지 않는다. 사용자가 "skip" 결정하면 패스 — 단, 결정 사항을 PR 설명에 기록. 근거: [LF: 3-Round Adversarial Review](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-adversarial-review).
 16. **Spec/코드 PR 분리 (§4.1).** spec 파일과 구현 코드를 같은 PR에 묶지 않는다. spec PR이 먼저, 코드 PR이 나중. 묶어야 할 사유가 있으면 PR 설명에 명시.
 17. **Stack Lock 준수.** `CLAUDE.md` Stack Lock 절에 명시된 결정 (web-first, Capacitor 보류, React CDN 유지, 백엔드 Supabase, 데이터=TSV 등) 외 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 근거: [LF: Lock Stack](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-lock-stack).
+18. **PR 직전 이슈 동기화(§4.2).** PR을 만들기 전 `gh issue list`로 관련 open 이슈를 점검하고, 완료분은 `Closes #N`·관련분은 `Refs #N`로 PR 본문에 연결한다. 작업 중 발견한 새 일은 §4.3 형식으로 이슈를 만들어 연결하거나 사용자에게 생성을 제안한다. 연결/생성 없이 PR을 만들지 않는다(사소하면 사유 1줄).
 
 모순이 생기면 **이 `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타**의 우선순위를 따른다.
 
@@ -276,3 +331,4 @@ git fetch --prune
 - [ ] 커밋 메시지가 Conventional Commits 형식인가?
 - [ ] `.env`, API 키, 개인정보가 포함되지 않았는가?
 - [ ] PR 제목과 본문이 **왜** 바꾸는지 한 문장으로 설명하는가?
+- [ ] 관련 이슈를 `Closes/Refs #N`로 연결했는가? (없으면 사유 1줄 또는 이슈 생성 — §4.2)
