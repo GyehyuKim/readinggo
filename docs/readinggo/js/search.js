@@ -1,133 +1,300 @@
-/* =========================================================
-   ReadingGo — search.js
-   도서 검색 모달 (하단 슬라이드업 시트)
-   ========================================================= */
+// SearchModal: 도서 검색 기능
+// - Fuse.js를 사용한 클라이언트 사이드 fuzzy 검색
+// - ISBN / 제목 / 저자 검색
+// - Phase 0: books.tsv 데이터 위에서만 검색
 
-function SearchModal({ isOpen, onClose, books, onSelectBook, topRecommendations }) {
-  const { useState, useMemo, useEffect, useRef } = React;
-  const [query, setQuery] = useState('');
-  const inputRef = useRef(null);
+const SearchModal = ({
+  isOpen,
+  onClose,
+  books,
+  onSelectBook,
+  topRecommendations,
+}) => {
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState([]);
+  const [fuse, setFuse] = React.useState(null);
 
-  // 열릴 때 입력 포커스 + 검색어 초기화
-  useEffect(() => {
-    if (isOpen) {
-      setQuery('');
-      const t = setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 280);
-      return () => clearTimeout(t);
+  // Fuse.js 인덱싱 (최초 1회)
+  React.useEffect(() => {
+    if (!fuse && books.length > 0) {
+      const fuseInstance = new Fuse(books, {
+        keys: ['title', 'author', 'isbn'],
+        threshold: 0.3,
+        minMatchCharLength: 1,
+        ignoreLocation: true,
+      });
+      setFuse(fuseInstance);
     }
-  }, [isOpen]);
+  }, [books, fuse]);
 
-  // Fuse 인스턴스 (books가 바뀔 때만 재생성)
-  const fuse = useMemo(() => {
-    if (typeof window.Fuse !== 'function' || !books) return null;
-    return new window.Fuse(books, {
-      keys: ['title', 'author', 'publisher'],
-      threshold: 0.4,
-      ignoreLocation: true,
-    });
-  }, [books]);
+  // 검색 수행
+  React.useEffect(() => {
+    if (!fuse) return;
 
-  const results = useMemo(() => {
-    const q = query.trim();
-    if (!q) return [];
-    if (fuse) return fuse.search(q).map(r => r.item).slice(0, 20);
-    // 폴백: 단순 includes
-    const lq = q.toLowerCase();
-    return (books || []).filter(b =>
-      (b.title || '').toLowerCase().includes(lq) ||
-      (b.author || '').toLowerCase().includes(lq) ||
-      (b.publisher || '').toLowerCase().includes(lq)
-    ).slice(0, 20);
-  }, [query, fuse, books]);
+    if (query.trim() === '') {
+      setResults([]);
+    } else {
+      const searchResults = fuse.search(query);
+      setResults(searchResults.slice(0, 10)); // 최대 10개 결과
+    }
+  }, [query, fuse]);
 
-  const showRecs = !query.trim();
-  const list = showRecs ? (topRecommendations || []) : results;
+  if (!isOpen) return null;
 
-  const renderRow = (book) => (
-    <div
-      key={book.book_id}
-      className="shelf-row"
-      onClick={() => onSelectBook(book)}
-    >
-      <div className="shelf-cover">
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
-        ) : null}
-      </div>
-      <div className="shelf-meta">
-        <div className="shelf-title">{book.title}</div>
-        <div className="shelf-prog">{book.author}{book.publisher ? ' · ' + book.publisher : ''}</div>
-      </div>
-    </div>
-  );
+  const handleSelectResult = (item) => {
+    onSelectBook(item);
+    setQuery('');
+    onClose();
+  };
 
   return (
     <div
-      className={'modal-backdrop' + (isOpen ? ' show' : '')}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 9999,
+        animation: 'fadeIn 0.2s',
+      }}
+      onClick={onClose}
     >
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="도서 검색">
-        <div className="sheet-grip" />
-        <div className="sheet-head">
-          <h2>🔍 책 찾기</h2>
-          <div className="sub">제목 · 저자 · 출판사로 검색</div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="어떤 책을 읽을까요?"
-            style={{
-              flex: 1,
-              border: '1.5px solid var(--line)',
-              borderRadius: 'var(--r-md)',
-              padding: '12px 14px',
-              fontSize: 15,
-              fontWeight: 700,
-              background: 'var(--card-soft)',
-              color: 'var(--ink)',
-            }}
-            onFocus={(e) => { e.target.style.borderColor = 'var(--brand)'; e.target.style.background = '#fff'; }}
-            onBlur={(e) => { e.target.style.borderColor = 'var(--line)'; e.target.style.background = 'var(--card-soft)'; }}
-          />
+      <div
+        style={{
+          background: 'var(--paper)',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          borderBottomLeftRadius: 20,
+          borderBottomRightRadius: 20,
+          overflow: 'hidden',
+          animation: 'slideDown 0.3s',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더: 검색창 */}
+        <div
+          style={{
+            padding: '12px 16px',
+            background: 'var(--card)',
+            borderBottom: '1px solid var(--line)',
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
           <button
             onClick={onClose}
             style={{
+              background: 'none',
               border: 'none',
-              background: 'var(--paper-2)',
-              color: 'var(--ink-2)',
-              fontWeight: 800,
-              fontSize: 14,
-              padding: '12px 14px',
-              borderRadius: 'var(--r-md)',
+              font: 'inherit',
+              cursor: 'pointer',
+              fontSize: 20,
+              padding: 4,
             }}
+            title="닫기"
           >
-            닫기
+            ✕
           </button>
+          <input
+            type="text"
+            placeholder="제목, 저자, ISBN 검색"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+            style={{
+              flex: 1,
+              border: 'none',
+              background: 'var(--paper)',
+              padding: '8px 12px',
+              borderRadius: 8,
+              font: 'inherit',
+              fontSize: 14,
+            }}
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                font: 'inherit',
+                cursor: 'pointer',
+                fontSize: 16,
+                color: 'var(--ink-3)',
+                padding: 4,
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
-        <div className="sheet-section">
-          <div className="label">
-            {showRecs ? '🐦 오늘의 추천' : `🔎 검색 결과 ${results.length}권`}
-          </div>
-          {list.length > 0 ? (
-            list.map(renderRow)
+        {/* 검색 결과 또는 추천 */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '8px 0',
+          }}
+        >
+          {query.trim() === '' ? (
+            // 검색어 없을 때: 추천도서
+            <div>
+              {topRecommendations && topRecommendations.length > 0 && (
+                <div>
+                  <h3
+                    style={{
+                      padding: '12px 16px 8px',
+                      fontSize: 12,
+                      color: 'var(--ink-3)',
+                      textTransform: 'uppercase',
+                      fontWeight: 500,
+                      margin: 0,
+                    }}
+                  >
+                    📚 인기 도서
+                  </h3>
+                  {topRecommendations.map((book) => (
+                    <SearchResultItem
+                      key={book.book_id}
+                      book={book}
+                      onClick={() => handleSelectResult(book)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : results.length > 0 ? (
+            // 검색 결과 있음
+            <div>
+              <div
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  color: 'var(--ink-3)',
+                }}
+              >
+                {results.length}개 검색 결과
+              </div>
+              {results.map((result) => (
+                <SearchResultItem
+                  key={result.item.book_id}
+                  book={result.item}
+                  onClick={() => handleSelectResult(result.item)}
+                />
+              ))}
+            </div>
           ) : (
-            <div className="empty">
-              <span className="ico">🪺</span>
-              찾는 책이 없어요. 다른 검색어로 짹 해보세요.
+            // 검색 결과 없음
+            <div
+              style={{
+                padding: '32px 16px',
+                textAlign: 'center',
+                color: 'var(--ink-3)',
+              }}
+            >
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📖</div>
+              <div style={{ fontSize: 14 }}>찾으시는 책이 없나요?</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                직접 등록할 수 있어요 (Phase 1)
+              </div>
             </div>
           )}
         </div>
       </div>
     </div>
   );
-}
+};
+
+// SearchResultItem: 검색 결과 아이템
+const SearchResultItem = ({ book, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%',
+        padding: '12px 16px',
+        background: 'transparent',
+        border: 'none',
+        borderBottom: '1px solid var(--line)',
+        display: 'flex',
+        gap: 12,
+        alignItems: 'flex-start',
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'background 0.2s',
+      }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.background = 'var(--card-soft)')
+      }
+      onMouseLeave={(e) =>
+        (e.currentTarget.style.background = 'transparent')
+      }
+    >
+      {/* 책 표지 */}
+      <img
+        src={book.cover_url}
+        alt={book.title}
+        style={{
+          width: 48,
+          height: 64,
+          objectFit: 'cover',
+          borderRadius: 4,
+          flexShrink: 0,
+        }}
+        onError={(e) => {
+          e.currentTarget.style.background = 'var(--line)';
+          e.currentTarget.src = '';
+        }}
+      />
+
+      {/* 정보 */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            color: 'var(--ink)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {book.title}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--ink-3)',
+            marginTop: 2,
+          }}
+        >
+          {book.author}
+        </div>
+        <div
+          style={{
+            fontSize: 11,
+            color: 'var(--ink-4)',
+            marginTop: 4,
+          }}
+        >
+          {book.publisher} · {book.total_pages}p
+        </div>
+      </div>
+    </button>
+  );
+};
 
 window.SearchModal = SearchModal;
+window.SearchResultItem = SearchResultItem;
