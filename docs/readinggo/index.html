@@ -1208,6 +1208,11 @@ input,textarea{font-family:inherit;}
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <!-- Fuse.js (Fuzzy search) -->
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+<!-- Supabase (Phase 1) — 백엔드 계층. config/client/adapter는 순수 JS(JSX 아님)라 일반 script. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/datastore-supabase.js"></script>
 
 <script>
 const _RG_V = '50';
@@ -1234,6 +1239,17 @@ async function loadBabel(src) {
     await loadBabel('js/town.js');
     await loadBabel('js/social.js');
     await loadBabel('js/library.js');
+    // Phase 1: 로그인 + Supabase 설정 시 DataStore 를 Supabase 로 교체.
+    // 미로그인이면 localStorageAdapter 폴백 유지 → Phase 0 데모 동작 그대로(안전).
+    try {
+      if (window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured()) {
+        const _u = await window.RG_SB.currentUser();
+        if (_u && window.SupabaseDataStore) {
+          window.DataStore = window.SupabaseDataStore;
+          console.log('[ReadingGo] Supabase DataStore 활성 (로그인됨)');
+        }
+      }
+    } catch (e) { console.warn('[ReadingGo] Supabase 스왑 스킵:', e.message); }
     await loadBabel('js/app.js');
   } catch (err) {
     console.error('[ReadingGo] 로드 실패:', err);
