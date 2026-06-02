@@ -66,7 +66,7 @@
 | `social.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 소셜·내서재·백엔드·로그인 |
 | `meta/*` · `README.md` | **gyehyu** | 결정 기록·통합 (머지 담당) |
 
-> **SSOT 규칙**: XP 수치 = `systems.md`, 둥지 단계표 = `nest.md`, 스포일러 블라인드 = `social.md`. 타 파일은 복붙 말고 링크 참조.
+> **SSOT 규칙**: XP 수치 = `systems.md`, 둥지 단계표 = `nest.md`, 스포일러 블라인드 = `social.md §5.7.1`. 타 파일은 복붙 말고 링크 참조.
 
 ---
 
