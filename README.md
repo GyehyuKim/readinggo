@@ -1,69 +1,89 @@
-# Glocalx — MVP Idea Lab
+# ReadingGo — 하루 한 페이지, 한 문장에서 시작하는 독서 습관 앱
 
-학교 MVP 프로젝트로 검토 중인 아이디어 데모 모음.  
-각 폴더는 독립적으로 동작하는 단일 페이지 인터랙티브 데모입니다.
+> KAIST IT경영 특수논제(AI 기반 비즈니스 진화·전략·실습) 학기 프로젝트.
+> 레포명 `glocalx` — 초기 아이디어 탐색([`old/`](./old/))을 거쳐 **ReadingGo**로 수렴했다.
 
----
-
-## test-idea-1: 트렌드 패치노트
-
-> 3040 마케터를 위한 트렌드 GAP 진단 + 주간 큐레이션 AI 에이전트
-
-- **타겟**: 3040 마케터·기획자 — 인스타 알고리즘 편향으로 주니어 트렌드 놓치는 시니어
-- **차별화**: 캐릿/뉴스레터는 "모두에게 같은 푸시" → 우리는 "당신의 약한 영역만 맞춤 큐레이션"
-- **포맷**: 10문항 진단 → 5가지 영포티 유형 → 주간 트렌드 패치노트 구독
-
-→ [데모 보기](./test-idea-1/) · [상세 README](./test-idea-1/README.md)
+**🔗 라이브 데모 → https://resilient-licorice-f4b889.netlify.app**
 
 ---
 
-## test-idea-2: 찍먹
+## ReadingGo가 뭔가
 
-> 찍어보면 알아. 사기 전에 답해주는 앱.
+"읽고 싶은데 이어가지 못하는 사람"을 위한 독서 습관 앱. 핵심 wedge:
 
-- **타겟**: 2030 당뇨전단계·인슐린저항성 직장인 (한국 ~1500만 명 추정)
-- **차별화**: Yuka는 일반 성분 점수, 글루코핏은 월 10만원+ CGM 장비 필요 → 찍먹은 *사진만으로 당신 프로파일 기준 답*
-- **로드맵**: 음료(NOW) → 간식 → 간편식 → 외식 → 집밥 (5단계 자연 확장)
-- **핵심 시연**: 같은 음료를 두 번 스캔 — "일반 기준 vs 당신 기준" 비교가 차별화 wow 모먼트
+- **마찰 최소** — 타이머·목표 페이지 없음. 하루 **1페이지만** 읽어도 오늘은 성공
+- **한 문장** — 오늘 읽은 책에서 마음에 든 한 문장을 적는 행위가 *읽음의 증명*이자, 누적되는 나만의 자산
+- **게이미피케이션 + 소셜** — 스트릭·방패·**둥지가 자란다**(진척률 5단계)·완독 **성(🏰) 컬렉션** + 단방향 팔로우·**마을**·**짹**(좋아요)
+- **한국 시장 + 무광고** — 북모리·Bookly·Fable이 비워 둔 *"고-게이미피케이션 × 고-소셜 × 한국 × 1페이지"* 좌표
 
-→ [데모 보기](./test-idea-2/) · [상세 README](./test-idea-2/README.md)
+> 한 줄: **"하루 한 페이지, 한 문장에서 시작해요."**
 
----
-
-## test-idea-3: GosiOps ⚡ 피벗 제안
-
-> 원장님이 분쟁 케이스를 보내면, 계약서가 스스로 진화한다.
-
-- **타겟**: 고시원 원장님 — 입실 계약을 아날로그로 처리, 분쟁 반복 경험
-- **차별화**: 기존 아이디어와 달리 **수요가 먼저 왔음** — 실제 원장님이 도움 요청, 인터뷰 2회 완료
-- **AI 역할**: 분쟁 케이스 → LLM → 계약서 조항 자동 생성 + 다국어(한/영) 번역
-- **계약서 예시**: [`contracts/`](./test-idea-3/contracts/) 폴더에 실제 작동하는 한/영 계약서 포함
-
-→ [상세 README](./test-idea-3/README.md) · [한국어 계약서](./test-idea-3/contracts/고시원_입실계약서.md) · [영문 계약서](./test-idea-3/contracts/Move-in_Agreement.md)
+제품 정의·핵심 루프·용어 사전은 **[`docs/readinggo/specs/README.md`](./docs/readinggo/specs/README.md)** (스펙 인덱스 = 정본).
 
 ---
 
-## 디자인 톤
+## 지금 상태 (v7 · 2026-06)
 
-두 데모 모두 [moneypatterns.netlify.app](https://moneypatterns.netlify.app/) 톤 차용 — 말랑·감각적·2030 친화.  
-브랜드 컬러로 구분: 트렌드 패치노트 = 코랄, 찍먹 = 민트, GosiOps = 네이비.
+- **web-first.** Phase 0 = 순수 정적 웹 데모, Phase 1 = Supabase. 네이티브(Capacitor)는 Phase 3로 보류.
+- **Phase 0 데모 완성·배포 중** — 둥지 / 마을 / 소셜 / 프로필 4탭.
+- Phase 0↔1은 **DataStore 계약**([backend.md §7.2](./docs/readinggo/specs/backend.md))으로 추상화 → 어댑터 교체만으로 이행.
 
-| | 트렌드 패치노트 | 찍먹 | GosiOps |
-|---|---|---|---|
-| 메인 컬러 | `#FF5A1F` 코랄 | `#6FE3D2` 민트 | `#1A2B48` 네이비 |
-| 분위기 | 호기심 자극 | 안전감 + 경고 | 신뢰 + 법적 무게감 |
-| 핵심 형식 | 진단지 → 결과 → 구독 | 사진 스캔 → 즉답 → 비교 | 분쟁 케이스 → 계약서 진화 |
-
-## 공통 디자인 토큰
-
-- 배경: 따뜻한 크림 `#F4F1EA` ~ `#F7F2EA`
-- 폰트: Pretendard (본문) + Black Han Sans (디스플레이)
-- 카드: 라운드 22~44px, 6px 솔리드 그림자 버튼
+| Phase | 산출물 | 데이터 |
+|---|---|---|
+| **0** (발표용) | 정적 웹 데모 (React 18 CDN + Babel) | `localStorage` + 정적 TSV |
+| **1** (MVP) | Supabase + Google 로그인 + 실 Gemini 추천 | Postgres + RLS + pg_cron |
+| **2** | PWA + 웹푸시 알림 + AI 고도화 | + 로컬 캐시 |
+| **3** (학기 후) | Capacitor 재검토 (OCR·STT·앱스토어) | 동일 |
 
 ---
 
-## Live Demos (GitHub Pages)
+## 데모 보기
 
-레포에 Pages 활성화 후:
-- 🟠 트렌드 패치노트: `https://GyehyuKim.github.io/glocalx/test-idea-1/`
-- 🟢 찍먹: `https://GyehyuKim.github.io/glocalx/test-idea-2/`
+- **온라인**: https://resilient-licorice-f4b889.netlify.app
+- **로컬**: 빌드 불필요(React 18 + Babel CDN). `books.tsv`를 `fetch`로 읽으므로 `file://` 직접 열기보다 **정적 서버** 권장:
+  ```bash
+  npx serve docs/readinggo
+  ```
+- **재배포**: `npx netlify-cli deploy --dir=docs/readinggo --prod`
+- **도서 데이터**: [`docs/readinggo/data/books.tsv`](./docs/readinggo/data/books.tsv) (542권, 유일한 소스 — 코드에 책 정보 하드코딩 금지)
+
+---
+
+## 레포 구조
+
+```
+docs/
+  readinggo/                 ← ReadingGo (현재 메인 프로젝트)
+    index.html               진입점 (React 18 CDN, 빌드 없음)
+    js/                       데모 코드 (data·datastore·nest·social·library·village·…)
+    data/books.tsv            도서 DB 542권
+    specs/                    ★ 스펙 (정본) — README.md가 인덱스
+    ROADMAP.md                Phase 매트릭스 + 북모리 채택 결정
+    COMPETITIVE-ANALYSIS.md   경쟁자 분석 (북모리·Bookly·Fable·리더스…)
+  0~4. */                    피치·리서치·스펙 원본·피어 피드백·유저 인터뷰
+tests/spec-align/            스펙 ↔ 코드 정합 verifier (align_v7.py)
+loop/                        Ralph 자동화 하니스
+old/                         초기 아이디어 아카이브 (트렌드 패치노트·찍먹·GosiOps)
+CONTRIBUTING.md              ★ 협업 규칙 (SSOT) · CLAUDE.md · AGENTS.md
+```
+
+---
+
+## 협업 / 분배
+
+거버넌스 SSOT = **[`CONTRIBUTING.md`](./CONTRIBUTING.md)** (커밋·브랜치·PR·동기화 규칙). 에이전트 가이드 = [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md).
+
+스펙 파일 소유권 (v7):
+
+| 담당 | 파일 | 영역 |
+|---|---|---|
+| **계휴** (gyehyu) | `social.md` · `profile.md` · `backend.md` · `onboarding.md` · `meta/*` · `README.md` | 소셜·내서재·백엔드·로그인·통합·머지 |
+| **승원** (seungwon) | `nest.md` · `systems.md` · `design.md` | 둥지·XP 보상·디자인 |
+| **윤지** (yunji) | `village.md` | 마을 |
+
+- 브랜치: `<owner>/<topic-slug>`. **spec PR과 코드 PR은 분리.** 머지는 계휴가 GitHub 웹에서.
+- 오픈 태스크는 GitHub Issues로 일원화 (README에 중복 관리 안 함).
+
+---
+
+*KAIST-IMMS · 2026 Spring · BIZ.69911 · ReadingGo*
