@@ -13,6 +13,7 @@ const SearchModal = ({
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState([]);
   const [fuse, setFuse] = React.useState(null);
+  const [remote, setRemote] = React.useState([]);  // 알라딘 원격 결과 (실 책 DB)
 
   // Fuse.js 인덱싱 (최초 1회)
   React.useEffect(() => {
@@ -39,6 +40,31 @@ const SearchModal = ({
     }
   }, [query, fuse]);
 
+  // 알라딘 원격 검색(실 책 DB) — 디바운스 + graceful(프록시 미배포/실패 시 무시).
+  React.useEffect(() => {
+    const q = query.trim();
+    if (!q) { setRemote([]); return; }
+    const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
+    if (!proxy) { setRemote([]); return; }
+    let alive = true;
+    const t = setTimeout(() => {
+      fetch(`${proxy}?query=${encodeURIComponent(q)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!alive || !d || !Array.isArray(d.items)) return;
+          setRemote(d.items.map((it) => ({
+            book_id: it.isbn13 || it.title,
+            isbn13: it.isbn13, isbn: it.isbn13,
+            title: it.title, author: it.author,
+            publisher: it.publisher, total_pages: it.total_pages,
+            cover_url: it.cover_url, _source: 'aladin',
+          })));
+        })
+        .catch(() => { if (alive) setRemote([]); });
+    }, 350);
+    return () => { alive = false; clearTimeout(t); };
+  }, [query]);
+
   if (!isOpen) return null;
 
   const handleSelectResult = (item) => {
@@ -46,6 +72,18 @@ const SearchModal = ({
     setQuery('');
     onClose();
   };
+
+  // 로컬(데모) + 알라딘 병합, isbn/제목 기준 중복 제거.
+  const localItems = results.map((r) => r.item);
+  const _seen = new Set(localItems.map((b) => b.isbn13 || b.isbn || b.title));
+  const merged = localItems.concat(
+    remote.filter((b) => {
+      const k = b.isbn13 || b.isbn || b.title;
+      if (_seen.has(k)) return false;
+      _seen.add(k);
+      return true;
+    })
+  );
 
   return (
     <div
@@ -170,8 +208,8 @@ const SearchModal = ({
                 </div>
               )}
             </div>
-          ) : results.length > 0 ? (
-            // 검색 결과 있음
+          ) : merged.length > 0 ? (
+            // 검색 결과 (로컬 데모 + 알라딘 실 책 DB)
             <div>
               <div
                 style={{
@@ -180,13 +218,13 @@ const SearchModal = ({
                   color: 'var(--ink-3)',
                 }}
               >
-                {results.length}개 검색 결과
+                {merged.length}개 검색 결과
               </div>
-              {results.map((result) => (
+              {merged.map((book) => (
                 <SearchResultItem
-                  key={result.item.book_id}
-                  book={result.item}
-                  onClick={() => handleSelectResult(result.item)}
+                  key={book.book_id}
+                  book={book}
+                  onClick={() => handleSelectResult(book)}
                 />
               ))}
             </div>
@@ -200,9 +238,9 @@ const SearchModal = ({
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 8 }}>📖</div>
-              <div style={{ fontSize: 14 }}>찾으시는 책이 없나요?</div>
+              <div style={{ fontSize: 14 }}>검색 중이거나 결과가 없어요</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
-                직접 등록할 수 있어요 (Phase 1)
+                제목·저자·ISBN으로 다시 검색해보세요
               </div>
             </div>
           )}
