@@ -200,6 +200,63 @@ function UserProfileModal({ handle, onClose }) {
   );
 }
 
+/* ── SettingsModal: 설정 (프로필 ⚙️ 진입, §5.8) ──
+   스포일러 전역 토글(여기로 이전) + 닉네임 변경 + 로그아웃. */
+function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
+  const me = window.RG_ME || {};
+  const [nick, setNick] = useState(me.displayName || me.handle || '');
+  const [busy, setBusy] = useState(false);
+  const saveNick = () => {
+    const v = (nick || '').trim();
+    if (!v || busy) return;
+    setBusy(true);
+    Promise.resolve((DataStore.profile && DataStore.profile.update) ? DataStore.profile.update({ display_name: v }) : null)
+      .then(() => { if (window.RG_ME) window.RG_ME.displayName = v; showToast('닉네임 저장됨'); })
+      .catch(() => showToast('저장 실패'))
+      .finally(() => setBusy(false));
+  };
+  const logout = () => {
+    if (window.RG_SB && window.RG_SB.signOut) {
+      Promise.resolve(window.RG_SB.signOut()).finally(() => window.location.reload());
+    }
+  };
+  return (
+    <div className="modal-backdrop show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" role="dialog" aria-label="설정">
+        <div className="sheet-grip" />
+        <div style={{ padding: '8px 20px 24px' }}>
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>⚙️ 설정</span>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ink-3)' }} title="닫기">✕</button>
+          </div>
+          {/* 스포일러 토글 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>스포일러 모두 보기</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>안 읽은 페이지의 한 문장도 표시</div>
+            </div>
+            <button onClick={() => setSpoilerReveal(v => !v)} aria-pressed={spoilerReveal} title="스포일러 토글"
+              style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: 'pointer', background: spoilerReveal ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: spoilerReveal ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+            </button>
+          </div>
+          {/* 닉네임 */}
+          <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 8 }}>닉네임</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={nick} onChange={e => setNick(e.target.value)} placeholder="표시 이름"
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none' }} />
+              <button onClick={saveNick} disabled={busy} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>저장</button>
+            </div>
+          </div>
+          {/* 로그아웃 */}
+          <button onClick={logout} style={{ marginTop: 18, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 window.showToast = showToast;
 window.Toast = Toast;
 window.Confetti = Confetti;
@@ -207,3 +264,4 @@ window.SentenceCard = SentenceCard;
 window.SpoilerContext = SpoilerContext;
 window.isSentenceBlinded = isSentenceBlinded;
 window.UserProfileModal = UserProfileModal;
+window.SettingsModal = SettingsModal;

@@ -251,7 +251,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   return (
     <section className="view active">
       {/* 프로필 상단 */}
-      <div style={{background:'linear-gradient(135deg, var(--brand), var(--brand-3))', color:'white', padding:'20px 16px', marginBottom:20}}>
+      <div style={{background:'linear-gradient(135deg, var(--brand), var(--brand-3))', color:'white', padding:'20px 16px', marginBottom:20, position:'relative'}}>
+        <button onClick={() => window.RG_openSettings && window.RG_openSettings()} title="설정"
+          style={{position:'absolute', top:12, right:12, background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'50%', width:34, height:34, fontSize:17, cursor:'pointer', color:'#fff', lineHeight:1}}>⚙️</button>
         <div style={{textAlign:'center'}}>
           <div style={{fontSize:28, fontWeight:900, marginBottom:4}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
           <div style={{fontSize:13, opacity:0.9, marginBottom:14, minHeight:20}}>

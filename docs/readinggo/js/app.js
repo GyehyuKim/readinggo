@@ -116,6 +116,9 @@ function App() {
   // 타인 프로필 모달(§5.8.2) — @핸들 탭으로 열림. SentenceCard 가 window.RG_openProfile 호출.
   const [profileHandle, setProfileHandle] = useState(null);
   useEffect(() => { window.RG_openProfile = (h) => setProfileHandle(h); return () => { window.RG_openProfile = null; }; }, []);
+  // 설정 모달(§5.8) — 프로필 ⚙️ 로 열림.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => { window.RG_openSettings = () => setSettingsOpen(true); return () => { window.RG_openSettings = null; }; }, []);
   const [appState, setAppState] = useState(() => ({
     ...INITIAL_STATE,
     // village sent 상태는 로컬 복사
@@ -373,23 +376,7 @@ function App() {
                 <span className="ico">🪶</span>
                 <span>{appState.shield}</span>
               </span>
-              <button
-                onClick={() => setSpoilerReveal(v => !v)}
-                aria-pressed={spoilerReveal}
-                title={spoilerReveal ? '스포일러 모두 표시 중 — 탭하면 다시 가림' : '스포일러 가리는 중 — 탭하면 안 읽은 부분도 표시'}
-                style={{
-                  background: spoilerReveal ? 'var(--brand-tint)' : 'transparent',
-                  border: spoilerReveal ? '1.5px solid var(--brand)' : '1.5px solid transparent',
-                  borderRadius:14,
-                  fontSize:16,
-                  cursor:'pointer',
-                  padding:'4px 6px',
-                  marginLeft:4,
-                  lineHeight:1,
-                }}
-              >
-                {spoilerReveal ? '🔓' : '🙈'}
-              </button>
+              {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               <button
                 onClick={() => setIsSearchOpen(true)}
                 style={{
@@ -487,6 +474,12 @@ function App() {
         {/* 타인 프로필 모달 (§5.8.2) — @핸들 탭으로 열림 */}
         {profileHandle && ReactDOM.createPortal(
           <UserProfileModal handle={profileHandle} onClose={() => setProfileHandle(null)} />,
+          document.body
+        )}
+
+        {/* 설정 모달 (§5.8) — 프로필 ⚙️ */}
+        {settingsOpen && ReactDOM.createPortal(
+          <SettingsModal onClose={() => setSettingsOpen(false)} spoilerReveal={spoilerReveal} setSpoilerReveal={setSpoilerReveal} />,
           document.body
         )}
 
