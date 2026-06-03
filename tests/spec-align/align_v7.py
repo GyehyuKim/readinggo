@@ -100,6 +100,26 @@ INVARIANTS = [
     ("S7", "absent", "is_private 수동 비공개 잔재", None, r"is_private|isSpoiler"),
     ("S7", "present", "페이지 블라인드 (spoiler.myCurrentPage + 카피)", FEATURE_FILES,
         r"myCurrentPage|아직 안 읽은|탭하면 보기|스포일러 그냥 보기"),
+
+    # ── B: Phase 1 실데이터 배선 (클로즈베타, PR #162) ─────────
+    ("B", "absent", "소셜 피드 데모 NPC_QUOTES 잔재 (실 피드 대체)",
+        ["social.js"], r"NPC_QUOTES"),
+    ("B", "present", "소셜 피드 실데이터 (sentences.feed)",
+        ["social.js"], r"sentences\.feed"),
+    ("B", "absent", "서재 데모 상수 잔재 (INITIAL_BOOKSHELF/INITIAL_PROGRESS/RG_BOOKS/WISHLIST/getBook)",
+        ["library.js"], r"INITIAL_BOOKSHELF|INITIAL_PROGRESS|RG_BOOKS|WISHLIST|getBook\("),
+    ("B", "present", "서재 실 myBooks 배선 (myBooks.list)",
+        ["library.js"], r"myBooks\.list"),
+    ("B", "present", "알라딘 책 검색 (ALADIN_PROXY)",
+        ["search.js"], r"ALADIN_PROXY"),
+    ("B", "present", "타인 프로필 보기 (UserProfileModal)",
+        ["components.js"], r"UserProfileModal"),
+    ("B", "present", "DataStore→Supabase 스왑 (쓰기 경로 활성)",
+        ["app.js"], r"window\.DataStore = window\.SupabaseDataStore"),
+    ("B", "present", "sentences book_id 임베드 (무작위회상·사후감상 실모드)",
+        ["datastore-supabase.js"], r"user_book:user_books\(book_id"),
+    ("B", "present", "어댑터 대칭 — localStorage sentences.setNote/random",
+        ["datastore.js"], r"setNote[\s\S]*random\(\)|random\(\)[\s\S]*setNote"),
 ]
 
 

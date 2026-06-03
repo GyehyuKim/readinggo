@@ -2,7 +2,7 @@
    ReadingGo — library.js
    프로필 탭: 프로필 정보 + 내서재 (찜한 책, 읽는 중, 완독)
    ========================================================= */
-const { useState: _useState, useMemo: _useMemo, useEffect: _useEffect } = React;
+const { useState: _useState, useEffect: _useEffect } = React;
 
 /* ── BookDetailModal ─────────────────────────────────────── */
 function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
