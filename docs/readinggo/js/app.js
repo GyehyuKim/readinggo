@@ -30,7 +30,7 @@ async function buildStateFromSupabase() {
     out.nest = { lv: getNestStage(Math.round((ub.current_page || 0) / total * 100)).lv };
   }
   if (Array.isArray(mine) && mine.length) {
-    out.myQuotes = mine.map(s => ({ text: s.text, bookId: s.book_id || '', page: s.page, when: '' }));
+    out.myQuotes = mine.map(s => ({ id: s.id, text: s.text, bookId: s.book_id || '', page: s.page, when: '', note: s.my_note || '' }));
   }
   // 소셜 isMine 판정 + 스포일러 동기맵: 현재 사용자 + 내 책별 현재 페이지 preload
   try {

@@ -14,6 +14,17 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
   const revealAll = React.useContext(SpoilerContext);
   const [revealed, setRevealed] = _useState({});
+  // 사후 감상(§5.8.4): 문장별 my_note 추가·편집. setNote 는 Supabase 어댑터에 존재.
+  const [noteEdits, setNoteEdits] = _useState({});   // sentenceId -> 저장된 감상(override)
+  const [editingId, setEditingId] = _useState(null);
+  const [draft, setDraft] = _useState('');
+  const saveNote = (q) => {
+    if (!q.id || !(DataStore.sentences && DataStore.sentences.setNote)) { setEditingId(null); return; }
+    Promise.resolve(DataStore.sentences.setNote(q.id, draft))
+      .then(() => setNoteEdits(m => ({ ...m, [q.id]: draft })))
+      .catch(() => {});
+    setEditingId(null);
+  };
 
   const kyoboUrl = book.isbn
     ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn)}`
@@ -96,9 +107,37 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                         ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
                       </div>
                     ) : (
-                      <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
-                        "{q.text}"
-                      </div>
+                      <>
+                        <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
+                          "{q.text}"
+                        </div>
+                        {(() => {
+                          const note = noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '');
+                          if (editingId === q.id) {
+                            return (
+                              <div style={{marginTop:8}}>
+                                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="이 문장에 대한 감상…" rows={3}
+                                  style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:8, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
+                                <div style={{display:'flex', gap:6, marginTop:6}}>
+                                  <button onClick={() => saveNote(q)} style={{padding:'6px 12px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
+                                  <button onClick={() => setEditingId(null)} style={{padding:'6px 12px', borderRadius:8, border:'1px solid var(--line)', background:'transparent', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return note ? (
+                            <div onClick={() => { if (q.id) { setEditingId(q.id); setDraft(note); } }}
+                              style={{marginTop:8, padding:'8px 10px', background:'var(--paper-2)', borderRadius:8, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer'}}>
+                              💬 {note}
+                            </div>
+                          ) : (q.id ? (
+                            <button onClick={() => { setEditingId(q.id); setDraft(''); }}
+                              style={{marginTop:6, padding:'4px 10px', borderRadius:8, border:'1px dashed var(--line)', background:'transparent', fontSize:11, fontWeight:700, color:'var(--ink-3)', cursor:'pointer'}}>
+                              ✏️ 감상 추가
+                            </button>
+                          ) : null);
+                        })()}
+                      </>
                     )}
                   </div>
                 );
