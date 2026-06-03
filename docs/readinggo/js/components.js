@@ -225,6 +225,9 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const me = window.RG_ME || {};
   const [nick, setNick] = useState(me.displayName || me.handle || '');
   const [busy, setBusy] = useState(false);
+  const [hdl, setHdl] = useState(me.handle || '');
+  const [hbusy, setHbusy] = useState(false);
+  const [hmsg, setHmsg] = useState('');
   const saveNick = () => {
     const v = (nick || '').trim();
     if (!v || busy) return;
@@ -233,6 +236,23 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
       .then(() => { if (window.RG_ME) window.RG_ME.displayName = v; showToast('닉네임 저장됨'); })
       .catch(() => showToast('저장 실패'))
       .finally(() => setBusy(false));
+  };
+  const HANDLE_RE = /^[A-Za-z0-9_가-힣]{2,20}$/;
+  const saveHandle = async () => {
+    const v = (hdl || '').replace(/^@/, '').trim();
+    if (hbusy) return;
+    if (!HANDLE_RE.test(v)) { setHmsg('2~20자, 한글·영문·숫자·_ 만 가능'); return; }
+    if (v === (me.handle || '')) { setHmsg('현재 아이디예요'); return; }
+    setHbusy(true); setHmsg('확인 중…');
+    try {
+      const ok = (DataStore.users && DataStore.users.isHandleAvailable)
+        ? await Promise.resolve(DataStore.users.isHandleAvailable(v)) : true;
+      if (!ok) { setHmsg('이미 사용 중인 아이디예요'); return; }
+      if (DataStore.profile && DataStore.profile.update) await Promise.resolve(DataStore.profile.update({ handle: v }));
+      if (window.RG_ME) window.RG_ME.handle = v;
+      setHmsg('✓ 저장됨'); showToast('아이디 저장됨 — 새로고침하면 피드에 반영돼요');
+    } catch (e) { setHmsg('이미 사용 중이거나 저장 실패'); }
+    finally { setHbusy(false); }
   };
   const logout = () => {
     if (window.RG_SB && window.RG_SB.signOut) {
@@ -259,14 +279,27 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <span style={{ position: 'absolute', top: 3, left: spoilerReveal ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
-          {/* 닉네임 */}
+          {/* 표시 이름(display_name) — 프로필에 크게 보이는 이름(중복 허용) */}
           <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 8 }}>닉네임</div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 4 }}>표시 이름</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>프로필 상단에 크게 보이는 이름이에요.</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input value={nick} onChange={e => setNick(e.target.value)} placeholder="표시 이름"
                 style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none' }} />
               <button onClick={saveNick} disabled={busy} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>저장</button>
             </div>
+          </div>
+          {/* 아이디(@handle) — 피드·프로필에 표시되는 고유 닉네임, 중복 불가 */}
+          <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 4 }}>아이디 (@)</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>피드·프로필에 <b>@아이디</b>로 표시돼요. 다른 사람과 겹칠 수 없어요.</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ color: 'var(--ink-3)', fontWeight: 800 }}>@</span>
+              <input value={hdl} onChange={e => { setHdl(e.target.value); setHmsg(''); }} placeholder="myname"
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none' }} />
+              <button onClick={saveHandle} disabled={hbusy} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: hbusy ? 'default' : 'pointer', opacity: hbusy ? 0.6 : 1 }}>저장</button>
+            </div>
+            {hmsg && <div style={{ fontSize: 12, color: hmsg.indexOf('✓') === 0 ? 'var(--brand)' : '#d33', marginTop: 6 }}>{hmsg}</div>}
           </div>
           {/* 로그아웃 */}
           <button onClick={logout} style={{ marginTop: 18, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>

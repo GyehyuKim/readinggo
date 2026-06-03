@@ -335,6 +335,14 @@
         if (!h) return null;
         return unwrap(await sb().from('users').select('*').eq('handle', h).maybeSingle());
       },
+      // 핸들(@아이디) 사용 가능 여부 — 중복검사. 본인이 이미 쓰는 핸들이면 사용 가능.
+      async isHandleAvailable(handle) {
+        const h = (handle || '').replace(/^@/, '').trim();
+        if (!h) return false;
+        const me = await uid();
+        const rows = unwrap(await sb().from('users').select('id').eq('handle', h).limit(1));
+        return !rows || rows.length === 0 || (!!me && rows[0] && rows[0].id === me);
+      },
       async publicBooks(userId) {
         return unwrap(await sb().from('user_books').select('*, book:books(*)')
           .eq('user_id', userId).eq('status', 'completed').order('completed_at', { ascending: false }));
