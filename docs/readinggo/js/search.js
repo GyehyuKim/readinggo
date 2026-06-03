@@ -96,6 +96,7 @@ const SearchModal = ({
         background: 'rgba(0,0,0,0.5)',
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'center',
         zIndex: 9999,
         animation: 'fadeIn 0.2s',
       }}
@@ -105,6 +106,8 @@ const SearchModal = ({
         style={{
           background: 'var(--paper)',
           flex: 1,
+          width: '100%',
+          maxWidth: 430,
           display: 'flex',
           flexDirection: 'column',
           borderBottomLeftRadius: 20,
