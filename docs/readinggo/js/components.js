@@ -70,12 +70,13 @@ function Confetti({ active, nestUp }) {
 
 /* ── SentenceCard ─────────────────────────────────────── */
 function SentenceCard({ item, bookId }) {
-  const sentenceId = `${bookId}:${item.page}:${item.nick}`;
-  // 본인 카드(짹·책갈피 비활성) — 현재 사용자 jerome(🐦) 판정 (social.md §5.7)
-  const isMine = item.nick === '@jerome' || item.nick === 'jerome';
+  // 실 피드(Supabase)면 item.id(UUID)·item.isMine·item.bookTitle 사용, 데모면 합성값 폴백.
+  const sentenceId = item.id || `${bookId}:${item.page}:${item.nick}`;
+  const isMine = (typeof item.isMine !== 'undefined') ? item.isMine : (item.nick === '@jerome' || item.nick === 'jerome');
   const [liked, setLiked] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const bk = getBook(bookId);
+  const cardTitle = item.bookTitle || (bk && bk.title) || '';
   const likeCount = (item.claps || 0) + (liked ? 1 : 0);
   // 짹/책갈피 토글 — 양 어댑터(동기 boolean / 비동기 Promise<boolean>) 정규화.
   // 토글이 곧 취소(다시 누르면 해제) — claps.toggle 이 존재 시 delete (#156).
@@ -97,7 +98,7 @@ function SentenceCard({ item, bookId }) {
       <div className="who">
         <div className="avatar">{item.avatar}</div>
         <div className="nick">{item.nick}</div>
-        <div className="meta">{bk ? bk.title + ' · ' : ''}{item.page}p · {item.time}</div>
+        <div className="meta">{cardTitle ? cardTitle + ' · ' : ''}{item.page}p · {item.time}</div>
       </div>
       {blinded ? (
         <div className="spoiler-blind" onClick={() => setRevealed(true)}>

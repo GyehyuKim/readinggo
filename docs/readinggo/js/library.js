@@ -192,7 +192,7 @@ function LibraryView({ state, onSetActiveBook }) {
       {/* 프로필 상단 */}
       <div style={{background:'linear-gradient(135deg, var(--brand), var(--brand-3))', color:'white', padding:'20px 16px', marginBottom:20}}>
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:28, fontWeight:900, marginBottom:4}}>🐦 jerome</div>
+          <div style={{fontSize:28, fontWeight:900, marginBottom:4}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
           <div style={{fontSize:13, opacity:0.9, marginBottom:14, minHeight:20}}>
             책 속에서 길을 찾는 중
           </div>
@@ -202,7 +202,7 @@ function LibraryView({ state, onSetActiveBook }) {
               <div style={{fontSize:10, opacity:0.85}}>둥지 레벨</div>
             </div>
             <div>
-              <div style={{fontSize:18, fontWeight:900}}>{completedBooks.length}</div>
+              <div style={{fontSize:18, fontWeight:900}}>{castles.length}</div>
               <div style={{fontSize:10, opacity:0.85}}>완독</div>
             </div>
             <div>

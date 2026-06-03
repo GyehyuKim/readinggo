@@ -32,6 +32,17 @@ async function buildStateFromSupabase() {
   if (Array.isArray(mine) && mine.length) {
     out.myQuotes = mine.map(s => ({ text: s.text, bookId: s.book_id || '', page: s.page, when: '' }));
   }
+  // 소셜 isMine 판정 + 스포일러 동기맵: 현재 사용자 + 내 책별 현재 페이지 preload
+  try {
+    const me = await window.RG_SB.myProfile();
+    if (me) window.RG_ME = { id: me.id, handle: me.handle, displayName: me.display_name, avatar: me.avatar_url };
+  } catch (e) {}
+  try {
+    const myb = await DS.myBooks.list();
+    const pages = {};
+    (myb || []).forEach(u => { if (u.book_id) pages[u.book_id] = u.current_page || 0; });
+    window.RG_MY_PAGES = pages;
+  } catch (e) {}
   return out;
 }
 
