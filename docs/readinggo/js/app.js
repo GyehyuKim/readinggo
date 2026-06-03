@@ -195,15 +195,19 @@ function App() {
         if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ub.id, page: ns.book.cur, text: sentence }));
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ub.id + ')');
-        // DB 권위값으로 스트릭·XP 정합 (낙관적 표시와 어긋남 방지, §5.4 / architect H2)
-        const [stDb, xpDb] = await Promise.all([
+        // DB 권위값으로 스트릭·XP·내 한 문장 정합 (낙관 표시 어긋남 + 새 문장 id 부재 → 감상 버튼 지연 방지, H2/§5.8.4)
+        const [stDb, xpDb, mineDb] = await Promise.all([
           Promise.resolve(DataStore.streak.get()).catch(() => null),
           Promise.resolve(DataStore.xp.get()).catch(() => null),
+          Promise.resolve(DataStore.sentences.listMine()).catch(() => null),
         ]);
         setAppState(s => ({
           ...s,
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
           xp: (typeof xpDb === 'number') ? xpDb : s.xp,
+          myQuotes: Array.isArray(mineDb)
+            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', page: x.page, when: '', note: x.my_note || '' }))
+            : s.myQuotes,
         }));
       } catch (e) { console.warn('[ReadingGo] 체크인 영속 실패:', e); }
     })();
