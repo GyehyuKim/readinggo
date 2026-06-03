@@ -26,8 +26,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     setEditingId(null);
   };
 
+  // 교보 상품 상세 직접 (바코드=isbn13). isbn 없으면 제목 검색 폴백. (QA #12-A)
   const kyoboUrl = book.isbn
-    ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn)}`
+    ? `https://product.kyobobook.co.kr/detail/${encodeURIComponent(book.isbn)}`
     : `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.title)}`;
 
   return (
