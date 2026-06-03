@@ -195,6 +195,16 @@ function App() {
         if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ub.id, page: ns.book.cur, text: sentence }));
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ub.id + ')');
+        // DB 권위값으로 스트릭·XP 정합 (낙관적 표시와 어긋남 방지, §5.4 / architect H2)
+        const [stDb, xpDb] = await Promise.all([
+          Promise.resolve(DataStore.streak.get()).catch(() => null),
+          Promise.resolve(DataStore.xp.get()).catch(() => null),
+        ]);
+        setAppState(s => ({
+          ...s,
+          streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
+          xp: (typeof xpDb === 'number') ? xpDb : s.xp,
+        }));
       } catch (e) { console.warn('[ReadingGo] 체크인 영속 실패:', e); }
     })();
   }, []);

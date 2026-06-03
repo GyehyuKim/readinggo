@@ -73,6 +73,7 @@ function SentenceCard({ item, bookId }) {
   // 실 피드(Supabase)면 item.id(UUID)·item.isMine·item.bookTitle 사용, 데모면 합성값 폴백.
   const sentenceId = item.id || `${bookId}:${item.page}:${item.nick}`;
   const isMine = (typeof item.isMine !== 'undefined') ? item.isMine : (item.nick === '@jerome' || item.nick === 'jerome');
+  const canReact = !!item.id;  // 실 sentence(UUID)만 짹·책갈피 가능 — 합성 id 는 uuid 컬럼 400 (architect L1)
   const [liked, setLiked] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const bk = getBook(bookId);
@@ -81,14 +82,14 @@ function SentenceCard({ item, bookId }) {
   // 짹/책갈피 토글 — 양 어댑터(동기 boolean / 비동기 Promise<boolean>) 정규화.
   // 토글이 곧 취소(다시 누르면 해제) — claps.toggle 이 존재 시 delete (#156).
   const toggleLike = () => {
-    if (isMine) return;
+    if (isMine || !canReact) return;
     Promise.resolve(DataStore.claps.toggle(sentenceId)).then(setLiked).catch(() => {});
   };
   const toggleBookmark = () => {
-    if (isMine) return;
+    if (isMine || !canReact) return;
     Promise.resolve(DataStore.bookmarks.toggle(sentenceId)).then(setBookmarked).catch(() => {});
   };
-  const mineStyle = isMine ? { opacity: 0.4, pointerEvents: 'none' } : undefined;
+  const mineStyle = (isMine || !canReact) ? { opacity: 0.4, pointerEvents: 'none' } : undefined;
   // 스포일러 블라인드: 전역 토글(revealAll) 또는 카드별 탭 공개 시 해제 (§5.7.1).
   const revealAll = React.useContext(SpoilerContext);
   const [revealed, setRevealed] = useState(false);
@@ -125,6 +126,7 @@ function SentenceCard({ item, bookId }) {
    핸들 탭 → 해당 사용자 공개 완독 책장 + 공개 한 문장. RLS select using(true). */
 function UserProfileModal({ handle, onClose }) {
   const [data, setData] = useState(undefined); // undefined=로딩, null=없음
+  const [revealed, setRevealed] = useState({}); // 스포일러 카드별 탭 공개 (§5.7.1)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -178,10 +180,16 @@ function UserProfileModal({ handle, onClose }) {
               <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '8px 0' }}>아직 공개된 한 문장이 없어요</div>
             ) : data.sents.map((s) => {
               const bt = s.user_book && s.user_book.book && s.user_book.book.title;
+              const bid = s.user_book && s.user_book.book_id;
+              const blinded = !revealed[s.id] && isSentenceBlinded(bid, s.page);
               return (
                 <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{bt ? bt + ' · ' : ''}{s.page}p</div>
-                  <div style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
+                  {blinded ? (
+                    <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기</div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
+                  )}
                 </div>
               );
             })}

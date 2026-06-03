@@ -77,6 +77,11 @@
       },
       // 알라딘 결과 등 외부 책을 books 에 upsert (isbn13 기준) → 등록 흐름
       async upsert(book) {
+        // isbn13 없으면 제목으로 기존 책 매칭 (null isbn 은 conflict 안 되어 중복 생성됨, architect H1).
+        if (!book.isbn13) {
+          const found = unwrap(await sb().from('books').select('*').eq('title', book.title).limit(1).maybeSingle());
+          if (found) return found;
+        }
         return unwrap(await sb().from('books').upsert({
           isbn13: book.isbn13, title: book.title, author: book.author,
           publisher: book.publisher, total_pages: book.total_pages, cover_url: book.cover_url,
@@ -302,7 +307,7 @@
           .eq('user_id', userId).eq('status', 'completed').order('completed_at', { ascending: false }));
       },
       async publicSentences(userId) {
-        return unwrap(await sb().from('sentences').select('*, user_book:user_books(book:books(title))')
+        return unwrap(await sb().from('sentences').select('*, user_book:user_books(book_id, book:books(title))')
           .eq('user_id', userId).order('created_at', { ascending: false }).limit(50));
       },
     },
