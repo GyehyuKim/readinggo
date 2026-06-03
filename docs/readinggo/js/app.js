@@ -330,21 +330,19 @@ function App() {
               <button
                 onClick={() => setSpoilerReveal(v => !v)}
                 aria-pressed={spoilerReveal}
-                title="스포일러 그냥 보기 — 안 읽은 부분도 모두 표시"
+                title={spoilerReveal ? '스포일러 모두 표시 중 — 탭하면 다시 가림' : '스포일러 가리는 중 — 탭하면 안 읽은 부분도 표시'}
                 style={{
                   background: spoilerReveal ? 'var(--brand-tint)' : 'transparent',
                   border: spoilerReveal ? '1.5px solid var(--brand)' : '1.5px solid transparent',
                   borderRadius:14,
-                  color: spoilerReveal ? 'var(--brand-3)' : 'var(--ink-2)',
-                  fontSize:11,
-                  fontWeight:800,
+                  fontSize:16,
                   cursor:'pointer',
-                  padding:'4px 8px',
-                  marginLeft:8,
-                  whiteSpace:'nowrap',
+                  padding:'4px 6px',
+                  marginLeft:4,
+                  lineHeight:1,
                 }}
               >
-                🔓 스포일러 그냥 보기
+                {spoilerReveal ? '🔓' : '🙈'}
               </button>
               <button
                 onClick={() => setIsSearchOpen(true)}
