@@ -172,6 +172,16 @@
         if (cursor) q = q.lt('created_at', cursor);
         return unwrap(await q);
       },
+      // 팔로우 피드 — 내가 팔로우한 사용자들의 한 문장만 (#7)
+      async feedFollowing({ limit } = {}) {
+        const id = await uid();
+        const f = unwrap(await sb().from('follows').select('following_id').eq('follower_id', id)) || [];
+        const ids = f.map(x => x.following_id);
+        if (!ids.length) return [];
+        return unwrap(await sb().from('sentences')
+          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url))')
+          .in('user_id', ids).order('created_at', { ascending: false }).limit(limit || 30));
+      },
       // 무작위 회상 — 내 과거 한 문장 1개 (profile §5.8.7)
       async random() {
         const mine = await A.sentences.listMine();
@@ -288,6 +298,18 @@
         const id = await uid();
         await sb().from('follows').upsert({ follower_id: id, following_id: userId }, { onConflict: 'follower_id,following_id' });
         return true;
+      },
+      async unfollow(userId) {
+        const id = await uid();
+        await sb().from('follows').delete().eq('follower_id', id).eq('following_id', userId);
+        return false;
+      },
+      async isFollowing(userId) {
+        const id = await uid();
+        if (!id || !userId) return false;
+        const row = unwrap(await sb().from('follows').select('follower_id')
+          .eq('follower_id', id).eq('following_id', userId).maybeSingle());
+        return !!row;
       },
     },
     users: {

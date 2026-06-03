@@ -15,12 +15,18 @@ function rgRelTime(iso) {
 
 function SocialView({ state }) {
   const { useState, useEffect } = React;
-  const [items, setItems] = useState(null); // null=로딩, []=빈
+  const [tab, setTab] = useState('all');     // 'all' | 'following' (#7)
+  const [items, setItems] = useState(null);  // null=로딩, []=빈
+  const hasFollow = !!(DataStore.sentences && DataStore.sentences.feedFollowing);
 
   useEffect(() => {
     let alive = true;
-    // 전체 공개 피드 — 양 어댑터 정규화(동기 배열 / 비동기 Promise).
-    Promise.resolve(DataStore.sentences.feed({ limit: 50 })).then(rows => {
+    setItems(null);
+    // 전체 공개 피드 또는 팔로우 피드 — 양 어댑터 정규화.
+    const src = (tab === 'following' && hasFollow)
+      ? DataStore.sentences.feedFollowing({ limit: 50 })
+      : DataStore.sentences.feed({ limit: 50 });
+    Promise.resolve(src).then(rows => {
       if (!alive) return;
       const myId = window.RG_ME && window.RG_ME.id;
       setItems((rows || []).map(s => {
@@ -41,16 +47,27 @@ function SocialView({ state }) {
       }));
     }).catch(() => { if (alive) setItems([]); });
     return () => { alive = false; };
-  }, []);
+  }, [tab]);
 
   return (
     <section className="view active">
-      <div className="section-head"><h3>📚 친구들의 한 문장</h3></div>
+      <div className="section-head"><h3>📚 한 문장 피드</h3></div>
+      {/* 전체 / 팔로우 탭 (#7) */}
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 10px' }}>
+        {[['all', '전체'], ['following', '팔로우']].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            style={{ padding: '6px 14px', borderRadius: 16, border: tab === id ? 'none' : '1px solid var(--line)', background: tab === id ? 'var(--brand)' : 'transparent', color: tab === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+            {label}
+          </button>
+        ))}
+      </div>
       {items === null ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>불러오는 중…</div>
       ) : items.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', lineHeight: 1.7 }}>
-          🐦 아직 공개된 한 문장이 없어요.<br />둥지에서 첫 문장을 남겨보세요!
+          {tab === 'following'
+            ? (<>🐦 팔로우한 사람의 한 문장이 아직 없어요.<br />다른 독자 프로필에서 팔로우해보세요!</>)
+            : (<>🐦 아직 공개된 한 문장이 없어요.<br />둥지에서 첫 문장을 남겨보세요!</>)}
         </div>
       ) : (
         <div>{items.map((it, i) => (<SentenceCard key={it.id || i} item={it} bookId={it.bookId} />))}</div>

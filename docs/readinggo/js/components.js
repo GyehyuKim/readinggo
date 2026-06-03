@@ -127,6 +127,7 @@ function SentenceCard({ item, bookId }) {
 function UserProfileModal({ handle, onClose }) {
   const [data, setData] = useState(undefined); // undefined=로딩, null=없음
   const [revealed, setRevealed] = useState({}); // 스포일러 카드별 탭 공개 (§5.7.1)
+  const [following, setFollowing] = useState(null); // null=자기자신/미상, true/false=팔로우 상태 (#7)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -140,10 +141,22 @@ function UserProfileModal({ handle, onClose }) {
           DS.users.publicSentences(u.id).catch(() => []),
         ]);
         if (alive) setData({ user: u, books: books || [], sents: sents || [] });
+        const myId = window.RG_ME && window.RG_ME.id;
+        if (myId && u.id !== myId && DS.friends && DS.friends.isFollowing) {
+          const f = await DS.friends.isFollowing(u.id).catch(() => false);
+          if (alive) setFollowing(!!f);
+        }
       } catch (e) { if (alive) setData(null); }
     })();
     return () => { alive = false; };
   }, [handle]);
+  const toggleFollow = () => {
+    const DS = window.SupabaseDataStore;
+    if (!data || !data.user || !(DS && DS.friends)) return;
+    const target = data.user.id;
+    const p = following ? DS.friends.unfollow(target) : DS.friends.follow(target);
+    Promise.resolve(p).then(() => setFollowing(!following)).catch(() => {});
+  };
 
   return (
     <div className="modal-backdrop show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -158,6 +171,12 @@ function UserProfileModal({ handle, onClose }) {
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--ink)' }}>🐦 {data.user.display_name || data.user.handle}</div>
               <div style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>@{data.user.handle} · 완독 {data.books.length}권</div>
+              {following !== null && (
+                <button onClick={toggleFollow}
+                  style={{ marginTop: 10, padding: '8px 22px', borderRadius: 20, border: following ? '1.5px solid var(--line)' : 'none', background: following ? 'transparent' : 'var(--brand)', color: following ? 'var(--ink-2)' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                  {following ? '팔로잉 ✓' : '+ 팔로우'}
+                </button>
+              )}
               {data.user.bio && <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{data.user.bio}</div>}
             </div>
             {data.books.length > 0 && (
