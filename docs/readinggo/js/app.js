@@ -47,16 +47,45 @@ function BootSplash({ text }) {
 }
 
 function LoginScreen({ onLogin }) {
+  const { useState } = React;
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const sendLink = async () => {
+    const addr = email.trim();
+    if (!addr || busy) return;
+    setBusy(true);
+    try { await window.RG_SB.signInWithEmail(addr); setSent(true); }
+    catch (e) { alert('메일 전송 실패: ' + ((e && e.message) || e)); }
+    finally { setBusy(false); }
+  };
   return (
     <div className="stage"><div className="app">
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, padding: '0 32px', textAlign: 'center' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '0 32px', textAlign: 'center' }}>
         <span style={{ fontSize: 54 }}>🐦</span>
         <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)' }}>reading<span style={{ color: 'var(--brand)' }}>GO</span></div>
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>하루 한 페이지,<br />한 문장에서 시작해요.</div>
-        <button onClick={onLogin} style={{ marginTop: 12, padding: '14px 22px', borderRadius: 14, border: '1.5px solid var(--line)', background: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+        <button onClick={onLogin} style={{ marginTop: 8, padding: '14px 22px', borderRadius: 14, border: '1.5px solid var(--line)', background: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
           <span style={{ fontSize: 18 }}>🟢</span> Google로 시작하기
         </button>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>클로즈베타 · 지인 초대</div>
+        {sent ? (
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.6, background: 'rgba(0,0,0,0.04)', borderRadius: 12, padding: '12px 16px', maxWidth: 300 }}>
+            📬 <b>{email.trim()}</b>로 로그인 링크를 보냈어요.<br />메일함에서 링크를 눌러 로그인하세요.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 300 }}>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') sendLink(); }}
+              placeholder="이메일 주소"
+              style={{ padding: '12px 14px', borderRadius: 12, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 600, outline: 'none' }}
+            />
+            <button onClick={sendLink} disabled={busy} style={{ padding: '12px 16px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+              {busy ? '보내는 중…' : '✉️ 이메일로 시작하기'}
+            </button>
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>클로즈베타 · 지인 초대</div>
       </div>
     </div></div>
   );
@@ -94,6 +123,13 @@ function App() {
   // 로그인 후 Supabase 실데이터 → appState (1회)
   useEffect(() => {
     if (!_supa || !authUser || authUser === 'local') return;
+    // 쓰기 경로 보장: index.html S2 스왑이 OAuth 복귀 직후엔 세션 hydration 타이밍상
+    // 누락될 수 있어 → 쓰기가 localStorage 로 새고 Supabase 엔 안 저장됨. 로그인 확정
+    // 시점에 여기서 DataStore 를 Supabase 로 확실히 교체(쓰기 경로 활성화).
+    if (window.SupabaseDataStore && window.DataStore !== window.SupabaseDataStore) {
+      window.DataStore = window.SupabaseDataStore;
+      console.log('[ReadingGo] DataStore → Supabase (쓰기 경로 활성)');
+    }
     let alive = true;
     (async () => {
       try {
@@ -126,7 +162,7 @@ function App() {
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
   // 둥지 단계(nest.lv)는 활성 책 진척률에서 파생 → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv) => {
+  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence) => {
     setAppState(s => ({
       ...s,
       book: ns.book,
@@ -135,6 +171,18 @@ function App() {
       nest: { ...s.nest, lv: nestLv },
       myQuotes: ns.myQuotes,
     }));
+    // Phase 1: 백엔드 영속(로그인 시). 낙관적 UI 유지 + 백그라운드 persist.
+    // sessions.addToday 가 스트릭 bump 까지 연동(양 어댑터). 활성 책 없으면 no-op.
+    (async () => {
+      try {
+        const ub = await Promise.resolve(DataStore.activeBook.get());
+        if (!ub || !ub.id) { console.warn('[ReadingGo] 체크인: 활성 책 없음 — 등록 먼저 필요'); return; }
+        await Promise.resolve(DataStore.sessions.addToday({ userBookId: ub.id, page: ns.book.cur }));
+        if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ub.id, page: ns.book.cur, text: sentence }));
+        if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
+        console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ub.id + ')');
+      } catch (e) { console.warn('[ReadingGo] 체크인 영속 실패:', e); }
+    })();
   }, []);
 
   // 하루 거르기: 둥지·XP·성은 존속, 스트릭만 영향 (§5.4).
@@ -180,6 +228,23 @@ function App() {
     });
     showToast(`📖 ${bk.title} — 활성 책으로 설정`);
     switchTab('nest');
+    // Phase 1: 로그인(Supabase 모드)이면 책을 백엔드에 등록 + 활성화. myBooks 없는
+    // localStorage 폴백에선 skip(데모 시드 사용) — 양 어댑터 안전.
+    if (DataStore.myBooks && DataStore.myBooks.add) {
+      (async () => {
+        try {
+          const mine = await Promise.resolve(DataStore.myBooks.list());
+          let ub = (mine || []).find(u => u.book && (u.book.isbn13 === bk.isbn || u.book.title === bk.title));
+          if (!ub) {
+            ub = await Promise.resolve(DataStore.myBooks.add({
+              book: { isbn13: bk.isbn, title: bk.title, author: bk.author, publisher: bk.pub, total_pages: bk.total, cover_url: bk.cover },
+              current_page: (window.INITIAL_PROGRESS && window.INITIAL_PROGRESS[bookId] && window.INITIAL_PROGRESS[bookId].cur) || 0,
+            }));
+          }
+          if (ub && ub.id) { await Promise.resolve(DataStore.activeBook.set(ub.id)); console.log('[ReadingGo] ✅ 책 등록 완료:', bk.title, '(ub=' + ub.id + ')'); }
+        } catch (e) { console.warn('[ReadingGo] 활성책 등록 실패:', e); }
+      })();
+    }
   }, [switchTab]);
 
   const handleSearchSelectBook = useCallback((book) => {

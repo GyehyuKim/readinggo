@@ -2,7 +2,7 @@
    ReadingGo — library.js
    프로필 탭: 프로필 정보 + 내서재 (찜한 책, 읽는 중, 완독)
    ========================================================= */
-const { useState: _useState, useMemo: _useMemo } = React;
+const { useState: _useState, useMemo: _useMemo, useEffect: _useEffect } = React;
 
 /* ── BookDetailModal ─────────────────────────────────────── */
 function BookDetailModal({ book, allQuotes, onClose, onSetActive }) {
@@ -155,21 +155,27 @@ function LibraryView({ state, onSetActiveBook }) {
 
   // 성(🏰) 컬렉션 = 완독 책 집합. 별도 카운터 없이 DataStore.castles.list
   // (status==='completed') 에서 파생 (§5.2.1/§5.8.1). 카드 = 표지+별점+완독일.
-  const castles = _useMemo(() => {
-    let rows = [];
-    try { rows = DataStore.castles.list(); } catch { rows = []; }
-    return rows.map(ub => {
-      const bk = getBook(ub.book_id);
-      return {
-        bookId: ub.book_id,
-        title: (ub.book && ub.book.title) || bk.title,
-        cover: (ub.book && ub.book.cover_url) || bk.cover,
-        fb: bk.fb,
-        rating: ub.rating,
-        reviewText: ub.review_text,
-        completedAt: ub.completed_at,
-      };
-    });
+  // 성(🏰) 컬렉션은 async 어댑터(Supabase)에서 Promise 를 돌려주므로 렌더-시점
+  // 호출 금지 → effect 에서 Promise.resolve 로 정규화(동기/비동기 어댑터 공통).
+  const [castles, setCastles] = _useState([]);
+  _useEffect(() => {
+    let alive = true;
+    Promise.resolve(DataStore.castles.list()).then(rows => {
+      if (!alive) return;
+      setCastles((rows || []).map(ub => {
+        const bk = getBook(ub.book_id);
+        return {
+          bookId: ub.book_id,
+          title: (ub.book && ub.book.title) || (bk && bk.title) || '제목 없음',
+          cover: (ub.book && ub.book.cover_url) || (bk && bk.cover) || '',
+          fb: (bk && bk.fb) || ['#9AA7B2', '#C7D0D8'],
+          rating: ub.rating,
+          reviewText: ub.review_text,
+          completedAt: ub.completed_at,
+        };
+      }));
+    }).catch(() => { if (alive) setCastles([]); });
+    return () => { alive = false; };
   }, []);
 
   const tabsData = [

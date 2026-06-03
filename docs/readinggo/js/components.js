@@ -12,10 +12,13 @@ const SpoilerContext = React.createContext(false);
 // 뒤 페이지면 가린다. 판정 데이터는 DataStore.spoiler.myCurrentPage(bookId).
 // 내가 안 읽는 책(myPage 0) · 완독 책(current_page=total) · 현재 페이지 이하 → 노출.
 function isSentenceBlinded(bookId, page) {
+  // Phase 1: 렌더 시점엔 async DataStore 호출 금지(Promise→오작동 + b008 같은 데모 id 로
+  // uuid 컬럼 쿼리 시 400 스팸). boot 에서 preload 한 동기 맵(window.RG_MY_PAGES:
+  // bookId→내 현재 페이지)을 사용. 실 피드 배선(B) 전까진 맵이 비어 블라인드 비활성
+  // (데모 피드엔 스포일러 리스크 없음).
   if (typeof page !== 'number') return false;
-  let myPage = 0;
-  try { myPage = DataStore.spoiler.myCurrentPage(bookId); } catch (e) { myPage = 0; }
-  if (!myPage) return false;          // 안 읽는 책 → 전체 공개
+  const myPage = (window.RG_MY_PAGES && window.RG_MY_PAGES[bookId]) || 0;
+  if (!myPage) return false;          // 안 읽는 책 / 미상 → 전체 공개
   return page > myPage;               // 내 현재 페이지보다 뒤 → 블라인드
 }
 
@@ -74,13 +77,15 @@ function SentenceCard({ item, bookId }) {
   const [bookmarked, setBookmarked] = useState(false);
   const bk = getBook(bookId);
   const likeCount = (item.claps || 0) + (liked ? 1 : 0);
+  // 짹/책갈피 토글 — 양 어댑터(동기 boolean / 비동기 Promise<boolean>) 정규화.
+  // 토글이 곧 취소(다시 누르면 해제) — claps.toggle 이 존재 시 delete (#156).
   const toggleLike = () => {
     if (isMine) return;
-    setLiked(DataStore.claps.toggle(sentenceId));
+    Promise.resolve(DataStore.claps.toggle(sentenceId)).then(setLiked).catch(() => {});
   };
   const toggleBookmark = () => {
     if (isMine) return;
-    setBookmarked(DataStore.bookmarks.toggle(sentenceId));
+    Promise.resolve(DataStore.bookmarks.toggle(sentenceId)).then(setBookmarked).catch(() => {});
   };
   const mineStyle = isMine ? { opacity: 0.4, pointerEvents: 'none' } : undefined;
   // 스포일러 블라인드: 전역 토글(revealAll) 또는 카드별 탭 공개 시 해제 (§5.7.1).

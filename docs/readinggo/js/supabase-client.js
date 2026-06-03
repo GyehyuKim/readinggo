@@ -35,6 +35,17 @@
       });
     },
 
+    // 이메일 매직링크 — 비밀번호 없이 메일 링크로 로그인. 메일 소유 검증이 곧 confirm
+    // 이라 mailer_autoconfirm 무관하게 안전 (#159).
+    async signInWithEmail(email) {
+      const c = client();
+      if (!c) throw new Error('Supabase 미설정');
+      return c.auth.signInWithOtp({
+        email: email,
+        options: { emailRedirectTo: window.location.origin },
+      });
+    },
+
     async signOut() {
       const c = client();
       return c ? c.auth.signOut() : null;

@@ -291,7 +291,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
 
     prevTwigsRef.current = twigsForProgress(prevPct);
     setNestState(ns);
-    onCheckin(ns, newLv);
+    onCheckin(ns, newLv, xpGain, sentence);
 
     // 단계 상승 시 진화 마이크로카피 toast (§5.2)
     if (nestUp) {
@@ -324,12 +324,15 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
   // 완독 세리머니에서 받은 별점/소감을 영속 (§5.8.3).
   // 활성 책의 user_book 을 status='completed' + rating/review_text 로 마감.
   const handleComplete = ({ rating, review_text }) => {
-    try {
-      const ub = DataStore.activeBook.get();
-      if (ub) DataStore.books.complete(ub.id, { rating, review_text });
-    } catch (e) {
-      console.warn('[nest] 완독 기록 저장 실패:', e.message);
-    }
+    // 양 어댑터 정규화(activeBook.get/books.complete 동기/비동기 공통).
+    (async () => {
+      try {
+        const ub = await Promise.resolve(DataStore.activeBook.get());
+        if (ub && ub.id) await Promise.resolve(DataStore.books.complete(ub.id, { rating, review_text }));
+      } catch (e) {
+        console.warn('[nest] 완독 기록 저장 실패:', (e && e.message) || e);
+      }
+    })();
     showToast('🏰 성 컬렉션에 기록이 남았어요!');
   };
 
