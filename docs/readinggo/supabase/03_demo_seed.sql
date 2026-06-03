@@ -19,6 +19,10 @@ begin
   if v_uid is null then
     raise exception '데모 계정 handle 을 찾을 수 없음: %  (먼저 그 계정으로 로그인했는지 확인)', v_handle;
   end if;
+  -- 실데이터 덮어쓰기 방지: 이미 책이 있는 계정엔 실행 금지(데모 전용 빈 계정만).
+  if exists (select 1 from public.user_books where user_id = v_uid) then
+    raise exception '이미 책 데이터가 있는 계정(%). 데모 전용(빈) 계정에만 실행하세요.', v_handle;
+  end if;
 
   -- 책 (isbn13 기준 upsert)
   insert into public.books (isbn13, title, author, publisher, total_pages, cover_url) values

@@ -155,7 +155,8 @@
       },
       async listMine() {
         const id = await uid();
-        return unwrap(await sb().from('sentences').select('*').eq('user_id', id)
+        // book_id 는 sentences 에 없음 → user_book 임베드로 해소(무작위회상·책상세 타임라인용).
+        return unwrap(await sb().from('sentences').select('*, user_book:user_books(book_id, book:books(title))').eq('user_id', id)
           .order('created_at', { ascending: false }));
       },
       // 전체 공개 피드 (§social). 책 제목은 user_books→books 중첩 embed.

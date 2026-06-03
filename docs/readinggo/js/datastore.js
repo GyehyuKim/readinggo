@@ -262,6 +262,21 @@ const DataStore = {
         _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
       );
     },
+    // 사후 감상 추가·편집 (§5.8.4) — Supabase 어댑터와 표면 일치(§7.2)
+    setNote(sentenceId, my_note) {
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (se) se.my_note = my_note;
+        return se;
+      });
+    },
+    // 무작위 회상 (§5.8.7)
+    random() {
+      return localStorageAdapter.mutate(s => {
+        const all = _allSentences(s);
+        return all.length ? all[Math.floor(Math.random() * all.length)] : null;
+      });
+    },
   },
 
   /* 스트릭 ──────────────────────────────────────── */

@@ -256,13 +256,13 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
       {/* 무작위 한 문장 회상 (§5.8.7) — 과거 내 문장 1개 */}
       {recall && (
         <div
-          onClick={() => recall.book_id && setSelectedBookId(recall.book_id)}
+          onClick={() => { const bid = (recall.user_book && recall.user_book.book_id) || recall.book_id; if (bid) setSelectedBookId(bid); }}
           style={{margin:'0 12px 20px', padding:'14px 16px', background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:12, cursor:'pointer'}}
         >
           <div style={{fontSize:12, fontWeight:800, color:'var(--brand-3)', marginBottom:6}}>💭 그때 이런 문장을 남겼어요</div>
           <div style={{fontSize:14, color:'var(--ink)', fontStyle:'italic', lineHeight:1.5, marginBottom:6}}>"{recall.text}"</div>
           <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700}}>
-            {(() => { const rb = books.find(b => b.id === recall.book_id); return rb ? rb.title + ' · ' : ''; })()}{recall.page}p
+            {(() => { const t = recall.user_book && recall.user_book.book && recall.user_book.book.title; return t ? t + ' · ' : ''; })()}{recall.page}p
           </div>
         </div>
       )}
