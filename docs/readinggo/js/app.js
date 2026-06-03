@@ -263,6 +263,26 @@ function App() {
     handleSetActiveBook(book.book_id);
   }, [handleSetActiveBook]);
 
+  // 이미 등록된 user_book 으로 활성 전환 (서재에서 — 재등록 없이 activeBook.set).
+  const handleActivateUserBook = useCallback((item) => {
+    if (!item || !item.id) return;
+    setAppState(s => ({
+      ...s,
+      book: {
+        id: item.id, title: item.title,
+        author: (item.author || '') + (item.pub ? ' · ' + item.pub : ''),
+        cur: item.cur || 0, total: item.total || 1, days: 1,
+        cover: item.cover, fb: item.fb || ['#9AA7B2', '#C7D0D8'], toc: [],
+      },
+      nest: { ...s.nest, lv: getNestStage(item.total ? Math.round((item.cur || 0) / item.total * 100) : 0).lv },
+    }));
+    showToast(`📖 ${item.title} — 활성 책으로 변경`);
+    switchTab('nest');
+    if (item.ubId && DataStore.activeBook && DataStore.activeBook.set) {
+      Promise.resolve(DataStore.activeBook.set(item.ubId)).catch(e => console.warn('[ReadingGo] 활성 전환 실패:', e));
+    }
+  }, [switchTab]);
+
   // Phase 1 로그인 게이트 (Supabase 모드에서만)
   if (_supa && authUser === undefined) return (<BootSplash text="확인 중..." />);
   if (_supa && authUser === null) return (<LoginScreen onLogin={() => window.RG_SB.signInWithGoogle()} />);
@@ -383,6 +403,7 @@ function App() {
               key="library"
               state={appState}
               onSetActiveBook={handleSetActiveBook}
+              onActivateUserBook={handleActivateUserBook}
             />
           )}
           </SpoilerContext.Provider>
