@@ -667,7 +667,6 @@ function AdminDashboardModal({ onClose }) {
     ['⚡ 오늘 체크인', stats && stats.todaySessions],
   ];
   const trend = (stats && stats.trend) || [];
-  const trendMax = Math.max(1, ...trend.map((t) => t.sessions));
   return (
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label="운영 대시보드">
@@ -687,22 +686,62 @@ function AdminDashboardModal({ onClose }) {
               ))}
             </div>
           )}
-          {/* 최근 7일 추세 (#190 B) — 일별 체크인(막대) + 가입(점) */}
-          {trend.length > 0 && (
-            <div style={{ marginTop: 22 }}>
-              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>📈 최근 7일 (체크인 막대 · 가입 +N)</div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
-                {trend.map((t) => (
-                  <div key={t.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                    <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700, minHeight: 12 }}>{t.signups > 0 ? '+' + t.signups : ''}</div>
-                    <div title={`${t.date} · 체크인 ${t.sessions} · 가입 ${t.signups}`}
-                      style={{ width: '70%', height: Math.round((t.sessions / trendMax) * 48) + 2, background: 'var(--brand)', borderRadius: 3 }} />
-                    <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700 }}>{t.date.slice(5)}</div>
+          {/* 최근 7일 추세 (#206) — 체크인=막대(하단 숫자) + 가입=선그래프(포인트 숫자). 가입은 NPC 제외 */}
+          {trend.length > 0 && (() => {
+            const n = trend.length;
+            const H = 96;
+            const sessMax = Math.max(1, ...trend.map((t) => t.sessions));
+            const signMax = Math.max(1, ...trend.map((t) => t.signups));
+            const pts = trend.map((t, i) => ({
+              x: ((i + 0.5) / n) * 100,
+              y: H - (t.signups / signMax) * (H - 20) - 6, // 위쪽 숫자 여백
+              signups: t.signups,
+            }));
+            const poly = pts.map((p) => `${p.x},${p.y}`).join(' ');
+            return (
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 2 }}>📈 최근 7일</div>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 10 }}>
+                  <span style={{ color: 'var(--brand)' }}>■ 체크인(막대)</span> · <span style={{ color: '#E2553B' }}>● 가입(선, NPC 제외)</span>
+                </div>
+                <div style={{ position: 'relative', height: H }}>
+                  {/* 체크인 막대 */}
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                    {trend.map((t) => (
+                      <div key={t.date} title={`${t.date} · 체크인 ${t.sessions} · 가입 ${t.signups}`}
+                        style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
+                        <div style={{ width: '60%', height: Math.round((t.sessions / sessMax) * (H - 16)) + 2, background: 'var(--brand)', borderRadius: 3, opacity: 0.88 }} />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  {/* 가입 선그래프 (SVG 오버레이) */}
+                  <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
+                    <polyline points={poly} fill="none" stroke="#E2553B" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                    {pts.map((p, i) => (<circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#E2553B" vectorEffect="non-scaling-stroke" />))}
+                  </svg>
+                  {/* 가입 포인트 숫자 */}
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+                    {pts.map((p, i) => (
+                      <div key={i} style={{ flex: 1, position: 'relative' }}>
+                        {p.signups > 0 && (
+                          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: (p.y / H * 100) + '%', marginTop: -15, fontSize: 9, fontWeight: 800, color: '#E2553B' }}>{p.signups}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* 체크인 수(막대 하단 숫자) + 날짜 */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
+                  {trend.map((t) => (
+                    <div key={t.date} style={{ flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand)' }}>{t.sessions}</div>
+                      <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700 }}>{t.date.slice(5)}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           {/* 문의 목록 */}
           <div style={{ marginTop: 22 }}>
             <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>✉️ 문의 {inqs && inqs.length ? '(' + inqs.length + ')' : ''}</div>

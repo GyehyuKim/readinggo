@@ -505,7 +505,7 @@
           sb().from('user_books').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
           sb().from('reading_sessions').select('*', { count: 'exact', head: true }).eq('session_date', today),
           sb().from('reading_sessions').select('session_date').gte('session_date', since7),    // B: 7일 추세
-          sb().from('users').select('created_at').gte('created_at', since7 + 'T00:00:00'),
+          sb().from('users').select('created_at').eq('is_npc', false).gte('created_at', since7 + 'T00:00:00'), // 가입 추세 — NPC(가상 가입) 제외 (#206)
         ]);
         // B: 최근 7일 일별 체크인·가입 추세
         const days = [];
