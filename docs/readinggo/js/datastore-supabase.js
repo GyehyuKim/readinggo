@@ -158,6 +158,10 @@
       async setNote(sentenceId, my_note) {
         return unwrap(await sb().from('sentences').update({ my_note }).eq('id', sentenceId).select().single());
       },
+      // 한 문장/감상 공개·비공개 토글 (QA #12). patch = { is_private } 또는 { note_private }.
+      async setVisibility(sentenceId, patch) {
+        return unwrap(await sb().from('sentences').update(patch).eq('id', sentenceId).select().single());
+      },
       async listByBook(userBookId) {
         return unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)
           .order('created_at', { ascending: false }));

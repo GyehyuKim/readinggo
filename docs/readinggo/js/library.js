@@ -51,6 +51,15 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       setBmarks(prev => { const n = new Set(prev || []); if (on) n.add(q.id); else n.delete(q.id); return n; });
     }).catch(() => {});
   };
+  // 한 문장/감상 공개·비공개 토글 (QA #12). priv: id -> {is_private, note_private} 로컬 override.
+  const [priv, setPriv] = _useState({});
+  const isPriv = (q, field) => { const o = priv[q.id]; return (o && o[field] !== undefined) ? o[field] : (field === 'is_private' ? !!q.isPrivate : !!q.notePrivate); };
+  const togglePriv = (q, field) => {
+    if (!q.id || !(DataStore.sentences && DataStore.sentences.setVisibility)) return;
+    const next = !isPriv(q, field);
+    setPriv(m => ({ ...m, [q.id]: { ...(m[q.id] || {}), [field]: next } }));
+    Promise.resolve(DataStore.sentences.setVisibility(q.id, { [field]: next })).catch(() => {});
+  };
 
   // 교보 상세는 ISBN 이 아닌 교보 고유번호(S…)를 써서 ISBN 직링크가 깨짐 → 검색결과로(QA #1-B).
   const kyoboUrl = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn || book.title)}`;
@@ -149,10 +158,16 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                       <span>{q.page}p · {q.when}</span>
                       {q.id && (
-                        <button onClick={() => toggleFav(q)} title="좋아요(즐겨찾기)"
-                          style={{background:'none', border:'none', cursor:'pointer', fontSize:14, padding:0, lineHeight:1}}>
-                          {(bmarks && bmarks.has(q.id)) ? '❤️' : '🤍'}
-                        </button>
+                        <span style={{display:'flex', gap:8, alignItems:'center'}}>
+                          <button onClick={() => togglePriv(q, 'is_private')} title={isPriv(q,'is_private') ? '비공개(나만 보기) — 탭하면 공개' : '공개 — 탭하면 비공개'}
+                            style={{background:'none', border:'none', cursor:'pointer', fontSize:13, padding:0, lineHeight:1}}>
+                            {isPriv(q,'is_private') ? '🔒' : '🌐'}
+                          </button>
+                          <button onClick={() => toggleFav(q)} title="좋아요(즐겨찾기)"
+                            style={{background:'none', border:'none', cursor:'pointer', fontSize:14, padding:0, lineHeight:1}}>
+                            {(bmarks && bmarks.has(q.id)) ? '❤️' : '🤍'}
+                          </button>
+                        </span>
                       )}
                     </div>
                     {blinded ? (
@@ -179,9 +194,17 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                             );
                           }
                           return note ? (
-                            <div onClick={() => { if (q.id) { setEditingId(q.id); setDraft(note); } }}
-                              style={{marginTop:8, padding:'8px 10px', background:'var(--paper-2)', borderRadius:8, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer'}}>
-                              💬 {note}
+                            <div style={{marginTop:8}}>
+                              <div onClick={() => { if (q.id) { setEditingId(q.id); setDraft(note); } }}
+                                style={{padding:'8px 10px', background:'var(--paper-2)', borderRadius:8, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer'}}>
+                                💬 {note}
+                              </div>
+                              {q.id && (
+                                <button onClick={() => togglePriv(q, 'note_private')}
+                                  style={{marginTop:4, background:'none', border:'none', color:'var(--ink-3)', fontSize:11, fontWeight:700, cursor:'pointer', padding:'2px 0'}}>
+                                  {isPriv(q,'note_private') ? '🔒 감상 비공개' : '🌐 감상 공개'}
+                                </button>
+                              )}
                             </div>
                           ) : (q.id ? (
                             <button onClick={() => { setEditingId(q.id); setDraft(''); }}
