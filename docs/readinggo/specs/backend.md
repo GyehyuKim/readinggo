@@ -107,7 +107,8 @@ admin.stats()                          → {users, realUsers, sentences, complet
 admin.inquiries()                      → Inquiry[]           // v7.2: 문의 목록 (RLS: is_admin)
 
 // 문의 (설정 → 운영자) v7.2
-inquiries.create({message, email?})    → Inquiry             // 09_inquiries.sql. LLM 자동처리는 Phase 2(Gemini)
+inquiries.create({message, email?})    → Inquiry             // 09_inquiries.sql + app_version(10) + response/answered_at(11_inquiry_response.sql, #208)
+// 답변: inquiries.response/answered_at 컬럼 존재. LLM(Hermes/Gemini) 자동응답·기록은 Phase 2 — 현재 admin UI는 스캐폴드(#208)
 
 // 스포일러 (read-side 계산, 저장 컬럼 없음)
 spoiler.myCurrentPage(bookId)              → int             // 블라인드 판정용 (§social)

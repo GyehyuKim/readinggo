@@ -60,6 +60,7 @@
 #### 5.8.4 책 상세 / Export
 
 - 표지·제목·저자·진척 바
+- **쪽수 미상 graceful (v7.2, #204)**: `total_pages`가 없으면(알라딘 itemPage 누락) 진척률 0·"쪽수 미상" 표기(1쪽=100% 버그 방지). 등록 시 BookInfoModal에서 **총 쪽수 수동 입력**(선택) 가능. *외부 교보 API는 무료 공식 소스 부재로 미채택 — 수동 폴백으로 대체*
 - 한 문장 타임라인 (날짜 desc, 페이지/문장 + `my_note` 있으면 함께). 스포일러 블라인드 적용
 - **한 문장 사후 감상**: 각 한 문장에 긴 감상(`my_note`)을 **작성 시점 이후 언제든 추가·편집**. 한 문장은 짧게(인용 ≤200자), 감상은 넉넉하게(권장 500자). 타임라인 항목 탭 → 감상 입력 (`DataStore.sentences.setNote`). 본인만 작성, 본인 프로필·책 상세에서만 표시. UX 참고: [북모리 캡쳐 분석](../bookmory-capture-analysis.md) (인용 위 감상 입력·페이지 메타·사후편집)
 - **교보문고 링크**: `https://search.kyobobook.co.kr/search?keyword={isbn}` — "교보문고에서 보기 →" (Phase 1+ 어필리에이트 파라미터)
@@ -99,12 +100,15 @@
 
 #### 5.8.9 운영 대시보드 — is_admin 전용 (#161 / #190 A+B)
 - 프로필 헤더 우측 📊 버튼 — `users.is_admin = true` 인 계정에게만 노출
-- 클릭 → AdminDashboardModal: 가입자·**실사용자(NPC 제외)**·한 문장·완독·오늘 체크인 집계 + **최근 7일 추세 막대**(체크인)+가입(+N) + 문의 목록(상태 토글·답장)
-- DataStore: `admin.stats()` → `{users, realUsers, sentences, completed, todaySessions, trend[]}` ([backend.md §7.2](./backend.md))
+- 클릭 → AdminDashboardModal: 가입자·**실사용자(NPC 제외)**·한 문장·완독·오늘 체크인 집계 + **최근 7일 추세**(아래) + 문의 목록(상태 토글·답장)
+- **7일 추세 차트 (v7.2, #206)**: **체크인 = 막대**(각 막대 하단에 체크인 수) + **가입 = 선그래프**(SVG, 각 포인트에 가입 수) — 두 계열을 시각적으로 분리. **가입 수는 NPC(is_npc) 제외**(실 신규만)
+- **문의 답변 (v7.2, #208)**: 각 문의에 `response`(있으면 표시) + "🤖 AI 답변 생성" 자리. LLM(Hermes/Gemini) 자동응답은 키·배포 후 활성화 — 현재 스캐폴드
+- DataStore: `admin.stats()` → `{users, realUsers, sentences, completed, todaySessions, trend[{date,sessions,signups}]}` ([backend.md §7.2](./backend.md))
 - 보안: RLS 우회 없음(anon count 허용 범위), is_admin 체크는 클라 UI 조건부 렌더. C단계(리텐션 코호트·인기책·퍼널)는 Phase 2(#190)
 
 #### 5.8.10 독서 활동 히트맵 (#195)
 - 프로필에 **GitHub식 잔디** — 최근 **26주(182일)** 일별 읽은 쪽수를 농도 4단계로 시각화
+- **월(月) 라벨 (v7.2, #207)**: 주 컬럼 위에 월이 바뀌는 지점마다 `M월` 표기 (GitHub 잔디식)
 - 데이터: `DataStore.sessions.heatmap(days)` → `[{date, pages}]`. 쪽수 원천 = `reading_sessions.pages_read_today`(`sessions.addToday`가 전일 대비 증분 누적 기록, [backend.md §7.2](./backend.md))
 - 셀 hover = 날짜·쪽수. 상단 요약 = 활동일·총 쪽수. 스트릭 캘린더(§nest 5.x)의 장기 확장판
 
