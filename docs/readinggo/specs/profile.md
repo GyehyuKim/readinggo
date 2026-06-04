@@ -95,6 +95,12 @@
 #### 5.8.8 한 문장 모아보기 (v7.1, #171)
 둥지 "전체 N개 보기" → 모달. **전체 / 책별 / 좋아요** 필터 + **읽었음 누적 카운터**. 문장 탭 → 책 정보(BookInfoModal).
 
+#### 5.8.9 운영 대시보드 — is_admin 전용 (#161, Phase 2 기본)
+- 프로필 헤더 우측 📊 버튼 — `users.is_admin = true` 인 계정에게만 노출
+- 클릭 → AdminDashboardModal: **가입자 수 · 한 문장 수 · 완독 수 · 오늘 체크인** 집계 4종 표시
+- DataStore: `admin.stats()` — Supabase count 쿼리 4개 병렬 ([backend.md §7.2](./backend.md))
+- 보안: RLS 우회 없음(anon 키 count 허용 범위), is_admin 체크는 클라이언트 UI 조건부 렌더
+
 ### 5.9 닉네임 규칙 (v7.1 — Model A: 닉네임 1개 통합) — [§4](./onboarding.md) E-1 참조
 
 표시이름/아이디 구분 제거. 고유·변경가능 **닉네임 1개**(=`users.handle`)를 피드·프로필에 표시. 내부 식별은 불변 `users.id`(UUID) — 닉 변경해도 기록 유지. 저장 시 `display_name`도 동기화.
