@@ -738,6 +738,18 @@ function TinderCards({ items, title, onClose }) {
         <div style={{ fontSize: 14, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{title || '한 문장 카드'}</div>
         <div style={{ fontSize: 13, opacity: 0.7, fontWeight: 800 }}>❤️ {liked}</div>
       </div>
+      {/* 현재 카드 책 표지·저자 — 중앙 상단 (카드 본문과 분리) */}
+      {top && (top.bookCover || top.bookTitle) && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '4px 18px 0' }}>
+          <div style={{ width: 56, height: 78, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {top.bookCover
+              ? <img src={top.bookCover} alt={top.bookTitle} loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontSize: 22 }}>📖</span>}
+          </div>
+          {top.bookTitle && <div style={{ fontSize: 13, fontWeight: 800, textAlign: 'center', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{top.bookTitle}</div>}
+          {top.bookAuthor && <div style={{ fontSize: 11, opacity: 0.6 }}>{top.bookAuthor}</div>}
+        </div>
+      )}
       <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
         {!top ? (
           <div style={{ textAlign: 'center', opacity: 0.8 }}>

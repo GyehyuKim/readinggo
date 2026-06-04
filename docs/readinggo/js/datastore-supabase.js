@@ -193,7 +193,7 @@
       // 전체 공개 피드 (§social). 책 제목은 user_books→books 중첩 embed.
       async feed({ cursor, limit } = {}) {
         let q = sb().from('sentences')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url))')
+          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author))')
           .order('created_at', { ascending: false }).limit(limit || 30);
         if (cursor) q = q.lt('created_at', cursor);
         return unwrap(await q);
@@ -205,7 +205,7 @@
         const ids = f.map(x => x.following_id);
         if (!ids.length) return [];
         return unwrap(await sb().from('sentences')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url))')
+          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author))')
           .in('user_id', ids).order('created_at', { ascending: false }).limit(limit || 30));
       },
       // 같은 책 피드 — 특정 책의 *다른* 사용자 한 문장 (둥지 '같은 책 읽는 사람들', NPC 포함, #1)
@@ -214,7 +214,7 @@
         if (!bookId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookId)) return [];
         const me = await uid();
         let q = sb().from('sentences')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url))')
+          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author))')
           .eq('user_book.book_id', bookId)
           .order('created_at', { ascending: false }).limit(limit || 10);
         if (me) q = q.neq('user_id', me);
@@ -229,7 +229,7 @@
         if (!bookIds.length) return await A.sentences.feed({ limit });
         const weekAgo = new Date(Date.now() - 7 * 86400 * 1000).toISOString();
         let q = sb().from('sentences')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url))')
+          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author))')
           .in('user_book.book_id', bookIds).gte('created_at', weekAgo)
           .order('created_at', { ascending: false }).limit(limit || 50);
         if (me) q = q.neq('user_id', me);
