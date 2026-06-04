@@ -146,6 +146,26 @@
 
 ---
 
+### 8.5 post-beta 결정 4 (2026-06-04, QA3. 충돌 시 §8.4 위에 **우선**)
+
+> 구현=`gyehyu/qa3-fixes`(PR #193), 스펙=이 PR. CI `spec-align` 게이트 가동(PR #192).
+
+| 항목 | 결정 | 담당 | 비고 |
+|---|---|---|---|
+| **#148 책 검색 재설계** | **우리 DB(books) 즉시 검색**(`books.search` ilike) + 데모 + **알라딘 병합·중복제거**(isbn13 기준, DB→데모→알라딘 우선). **외국 작가 표기 변이(도스토옙스키/Dostoevsky)는 알라딘에 위임**(재발명 X). 알라딘 책 선택 시 `books` upsert(lazy-cache). Netlify `ALADIN_TTB_KEY` 설정 | backend/social | 키 없어 미동작이던 것 정상화 |
+| **#170 마을 추천/검색 필터** | 추천·검색 둘 다 `myVillageIds` 제외(렌더 단계 이중 방어) | village(윤지) | 버그 수정 |
+| **공개 범위 토글 라벨** | 아이콘(🌐/👥/🔒) → **텍스트 칩 "전체공개/친구공개/비공개"**(아이콘만은 헷갈림) | social/profile | UX |
+| **틴더 카드 책표지** | 카드 중앙 상단에 표지·제목·저자(카드 본문 불변). 피드 임베드 author 추가 | social | #186 후속 |
+| **앱 버전 체계** | `RG_VERSION`(config.js) = 베타 **0.XXX**. **publish 1회마다 +0.001 수동**(≈머지 PR 수). 설정 표시 + 문의에 `app_version` 첨부(10_inquiry_version.sql) → "어느 버전 문제/해결" 추적 | backend/profile | 시작 0.192 |
+| **문의 답변 메일** | 문의 작성 시 **auth 이메일 캡처**(닉 변경 무관) → admin 대시보드 mailto 답장 + 상태 토글(open/answered/closed) | backend/profile | #189 |
+| **세션 관리** | 멀티 디바이스 유지 + 설정 "다른 기기 로그아웃"(`signOut scope:others`). 기기별 목록은 Phase 2(#191) | profile/backend | #189 |
+
+**스펙-우선 강제(거버넌스, PR #192)**: CI `spec-align` 잡이 PR마다 스펙↔구현 invariant 검사 + PR 템플릿 스펙 체크리스트. 앞으로 동작 변경엔 스펙/ invariant 동반 필수.
+
+**Phase 2 이슈로 분리**: 대시보드 고도화(#190), 기기 관리자+실시간(#191), 활동 히트맵(잔디, 신규). nest 영역(읽기모드/캐러셀/반별점)은 승원.
+
+---
+
 ### v5/v6 결정 이력 (참고 — 충돌 시 §8.0 우선)
 
 | 이슈 | 결정 |
