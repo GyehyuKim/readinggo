@@ -239,8 +239,82 @@ function NestTheatre({ progressPct, streak, prevTwigs }) {
 }
 
 /* ── NestView ─────────────────────────────────────────── */
+/* ── ReadingMode: 읽기 모드 (#184) — 독서 타이머 + 상시 한 문장 입력 ──
+   둥지에서 활성 책으로 진입. 북모리식 몰입 캡처: 타이머가 도는 동안
+   입력칸이 항상 열려 있어 떠오른 한 문장을 즉시 아카이브한다. */
+function ReadingMode({ book, onClose, onArchive }) {
+  const [secs, setSecs] = _useState(0);
+  const [running, setRunning] = _useState(true);
+  const [page, setPage] = _useState(book.cur || 0);
+  const [text, setText] = _useState('');
+  const [saved, setSaved] = _useState([]);
+  const ubRef = _useRef(null);
+  _useEffect(() => {
+    Promise.resolve(DataStore.activeBook.get()).then((ub) => { if (ub) ubRef.current = ub.id; }).catch(() => {});
+  }, []);
+  _useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    const onVis = () => { if (document.hidden) setRunning(false); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [running]);
+  const fmt = (s) => {
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    return (h > 0 ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+  };
+  const save = () => {
+    const t = text.trim();
+    if (!t) { showToast('한 문장을 적어주세요'); return; }
+    const ubId = ubRef.current;
+    if (DataStore.sessions && DataStore.sessions.addToday) Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page })).catch(() => {});
+    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page, text: t })).then(() => {
+      setSaved((list) => [{ text: t, page }, ...list]);
+      setText('');
+      showToast('📍 ' + page + 'p 한 문장 저장됨');
+      if (onArchive) onArchive({ text: t, bookId: book.id, page, when: '방금' });
+    }).catch(() => showToast('저장 실패 — 다시 시도'));
+  };
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#F4F2EC', fontSize: 20, cursor: 'pointer' }}>←</button>
+        <div style={{ fontSize: 22, fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: 1 }}>⏱ {fmt(secs)}</div>
+        <button onClick={() => setRunning((r) => !r)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 14px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{running ? '⏸ 일시정지' : '▶ 계속'}</button>
+      </div>
+      <div style={{ padding: '20px 18px 10px', textAlign: 'center' }}>
+        <div style={{ fontSize: 17, fontWeight: 900 }}>{book.title}</div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>{book.author}</div>
+      </div>
+      {/* 상시 입력칸 */}
+      <div style={{ padding: '8px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, justifyContent: 'center' }}>
+          <span style={{ fontSize: 13, opacity: 0.8 }}>📍 이 문장의 페이지</span>
+          <button onClick={() => setPage((p) => Math.max(0, p - 1))} style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 16, cursor: 'pointer' }}>−</button>
+          <input type="number" value={page} onChange={(e) => setPage(Math.max(0, Math.min(book.total || 9999, parseInt(e.target.value, 10) || 0)))} style={{ width: 64, textAlign: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#F4F2EC', fontSize: 15, fontWeight: 800, padding: '6px 0' }} />
+          <button onClick={() => setPage((p) => Math.min(book.total || 9999, p + 1))} style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 16, cursor: 'pointer' }}>+</button>
+        </div>
+        <textarea value={text} onChange={(e) => { if (e.target.value.length <= 1000) setText(e.target.value); }} placeholder="떠오른 한 문장을 바로 옮겨 적어요…" rows={3}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
+        <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>✨ 한 문장 저장 ({text.length}/1000)</button>
+      </div>
+      {/* 이번 세션 아카이브 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 24px' }}>
+        {saved.length > 0 && <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 800, margin: '8px 0' }}>이번 독서에서 모은 {saved.length}문장</div>}
+        {saved.map((s, i) => (
+          <div key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>{s.page}p</div>
+            <div style={{ fontSize: 14, lineHeight: 1.5, fontStyle: 'italic' }}>"{s.text}"</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpenSearch }) {
   const [modalOpen, setModalOpen] = _useState(false);
+  const [readingOpen, setReadingOpen] = _useState(false); // 읽기 모드 (#184)
   const [ceremony, setCeremony] = _useState(null);
   const [showConfetti, setShowConfetti] = _useState(false);
   const [sameBookFeed, setSameBookFeed] = _useState([]); // 같은 책 다른 사용자 한 문장 (#1)
@@ -424,6 +498,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         <button onClick={handleSimSkip}>⏩ 데모: 하루 거르기 (스트릭 위기)</button>
       </div>
 
+      {/* 읽기 모드 진입 (#184) */}
+      <button className="checkin-cta" onClick={() => setReadingOpen(true)}
+        style={{ background: '#2A2D33', marginBottom: 10 }}>
+        📖 읽기 모드 — 타이머 + 한 문장 모으기
+      </button>
+
       {/* 체크인 CTA */}
       <button className="checkin-cta" onClick={() => setModalOpen(true)}>
         <span className="pulse" />
@@ -489,6 +569,16 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           book={nestState.book}
           onClose={() => setModalOpen(false)}
           onSubmit={handleCheckin}
+        />,
+        document.body
+      )}
+
+      {/* 읽기 모드 — portal (#184) */}
+      {readingOpen && ReactDOM.createPortal(
+        <ReadingMode
+          book={nestState.book}
+          onClose={() => setReadingOpen(false)}
+          onArchive={(q) => setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] }))}
         />,
         document.body
       )}
