@@ -17,6 +17,7 @@ function SocialView({ state }) {
   const { useState, useEffect } = React;
   const [tab, setTab] = useState('recent');  // 'following' | 'recent' | 'recommend' (#8)
   const [items, setItems] = useState(null);  // null=로딩, []=빈
+  const [cardMode, setCardMode] = useState(false); // 틴더 카드 리뷰 (#186)
 
   useEffect(() => {
     let alive = true;
@@ -61,6 +62,18 @@ function SocialView({ state }) {
           </button>
         ))}
       </div>
+      {items && items.length > 0 && (
+        <div style={{ padding: '0 16px 10px' }}>
+          <button onClick={() => setCardMode(true)}
+            style={{ width: '100%', padding: '10px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+            🃏 카드로 넘겨보기 — 좋아요/넘기기로 한 문장 리뷰
+          </button>
+        </div>
+      )}
+      {cardMode && items && ReactDOM.createPortal(
+        <TinderCards items={items} title={tab === 'recommend' ? '추천 한 문장' : tab === 'following' ? '팔로우 한 문장' : '최근 한 문장'} onClose={() => setCardMode(false)} />,
+        document.body
+      )}
       {items === null ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>불러오는 중…</div>
       ) : items.length === 0 ? (
