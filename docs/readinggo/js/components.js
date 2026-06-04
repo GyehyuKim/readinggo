@@ -889,21 +889,38 @@ function ActivityHeatmap({ days }) {
   const COLOR = ['var(--line, #ebedf0)', '#9be9a8', '#40c463', '#216e39'];
   const totalPages = cells.reduce((s, c) => s + c.pages, 0);
   const activeDays = cells.filter((c) => c.pages > 0).length;
+  // 월 라벨 (#207) — 주 컬럼의 첫날 월이 직전 주와 바뀌면 그 컬럼 위에 'M월'
+  const months = weeks.map((w, wi) => {
+    const m = w[0] ? parseInt(w[0].date.slice(5, 7), 10) : null;
+    const pm = (wi > 0 && weeks[wi - 1][0]) ? parseInt(weeks[wi - 1][0].date.slice(5, 7), 10) : null;
+    return (m && (wi === 0 || m !== pm)) ? m + '월' : '';
+  });
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <div style={{ fontSize: 15, fontWeight: 900 }}>🌱 독서 활동</div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{Math.round(N / 7)}주 · {activeDays}일 · {totalPages}쪽</div>
       </div>
-      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', paddingBottom: 4 }}>
-        {weeks.map((w, wi) => (
-          <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {w.map((c) => (
-              <div key={c.date} title={`${c.date} · ${c.pages}쪽`}
-                style={{ width: 11, height: 11, borderRadius: 2, background: COLOR[lvl(c.pages)], flexShrink: 0 }} />
+      <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+        <div style={{ display: 'inline-block' }}>
+          {/* 월 라벨 행 (#207) */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 3, height: 11 }}>
+            {months.map((m, wi) => (
+              <div key={wi} style={{ width: 11, fontSize: 9, lineHeight: '11px', color: 'var(--ink-3)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'visible', flexShrink: 0 }}>{m}</div>
             ))}
           </div>
-        ))}
+          {/* 주 그리드 */}
+          <div style={{ display: 'flex', gap: 3 }}>
+            {weeks.map((w, wi) => (
+              <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {w.map((c) => (
+                  <div key={c.date} title={`${c.date} · ${c.pages}쪽`}
+                    style={{ width: 11, height: 11, borderRadius: 2, background: COLOR[lvl(c.pages)], flexShrink: 0 }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
