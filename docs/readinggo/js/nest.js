@@ -142,17 +142,22 @@ function Ceremony({ data, onClose, onComplete }) {
         {isComplete && (
           <div className="complete-review">
             <div className="complete-head">🏰 완독을 축하해요! 이 책, 어땠나요?</div>
-            <div className="rating-stars" role="radiogroup" aria-label="별점 (선택)">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  className={'star' + (n <= rating ? ' on' : '')}
-                  aria-label={`${n}점`}
-                  aria-pressed={n <= rating}
-                  onClick={() => setRating(n === rating ? 0 : n)}
-                >★</button>
-              ))}
+            {/* 반별점 0.5 (#153): 별 우측 절반 탭=정수, 좌측 절반 탭=0.5 */}
+            <div className="rating-stars" role="radiogroup" aria-label="별점 (0.5 단위, 선택)" style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+              {[1, 2, 3, 4, 5].map(n => {
+                const fillPct = Math.max(0, Math.min(1, rating - (n - 1))) * 100; // 이 별 채움 0/50/100%
+                return (
+                  <span key={n} style={{ position: 'relative', display: 'inline-block', width: 30, height: 30, fontSize: 28, lineHeight: '30px' }} aria-label={`${n}점`}>
+                    <span style={{ color: 'var(--line-2, #d0d4da)' }}>★</span>
+                    <span style={{ position: 'absolute', left: 0, top: 0, width: fillPct + '%', overflow: 'hidden', color: '#FFC233' }}>★</span>
+                    <button type="button" aria-label={`${n - 0.5}점`} onClick={() => setRating(rating === n - 0.5 ? 0 : n - 0.5)}
+                      style={{ position: 'absolute', left: 0, top: 0, width: '50%', height: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} />
+                    <button type="button" aria-label={`${n}점`} onClick={() => setRating(rating === n ? 0 : n)}
+                      style={{ position: 'absolute', right: 0, top: 0, width: '50%', height: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} />
+                  </span>
+                );
+              })}
+              <span style={{ marginLeft: 8, fontSize: 14, fontWeight: 800, color: 'var(--ink-2)', alignSelf: 'center' }}>{rating > 0 ? rating.toFixed(1) : ''}</span>
             </div>
             <textarea
               className="review-area"

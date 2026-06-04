@@ -113,11 +113,20 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               </div>
               {editMeta ? (
                 <div>
-                  <div role="radiogroup" aria-label="별점" style={{marginBottom:8}}>
-                    {[1,2,3,4,5].map(n => (
-                      <button key={n} type="button" aria-pressed={n <= rt} onClick={() => setRt(n === rt ? 0 : n)}
-                        style={{background:'none', border:'none', cursor:'pointer', fontSize:22, padding:'0 2px', color: n <= rt ? '#f5b301' : 'var(--line)'}}>★</button>
-                    ))}
+                  {/* 반별점 0.5 (#153): 좌측 절반=0.5, 우측 절반=정수 */}
+                  <div role="radiogroup" aria-label="별점 (0.5 단위)" style={{marginBottom:8, display:'flex', gap:3, alignItems:'center'}}>
+                    {[1,2,3,4,5].map(n => {
+                      const fillPct = Math.max(0, Math.min(1, rt - (n - 1))) * 100;
+                      return (
+                        <span key={n} style={{position:'relative', display:'inline-block', width:26, height:26, fontSize:24, lineHeight:'26px'}}>
+                          <span style={{color:'var(--line-2, #d0d4da)'}}>★</span>
+                          <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'#f5b301'}}>★</span>
+                          <button type="button" aria-label={`${n-0.5}점`} onClick={() => setRt(rt === n-0.5 ? 0 : n-0.5)} style={{position:'absolute', left:0, top:0, width:'50%', height:'100%', background:'none', border:'none', cursor:'pointer', padding:0}} />
+                          <button type="button" aria-label={`${n}점`} onClick={() => setRt(rt === n ? 0 : n)} style={{position:'absolute', right:0, top:0, width:'50%', height:'100%', background:'none', border:'none', cursor:'pointer', padding:0}} />
+                        </span>
+                      );
+                    })}
+                    <span style={{marginLeft:6, fontSize:13, fontWeight:800, color:'var(--ink-2)'}}>{rt > 0 ? rt.toFixed(1) : ''}</span>
                   </div>
                   <textarea value={rv} maxLength={1000} onChange={e => setRv(e.target.value)} placeholder="완독 소감 (최대 1000자)" rows={3}
                     style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:8, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
