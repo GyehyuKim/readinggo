@@ -347,6 +347,17 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [hdl, setHdl] = useState(me.handle || '');
   const [hbusy, setHbusy] = useState(false);
   const [hmsg, setHmsg] = useState('');
+  const [bio, setBio] = useState(me.bio || '');
+  const [bmsg, setBmsg] = useState('');
+  const saveBio = async () => {
+    const v = bio.trim().slice(0, 100);
+    if (!(DataStore.profile && DataStore.profile.update)) return;
+    try {
+      await Promise.resolve(DataStore.profile.update({ bio: v || null }));
+      if (window.RG_ME) window.RG_ME.bio = v;
+      setBmsg('✓ 저장됨'); showToast('소개 저장됨');
+    } catch (e) { setBmsg('저장 실패'); }
+  };
   // 닉네임 1개 통합(Model A): 화면 표시·고유성은 handle 로, 저장 시 display_name 도 동기화.
   // 내부 식별은 불변 UUID — 닉네임을 바꿔도 기록은 갈리지 않는다.
   const saveHandle = async () => {
@@ -433,6 +444,16 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <button onClick={saveHandle} disabled={hbusy} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: hbusy ? 'default' : 'pointer', opacity: hbusy ? 0.6 : 1 }}>저장</button>
             </div>
             {hmsg && <div style={{ fontSize: 12, color: hmsg.indexOf('✓') === 0 ? 'var(--brand)' : '#d33', marginTop: 6 }}>{hmsg}</div>}
+          </div>
+          {/* 한 줄 소개 (#10) */}
+          <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 4 }}>한 줄 소개</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input value={bio} maxLength={100} onChange={e => { setBio(e.target.value); setBmsg(''); }} placeholder="책 속에서 길을 찾는 중…"
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none' }} />
+              <button onClick={saveBio} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>저장</button>
+            </div>
+            {bmsg && <div style={{ fontSize: 12, color: bmsg.indexOf('✓') === 0 ? 'var(--brand)' : '#d33', marginTop: 6 }}>{bmsg}</div>}
           </div>
           {/* 데이터 내보내기 (#172) — 데이터 주권: 내 기록은 내 것 */}
           <button onClick={exportData} style={{ marginTop: 18, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📦 내 데이터 내보내기 (JSON)</button>
@@ -921,14 +942,16 @@ function ActivityHeatmap({ days }) {
       </div>
       <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
         <div style={{ display: 'inline-block' }}>
-          {/* 월 라벨 행 (#207) */}
-          <div style={{ display: 'flex', gap: 3, marginBottom: 3, height: 11 }}>
+          {/* 월 라벨 행 (#207) — absolute로 레이아웃 영향 없이 텍스트 오버플로 (#11 스크롤 방지) */}
+          <div style={{ display: 'flex', gap: 2, marginBottom: 3, height: 11 }}>
             {months.map((m, wi) => (
-              <div key={wi} style={{ width: 11, fontSize: 9, lineHeight: '11px', color: 'var(--ink-3)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'visible', flexShrink: 0 }}>{m}</div>
+              <div key={wi} style={{ width: 11, flexShrink: 0, position: 'relative', overflow: 'visible' }}>
+                {m && <span style={{ position: 'absolute', left: 0, top: 0, fontSize: 9, lineHeight: '11px', color: 'var(--ink-3)', fontWeight: 800, whiteSpace: 'nowrap', pointerEvents: 'none' }}>{m}</span>}
+              </div>
             ))}
           </div>
           {/* 주 그리드 */}
-          <div style={{ display: 'flex', gap: 3 }}>
+          <div style={{ display: 'flex', gap: 2 }}>
             {weeks.map((w, wi) => (
               <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {w.map((c) => (

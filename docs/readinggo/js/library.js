@@ -265,7 +265,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const [myBooks, setMyBooks] = _useState(null);   // null=로딩
   const [wishlistBooks, setWishlistBooks] = _useState([]);
   const [recall, setRecall] = _useState(null);     // 무작위 회상 (§5.8.7)
-  const [favs, setFavs] = _useState(null);         // 좋아요한 문장 (#11)
+  // 좋아요한 문장은 내 한 문장 "전체 보기" 컬렉션 모달 내 필터로 이동 (#12)
   const [adminOpen, setAdminOpen] = _useState(false); // 운영 대시보드 (#161)
   const isAdmin = !!(window.RG_ME && window.RG_ME.isAdmin);
 
@@ -299,8 +299,6 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
     }).catch(() => { if (alive) setWishlistBooks([]); });
     // 무작위 한 문장 회상 (§5.8.7)
     Promise.resolve(DataStore.sentences.random()).then(s => { if (alive) setRecall(s || null); }).catch(() => {});
-    // 좋아요한 문장 (#11)
-    Promise.resolve((DataStore.bookmarks && DataStore.bookmarks.list) ? DataStore.bookmarks.list() : []).then(rows => { if (alive) setFavs((rows || []).filter(r => r.sentence)); }).catch(() => { if (alive) setFavs([]); });
     return () => { alive = false; };
   }, []);
 
@@ -339,7 +337,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         <div style={{textAlign:'center'}}>
           <div style={{fontSize:24, fontWeight:900}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
           <div style={{fontSize:13, opacity:0.9, marginTop:4, minHeight:18}}>
-            책 속에서 길을 찾는 중
+            {(window.RG_ME && window.RG_ME.bio) || '한 줄 소개를 설정에서 적어보세요'}
           </div>
           {/* 둥지레벨/완독/스트릭/XP 스탯 제거 — 둥지 탭 최상단과 중복 (#205) */}
         </div>
@@ -407,25 +405,27 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         </div>
       )}
 
-      {/* 독서 활동 잔디 (#195) */}
-      <div style={{padding:'0 12px', marginBottom:20}}>
+      {/* 독서 활동 잔디 (#195) — 좌우 여백 축소로 스크롤 방지 (#11) */}
+      <div style={{padding:'0 8px', marginBottom:20}}>
         <ActivityHeatmap days={182} />
       </div>
 
-      {/* 좋아요한 문장 (#11) — 즐겨찾기한 내 한 문장만 모아보기 */}
-      {favs && favs.length > 0 && (
+      {/* 내 한 문장 — 최대 10개 + 더 보기(컬렉션 모달, 좋아요 필터 포함) */}
+      {state.myQuotes && state.myQuotes.length > 0 && (
         <div style={{padding:'0 12px', marginBottom:20}}>
-          <div style={{fontSize:18, fontWeight:900, marginBottom:12, paddingLeft:4}}>❤️ 좋아요한 문장 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>({favs.length})</span></div>
-          {favs.map((f) => {
-            const se = f.sentence || {};
-            const bt = se.user_book && se.user_book.book && se.user_book.book.title;
-            return (
-              <div key={f.sentence_id} style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:12, marginBottom:8}}>
-                <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:4}}>{bt ? bt + ' · ' : ''}{se.page}p</div>
-                <div style={{fontSize:13, color:'var(--ink)', fontStyle:'italic', lineHeight:1.5}}>"{se.text}"</div>
-              </div>
-            );
-          })}
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, paddingLeft:4}}>
+            <div style={{fontSize:18, fontWeight:900}}>🔖 내 한 문장 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>({state.myQuotes.length})</span></div>
+            {state.myQuotes.length > 10 && (
+              <button onClick={() => window.RG_openCollection && window.RG_openCollection()} style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer'}}>더 보기 →</button>
+            )}
+          </div>
+          {state.myQuotes.slice(0, 10).map((q) => (
+            <div key={q.id || q.text} style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:12, marginBottom:8}}>
+              <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:4}}>{q.bookTitle ? q.bookTitle + ' · ' : ''}{q.page != null ? q.page + 'p' : '페이지 미상'}</div>
+              <div style={{fontSize:13, color:'var(--ink)', fontStyle:'italic', lineHeight:1.5}}>"{q.text}"</div>
+            </div>
+          ))}
+          <button onClick={() => window.RG_openCollection && window.RG_openCollection()} style={{display:'block', width:'100%', marginTop:4, padding:'10px', background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, color:'var(--ink-3)', fontWeight:800, fontSize:13, cursor:'pointer', textAlign:'center'}}>전체 보기 · 좋아요 필터 →</button>
         </div>
       )}
 
