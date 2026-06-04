@@ -72,6 +72,10 @@
         if (!query) return [];
         return unwrap(await sb().from('books').select('*').ilike('title', '%' + query + '%').limit(20));
       },
+      async getById(id) {
+        if (!id) return null;
+        return unwrap(await sb().from('books').select('*').eq('id', id).maybeSingle());
+      },
       async get(bookId) {
         return unwrap(await sb().from('books').select('*').eq('id', bookId).single());
       },

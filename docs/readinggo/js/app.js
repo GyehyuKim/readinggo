@@ -123,6 +123,9 @@ function App() {
   // 설정 모달(§5.8) — 프로필 ⚙️ 로 열림.
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => { window.RG_openSettings = () => setSettingsOpen(true); return () => { window.RG_openSettings = null; }; }, []);
+  // 책 정보 모달(#11) — 한 문장의 책 제목 탭으로 열림.
+  const [bookDetailId, setBookDetailId] = useState(null);
+  useEffect(() => { window.RG_openBook = (id) => setBookDetailId(id); return () => { window.RG_openBook = null; }; }, []);
   const [appState, setAppState] = useState(() => ({
     ...INITIAL_STATE,
     // village sent 상태는 로컬 복사
@@ -316,6 +319,12 @@ function App() {
     })();
   }, [switchTab]);
 
+  // 책 정보 모달 '이 책 읽기' → 검색-등록 경로 재사용 (#11)
+  useEffect(() => {
+    window.RG_registerBook = (b) => handleSearchSelectBook({ isbn13: b.isbn13 || b.isbn, title: b.title, author: b.author, publisher: b.publisher, total_pages: b.total_pages, cover_url: b.cover_url });
+    return () => { window.RG_registerBook = null; };
+  }, [handleSearchSelectBook]);
+
   // 이미 등록된 user_book 으로 활성 전환 (서재에서 — 재등록 없이 activeBook.set).
   const handleActivateUserBook = useCallback((item) => {
     if (!item || !item.id) return;
@@ -485,6 +494,12 @@ function App() {
         {/* 설정 모달 (§5.8) — 프로필 ⚙️ */}
         {settingsOpen && ReactDOM.createPortal(
           <SettingsModal onClose={() => setSettingsOpen(false)} spoilerReveal={spoilerReveal} setSpoilerReveal={setSpoilerReveal} />,
+          document.body
+        )}
+
+        {/* 책 정보 모달 (#11) — 한 문장 책 제목 탭 */}
+        {bookDetailId && ReactDOM.createPortal(
+          <BookInfoModal bookId={bookDetailId} onClose={() => setBookDetailId(null)} />,
           document.body
         )}
 

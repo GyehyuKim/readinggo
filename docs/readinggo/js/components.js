@@ -101,7 +101,12 @@ function SentenceCard({ item, bookId }) {
         <div className="nick"
           onClick={() => { if (!isMine && item.nick && window.RG_openProfile) window.RG_openProfile(item.nick); }}
           style={{ cursor: (!isMine && window.RG_openProfile) ? 'pointer' : 'default' }}>{item.nick}</div>
-        <div className="meta">{cardTitle ? cardTitle + ' · ' : ''}{item.page}p · {item.time}</div>
+        <div className="meta">
+          {cardTitle ? (
+            <span onClick={() => { if (item.bookId && window.RG_openBook) window.RG_openBook(item.bookId); }}
+              style={{ cursor: (item.bookId && window.RG_openBook) ? 'pointer' : 'default', textDecoration: (item.bookId && window.RG_openBook) ? 'underline' : 'none' }}>{cardTitle}</span>
+          ) : null}{cardTitle ? ' · ' : ''}{item.page}p · {item.time}
+        </div>
       </div>
       {blinded ? (
         <div className="spoiler-blind" onClick={() => setRevealed(true)}>
@@ -304,3 +309,41 @@ window.SpoilerContext = SpoilerContext;
 window.isSentenceBlinded = isSentenceBlinded;
 window.UserProfileModal = UserProfileModal;
 window.SettingsModal = SettingsModal;
+
+/* ── BookInfoModal: 한 문장의 책 제목 탭 → 책 정보(#11). books.getById 로 단건 조회. ── */
+function BookInfoModal({ bookId, onClose }) {
+  const [bk, setBk] = useState(undefined); // undefined=로딩, null=없음
+  useEffect(() => {
+    let alive = true;
+    const DS = window.SupabaseDataStore || window.DataStore || {};
+    Promise.resolve((DS.books && DS.books.getById) ? DS.books.getById(bookId) : null)
+      .then(b => { if (alive) setBk(b || null); }).catch(() => { if (alive) setBk(null); });
+    return () => { alive = false; };
+  }, [bookId]);
+  const kyoboUrl = bk ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(bk.isbn13 || bk.title)}` : '#';
+  return (
+    <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" role="dialog" aria-label="책 정보">
+        <div className="sheet-grip" />
+        {bk === undefined ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>불러오는 중…</div>
+        ) : bk === null ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>책 정보를 찾을 수 없어요</div>
+        ) : (
+          <div style={{ padding: '8px 20px 20px' }}>
+            <div style={{ textAlign: 'center', marginBottom: 14 }}>
+              <div style={{ width: 100, height: 140, margin: '0 auto 12px', borderRadius: 8, overflow: 'hidden', background: 'var(--line)' }}>
+                {bk.cover_url && <img src={bk.cover_url} alt={bk.title} referrerPolicy="no-referrer" onError={e => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+              </div>
+              <h2 style={{ fontSize: 18, fontWeight: 900, margin: '0 0 4px', color: 'var(--ink)' }}>{bk.title}</h2>
+              <p style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 700, margin: 0 }}>{bk.author}{bk.publisher ? ' · ' + bk.publisher : ''}{bk.total_pages ? ' · ' + bk.total_pages + 'p' : ''}</p>
+            </div>
+            <a href={kyoboUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '12px', background: 'var(--brand-tint)', border: '1.5px solid var(--brand)', borderRadius: 8, color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, textDecoration: 'none', marginBottom: 10 }}>교보문고에서 보기 →</a>
+            <button className="submit-btn" style={{ margin: '4px 0 0' }} onClick={() => { if (window.RG_registerBook) window.RG_registerBook(bk); onClose(); }}>📖 이 책 읽기</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+window.BookInfoModal = BookInfoModal;
