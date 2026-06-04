@@ -170,6 +170,64 @@ async function cmdConfirmUser(email) {
   console.log(JSON.stringify(out));
 }
 
+// ReadingGo 브랜딩 이메일 템플릿 — 사용자가 ReadingGo 발신임을 확인할 수 있도록
+const RG_EMAIL_TEMPLATES = {
+  confirmation: {
+    subject: 'ReadingGo — 이메일을 확인해주세요 🐦',
+    content: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+  <h2 style="color:#3FD17F;margin-bottom:4px">🐦 ReadingGo</h2>
+  <p style="color:#888;font-size:13px;margin-top:0">하루 한 페이지, 한 문장에서 시작해요</p>
+  <hr style="border:none;border-top:1px solid #eee;margin:16px 0">
+  <p>ReadingGo에 가입해주셔서 감사합니다!<br>아래 버튼을 눌러 이메일을 확인해주세요.</p>
+  <a href="{{ .ConfirmationURL }}" style="display:inline-block;margin:16px 0;padding:14px 28px;background:#3FD17F;color:#fff;border-radius:12px;text-decoration:none;font-weight:800;font-size:15px">이메일 확인하기 →</a>
+  <p style="color:#aaa;font-size:12px">본인이 가입하지 않은 경우 이 메일을 무시해주세요.</p>
+  <p style="color:#aaa;font-size:12px">문의: <a href="mailto:readinggo.admin@gmail.com" style="color:#3FD17F">readinggo.admin@gmail.com</a></p>
+</div>`,
+  },
+  magic_link: {
+    subject: 'ReadingGo — 로그인 링크입니다 🐦',
+    content: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+  <h2 style="color:#3FD17F;margin-bottom:4px">🐦 ReadingGo</h2>
+  <p style="color:#888;font-size:13px;margin-top:0">하루 한 페이지, 한 문장에서 시작해요</p>
+  <hr style="border:none;border-top:1px solid #eee;margin:16px 0">
+  <p>ReadingGo 로그인 링크가 도착했습니다.<br>아래 버튼을 클릭하면 바로 로그인됩니다 (10분 유효).</p>
+  <a href="{{ .ConfirmationURL }}" style="display:inline-block;margin:16px 0;padding:14px 28px;background:#3FD17F;color:#fff;border-radius:12px;text-decoration:none;font-weight:800;font-size:15px">ReadingGo 시작하기 →</a>
+  <p style="color:#aaa;font-size:12px">본인이 요청하지 않은 경우 이 메일을 무시해주세요.</p>
+  <p style="color:#aaa;font-size:12px">문의: <a href="mailto:readinggo.admin@gmail.com" style="color:#3FD17F">readinggo.admin@gmail.com</a></p>
+</div>`,
+  },
+};
+
+async function cmdEmailTemplate(sub) {
+  if (!sub || sub === 'show') {
+    // 현재 설정 확인 — template 관련 필드만 출력
+    const c = await mgmtApi('GET', '/config/auth');
+    const keys = Object.keys(c).filter(k => k.includes('template') || k.includes('mailer_subject') || k.includes('mailer_content') || k.includes('magic'));
+    console.log('현재 이메일 템플릿 관련 설정:', JSON.stringify(Object.fromEntries(keys.map(k => [k, c[k]])), null, 2));
+    return;
+  }
+  if (sub === 'set') {
+    // Supabase Management API email template 필드명 (v1)
+    const patch = {
+      mailer_subjects_confirmation: RG_EMAIL_TEMPLATES.confirmation.subject,
+      mailer_templates_confirmation_content: RG_EMAIL_TEMPLATES.confirmation.content,
+      mailer_subjects_magic_link: RG_EMAIL_TEMPLATES.magic_link.subject,
+      mailer_templates_magic_link_content: RG_EMAIL_TEMPLATES.magic_link.content,
+    };
+    try {
+      const c = await mgmtApi('PATCH', '/config/auth', patch);
+      console.log('✅ 이메일 템플릿 적용 완료');
+      const keys = Object.keys(patch);
+      keys.forEach(k => console.log(' ', k, '=', String(c[k] || '(응답 없음)').slice(0, 60)));
+    } catch (e) {
+      console.error('템플릿 설정 실패:', e.message);
+      console.log('💡 대시보드에서 직접 설정: Authentication > Email Templates');
+      console.log('   Confirmation Subject:', RG_EMAIL_TEMPLATES.confirmation.subject);
+      console.log('   Magic Link Subject:', RG_EMAIL_TEMPLATES.magic_link.subject);
+    }
+  }
+}
+
 async function cmdAuthSetUrl(url) {
   need(url, 'site_url 필요: node admin-cli.mjs auth-seturl https://xxx.netlify.app');
   const cur = await mgmtApi('GET', '/config/auth');
@@ -193,6 +251,7 @@ const run = {
   'auth-autoconfirm': () => cmdAuthAutoconfirm(rest[0]),
   'auth-seturl': () => cmdAuthSetUrl(rest[0]),
   'confirm-user': () => cmdConfirmUser(rest[0]),
+  'email-template': () => cmdEmailTemplate(rest[0]),
 }[cmd];
-need(run, `알 수 없는 명령: ${cmd || '(없음)'} — verify|state|sql|sql-inline|create-admin|set-admin|auth-get|auth-autoconfirm|auth-seturl|confirm-user`);
+need(run, `알 수 없는 명령: ${cmd || '(없음)'} — verify|state|sql|sql-inline|create-admin|set-admin|auth-get|auth-autoconfirm|auth-seturl|confirm-user|email-template`);
 run().catch((e) => { console.error('실패:', e.message || e); process.exit(1); });
