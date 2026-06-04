@@ -23,7 +23,17 @@ function TownDetailView({ state, townId, onBack }) {
     ];
   }
 
-  const isAdmin = (town.myRole === 'admin' || (town.coAdmins || []).includes('jerome')) && town.collection !== 'past';
+  const myHandle = (window.RG_ME && window.RG_ME.handle) || '';
+  const leaderHandle = String(town.leader || '').replace(/^@/, '');
+  const isAdmin = (town.myRole === 'admin' || (leaderHandle && leaderHandle === myHandle) || (town.coAdmins || []).includes(myHandle)) && town.collection !== 'past';
+  // 모든 노출 닉네임 → 프로필 (#3·7·8·9). @ 접두 정규화 후 RG_openProfile.
+  const goProfile = (h) => { const handle = String(h || '').replace(/^@/, ''); if (handle && window.RG_openProfile) window.RG_openProfile(handle); };
+  const _norm = (h) => String(h || '').replace(/^@/, '');
+  const canEditTopic = (t) => isAdmin || (t.createdBy && _norm(t.createdBy) === myHandle);
+  const canEditOpinion = (o) => isAdmin || (o.author && _norm(o.author) === myHandle);
+  // 마을 한 문장 좋아요/짹 (#4) — Phase0 in-memory 토글
+  const [sentLikes, setSentLikes] = useState({});
+  const toggleSentLike = (name) => setSentLikes(s => ({ ...s, [name]: !s[name] }));
 
   // 마을 공유 (#8) — 공유 URL + Web Share API, 미지원 시 클립보드 폴백
   const shareVillage = async () => {
@@ -56,24 +66,32 @@ function TownDetailView({ state, townId, onBack }) {
   const addTopic = (title, desc, days) => {
     if (!title || title.trim().length===0) { showToast('주제는 필수입니다'); return; }
     const id = 't' + Math.random().toString(36).slice(2,8);
-    town._topics.unshift({ id, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: 'jerome', opinions: [] });
+    town._topics.unshift({ id, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: myHandle, createdAt: '방금', opinions: [] });
     showToast('주제가 등록되었습니다');
     setRenderKey(k=>k+1);
+  };
+  const updateTopic = (id, title, desc, days) => {
+    const t = town._topics.find(x=>x.id===id); if(!t) return;
+    if (!canEditTopic(t)) { showToast('내가 등록한 주제만 수정할 수 있어요'); return; }
+    t.title = title.slice(0,100); t.desc = desc ? desc.slice(0,200) : ''; t.due = days;
+    showToast('주제를 수정했습니다'); setRenderKey(k=>k+1);
   };
   const addOpinion = (topicId, text, author) => {
     if (!text || text.trim().length===0) { showToast('의견을 입력하세요'); return; }
     const t = town._topics.find(x=>x.id===topicId); if(!t) return;
-    t.opinions.push({ id: 'o'+Math.random().toString(36).slice(2,8), author: author||'jerome', text: text.slice(0,300), createdAt: '방금' });
+    t.opinions.push({ id: 'o'+Math.random().toString(36).slice(2,8), author: author||myHandle, text: text.slice(0,300), createdAt: '방금' });
     showToast('의견이 등록되었습니다'); setRenderKey(k=>k+1);
   };
-  const deleteTopic = (topicId) => { town._topics = town._topics.filter(t=>t.id!==topicId); showToast('주제를 삭제했습니다'); setRenderKey(k=>k+1); };
-  const deleteOpinion = (topicId, opinionId) => { const t=town._topics.find(x=>x.id===topicId); if(!t) return; t.opinions = t.opinions.filter(o=>o.id!==opinionId); showToast('의견이 삭제되었습니다'); setRenderKey(k=>k+1); };
+  const deleteTopic = (topicId) => { const t=town._topics.find(x=>x.id===topicId); if(t && !canEditTopic(t)) { showToast('내가 등록한 주제만 삭제할 수 있어요'); return; } town._topics = town._topics.filter(t=>t.id!==topicId); showToast('주제를 삭제했습니다'); setRenderKey(k=>k+1); };
+  const deleteOpinion = (topicId, opinionId) => { const t=town._topics.find(x=>x.id===topicId); if(!t) return; const o=t.opinions.find(x=>x.id===opinionId); if(o && !canEditOpinion(o)) { showToast('내가 쓴 의견만 삭제할 수 있어요'); return; } t.opinions = t.opinions.filter(o=>o.id!==opinionId); showToast('의견이 삭제되었습니다'); setRenderKey(k=>k+1); };
 
   // Topic editor control (parent-controlled)
   const [topicEditorOpen, setTopicEditorOpen] = useState(false);
   const [topicDraft, setTopicDraft] = useState(null);
+  const [editingTopicId, setEditingTopicId] = useState(null);
 
-  const openNewTopic = () => { setTopicDraft({title:'',desc:'',due:3}); setTopicEditorOpen(true); };
+  const openNewTopic = () => { setEditingTopicId(null); setTopicDraft({title:'',desc:'',due:3}); setTopicEditorOpen(true); };
+  const openEditTopic = (topic) => { setEditingTopicId(topic.id); setTopicDraft({title:topic.title,desc:topic.desc,due:topic.due}); setTopicEditorOpen(true); };
 
   return (
     <section className="view active">
@@ -90,7 +108,7 @@ function TownDetailView({ state, townId, onBack }) {
       <div style={{padding:'16px',marginBottom:8}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
           <div style={{fontSize:13,fontWeight:700}}>{town.currentPart} / {town.totalParts} 파트 · {town.currentRange}</div>
-          <div style={{fontSize:12,color:'var(--ink-3)'}}>리더: {town.leader}</div>
+          <div style={{fontSize:12,color:'var(--ink-3)'}}>리더: <button onClick={()=>goProfile(town.leader)} style={{background:'none',border:'none',padding:0,color:'var(--brand-3)',fontWeight:800,fontSize:12,cursor:'pointer'}}>{town.leader}</button></div>
         </div>
         <div style={{height:8,background:'var(--line)',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${((town.currentPart-1)/town.totalParts)*100}%`,background:'var(--brand)'}}/></div>
       </div>
@@ -107,7 +125,7 @@ function TownDetailView({ state, townId, onBack }) {
         <div style={{padding:'0 16px 40px'}}>
           <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:12}}>👥 참여자 둥지 ({town.members.length}명)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-            {town.members.map(m=> <div key={m.name} onClick={()=>setSelectedMember(m)} style={{cursor:'pointer',textAlign:'center',padding:10,borderRadius:10,background:m.todayRecorded?'var(--brand-tint)':'var(--line-2)'}}><div style={{fontSize:28}}>{m.nest}</div><div style={{fontSize:11,fontWeight:700,color:'var(--ink-2)'}}>@{m.name}</div></div>)}
+            {town.members.map(m=> <div key={m.name} onClick={()=>goProfile(m.name)} style={{cursor:'pointer',textAlign:'center',padding:10,borderRadius:10,background:m.todayRecorded?'var(--brand-tint)':'var(--line-2)'}}><div style={{fontSize:28}}>{m.nest}</div><div style={{fontSize:11,fontWeight:700,color:'var(--brand-3)'}}>@{m.name}</div></div>)}
           </div>
 
           <div style={{marginTop:20}}>
@@ -116,7 +134,7 @@ function TownDetailView({ state, townId, onBack }) {
               {ranking.map((member,idx)=> (
                 <div key={member.name} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderBottom:idx<ranking.length-1?'1px solid var(--line-2)':'none'}}>
                   <div style={{width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>{member.rank<=3?['🥇','🥈','🥉'][member.rank-1]:member.rank}</div>
-                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>@{member.name}</div><div style={{fontSize:11,color:'var(--ink-2)'}}>{member.nest} · 🔥 {member.streak}</div></div>
+                  <div style={{flex:1}}><button onClick={()=>goProfile(member.name)} style={{background:'none',border:'none',padding:0,fontSize:13,fontWeight:700,color:'var(--brand-3)',cursor:'pointer'}}>@{member.name}</button><div style={{fontSize:11,color:'var(--ink-2)'}}>{member.nest} · 🔥 {member.streak}</div></div>
                   <div style={{textAlign:'right'}}><div style={{fontSize:15,fontWeight:900}}>{member.cumulativePage}</div><div style={{fontSize:10,color:'var(--ink-3)'}}>페이지</div></div>
                 </div>
               ))}
@@ -129,7 +147,7 @@ function TownDetailView({ state, townId, onBack }) {
         <div style={{padding:'0 16px 40px'}}>
           <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:12}}>📖 마을 지정 책 한 문장</div>
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            {(town.members||[]).filter(m=>m.quote).map(m=> (<div key={m.name} style={{padding:14,borderRadius:14,background:'var(--card)',border:'1.5px solid var(--line)'}}><div style={{fontSize:12,fontWeight:800,color:'var(--ink-2)',marginBottom:6}}>@{m.name} · {m.todayRecorded?'오늘 기록':'기록 있음'}</div><div style={{fontSize:14,fontWeight:700,lineHeight:1.5}}>{m.quote}</div></div>))}
+            {(town.members||[]).filter(m=>m.quote).map(m=> { const liked = !!sentLikes[m.name]; return (<div key={m.name} style={{padding:14,borderRadius:14,background:'var(--card)',border:'1.5px solid var(--line)'}}><div style={{fontSize:12,fontWeight:800,color:'var(--ink-2)',marginBottom:6}}><button onClick={()=>goProfile(m.name)} style={{background:'none',border:'none',padding:0,color:'var(--brand-3)',fontWeight:800,fontSize:12,cursor:'pointer'}}>@{m.name}</button> · {m.todayRecorded?'오늘 기록':'기록 있음'}</div><div style={{fontSize:14,fontWeight:700,lineHeight:1.5,marginBottom:8}}>{m.quote}</div><button onClick={()=>toggleSentLike(m.name)} style={{background:liked?'var(--brand-tint)':'transparent',border:'1.5px solid '+(liked?'var(--brand)':'var(--line)'),borderRadius:16,padding:'5px 12px',fontSize:13,fontWeight:800,color:liked?'var(--brand-3)':'var(--ink-3)',cursor:'pointer'}}>🐦 짹 {liked?(m.claps||0)+1:(m.claps||0)||''}</button></div>); })}
           </div>
         </div>
       )}
@@ -144,24 +162,28 @@ function TownDetailView({ state, townId, onBack }) {
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
             {(town._topics||[]).map(topic=> (
               <div key={topic.id} style={{padding:12,borderRadius:12,background:'var(--card)',border:'1.5px solid var(--line)'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                  <div><div style={{fontSize:13,fontWeight:900}}>{topic.title}</div><div style={{fontSize:12,color:'var(--ink-3)'}}>{topic.desc}</div></div>
-                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                    <div style={{fontSize:12,color:'var(--ink-3)'}}>의견 {topic.opinions.length}개</div>
-                    {isAdmin && (<>
-                      <button onClick={()=>{/* edit */}} style={{background:'transparent',border:'none',cursor:'pointer'}}>수정</button>
-                      <button onClick={()=>deleteTopic(topic.id)} style={{background:'transparent',border:'none',color:'var(--danger)'}}>삭제</button>
-                    </>)}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:900}}>{topic.title}</div>
+                    {topic.desc && <div style={{fontSize:12,color:'var(--ink-3)'}}>{topic.desc}</div>}
+                    <div style={{fontSize:11,color:'var(--ink-3)',fontWeight:700,marginTop:3}}>
+                      <button onClick={()=>goProfile(topic.createdBy)} style={{background:'none',border:'none',padding:0,color:'var(--brand-3)',fontWeight:800,fontSize:11,cursor:'pointer'}}>@{_norm(topic.createdBy)}</button>
+                      {topic.createdAt ? ' · ' + topic.createdAt : ''} · 🗓 {topic.due}일 토론 · 의견 {topic.opinions.length}
+                    </div>
                   </div>
+                  {canEditTopic(topic) && (<div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+                    <button onClick={()=>openEditTopic(topic)} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-2)',fontWeight:700}}>수정</button>
+                    <button onClick={()=>deleteTopic(topic.id)} style={{background:'transparent',border:'none',color:'#E5484D',cursor:'pointer',fontSize:12,fontWeight:700}}>삭제</button>
+                  </div>)}
                 </div>
 
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  {topic.opinions.slice(0,3).map(op=> (
-                    <div key={op.id} style={{padding:8,borderRadius:8,background:'white',border:'1px solid var(--line-2)'}}><div style={{fontSize:12,fontWeight:700}}>@{op.author}</div><div style={{fontSize:13}}>{op.text}</div><div style={{fontSize:11,color:'var(--ink-3)'}}>{op.createdAt} {op.author==='jerome' && (<button onClick={()=>deleteOpinion(topic.id,op.id)} style={{background:'transparent',border:'none',color:'var(--ink-3)'}}>삭제</button>)}</div></div>
+                  {topic.opinions.map(op=> (
+                    <div key={op.id} style={{padding:8,borderRadius:8,background:'white',border:'1px solid var(--line-2)'}}><button onClick={()=>goProfile(op.author)} style={{background:'none',border:'none',padding:0,fontSize:12,fontWeight:700,color:'var(--brand-3)',cursor:'pointer'}}>@{_norm(op.author)}</button><div style={{fontSize:13}}>{op.text}</div><div style={{fontSize:11,color:'var(--ink-3)'}}>{op.createdAt} {canEditOpinion(op) && (<button onClick={()=>deleteOpinion(topic.id,op.id)} style={{background:'transparent',border:'none',color:'var(--ink-3)',cursor:'pointer'}}>삭제</button>)}</div></div>
                   ))}
                   <div style={{display:'flex',gap:8,marginTop:8}}>
                     <input placeholder="의견 쓰기..." style={{flex:1,padding:8,borderRadius:8,border:'1px solid var(--line)'}} id={`op_input_${topic.id}`} />
-                    <button onClick={()=>{ const el=document.getElementById(`op_input_${topic.id}`); if(el) { addOpinion(topic.id, el.value, 'jerome'); el.value=''; } }} style={{padding:'8px 10px',borderRadius:8,background:'var(--brand)',color:'white',border:'none'}}>등록</button>
+                    <button onClick={()=>{ const el=document.getElementById(`op_input_${topic.id}`); if(el) { addOpinion(topic.id, el.value, myHandle); el.value=''; } }} style={{padding:'8px 10px',borderRadius:8,background:'var(--brand)',color:'white',border:'none'}}>등록</button>
                   </div>
                 </div>
               </div>
@@ -169,7 +191,7 @@ function TownDetailView({ state, townId, onBack }) {
           </div>
 
           {/* Topic editor sheet (controlled) */}
-          <TopicEditor open={topicEditorOpen} onClose={()=>setTopicEditorOpen(false)} initial={topicDraft} onSave={(title,desc,due)=>{ addTopic(title,desc,due); setTopicEditorOpen(false); }} />
+          <TopicEditor open={topicEditorOpen} editing={!!editingTopicId} onClose={()=>setTopicEditorOpen(false)} initial={topicDraft} onSave={(title,desc,due)=>{ if(editingTopicId) updateTopic(editingTopicId,title,desc,due); else addTopic(title,desc,due); setTopicEditorOpen(false); }} />
         </div>
       )}
 
@@ -209,7 +231,7 @@ function TownDetailView({ state, townId, onBack }) {
   );
 }
 
-function TopicEditor({ open, onClose, initial, onSave }) {
+function TopicEditor({ open, editing, onClose, initial, onSave }) {
   const [title, setTitle] = React.useState(initial ? initial.title : '');
   const [desc, setDesc] = React.useState(initial ? initial.desc : '');
   const [due, setDue] = React.useState(initial ? initial.due : 3);
@@ -230,14 +252,15 @@ function TopicEditor({ open, onClose, initial, onSave }) {
         <div className="sheet-grip" />
         <div style={{padding:12}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div style={{fontSize:15,fontWeight:900}}>주제 등록</div>
+            <div style={{fontSize:15,fontWeight:900}}>{editing ? '주제 수정' : '주제 등록'}</div>
             <button onClick={onClose} style={{background:'transparent',border:'none'}}>✕</button>
           </div>
           <input placeholder="주제 (최대 100자)" value={title} onChange={e=>setTitle(e.target.value)} style={{width:'100%',padding:8,borderRadius:8,border:'1px solid var(--line)',marginBottom:8}} />
           <textarea placeholder="설명 (선택, 최대 200자)" value={desc} onChange={e=>setDesc(e.target.value)} style={{width:'100%',padding:8,borderRadius:8,border:'1px solid var(--line)',marginBottom:8}} />
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <label style={{fontSize:13,color:'var(--ink-2)',fontWeight:700}}>토론 마감</label>
             <select value={due} onChange={e=>setDue(Number(e.target.value))}><option value={1}>1일</option><option value={3}>3일</option><option value={5}>5일</option><option value={7}>7일</option></select>
-            <button onClick={()=>{ if(onSave) onSave(title,desc,due); }} style={{marginLeft:'auto',background:'var(--brand)',color:'white',padding:8,borderRadius:8}}>등록</button>
+            <button onClick={()=>{ if(onSave) onSave(title,desc,due); }} style={{marginLeft:'auto',background:'var(--brand)',color:'white',padding:8,borderRadius:8,border:'none',fontWeight:800,cursor:'pointer'}}>{editing ? '수정' : '등록'}</button>
           </div>
         </div>
       </div>

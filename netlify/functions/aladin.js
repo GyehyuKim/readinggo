@@ -26,7 +26,7 @@ exports.handler = async (event) => {
     const max = Math.min(parseInt(q.max, 10) || 10, 20);
     url = `${BASE}ItemSearch.aspx?ttbkey=${key}&Query=${encodeURIComponent(query)}`
         + `&QueryType=Keyword&SearchTarget=Book&MaxResults=${max}&start=1`
-        + `&output=js&Version=20131101&Cover=Big`;
+        + `&output=js&Version=20131101&Cover=Big&OptResult=packing`; // packing → subInfo.itemPage(쪽수) 포함
   } else {
     return resp(400, { error: 'query 또는 isbn 파라미터 필요' });
   }

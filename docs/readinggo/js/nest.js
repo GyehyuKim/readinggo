@@ -589,21 +589,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         <span style={{ fontSize: 12, opacity: 0.72, fontWeight: 700 }}>타이머 + 한 문장 모으기</span>
       </button>
 
-      {/* 체크인 CTA — 읽기 모드로 오늘 기록했으면 숨기고 완료 표시 (#203) */}
-      {checkedToday ? (
+      {/* 체크인 = 읽기 모드 종료로 자동 처리 (#1) */}
+      {checkedToday && (
         <div className="nudge" style={{ textAlign: 'center', fontWeight: 800 }}>
-          🐦 오늘의 짹 완료! <span className="em">🔥 {nestState.streak}일</span> 연속 — 더 읽고 싶으면 위 ‘읽기 모드’를 눌러요.
+          🐦 오늘 기록 완료! <span className="em">🔥 {nestState.streak}일</span> 연속
         </div>
-      ) : (
-        <React.Fragment>
-          <button className="checkin-cta" onClick={() => setModalOpen(true)}>
-            <span className="pulse" />
-            오늘의 한 쪽, 짹 하기
-          </button>
-          <div className="nudge">
-            한 쪽이라도 읽으면 <span className="em">🔥 {nestState.streak}일</span> 연속 유지! 작은 호흡도 충분해요.
-          </div>
-        </React.Fragment>
       )}
 
       {/* 내 한 문장 */}
@@ -622,7 +612,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           등록한 문장이 여기 차곡차곡 쌓여요.
         </div>
       ) : (
-        nestState.myQuotes.slice(0, 3).map((q, i) => {
+        nestState.myQuotes.slice(0, 10).map((q, i) => {
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.title) || '책';
           return (
@@ -654,16 +644,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         sameBookFeed.map((it, i) => (
           <SentenceCard key={i} item={it} bookId={nestState.book.id} />
         ))
-      )}
-
-      {/* 체크인 모달 — portal로 document.body에 마운트 (overflow 클리핑 회피) */}
-      {modalOpen && ReactDOM.createPortal(
-        <CheckinModal
-          book={nestState.book}
-          onClose={() => setModalOpen(false)}
-          onSubmit={handleCheckin}
-        />,
-        document.body
       )}
 
       {/* 읽기 모드 — portal (#184) */}
