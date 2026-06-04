@@ -2,6 +2,7 @@
 
 > **Split from** `docs/2. specifications/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §7.
 > **v7 갱신 (2026-06-01)**: web-first 재정의. Capacitor 보류 → 순수 웹(Phase 0/1). 운영자 짹·스포일러 컬럼(`is_private`)·`chapter_id` 자동매핑 제거, 완독 별점·소감·마을 테이블 추가, **DataStore 계약(§7.2) 신설**. 변경 이력은 git log 참조.
+> **v7.1 갱신 (2026-06-04, QA 2차)**: ⚠️ **`is_private` 재도입** + `note_private`(§social 5.7.1, RLS 강제), **DB CHECK 제약**(`04_constraints.sql` — 길이·범위·형식), 닉네임 규칙 `{2,20}`·대문자 허용, 이메일 **autoconfirm**(베타 한정). [decisions §8.1](./meta/decisions.md).
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -64,7 +65,10 @@ sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?}) → Sentence
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
 sentences.listByBook(userBookId)           → Sentence[]
-sentences.feed({cursor})                   → Sentence[]      // 전체 공개 피드 (§social)
+sentences.feed({cursor})                   → Sentence[]      // 최근(전체 공개) 피드 (§social)
+sentences.feedFollowing({limit})           → Sentence[]      // v7.1: 팔로우 피드
+sentences.feedRecommended({limit})         → Sentence[]      // v7.1: 추천(공유 책 유사도, 비면 최근 폴백)
+sentences.setVisibility(id, {is_private?, note_private?})    // v7.1: 한 문장/감상 비공개 토글
 sentences.listMine()                       → Sentence[]
 sentences.random()                         → Sentence        // 무작위 회상 — 내 과거 한 문장 1개 (§profile 5.8.7)
 
@@ -169,10 +173,11 @@ sentences                                   -- "한 문장" (DB 테이블명 유
   user_book_id  uuid FK user_books.id
   session_id    uuid FK reading_sessions.id NULL
   page          int                  -- 스포일러 블라인드 판정 기준 (§social)
-  text          text                 -- 원문 인용. 200자 이내 (클라이언트 검증)
-  my_note       text NULL            -- 내 감상·코멘트 (선택, 사후 추가·편집 가능). UI 권장 500자
+  text          text                 -- 원문 인용. 1~200자 (CHECK + 클라, 04_constraints.sql)
+  my_note       text NULL            -- 내 감상·코멘트 (선택, 사후 추가·편집). ≤1000자 (CHECK)
+  is_private    boolean default false -- v7.1 재도입: 한 문장 비공개(나만 보기). RLS 강제 (§social 5.7.1)
+  note_private  boolean default false -- v7.1: 감상만 비공개 (클라 존중 — 컬럼 단위 RLS 불가)
   created_at    timestamptz
-  -- v7 제거: is_private (스포일러 → 페이지 기반 블라인드로 일원화, §social)
   -- v7 제거: chapter_id (챕터 자동매핑 폐기)
 
 streak
@@ -285,7 +290,7 @@ village_parts(village_id, part_order)                    -- v7 신설
 ### 7.5 RLS 정책 (요약)
 
 - `users`: 본인 row update. 다른 유저 select 가능 (피드용 공개 정보)
-- `sentences`: 모두 select (스포일러는 클라이언트 페이지 블라인드로 처리, §social). insert/update 본인만
+- `sentences`: select = `is_private = false or user_id = auth.uid()` (v7.1 — 비공개 한 문장은 본인만, §social 5.7.1). insert/update 본인만
 - `reading_sessions`, `streak`, `user_books`: insert/update 본인. select 모두 (마을 그리드·완독 별점 공개)
 - `follows`: follower_id가 본인인 행만 insert/delete
 - `claps`: from_user_id가 본인인 행만 insert
