@@ -68,6 +68,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label={book.title}>
         <div className="sheet-grip" />
+        <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1, zIndex:2}}>✕</button>
         
         <div style={{textAlign:'center', padding:'16px 20px 0'}}>
           <div
