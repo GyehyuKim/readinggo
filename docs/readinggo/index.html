@@ -144,16 +144,16 @@ input,textarea{font-family:inherit;}
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
-  padding: 12px 16px 12px;
+  padding: 8px 14px;
 }
-.topbar-row{ display:flex; align-items:center; gap: 10px; }
+.topbar-row{ display:flex; align-items:center; gap: 8px; }
 .brand-mark{
-  display:flex; align-items:center; gap:8px;
-  font-weight: 900; font-size: 19px; letter-spacing:-.3px;
-  color: var(--ink);
+  display:flex; align-items:center; gap:7px;
+  font-weight: 900; font-size: 17px; letter-spacing:-.3px;
+  color: var(--ink); cursor:pointer; flex-shrink:0;
 }
 .brand-mark .sparrow{
-  width: 32px; height: 32px;
+  width: 28px; height: 28px;
   display:inline-flex; align-items:center; justify-content:center;
   background: var(--brand);
   border-radius: 12px;
@@ -164,18 +164,21 @@ input,textarea{font-family:inherit;}
 .brand-mark .go{ color: var(--brand-2); }
 
 .topbar-stats{
-  margin-left:auto; display:flex; gap:5px; align-items:center; flex-wrap:wrap; justify-content:flex-end;
+  margin-left:auto; display:flex; gap:4px; align-items:center;
+  flex-wrap:nowrap; justify-content:flex-end;   /* 한 줄 고정 — 줄바꿈 높이 낭비 방지 (#205) */
+  min-width:0; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none;
 }
+.topbar-stats::-webkit-scrollbar{ display:none; }
 .stat{
-  display:inline-flex; align-items:center; gap:4px;
-  padding: 5px 8px;
+  display:inline-flex; align-items:center; gap:3px;
+  padding: 4px 7px;
   border-radius: 999px;
   background: var(--card);
   border: 1.5px solid var(--line);
-  font-weight: 800; font-size: 12px;
-  color: var(--ink);
+  font-weight: 800; font-size: 11px;
+  color: var(--ink); white-space:nowrap; flex-shrink:0;
 }
-.stat .ico{ font-size: 14px; }
+.stat .ico{ font-size: 13px; }
 .stat.fire{ color: var(--fire-shadow); border-color: var(--fire-soft); background: #FFF7EE; }
 .stat.gold{ color: var(--gold-shadow); border-color: var(--gold-soft); background: #FFFAE3; }
 .stat.league{ color: var(--brand-3); border-color: var(--brand-soft); background: var(--brand-tint); }

@@ -482,6 +482,7 @@ window.SettingsModal = SettingsModal;
 /* ── BookInfoModal: 한 문장의 책 제목 탭 → 책 정보(#11). books.getById 로 단건 조회. ── */
 function BookInfoModal({ bookId, onClose }) {
   const [bk, setBk] = useState(undefined); // undefined=로딩, null=없음
+  const [manualPages, setManualPages] = useState(''); // 쪽수 메타 누락 시 수동 입력 (#204)
   useEffect(() => {
     let alive = true;
     const DS = window.SupabaseDataStore || window.DataStore || {};
@@ -509,7 +510,17 @@ function BookInfoModal({ bookId, onClose }) {
               <p style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 700, margin: 0 }}>{bk.author}{bk.publisher ? ' · ' + bk.publisher : ''}{bk.total_pages ? ' · ' + bk.total_pages + 'p' : ''}</p>
             </div>
             <a href={kyoboUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '12px', background: 'var(--brand-tint)', border: '1.5px solid var(--brand)', borderRadius: 8, color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, textDecoration: 'none', marginBottom: 10 }}>교보문고에서 보기 →</a>
-            <button className="submit-btn" style={{ margin: '4px 0 0' }} onClick={() => { if (window.RG_registerBook) window.RG_registerBook(bk); onClose(); }}>📖 이 책 읽기</button>
+            {/* 쪽수 메타 누락 시 수동 입력 — 진척률·읽기모드용 (#204) */}
+            {!bk.total_pages && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--ink-2)', fontWeight: 700 }}>
+                <span>총 쪽수 <small style={{ color: 'var(--ink-3)' }}>(선택 — 모르면 비워둬요)</small></span>
+                <input type="number" inputMode="numeric" min="0" max="99999" value={manualPages} placeholder="예: 320"
+                  onChange={e => setManualPages(e.target.value)}
+                  style={{ width: 80, textAlign: 'center', padding: '6px 4px', border: '1.5px solid var(--line)', borderRadius: 8, fontSize: 14, fontWeight: 800 }} />
+                <span>p</span>
+              </div>
+            )}
+            <button className="submit-btn" style={{ margin: '4px 0 0' }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>📖 이 책 읽기</button>
           </div>
         )}
       </div>
@@ -667,7 +678,6 @@ function AdminDashboardModal({ onClose }) {
     ['⚡ 오늘 체크인', stats && stats.todaySessions],
   ];
   const trend = (stats && stats.trend) || [];
-  const trendMax = Math.max(1, ...trend.map((t) => t.sessions));
   return (
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label="운영 대시보드">
@@ -687,22 +697,62 @@ function AdminDashboardModal({ onClose }) {
               ))}
             </div>
           )}
-          {/* 최근 7일 추세 (#190 B) — 일별 체크인(막대) + 가입(점) */}
-          {trend.length > 0 && (
-            <div style={{ marginTop: 22 }}>
-              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>📈 최근 7일 (체크인 막대 · 가입 +N)</div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
-                {trend.map((t) => (
-                  <div key={t.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                    <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700, minHeight: 12 }}>{t.signups > 0 ? '+' + t.signups : ''}</div>
-                    <div title={`${t.date} · 체크인 ${t.sessions} · 가입 ${t.signups}`}
-                      style={{ width: '70%', height: Math.round((t.sessions / trendMax) * 48) + 2, background: 'var(--brand)', borderRadius: 3 }} />
-                    <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700 }}>{t.date.slice(5)}</div>
+          {/* 최근 7일 추세 (#206) — 체크인=막대(하단 숫자) + 가입=선그래프(포인트 숫자). 가입은 NPC 제외 */}
+          {trend.length > 0 && (() => {
+            const n = trend.length;
+            const H = 96;
+            const sessMax = Math.max(1, ...trend.map((t) => t.sessions));
+            const signMax = Math.max(1, ...trend.map((t) => t.signups));
+            const pts = trend.map((t, i) => ({
+              x: ((i + 0.5) / n) * 100,
+              y: H - (t.signups / signMax) * (H - 20) - 6, // 위쪽 숫자 여백
+              signups: t.signups,
+            }));
+            const poly = pts.map((p) => `${p.x},${p.y}`).join(' ');
+            return (
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 2 }}>📈 최근 7일</div>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 10 }}>
+                  <span style={{ color: 'var(--brand)' }}>■ 체크인(막대)</span> · <span style={{ color: '#E2553B' }}>● 가입(선, NPC 제외)</span>
+                </div>
+                <div style={{ position: 'relative', height: H }}>
+                  {/* 체크인 막대 */}
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                    {trend.map((t) => (
+                      <div key={t.date} title={`${t.date} · 체크인 ${t.sessions} · 가입 ${t.signups}`}
+                        style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
+                        <div style={{ width: '60%', height: Math.round((t.sessions / sessMax) * (H - 16)) + 2, background: 'var(--brand)', borderRadius: 3, opacity: 0.88 }} />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  {/* 가입 선그래프 (SVG 오버레이) */}
+                  <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
+                    <polyline points={poly} fill="none" stroke="#E2553B" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                    {pts.map((p, i) => (<circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#E2553B" vectorEffect="non-scaling-stroke" />))}
+                  </svg>
+                  {/* 가입 포인트 숫자 */}
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+                    {pts.map((p, i) => (
+                      <div key={i} style={{ flex: 1, position: 'relative' }}>
+                        {p.signups > 0 && (
+                          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: (p.y / H * 100) + '%', marginTop: -15, fontSize: 9, fontWeight: 800, color: '#E2553B' }}>{p.signups}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* 체크인 수(막대 하단 숫자) + 날짜 */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
+                  {trend.map((t) => (
+                    <div key={t.date} style={{ flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand)' }}>{t.sessions}</div>
+                      <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700 }}>{t.date.slice(5)}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           {/* 문의 목록 */}
           <div style={{ marginTop: 22 }}>
             <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>✉️ 문의 {inqs && inqs.length ? '(' + inqs.length + ')' : ''}</div>
@@ -719,6 +769,13 @@ function AdminDashboardModal({ onClose }) {
                 <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{q.message}</div>
                 {q.app_version && <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, marginRight: 8 }}>v{q.app_version}</span>}
                 {q.email && <a href={`mailto:${q.email}?subject=${encodeURIComponent('[ReadingGo] 문의 답변')}`} style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: 'var(--brand-3)', fontWeight: 800 }}>✉️ {q.email} 로 답장</a>}
+                {/* AI 자동 답변 (#208) — 스캐폴드: LLM 연동 전까지 자리만 */}
+                {q.response ? (
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-2)', background: 'var(--brand-tint)', borderRadius: 6, padding: '6px 8px', whiteSpace: 'pre-wrap' }}>🤖 {q.response}</div>
+                ) : (
+                  <button onClick={() => (window.showToast ? window.showToast('AI 자동 답변은 LLM 연동 후 활성화돼요 (#208)') : null)}
+                    style={{ display: 'inline-block', marginTop: 6, marginLeft: 8, fontSize: 11, fontWeight: 800, color: 'var(--ink-3)', background: 'transparent', border: '1px dashed var(--line)', borderRadius: 10, padding: '3px 8px', cursor: 'pointer' }}>🤖 AI 답변 생성 (준비중)</button>
+                )}
               </div>
             ))}
           </div>
@@ -850,21 +907,38 @@ function ActivityHeatmap({ days }) {
   const COLOR = ['var(--line, #ebedf0)', '#9be9a8', '#40c463', '#216e39'];
   const totalPages = cells.reduce((s, c) => s + c.pages, 0);
   const activeDays = cells.filter((c) => c.pages > 0).length;
+  // 월 라벨 (#207) — 주 컬럼의 첫날 월이 직전 주와 바뀌면 그 컬럼 위에 'M월'
+  const months = weeks.map((w, wi) => {
+    const m = w[0] ? parseInt(w[0].date.slice(5, 7), 10) : null;
+    const pm = (wi > 0 && weeks[wi - 1][0]) ? parseInt(weeks[wi - 1][0].date.slice(5, 7), 10) : null;
+    return (m && (wi === 0 || m !== pm)) ? m + '월' : '';
+  });
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <div style={{ fontSize: 15, fontWeight: 900 }}>🌱 독서 활동</div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{Math.round(N / 7)}주 · {activeDays}일 · {totalPages}쪽</div>
       </div>
-      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', paddingBottom: 4 }}>
-        {weeks.map((w, wi) => (
-          <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {w.map((c) => (
-              <div key={c.date} title={`${c.date} · ${c.pages}쪽`}
-                style={{ width: 11, height: 11, borderRadius: 2, background: COLOR[lvl(c.pages)], flexShrink: 0 }} />
+      <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+        <div style={{ display: 'inline-block' }}>
+          {/* 월 라벨 행 (#207) */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 3, height: 11 }}>
+            {months.map((m, wi) => (
+              <div key={wi} style={{ width: 11, fontSize: 9, lineHeight: '11px', color: 'var(--ink-3)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'visible', flexShrink: 0 }}>{m}</div>
             ))}
           </div>
-        ))}
+          {/* 주 그리드 */}
+          <div style={{ display: 'flex', gap: 3 }}>
+            {weeks.map((w, wi) => (
+              <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {w.map((c) => (
+                  <div key={c.date} title={`${c.date} · ${c.pages}쪽`}
+                    style={{ width: 11, height: 11, borderRadius: 2, background: COLOR[lvl(c.pages)], flexShrink: 0 }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

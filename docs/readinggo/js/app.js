@@ -20,14 +20,14 @@ async function buildStateFromSupabase() {
     castleCount: (castles || []).length,
   };
   if (ub && ub.book) {
-    const total = ub.book.total_pages || 1;
+    const total = ub.book.total_pages || 0; // 0 = 쪽수 미상 (#204) — 진척률 계산 시 가드
     out.book = {
       id: ub.book_id, title: ub.book.title,
       author: (ub.book.author || '') + (ub.book.publisher ? ' · ' + ub.book.publisher : ''),
       cur: ub.current_page || 0, total, days: 1,
       cover: ub.book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
     };
-    out.nest = { lv: getNestStage(Math.round((ub.current_page || 0) / total * 100)).lv };
+    out.nest = { lv: getNestStage(total > 0 ? Math.round((ub.current_page || 0) / total * 100) : 0).lv };
   } else {
     // 활성 책 없음(Supabase 모드): 데모책(b008) 환영 방지 — 빈 sentinel 로 '책 등록' 유도.
     out.book = { id: '', title: '', author: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
@@ -345,7 +345,7 @@ function App() {
             book: {
               id: ub.book_id, title: book.title,
               author: (book.author || '') + (book.publisher ? ' · ' + book.publisher : ''),
-              cur: ub.current_page || 0, total: book.total_pages || 1, days: 1,
+              cur: ub.current_page || 0, total: book.total_pages || 0, days: 1,
               cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
             },
             nest: { ...s.nest, lv: getNestStage(book.total_pages ? Math.round((ub.current_page || 0) / book.total_pages * 100) : 0).lv },
@@ -370,7 +370,7 @@ function App() {
       book: {
         id: item.id, title: item.title,
         author: (item.author || '') + (item.pub ? ' · ' + item.pub : ''),
-        cur: item.cur || 0, total: item.total || 1, days: 1,
+        cur: item.cur || 0, total: item.total || 0, days: 1,
         cover: item.cover, fb: item.fb || ['#9AA7B2', '#C7D0D8'], toc: [],
       },
       nest: { ...s.nest, lv: getNestStage(item.total ? Math.round((item.cur || 0) / item.total * 100) : 0).lv },
@@ -396,7 +396,9 @@ function App() {
         {/* 상단 바 */}
         <header className="topbar">
           <div className="topbar-row">
-            <div className="brand-mark">
+            <div className="brand-mark" role="button" tabIndex={0} title="둥지로 (홈)"
+              onClick={() => switchTab('nest')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchTab('nest'); }}>
               <span className="sparrow" aria-hidden="true">🐦</span>
               <span>reading<span className="go">GO</span></span>
             </div>

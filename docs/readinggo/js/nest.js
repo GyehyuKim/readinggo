@@ -10,13 +10,14 @@ function CheckinModal({ book, onClose, onSubmit }) {
   const [page, setPage] = _useState(book.cur);
   const [sentence, setSentence] = _useState('');
 
+  const _maxPage = book.total > 0 ? book.total : 99999; // 쪽수 미상이면 상한 없음 (#204)
   const adjustPage = (delta) => {
-    setPage(p => Math.max(0, Math.min(book.total, p + delta)));
+    setPage(p => Math.max(0, Math.min(_maxPage, p + delta)));
   };
   const handleInput = (e) => {
     let v = parseInt(e.target.value, 10);
     if (isNaN(v)) v = 0;
-    setPage(Math.max(0, Math.min(book.total, v)));
+    setPage(Math.max(0, Math.min(_maxPage, v)));
   };
   const handleSentence = (e) => {
     if (e.target.value.length <= 1000) setSentence(e.target.value);
@@ -56,7 +57,7 @@ function CheckinModal({ book, onClose, onSubmit }) {
           <div className="page-direct">
             직접 입력{' '}
             <input type="number" min="0" max="9999" value={page} onChange={handleInput} />
-            <span className="page-totalmark">전체 {book.total}p</span>
+            <span className="page-totalmark">{book.total > 0 ? '전체 ' + book.total + 'p' : '쪽수 미상'}</span>
           </div>
         </div>
 
@@ -258,7 +259,7 @@ function NestTheatre({ progressPct, streak, prevTwigs }) {
 /* ── ReadingMode: 읽기 모드 (#184) — 독서 타이머 + 상시 한 문장 입력 ──
    둥지에서 활성 책으로 진입. 북모리식 몰입 캡처: 타이머가 도는 동안
    입력칸이 항상 열려 있어 떠오른 한 문장을 즉시 아카이브한다. */
-function ReadingMode({ book, onClose, onArchive }) {
+function ReadingMode({ book, onClose, onArchive, onChecked }) {
   const [secs, setSecs] = _useState(0);
   const [running, setRunning] = _useState(true);
   const [page, setPage] = _useState(String(book.cur || 0)); // 문자열 — 빈칸 허용(페이지 미상)
@@ -300,7 +301,7 @@ function ReadingMode({ book, onClose, onArchive }) {
   const finish = () => {
     const fp = pageNum(finalPage);
     const ubId = ubRef.current;
-    const done = () => { showToast('📖 ' + fmt(secs) + ' 독서 완료' + (fp != null ? ' · ' + fp + 'p' : '')); onClose(); };
+    const done = () => { showToast('📖 ' + fmt(secs) + ' 독서 완료' + (fp != null ? ' · ' + fp + 'p' : '')); if (onChecked) onChecked(); onClose(); };
     if (DataStore.sessions && DataStore.sessions.addToday) {
       Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: fp != null ? fp : (book.cur || 0) })).then(done).catch(done);
     } else done();
@@ -363,6 +364,7 @@ function ReadingMode({ book, onClose, onArchive }) {
 function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpenSearch }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [readingOpen, setReadingOpen] = _useState(false); // 읽기 모드 (#184)
+  const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
   const [ceremony, setCeremony] = _useState(null);
   const [showConfetti, setShowConfetti] = _useState(false);
@@ -434,6 +436,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
 
   const handleCheckin = ({ page, sentence }) => {
     setModalOpen(false);
+    setCheckedToday(true); // 오늘의 짹 완료 (#203)
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
     const wasReset = ns.streak === 0;
@@ -579,20 +582,29 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         <button onClick={handleSimSkip}>⏩ 데모: 하루 거르기 (스트릭 위기)</button>
       </div>
 
-      {/* 읽기 모드 진입 (#184) */}
+      {/* 읽기 모드 진입 (#184·#203) — 2줄 가운데 정렬, 주 CTA */}
       <button className="checkin-cta" onClick={() => setReadingOpen(true)}
-        style={{ background: '#2A2D33', marginBottom: 10 }}>
-        📖 읽기 모드 — 타이머 + 한 문장 모으기
+        style={{ background: '#2A2D33', marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, lineHeight: 1.3 }}>
+        <span style={{ fontSize: 16, fontWeight: 900 }}>📖 읽기 모드</span>
+        <span style={{ fontSize: 12, opacity: 0.72, fontWeight: 700 }}>타이머 + 한 문장 모으기</span>
       </button>
 
-      {/* 체크인 CTA */}
-      <button className="checkin-cta" onClick={() => setModalOpen(true)}>
-        <span className="pulse" />
-        오늘의 한 쪽, 짹 하기
-      </button>
-      <div className="nudge">
-        한 쪽이라도 읽으면 <span className="em">🔥 {nestState.streak}일</span> 연속 유지! 작은 호흡도 충분해요.
-      </div>
+      {/* 체크인 CTA — 읽기 모드로 오늘 기록했으면 숨기고 완료 표시 (#203) */}
+      {checkedToday ? (
+        <div className="nudge" style={{ textAlign: 'center', fontWeight: 800 }}>
+          🐦 오늘의 짹 완료! <span className="em">🔥 {nestState.streak}일</span> 연속 — 더 읽고 싶으면 위 ‘읽기 모드’를 눌러요.
+        </div>
+      ) : (
+        <React.Fragment>
+          <button className="checkin-cta" onClick={() => setModalOpen(true)}>
+            <span className="pulse" />
+            오늘의 한 쪽, 짹 하기
+          </button>
+          <div className="nudge">
+            한 쪽이라도 읽으면 <span className="em">🔥 {nestState.streak}일</span> 연속 유지! 작은 호흡도 충분해요.
+          </div>
+        </React.Fragment>
+      )}
 
       {/* 내 한 문장 */}
       <div className="section-head">
@@ -660,6 +672,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           book={nestState.book}
           onClose={() => setReadingOpen(false)}
           onArchive={(q) => setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] }))}
+          onChecked={() => setCheckedToday(true)}
         />,
         document.body
       )}
