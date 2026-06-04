@@ -61,6 +61,41 @@ function getEvolutionCopy(fromLv, toLv){
   return t ? t.text : null;
 }
 
+/* ── XP 보상 — systems.md §6.3 SSOT (v7.1 행동 가중치) ──
+   1) 위계: 핵심 기여(읽고 한 줄) > 반응(주는 짹) > 단순 방문. 방문도 0 아님.
+   2) 레벨 곡선: 초반 쉽게, 후반 더디게(루트). 3) v7: XP 차감 없음. */
+const XP_RULES = {
+  dailyMission:     20,
+  reaction:          5,
+  reactionDailyMax: 20,
+  visit:             2,
+  bookComplete:    200,
+  streak7:         100,
+  streak30:        500,
+};
+function calcLevel(xp){ return Math.floor(Math.sqrt(Math.max(0, xp || 0) / 100)) + 1; }
+function xpForLevel(level){ const l = Math.max(1, level); return Math.pow(l - 1, 2) * 100; }
+function computeCheckinXp({ isNewDay, isComplete, newStreak }){
+  const parts = [];
+  if (isNewDay) parts.push({ key:'daily', label:'읽고 한 줄', xp: XP_RULES.dailyMission, ico:'📖' });
+  if (isComplete) parts.push({ key:'complete', label:'책 완독', xp: XP_RULES.bookComplete, ico:'🏰' });
+  if (newStreak === 7)  parts.push({ key:'streak7',  label:'7일 스트릭',  xp: XP_RULES.streak7,  ico:'🔥' });
+  if (newStreak === 30) parts.push({ key:'streak30', label:'30일 스트릭', xp: XP_RULES.streak30, ico:'🔥' });
+  return { total: parts.reduce((s,p)=>s+p.xp,0), parts };
+}
+function reactionXpFor(prevCount){
+  const already = Math.max(0, prevCount || 0) * XP_RULES.reaction;
+  if (already >= XP_RULES.reactionDailyMax) return 0;
+  return Math.min(XP_RULES.reaction, XP_RULES.reactionDailyMax - already);
+}
+function grantXp(amount, reason){
+  const amt = Math.max(0, amount || 0);
+  if (!amt) return 0;
+  try { if (window.DataStore && DataStore.xp && DataStore.xp.add) DataStore.xp.add(amt, reason || 'earn'); } catch (e) {}
+  try { window.dispatchEvent(new CustomEvent('rg:xp', { detail: { amount: amt, reason } })); } catch (e) {}
+  return amt;
+}
+
 const NPC_QUOTES = {
   "b008": [
     { nick:"@activist_raccoon", avatar:"🦝", page:120, q:"새는 알에서 나오려고 투쟁한다. 알은 세계다. 태어나려는 자는 한 세계를 깨뜨려야 한다.", time:"2시간 전", claps:34 },
@@ -341,7 +376,9 @@ function drawNest(twigs, nestLv, prevTwigs){
   function rt(t){const isNew=t._origIdx>=prevTwigs,ni=isNew?(t._origIdx-prevTwigs):0,cls=isNew?'twig twig-new':'twig';return`<path class="${cls}" style="--i:${t._origIdx};--new-i:${ni}" d="${t.path}" stroke="${t.col}" stroke-width="${t.sw.toFixed(2)}" fill="none" stroke-linecap="round" opacity="${t.op.toFixed(2)}"/>`;}
   function rimPt(a,rs){const t=a*Math.PI/180;return{x:G.cx+G.rx*rs*Math.cos(t),y:G.cy+G.ry*rs*Math.sin(t)};}
   const defs=`<defs><radialGradient id="g_sun" cx="50%" cy="30%" r="55%"><stop offset="0%" stop-color="#FFE9A8"/><stop offset="100%" stop-color="#FFFCEF" stop-opacity="0"/></radialGradient><radialGradient id="g_inner" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#1A0E06"/><stop offset="45%" stop-color="#3A2410"/><stop offset="100%" stop-color="#6B4423" stop-opacity="0"/></radialGradient></defs>`;
-  const sky=`<circle cx="110" cy="36" r="55" fill="url(#g_sun)"/>`;
+  const clouds=`<g fill="#FFFFFF" opacity="0.7"><ellipse cx="48" cy="34" rx="13" ry="6"/><ellipse cx="58" cy="30" rx="10" ry="6"/><ellipse cx="38" cy="31" rx="8" ry="5"/></g><g fill="#FFFFFF" opacity="0.5"><ellipse cx="178" cy="46" rx="11" ry="5"/><ellipse cx="186" cy="43" rx="8" ry="5"/></g>`;
+  const sky=`<circle cx="110" cy="36" r="55" fill="url(#g_sun)"/>${clouds}`;
+  const skyBirds=lvNow>=4?`<g stroke="#7A6A52" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.55"><path d="M 36 44 Q 40 40 44 44 Q 48 40 52 44"/><path d="M 168 34 Q 171 31 174 34 Q 177 31 180 34"/></g>`:'';
   const ground=`<ellipse cx="${G.cx}" cy="${G.cy+G.ry+18}" rx="${G.rx*1.1}" ry="7" fill="rgba(30,15,5,.32)"/>`;
   const bowlOutline=twigs>=8?`<ellipse cx="${G.cx}" cy="${G.cy+2}" rx="${G.rx+2}" ry="${G.ry+3}" fill="none" stroke="#3A2410" stroke-width="2.5" opacity="0.18"/>`:'';
   const cavity=twigs>=25?`<ellipse cx="${G.cx}" cy="${G.cy+2}" rx="${G.irx}" ry="${G.iry}" fill="url(#g_inner)"/>`:'';
@@ -351,7 +388,7 @@ function drawNest(twigs, nestLv, prevTwigs){
   const leftEye=winking?`<path d="M 99 102 Q 103 100 105 102" stroke="#2A2D33" stroke-width="1.8" fill="none" stroke-linecap="round"/>`:`<circle cx="102" cy="101" r="2.6" fill="#2A2D33"/><circle cx="103" cy="100" r="0.9" fill="#FFF"/>`;
   const rightEye=`<circle cx="118" cy="101" r="2.6" fill="#2A2D33"/><circle cx="119" cy="100" r="0.9" fill="#FFF"/>`;
   const beak=`<polygon points="105,108 115,108 110,114" fill="#F4B400" stroke="#C8901C" stroke-width="0.6"/>`+(holdingTwig?`<path d="M 115 110 Q 132 100 158 92" stroke="#6B4423" stroke-width="2.6" fill="none" stroke-linecap="round"/><ellipse cx="138" cy="100" rx="4.2" ry="2.1" fill="#5FAB5C" transform="rotate(-22 138 100)"/><ellipse cx="150" cy="93" rx="4.5" ry="2.3" fill="#3E7C3B" transform="rotate(-30 150 93)"/><ellipse cx="160" cy="89" rx="3.5" ry="1.8" fill="#5FAB5C" transform="rotate(-18 160 89)"/>`:'');
-  const sparrowHead=`<g class="sparrow-head"><circle cx="110" cy="100" r="22" fill="#F3CD9E" stroke="#C49460" stroke-width="1.2"/><path d="M 88 95 Q 88 78 110 76 Q 132 78 132 95 Q 110 88 88 95 Z" fill="#7A4F2C" stroke="#5A3A1F" stroke-width="0.9"/><path d="M 103 76 L 100 67 L 106 75 Z" fill="#5A3A1F"/><path d="M 110 76 L 108 64 L 112 64 L 113 76 Z" fill="#5A3A1F"/><path d="M 117 76 L 120 67 L 114 75 Z" fill="#5A3A1F"/>${leftEye}${rightEye}${beak}<ellipse cx="93" cy="108" rx="4.2" ry="3.2" fill="#FFA8B8" opacity="${cheekHi?'0.88':'0.7'}"/><ellipse cx="127" cy="108" rx="4.2" ry="3.2" fill="#FFA8B8" opacity="${cheekHi?'0.88':'0.7'}"/></g>`;
+  const sparrowHead=`<g class="sparrow-head"><circle cx="110" cy="100" r="22" fill="#F3CD9E" stroke="#C49460" stroke-width="1.2"/><path d="M 88 95 Q 88 78 110 76 Q 132 78 132 95 Q 110 88 88 95 Z" fill="#7A4F2C" stroke="#5A3A1F" stroke-width="0.9"/><path d="M 103 76 L 100 67 L 106 75 Z" fill="#5A3A1F"/><path d="M 110 76 L 108 64 L 112 64 L 113 76 Z" fill="#5A3A1F"/><path d="M 117 76 L 120 67 L 114 75 Z" fill="#5A3A1F"/>${leftEye}${rightEye}${beak}<ellipse cx="93" cy="108" rx="4.2" ry="3.2" fill="#FFA8B8" opacity="${cheekHi?'0.88':'0.7'}"/><ellipse cx="127" cy="108" rx="4.2" ry="3.2" fill="#FFA8B8" opacity="${cheekHi?'0.88':'0.7'}"/><g class="sparrow-blink"><ellipse cx="102" cy="101" rx="3" ry="3.2" fill="#F3CD9E"/><ellipse cx="118" cy="101" rx="3" ry="3.2" fill="#F3CD9E"/></g></g>`;
   const leafAccents=lvNow>=4?`<g><ellipse cx="56" cy="138" rx="4" ry="2" fill="#5FAB5C" transform="rotate(-30 56 138)"/><ellipse cx="68" cy="148" rx="3" ry="1.6" fill="#3E7C3B" transform="rotate(-15 68 148)"/><ellipse cx="164" cy="138" rx="4" ry="2" fill="#5FAB5C" transform="rotate(30 164 138)"/><ellipse cx="152" cy="148" rx="3" ry="1.6" fill="#3E7C3B" transform="rotate(15 152 148)"/></g>`:'';
   let sparkles='';
   if(lvNow>=4)sparkles+=`<g fill="#FFD66B"><polygon points="178,84 180,90 186,90 181,93 183,99 178,95 173,99 175,93 170,90 176,90"/></g>`;
@@ -368,7 +405,7 @@ function drawNest(twigs, nestLv, prevTwigs){
   const wrap=(c)=>standMode?`<g ${birdT}>${c}</g>`:c;
   const bodyLayer=wrap(sparrowBody);
   const headW=wrap(sparrowHead);
-  let dec=lvNow>=4?(leafAccents+headW+leafyRoof+chimney+sparkles):(leafAccents+headW+sparkles+motionMarks);
+  let dec=lvNow>=4?(skyBirds+leafAccents+headW+leafyRoof+chimney+sparkles):(leafAccents+headW+sparkles+motionMarks);
   return `<svg class="nest-art" viewBox="0 0 220 200" xmlns="http://www.w3.org/2000/svg">${defs}${sky}${ground}${branchBase}${useTwigRing?twigRing:`${bowlOutline}<g class="twig-layer back">${backTwigs.map(rt).join('')}</g>${cavity}`}${bodyLayer}${feet}${useTwigRing?'':`${rim}<g class="twig-layer front">${frontTwigs.map(rt).join('')}</g>`}${dec}</svg>`;
 }
 
@@ -452,6 +489,8 @@ window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
 window.INITIAL_PROGRESS=INITIAL_PROGRESS;
 window.NEST_STAGES=NEST_STAGES; window.getNestStage=getNestStage;
 window.NEST_STAGE_TRANSITIONS=NEST_STAGE_TRANSITIONS; window.getEvolutionCopy=getEvolutionCopy;
+window.XP_RULES=XP_RULES; window.calcLevel=calcLevel; window.xpForLevel=xpForLevel; window.computeCheckinXp=computeCheckinXp;
+window.reactionXpFor=reactionXpFor; window.grantXp=grantXp;
 window.NPC_QUOTES=NPC_QUOTES; window.INITIAL_STATE=INITIAL_STATE;
 window.INITIAL_BOOKSHELF=INITIAL_BOOKSHELF; window.WISHLIST=WISHLIST;
 window.ALL_BOOKS=ALL_BOOKS;
