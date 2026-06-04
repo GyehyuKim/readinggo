@@ -2,7 +2,8 @@
 
 > **Split from** `docs/2. specifications/readinggo-spec.md` v6. 원 위치: §5.7.
 > **v7 갱신 (2026-06-01)**: "모이"→"한 문장", **페이지 기반 스포일러 블라인드(§5.7.1) 신설** (`is_private` 폐기), 리액션 **짹** 확정. 피드는 **전체 공개**. 짹 XP는 [systems.md §6.3](./systems.md).
-> **v7.1 갱신 (2026-06-04, QA 2차)**: 피드 **팔로우/최근/추천 3탭**, ⚠️ **`is_private` 재도입**(페이지 블라인드와 병행 — §5.7.1) + 감상 `note_private`. [decisions §8.1](./meta/decisions.md).
+> **v7.1 갱신 (2026-06-04, QA 2차)**: 피드 **팔로우/최근/추천 3탭**, `is_private` 재도입 + 감상 `note_private`. [decisions §8.1](./meta/decisions.md).
+> **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, Instagram 모델 — §5.7.1). [decisions §8.3](./meta/decisions.md).
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 준수.
 
 ### 5.7 소셜 탭
@@ -44,16 +45,17 @@
 
 > v7 폐기: ~~주간 리그~~([systems.md §6.5](./systems.md)), ~~"모이"~~.
 
-#### 5.7.1 한 문장 노출 — 페이지 블라인드(자동) + 수동 비공개 (v7.1, SSOT)
+#### 5.7.1 한 문장 노출 — 페이지 블라인드(자동) + 공개 범위 3단계 (v7.2, SSOT)
 
 노출을 두 층으로 통제한다. **이 절이 단일 출처** — 책 상세·프로필·마을이 참조.
 
 **(A) 페이지 기반 블라인드 (자동)** — 읽은 위치 기준 자동 가림(아래 표). 저장 컬럼 없음.
 
-**(B) 수동 비공개 (v7.1 재도입 — ⚠️ v7 "`is_private` 폐기" 뒤집음, [decisions §8.1](./meta/decisions.md))**
-- `sentences.is_private` — 본인이 한 문장을 **비공개(나만 보기)** 로 토글. 비공개는 피드·타인프로필에서 **서버(RLS)가 숨김**: `is_private = false or user_id = auth.uid()`.
+**(B) 수동 공개 범위 — `visibility` 3단계 (v7.2, #179 — v7.1 `is_private` binary 확장. [decisions §8.3](./meta/decisions.md))**
+- `sentences.visibility` ∈ **`public`**(전체 공개) · **`followers`**(상호 팔로워만) · **`private`**(나만 보기). 기본 `public`. Instagram 모델 — **작성자가 공개해야만 타인에게 보인다.**
+- 서버(RLS) 강제: `public`=누구나 / `followers`=작성자 본인 OR 양방향 `follows` 존재 / `private`=작성자 본인만. 마이그레이션 `06_privacy_v2.sql`(기존 `is_private=true`→`private`, `false`→`public`).
 - `sentences.note_private` — 감상(`my_note`)만 별도 비공개. 컬럼 단위라 RLS 불가 → **클라이언트 표시 단계 존중**(soft).
-- 토글 위치: 책 상세(BookDetailModal) 각 한 문장의 🔒/🌐.
+- 토글 위치: 책 상세(BookDetailModal) 각 한 문장의 **🌐(public)→👥(followers)→🔒(private)** 순환 탭.
 
 | 상황 | 처리 |
 |---|---|
@@ -62,7 +64,7 @@
 | 내가 **읽지 않는** 책 | **전체 공개** (블라인드 없음) |
 | 내가 **완독**한 책 | **전체 공개** |
 
-- **전역 토글**: 헤더 `🔓 스포일러 그냥 보기` ON/OFF. ON이면 블라인드 전부 해제(상관없이 보고 싶을 때).
+- **전역 토글**: 소셜 탭 헤더 우측 `🔓` 버튼 ON/OFF. ON이면 블라인드 전부 해제(상관없이 보고 싶을 때). *현재 구현(social.js)에서 헤더 버튼 미구현 상태 — 배선 대상(#157, 승원).*
 - 적용 범위: **소셜 피드 · 책 상세 · 프로필 한 문장 모음 · 마을 한 문장** — 전 영역 동일 규칙.
 - 판정 데이터: 뷰어의 `user_books.current_page`(해당 책) vs `sentences.page` 비교 (`DataStore.spoiler.myCurrentPage`). 저장 컬럼 없음.
 

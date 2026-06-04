@@ -2,7 +2,8 @@
 
 > **Split from** `docs/2. specifications/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §7.
 > **v7 갱신 (2026-06-01)**: web-first 재정의. Capacitor 보류 → 순수 웹(Phase 0/1). 운영자 짹·스포일러 컬럼(`is_private`)·`chapter_id` 자동매핑 제거, 완독 별점·소감·마을 테이블 추가, **DataStore 계약(§7.2) 신설**. 변경 이력은 git log 참조.
-> **v7.1 갱신 (2026-06-04, QA 2차)**: ⚠️ **`is_private` 재도입** + `note_private`(§social 5.7.1, RLS 강제), **DB CHECK 제약**(`04_constraints.sql` — 길이·범위·형식), 닉네임 규칙 `{2,20}`·대문자 허용, 이메일 **autoconfirm**(베타 한정). [decisions §8.1](./meta/decisions.md).
+> **v7.1 갱신 (2026-06-04, QA 2차)**: `is_private` 재도입 + `note_private`, **DB CHECK 제약**(`04_constraints.sql`), 닉네임 규칙 `{2,20}`, 이메일 **autoconfirm**(베타 한정). [decisions §8.1](./meta/decisions.md).
+> **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, `06_privacy_v2.sql`), `admin.stats()`·`claps.isMine`·`friends.unfollow/isFollowing`·`users.public*`·`sessions.calendar` 계약 추가, 마을 Supabase 연동·이메일 브랜딩. [decisions §8.2/§8.3](./meta/decisions.md).
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -68,7 +69,7 @@ sentences.listByBook(userBookId)           → Sentence[]
 sentences.feed({cursor})                   → Sentence[]      // 최근(전체 공개) 피드 (§social)
 sentences.feedFollowing({limit})           → Sentence[]      // v7.1: 팔로우 피드
 sentences.feedRecommended({limit})         → Sentence[]      // v7.1: 추천(공유 책 유사도, 비면 최근 폴백)
-sentences.setVisibility(id, {is_private?, note_private?})    // v7.1: 한 문장/감상 비공개 토글
+sentences.setVisibility(id, {visibility?, note_private?})    // v7.2: visibility 3단계(public|followers|private) + 감상 note_private
 sentences.listMine()                       → Sentence[]
 sentences.random()                         → Sentence        // 무작위 회상 — 내 과거 한 문장 1개 (§profile 5.8.7)
 
@@ -94,7 +95,7 @@ friends.list() / friends.follow(userId) / friends.unfollow(userId) / friends.isF
 users.search(query)                    → User[]
 users.getByHandle(handle)              → User | null
 users.publicBooks(userId)              → UserBook[]          // 완독 책장 (status='completed', 전체 공개)
-users.publicSentences(userId)          → Sentence[]          // 공개 한 문장 (is_private=false)
+users.publicSentences(userId)          → Sentence[]          // 공개 한 문장 (visibility='public', RLS가 followers/private 필터)
 users.publicStreak(userId)             → number              // 타인 스트릭 카운트 (공개)
 users.isHandleAvailable(handle)        → boolean             // 닉네임 중복 검사 (본인 제외)
 
@@ -190,7 +191,8 @@ sentences                                   -- "한 문장" (DB 테이블명 유
   page          int                  -- 스포일러 블라인드 판정 기준 (§social)
   text          text                 -- 원문 인용. 1~200자 (CHECK + 클라, 04_constraints.sql)
   my_note       text NULL            -- 내 감상·코멘트 (선택, 사후 추가·편집). ≤1000자 (CHECK)
-  is_private    boolean default false -- v7.1 재도입: 한 문장 비공개(나만 보기). RLS 강제 (§social 5.7.1)
+  visibility    text default 'public' -- v7.2: 'public'|'followers'|'private' 3단계. RLS 강제 (§social 5.7.1, 06_privacy_v2.sql). is_private(boolean) 대체
+  is_private    boolean default false -- DEPRECATED (v7.1→v7.2 visibility 마이그레이션 후 미사용. 마이그레이션 호환 위해 컬럼 보존)
   note_private  boolean default false -- v7.1: 감상만 비공개 (클라 존중 — 컬럼 단위 RLS 불가)
   created_at    timestamptz
   -- v7 제거: chapter_id (챕터 자동매핑 폐기)
@@ -305,7 +307,7 @@ village_parts(village_id, part_order)                    -- v7 신설
 ### 7.5 RLS 정책 (요약)
 
 - `users`: 본인 row update. 다른 유저 select 가능 (피드용 공개 정보)
-- `sentences`: select = `is_private = false or user_id = auth.uid()` (v7.1 — 비공개 한 문장은 본인만, §social 5.7.1). insert/update 본인만
+- `sentences`: select = `visibility='public' OR user_id=auth.uid() OR (visibility='followers' AND 양방향 follows 존재)` (v7.2 — 3단계 공개 범위, §social 5.7.1, 06_privacy_v2.sql). insert/update 본인만
 - `reading_sessions`, `streak`, `user_books`: insert/update 본인. select 모두 (마을 그리드·완독 별점 공개)
 - `follows`: follower_id가 본인인 행만 insert/delete
 - `claps`: from_user_id가 본인인 행만 insert
