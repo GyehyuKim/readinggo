@@ -97,15 +97,15 @@ INVARIANTS = [
         r"rating[\s\S]*review_text|review_text[\s\S]*rating"),
 
     # ── S7: 페이지 기반 스포일러 블라인드 ─────────────────────
-    ("S7", "absent", "is_private 수동 비공개 잔재", None, r"is_private|isSpoiler"),
+    ("S7", "present", "한 문장/감상 공개·비공개 토글 (QA #12)", FEATURE_FILES, r"setVisibility|note_private"),
     ("S7", "present", "페이지 블라인드 (spoiler.myCurrentPage + 카피)", FEATURE_FILES,
         r"myCurrentPage|아직 안 읽은|탭하면 보기|스포일러 그냥 보기"),
 
     # ── B: Phase 1 실데이터 배선 (클로즈베타, PR #162) ─────────
     ("B", "absent", "소셜 피드 데모 NPC_QUOTES 잔재 (실 피드 대체)",
         ["social.js"], r"NPC_QUOTES"),
-    ("B", "present", "소셜 피드 실데이터 (sentences.feed)",
-        ["social.js"], r"sentences\.feed"),
+    ("B", "present", "소셜 피드 실데이터 (feed/추천 탭)",
+        ["social.js"], r"feedRecommended|\.feed\(|feedFollowing"),
     ("B", "absent", "서재 데모 상수 잔재 (INITIAL_BOOKSHELF/INITIAL_PROGRESS/RG_BOOKS/WISHLIST/getBook)",
         ["library.js"], r"INITIAL_BOOKSHELF|INITIAL_PROGRESS|RG_BOOKS|WISHLIST|getBook\("),
     ("B", "present", "서재 실 myBooks 배선 (myBooks.list)",
