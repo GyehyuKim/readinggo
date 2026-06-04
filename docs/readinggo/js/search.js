@@ -15,6 +15,8 @@ const SearchModal = ({
   const [fuse, setFuse] = React.useState(null);
   const [remote, setRemote] = React.useState([]);  // 알라딘 원격 결과 (외부)
   const [dbResults, setDbResults] = React.useState([]); // 우리 DB(books) 결과 — 즉시 표시 (#148)
+  const [dbLoading, setDbLoading] = React.useState(false);     // 검색 진행중 구분 (#202)
+  const [remoteLoading, setRemoteLoading] = React.useState(false);
 
   // Fuse.js 인덱싱 (최초 1회)
   React.useEffect(() => {
@@ -44,17 +46,18 @@ const SearchModal = ({
   // 우리 DB(books) 검색 — 이미 등록·캐시된 책을 즉시 표시 (DataStore.books.search ilike).
   React.useEffect(() => {
     const q = query.trim();
-    if (!q || !(window.DataStore && window.DataStore.books && window.DataStore.books.search)) { setDbResults([]); return; }
+    if (!q || !(window.DataStore && window.DataStore.books && window.DataStore.books.search)) { setDbResults([]); setDbLoading(false); return; }
     let alive = true;
+    setDbLoading(true);
     const t = setTimeout(() => {
       Promise.resolve(window.DataStore.books.search(q)).then((rows) => {
-        if (!alive || !Array.isArray(rows)) return;
-        setDbResults(rows.map((b) => ({
+        if (!alive) return;
+        if (Array.isArray(rows)) setDbResults(rows.map((b) => ({
           book_id: b.id, id: b.id, isbn13: b.isbn13, isbn: b.isbn13,
           title: b.title, author: b.author, publisher: b.publisher,
           total_pages: b.total_pages, cover_url: b.cover_url, _source: 'db',
         })));
-      }).catch(() => { if (alive) setDbResults([]); });
+      }).catch(() => { if (alive) setDbResults([]); }).then(() => { if (alive) setDbLoading(false); });
     }, 150);
     return () => { alive = false; clearTimeout(t); };
   }, [query]);
@@ -62,10 +65,11 @@ const SearchModal = ({
   // 알라딘 원격 검색(외부) — 디바운스 + graceful(프록시 미배포/실패 시 무시).
   React.useEffect(() => {
     const q = query.trim();
-    if (!q) { setRemote([]); return; }
+    if (!q) { setRemote([]); setRemoteLoading(false); return; }
     const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
-    if (!proxy) { setRemote([]); return; }
+    if (!proxy) { setRemote([]); setRemoteLoading(false); return; }
     let alive = true;
+    setRemoteLoading(true);
     const t = setTimeout(() => {
       fetch(`${proxy}?query=${encodeURIComponent(q)}`)
         .then((r) => (r.ok ? r.json() : null))
@@ -79,7 +83,8 @@ const SearchModal = ({
             cover_url: it.cover_url, _source: 'aladin',
           })));
         })
-        .catch(() => { if (alive) setRemote([]); });
+        .catch(() => { if (alive) setRemote([]); })
+        .then(() => { if (alive) setRemoteLoading(false); });
     }, 350);
     return () => { alive = false; clearTimeout(t); };
   }, [query]);
@@ -102,6 +107,7 @@ const SearchModal = ({
     return true;
   });
   const merged = _dedup(dbResults).concat(_dedup(localItems)).concat(_dedup(remote));
+  const searching = dbLoading || remoteLoading;  // 진행중 — 결과없음과 구분 (#202)
 
   return (
     <div
@@ -251,8 +257,14 @@ const SearchModal = ({
                 />
               ))}
             </div>
+          ) : searching ? (
+            // 검색 진행중 (#202) — 결과없음과 구분
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🔎</div>
+              <div style={{ fontSize: 14 }}>검색 중…</div>
+            </div>
           ) : (
-            // 검색 결과 없음
+            // 검색 결과 없음 (#202)
             <div
               style={{
                 padding: '32px 16px',
@@ -261,7 +273,7 @@ const SearchModal = ({
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 8 }}>📖</div>
-              <div style={{ fontSize: 14 }}>검색 중이거나 결과가 없어요</div>
+              <div style={{ fontSize: 14 }}>검색 결과가 없어요</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
                 제목·저자·ISBN으로 다시 검색해보세요
               </div>
@@ -339,6 +351,9 @@ const SearchResultItem = ({ book, onClick }) => {
             fontSize: 12,
             color: 'var(--ink-3)',
             marginTop: 2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
           {book.author}
@@ -348,6 +363,9 @@ const SearchResultItem = ({ book, onClick }) => {
             fontSize: 11,
             color: 'var(--ink-4)',
             marginTop: 4,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
           {book.publisher} · {book.total_pages}p
