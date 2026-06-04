@@ -119,7 +119,8 @@ function VillageView({ state, onSelectTown }) {
   const recommendedTowns = useMemo(() => {
     const currentBookId = state.book && state.book.id;
     return towns
-      .filter((town) => (town.collection || 'active') === 'recommended' && (town.visibility || 'public') === 'public')
+      // #170: 내가 생성/참여 중인 마을은 추천에서 제외 (collection 라벨 + myVillageIds 이중 방어)
+      .filter((town) => (town.collection || 'active') === 'recommended' && (town.visibility || 'public') === 'public' && !myVillageIds.includes(town.id))
       .slice()
       .sort((a, b) => {
         const aPriority = a.bookId === currentBookId ? 0 : 1;
@@ -147,6 +148,7 @@ function VillageView({ state, onSelectTown }) {
     return towns.filter((town) => {
       if ((town.collection || 'active') === 'past') return false;
       if ((town.visibility || 'public') !== 'public') return false;
+      if (myVillageIds.includes(town.id)) return false; // #170: 이미 참여/생성한 마을 제외
 
       const book = getBook(town.bookId);
       const haystack = [town.name, town.currentRange, book.title, book.author, town.bookId]

@@ -13,7 +13,8 @@ const SearchModal = ({
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState([]);
   const [fuse, setFuse] = React.useState(null);
-  const [remote, setRemote] = React.useState([]);  // 알라딘 원격 결과 (실 책 DB)
+  const [remote, setRemote] = React.useState([]);  // 알라딘 원격 결과 (외부)
+  const [dbResults, setDbResults] = React.useState([]); // 우리 DB(books) 결과 — 즉시 표시 (#148)
 
   // Fuse.js 인덱싱 (최초 1회)
   React.useEffect(() => {
@@ -40,7 +41,25 @@ const SearchModal = ({
     }
   }, [query, fuse]);
 
-  // 알라딘 원격 검색(실 책 DB) — 디바운스 + graceful(프록시 미배포/실패 시 무시).
+  // 우리 DB(books) 검색 — 이미 등록·캐시된 책을 즉시 표시 (DataStore.books.search ilike).
+  React.useEffect(() => {
+    const q = query.trim();
+    if (!q || !(window.DataStore && window.DataStore.books && window.DataStore.books.search)) { setDbResults([]); return; }
+    let alive = true;
+    const t = setTimeout(() => {
+      Promise.resolve(window.DataStore.books.search(q)).then((rows) => {
+        if (!alive || !Array.isArray(rows)) return;
+        setDbResults(rows.map((b) => ({
+          book_id: b.id, id: b.id, isbn13: b.isbn13, isbn: b.isbn13,
+          title: b.title, author: b.author, publisher: b.publisher,
+          total_pages: b.total_pages, cover_url: b.cover_url, _source: 'db',
+        })));
+      }).catch(() => { if (alive) setDbResults([]); });
+    }, 150);
+    return () => { alive = false; clearTimeout(t); };
+  }, [query]);
+
+  // 알라딘 원격 검색(외부) — 디바운스 + graceful(프록시 미배포/실패 시 무시).
   React.useEffect(() => {
     const q = query.trim();
     if (!q) { setRemote([]); return; }
@@ -73,17 +92,16 @@ const SearchModal = ({
     onClose();
   };
 
-  // 로컬(데모) + 알라딘 병합, isbn/제목 기준 중복 제거.
+  // 병합 우선순위: 우리 DB(즉시) → 로컬(데모) → 알라딘(외부). isbn/제목 기준 중복 제거.
   const localItems = results.map((r) => r.item);
-  const _seen = new Set(localItems.map((b) => b.isbn13 || b.isbn || b.title));
-  const merged = localItems.concat(
-    remote.filter((b) => {
-      const k = b.isbn13 || b.isbn || b.title;
-      if (_seen.has(k)) return false;
-      _seen.add(k);
-      return true;
-    })
-  );
+  const _seen = new Set();
+  const _dedup = (arr) => arr.filter((b) => {
+    const k = b.isbn13 || b.isbn || b.title;
+    if (!k || _seen.has(k)) return false;
+    _seen.add(k);
+    return true;
+  });
+  const merged = _dedup(dbResults).concat(_dedup(localItems)).concat(_dedup(remote));
 
   return (
     <div

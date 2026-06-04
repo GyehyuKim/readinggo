@@ -43,6 +43,8 @@ function SocialView({ state }) {
           time: rgRelTime(s.created_at),
           bookTitle: bk.title || '',
           bookId: bk.id || '',
+          bookCover: bk.cover_url || '',
+          bookAuthor: bk.author || '',
           isMine: !!(myId && s.user_id === myId),
         };
       }));

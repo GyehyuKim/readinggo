@@ -54,7 +54,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // visibility 3단계: public(전체) | followers(친구만) | private(나만) (#179)
   const _VIS_CYCLE = ['public', 'followers', 'private'];
   const _VIS_ICON = { public: '🌐', followers: '👥', private: '🔒' };
-  const _VIS_LABEL = { public: '전체 공개', followers: '친구만', private: '나만 보기' };
+  const _VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '비공개' };
   const [vis, setVis] = _useState({});
   const getVis = (q) => vis[q.id] || q.visibility || (q.isPrivate ? 'private' : 'public');
   const cycleVis = (q) => {
@@ -172,9 +172,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                       <span>{q.page}p · {q.when}</span>
                       {q.id && (
                         <span style={{display:'flex', gap:8, alignItems:'center'}}>
-                          <button onClick={() => cycleVis(q)} title={_VIS_LABEL[getVis(q)]}
-                            style={{background:'none', border:'none', cursor:'pointer', fontSize:13, padding:0, lineHeight:1}}>
-                            {_VIS_ICON[getVis(q)]}
+                          <button onClick={() => cycleVis(q)} title="탭하면 공개 범위 변경 (전체공개→친구공개→비공개)"
+                            style={{display:'inline-flex', alignItems:'center', gap:4, background:'var(--card)', border:'1px solid var(--line)', borderRadius:12, cursor:'pointer', fontSize:11, fontWeight:800, color:'var(--ink-2)', padding:'3px 9px', lineHeight:1}}>
+                            <span>{_VIS_ICON[getVis(q)]}</span><span>{_VIS_LABEL[getVis(q)]}</span>
                           </button>
                           <button onClick={() => toggleFav(q)} title="좋아요(즐겨찾기)"
                             style={{background:'none', border:'none', cursor:'pointer', fontSize:14, padding:0, lineHeight:1}}>
