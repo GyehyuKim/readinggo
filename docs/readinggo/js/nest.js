@@ -236,7 +236,7 @@ function NestTheatre({ progressPct, streak, prevTwigs }) {
 }
 
 /* ── NestView ─────────────────────────────────────────── */
-function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
+function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpenSearch }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [ceremony, setCeremony] = _useState(null);
   const [showConfetti, setShowConfetti] = _useState(false);
@@ -269,7 +269,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
   _useEffect(() => {
     let alive = true;
     const bid = nestState.book.id;
-    Promise.resolve((DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(bid, { limit: 5 }) : [])
+    const _isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bid || '');
+    Promise.resolve((_isUuid && DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(bid, { limit: 5 }) : [])
       .then(rows => {
         if (!alive) return;
         setSameBookFeed((rows || []).map(s => {
@@ -359,6 +360,25 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
 
   // sameBookFeed 는 위 effect 에서 실 byBook 으로 로드됨 (#1). 데모 NPC_QUOTES 미사용.
 
+  // 활성 책 없음(신규/미등록): 데모책 대신 '책 등록' 온보딩 — 유령 책 체크인(영속 실패) 방지.
+  if (!nestState.book || !nestState.book.id) {
+    return (
+      <section className="view active">
+        <div className="card book-card-wrap">
+          <button className="book-jump" onClick={onGoLibrary}><span>📚</span><span>내 서재</span></button>
+          <div style={{ padding: '38px 22px', textAlign: 'center' }}>
+            <div style={{ fontSize: 46, marginBottom: 12 }}>🐦</div>
+            <div style={{ fontWeight: 900, fontSize: 18, color: 'var(--ink)', marginBottom: 6 }}>아직 읽는 책이 없어요</div>
+            <div style={{ fontSize: 14, color: 'var(--ink-3)', lineHeight: 1.6, marginBottom: 20 }}>책을 등록하면 둥지가 자라기 시작해요.<br />하루 한 쪽, 한 문장부터.</div>
+            <button className="checkin-cta" onClick={onOpenSearch} style={{ display: 'inline-flex', width: 'auto', padding: '14px 28px' }}>
+              📖 읽을 책 등록하기
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="view active">
       {/* 활성 책 카드 */}
@@ -427,11 +447,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial }) {
         </div>
       ) : (
         nestState.myQuotes.slice(0, 3).map((q, i) => {
-          const bk = getBook(q.bookId);
+          const _bk = getBook(q.bookId);
+          const bkTitle = q.bookTitle || (_bk && _bk.title) || '책';
           return (
             <div key={i} className="my-q-card">
               <div className="meta">
-                <span className="bk">{bk ? bk.title : '책'}</span>
+                <span className="bk">{bkTitle}</span>
                 <span className="dot">·</span>
                 <span>{q.page}p</span>
                 <span className="dot">·</span>

@@ -20,9 +20,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const URL = process.env.SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!URL || !KEY) { console.error('❌ SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY env 필요'); process.exit(1); }
+// env 미지정 시 레포 루트 .env 폴백 — 시크릿을 CLI 인자로 노출하지 않기 위함.
+function _loadEnv(p) { const o = {}; try { for (const l of fs.readFileSync(p, 'utf8').split(/\r?\n/)) { const t = l.trim(); if (!t || t.startsWith('#')) continue; const i = t.indexOf('='); if (i > 0) o[t.slice(0, i).trim()] = t.slice(i + 1).trim(); } } catch {} return o; }
+const _env = _loadEnv(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../.env'));
+const URL = process.env.SUPABASE_URL || _env.SUPABASE_URL;
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || _env.SUPABASE_SERVICE_ROLE_KEY;
+if (!URL || !KEY) { console.error('❌ SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (env 또는 .env) 필요'); process.exit(1); }
 const sb = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));

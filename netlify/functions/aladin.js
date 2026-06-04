@@ -15,10 +15,11 @@ exports.handler = async (event) => {
 
   const q = (event && event.queryStringParameters) || {};
   const isbn = (q.isbn || '').trim();
-  const query = (q.query || q.q || '').trim();
+  const query = (q.query || q.q || '').trim().slice(0, 100);
 
   let url;
   if (isbn) {
+    if (!/^\d{10,13}$/.test(isbn)) return resp(400, { error: 'isbn 형식 오류(숫자 10~13자리)' });
     url = `${BASE}ItemLookUp.aspx?ttbkey=${key}&itemIdType=ISBN13&ItemId=${encodeURIComponent(isbn)}`
         + `&output=js&Version=20131101&Cover=Big&OptResult=packing`;
   } else if (query) {
@@ -78,7 +79,7 @@ function resp(statusCode, body) {
     statusCode,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'access-control-allow-origin': '*',
+      'access-control-allow-origin': process.env.ALLOWED_ORIGIN || '*',
       'cache-control': 'public, max-age=86400',  // 책 메타는 하루 캐시
     },
     body: JSON.stringify(body),

@@ -28,6 +28,10 @@ __pycache__/
 # Node
 node_modules/
 
+# ReadingGo 운영 스크립트 로컬 의존성 (seed_npc.mjs — 헤더의 npm i 로 설치)
+docs/readinggo/supabase/package.json
+docs/readinggo/supabase/package-lock.json
+
 # gstack local data (security reports, analytics)
 .gstack/
 

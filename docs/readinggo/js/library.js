@@ -138,7 +138,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                           if (editingId === q.id) {
                             return (
                               <div style={{marginTop:8}}>
-                                <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder="이 문장에 대한 감상…" rows={3}
+                                <textarea value={draft} maxLength={1000} onChange={e => setDraft(e.target.value)} placeholder="이 문장에 대한 감상… (최대 1000자)" rows={3}
                                   style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:8, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
                                 <div style={{display:'flex', gap:6, marginTop:6}}>
                                   <button onClick={() => saveNote(q)} style={{padding:'6px 12px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>

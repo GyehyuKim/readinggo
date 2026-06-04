@@ -13,11 +13,15 @@ returns boolean language sql stable security definer set search_path = public as
   select exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin);
 $$;
 
--- ── 운영자 지정 (본인 계정 1회) ──────────────────────────────────────
--- 로그인한 본인을 운영자로:
---   update public.users set is_admin = true where id = auth.uid();
--- 또는 handle 로 (대시보드에서 직접):
---   update public.users set is_admin = true where handle = 'reader_xxxxxxxx';
+-- ── 운영자 지정 — 공통 전용 admin 계정에만 (팀 공유) ─────────────────
+-- 원칙: 팀원 개인 계정 = 실사용/체험.  공통 admin 계정 = 고객 통계·관리만.
+--   ① 전용 admin 이메일(예: readinggo.admin@gmail.com)로 앱에서 로그인(매직링크)
+--      → public.users 행 자동 생성됨
+--   ② 그 계정을 운영자로 지정 (auth.users 의 이메일로 매칭):
+--        update public.users set is_admin = true
+--        where id = (select id from auth.users where email = 'readinggo.admin@gmail.com');
+-- (혹시 개인 계정에 잘못 부여했다면 회수)
+--        update public.users set is_admin = false where handle = 'reader_xxxxxxxx';
 
 -- ── 메모 ──────────────────────────────────────────────────────────────
 -- 모더레이션 읽기: sentences/users/claps 는 이미 select using(true)(공개)라

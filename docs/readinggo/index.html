@@ -164,15 +164,15 @@ input,textarea{font-family:inherit;}
 .brand-mark .go{ color: var(--brand-2); }
 
 .topbar-stats{
-  margin-left:auto; display:flex; gap:6px; align-items:center;
+  margin-left:auto; display:flex; gap:5px; align-items:center; flex-wrap:wrap; justify-content:flex-end;
 }
 .stat{
   display:inline-flex; align-items:center; gap:4px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border-radius: 999px;
   background: var(--card);
   border: 1.5px solid var(--line);
-  font-weight: 800; font-size: 13px;
+  font-weight: 800; font-size: 12px;
   color: var(--ink);
 }
 .stat .ico{ font-size: 14px; }
@@ -912,7 +912,7 @@ input,textarea{font-family:inherit;}
   border-radius: 28px 28px 0 0;
   padding: 14px 18px 24px;
   animation: slideUp .3s cubic-bezier(.2,.8,.2,1) both;
-  max-height: 90vh; overflow-y: auto;
+  max-height: 90vh; overflow-y: auto; overflow-x: hidden;
 }
 @keyframes slideUp{
   from { transform: translateY(100%); }

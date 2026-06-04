@@ -184,7 +184,8 @@
       },
       // 같은 책 피드 — 특정 책의 *다른* 사용자 한 문장 (둥지 '같은 책 읽는 사람들', NPC 포함, #1)
       async byBook(bookId, { limit } = {}) {
-        if (!bookId) return [];
+        // 데모 book id('b008' 등) 비-UUID 방어 — uuid 컬럼 질의 400 방지.
+        if (!bookId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookId)) return [];
         const me = await uid();
         let q = sb().from('sentences')
           .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url))')
@@ -334,6 +335,14 @@
         const h = (handle || '').replace(/^@/, '').trim();
         if (!h) return null;
         return unwrap(await sb().from('users').select('*').eq('handle', h).maybeSingle());
+      },
+      // 핸들(@아이디) 사용 가능 여부 — 중복검사. 본인이 이미 쓰는 핸들이면 사용 가능.
+      async isHandleAvailable(handle) {
+        const h = (handle || '').replace(/^@/, '').trim();
+        if (!h) return false;
+        const me = await uid();
+        const rows = unwrap(await sb().from('users').select('id').eq('handle', h).limit(1));
+        return !rows || rows.length === 0 || (!!me && rows[0] && rows[0].id === me);
       },
       async publicBooks(userId) {
         return unwrap(await sb().from('user_books').select('*, book:books(*)')

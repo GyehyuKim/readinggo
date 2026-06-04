@@ -28,9 +28,13 @@ async function buildStateFromSupabase() {
       cover: ub.book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
     };
     out.nest = { lv: getNestStage(Math.round((ub.current_page || 0) / total * 100)).lv };
+  } else {
+    // 활성 책 없음(Supabase 모드): 데모책(b008) 환영 방지 — 빈 sentinel 로 '책 등록' 유도.
+    out.book = { id: '', title: '', author: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
+    out.nest = { lv: 0 };
   }
   if (Array.isArray(mine) && mine.length) {
-    out.myQuotes = mine.map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', page: s.page, when: '', note: s.my_note || '' }));
+    out.myQuotes = mine.map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', note: s.my_note || '' }));
   }
   // 소셜 isMine 판정 + 스포일러 동기맵: 현재 사용자 + 내 책별 현재 페이지 preload
   try {
@@ -209,7 +213,7 @@ function App() {
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
           xp: (typeof xpDb === 'number') ? xpDb : s.xp,
           myQuotes: Array.isArray(mineDb)
-            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', page: x.page, when: '', note: x.my_note || '' }))
+            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', note: x.my_note || '' }))
             : s.myQuotes,
         }));
       } catch (e) { console.warn('[ReadingGo] 체크인 영속 실패:', e); }
@@ -406,6 +410,7 @@ function App() {
               onSimSkip={handleSimSkip}
               onGoLibrary={() => switchTab('library')}
               onGoSocial={() => switchTab('social')}
+              onOpenSearch={() => setIsSearchOpen(true)}
             />
           )}
           {activeTab === 'village' && !selectedTownId && (
