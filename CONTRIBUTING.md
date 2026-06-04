@@ -133,6 +133,8 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 
 **살아있는 spec 의무**: 구현 중 가정이 틀렸음·예상보다 어려움·예측 못 한 사용자 행동을 발견하면 *spec commit*으로 먼저 반영. 코드 commit이 아니다. 근거: [LF: Living Document](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-living-document).
 
+**강제 (CI 게이트)**: PR마다 `spec-align` 잡(`.github/workflows/test.yml` → `tests/spec-align/align_v7.py`)이 **스펙↔구현 invariant**를 검사한다. 동작/계약을 바꿨는데 스펙(또는 invariant)을 안 고치면 **CI가 빨간불** → 머지 차단. 새 기능 추가 시 `align_v7.py`에 해당 invariant(존재/부재 grep)를 같이 추가해 "스펙=구현"을 못 빠져나가게 한다. PR 본문 상단 **스펙 동기화 체크리스트**(pull_request_template.md)도 함께 확인.
+
 ### 4.2 이슈 동기화 (필수)
 
 작업과 GitHub Issues를 어긋나지 않게 유지한다. **PR이 이슈를 움직인다.**

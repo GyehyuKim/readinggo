@@ -17,3 +17,16 @@ jobs:
           python-version: "3.12"
       - name: Validate books.tsv
         run: python tests/data/validate-books.py
+
+  spec-align:
+    name: spec-align (스펙↔구현 동기화 게이트)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # spec(docs/readinggo/specs/)와 구현(docs/readinggo/js/)이 어긋나면 실패.
+      # 새 기능은 align_v7.py에 invariant를 추가해 "스펙=구현"을 강제한다 (CONTRIBUTING §4.1).
+      - name: Spec-align invariants
+        run: python tests/spec-align/align_v7.py
