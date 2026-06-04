@@ -79,12 +79,27 @@ xp.get() / xp.add(amount, reason)
 books.complete(userBookId, {rating?, review_text?})         // 완독 → 🏰 1개 (성 = 파생)
 castles.list()                             → UserBook[]      // status='completed' (성 컬렉션)
 
+// 일일 기록 (추가)
+sessions.calendar(days?)               → {readDates, shieldDates}  // 스트릭 캘린더 — 최근 N일(기본 35) 읽은/방패 날짜
+
 // 소셜 (짹 / 책갈피 / 관심책 / 콕찌르기 / 팔로우)
-claps.toggle(sentenceId)                                    // 짹 = 한 문장 좋아요
+claps.toggle(sentenceId)               → boolean            // 짹 = 한 문장 좋아요 (true=liked)
+claps.isMine(sentenceId)               → boolean            // 내가 좋아요했는지 — SentenceCard 초기 상태 로드 (#156)
 bookmarks.toggle(sentenceId) / bookmarks.list()             // 책갈피
 wishBooks.add(bookId) / wishBooks.list() / wishBooks.remove(bookId)
 pokes.send(toUserId) / pokes.listReceived()                 // 콕찌르기 🪱 (일 1회)
-friends.list() / friends.follow(userId) / users.search(query)
+friends.list() / friends.follow(userId) / friends.unfollow(userId) / friends.isFollowing(userId)  // 팔로우
+
+// 유저 (공개 데이터)
+users.search(query)                    → User[]
+users.getByHandle(handle)              → User | null
+users.publicBooks(userId)              → UserBook[]          // 완독 책장 (status='completed', 전체 공개)
+users.publicSentences(userId)          → Sentence[]          // 공개 한 문장 (is_private=false)
+users.publicStreak(userId)             → number              // 타인 스트릭 카운트 (공개)
+users.isHandleAvailable(handle)        → boolean             // 닉네임 중복 검사 (본인 제외)
+
+// 운영 대시보드 — is_admin=true 전용 (#161, Phase 2 기본)
+admin.stats()                          → {users, sentences, completed, todaySessions}  // count 집계 4종
 
 // 스포일러 (read-side 계산, 저장 컬럼 없음)
 spoiler.myCurrentPage(bookId)              → int             // 블라인드 판정용 (§social)

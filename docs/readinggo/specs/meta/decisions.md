@@ -95,6 +95,20 @@
 
 ---
 
+### 8.2 post-beta 결정 (2026-06-04, Ralph 루프 2차. 충돌 시 §8.1 위에 **우선**)
+
+> PR #180 코드, 이 PR 스펙. 구현=`gyehyu/features-post-beta`.
+
+| 이슈 | 결정 | 담당 | 비고 |
+|---|---|---|---|
+| **#156 짹 초기 liked 상태** | SentenceCard 마운트 시 `claps.isMine(sentenceId)` 로드 → initialLikedRef delta 공식으로 취소(-1)·신규(+1) optimistic 계산. 양 어댑터에 `isMine` 메서드 추가 | social/backend | 버그 수정 |
+| **#159 매직링크 로그인** | **이번 범위 제외** — Supabase SMTP 설정 별도 안건. 현행 이메일+비밀번호·Google OAuth 유지 | onboarding | 추후 논의 |
+| **#161 운영 대시보드** | Phase 2 기본 버전 우선 구현: is_admin 전용 📊 버튼 + AdminDashboardModal(집계 4종). Phase 2 full(필터·그래프)은 베타 이후 | profile/backend | §5.8.9 참조 |
+| **P2 이슈 포함** | #161·#167(NPC 피드 동작 확인) 이번 루프에 포함. NPC 피드는 기존 feed() 쿼리 NPC 포함 확인으로 완료 | — | #167 close |
+| **이슈 일괄 정리** | #165·#166·#151·#150·#152·#167·#160 — PR #175·#174에서 이미 구현 완료, 이슈 close 처리 | — | 이슈 close만 |
+
+---
+
 ### v5/v6 결정 이력 (참고 — 충돌 시 §8.0 우선)
 
 | 이슈 | 결정 |
