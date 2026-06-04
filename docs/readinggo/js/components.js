@@ -451,6 +451,9 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           }} style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📱 다른 기기에서 로그아웃</button>
           {/* 로그아웃 */}
           <button onClick={logout} style={{ marginTop: 10, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>
+
+          {/* 앱 버전 (베타) */}
+          <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo v{(window.RG_VERSION || '0.000')} · beta</div>
         </div>
       </div>
     </div>
@@ -685,6 +688,7 @@ function AdminDashboardModal({ onClose }) {
                   <button onClick={() => cycleStatus(q)} title="상태 변경" style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: _stColor[q.status] || '#9097A0', border: 'none', borderRadius: 10, padding: '2px 8px', cursor: 'pointer' }}>{q.status}</button>
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{q.message}</div>
+                {q.app_version && <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, marginRight: 8 }}>v{q.app_version}</span>}
                 {q.email && <a href={`mailto:${q.email}?subject=${encodeURIComponent('[ReadingGo] 문의 답변')}`} style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: 'var(--brand-3)', fontWeight: 800 }}>✉️ {q.email} 로 답장</a>}
               </div>
             ))}
