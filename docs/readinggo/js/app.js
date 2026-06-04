@@ -396,7 +396,9 @@ function App() {
         {/* 상단 바 */}
         <header className="topbar">
           <div className="topbar-row">
-            <div className="brand-mark">
+            <div className="brand-mark" role="button" tabIndex={0} title="둥지로 (홈)"
+              onClick={() => switchTab('nest')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchTab('nest'); }}>
               <span className="sparrow" aria-hidden="true">🐦</span>
               <span>reading<span className="go">GO</span></span>
             </div>

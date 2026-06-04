@@ -337,30 +337,61 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             style={{position:'absolute', top:12, right:52, background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'50%', width:34, height:34, fontSize:17, cursor:'pointer', color:'#fff', lineHeight:1}}>📊</button>
         )}
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:28, fontWeight:900, marginBottom:4}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
-          <div style={{fontSize:13, opacity:0.9, marginBottom:14, minHeight:20}}>
+          <div style={{fontSize:24, fontWeight:900}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
+          <div style={{fontSize:13, opacity:0.9, marginTop:4, minHeight:18}}>
             책 속에서 길을 찾는 중
           </div>
-          <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:12, textAlign:'center'}}>
-            <div>
-              <div style={{fontSize:18, fontWeight:900}}>{state.nest.lv}</div>
-              <div style={{fontSize:10, opacity:0.85}}>둥지 레벨</div>
-            </div>
-            <div>
-              <div style={{fontSize:18, fontWeight:900}}>{castles.length}</div>
-              <div style={{fontSize:10, opacity:0.85}}>완독</div>
-            </div>
-            <div>
-              <div style={{fontSize:18, fontWeight:900}}>{state.streak}</div>
-              <div style={{fontSize:10, opacity:0.85}}>스트릭 🔥</div>
-            </div>
-            <div>
-              <div style={{fontSize:18, fontWeight:900}}>{state.xp}</div>
-              <div style={{fontSize:10, opacity:0.85}}>XP</div>
-            </div>
-          </div>
+          {/* 둥지레벨/완독/스트릭/XP 스탯 제거 — 둥지 탭 최상단과 중복 (#205) */}
         </div>
       </div>
+
+      {/* 성(🏰) 컬렉션 선반 — 최상단 (§5.8.1, #205). 완독 파생. 둥지 상단 🏰×N 배지가 여기로 연결. */}
+      {castles.length > 0 && (
+        <div style={{padding:'0 12px', marginTop:16, marginBottom:20}}>
+          <div style={{fontSize:18, fontWeight:900, marginBottom:12, paddingLeft:4}}>
+            🏰 성 컬렉션 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>(완독 {castles.length}권)</span>
+          </div>
+          <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:8, paddingLeft:4, scrollBehavior:'smooth'}}>
+            {castles.map(c => (
+              <div
+                key={c.bookId}
+                onClick={() => setSelectedBookId(c.bookId)}
+                style={{flex:'0 0 auto', width:96, cursor:'pointer'}}
+              >
+                <div
+                  className="book-cover"
+                  style={{
+                    width:96,
+                    height:134,
+                    background:`linear-gradient(135deg,${c.fb[0]},${c.fb[1]})`,
+                    borderRadius:'8px',
+                    overflow:'hidden',
+                    marginBottom:6,
+                    position:'relative',
+                    boxShadow:'0 2px 6px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  <img src={c.cover} alt={c.title} loading="lazy" referrerPolicy="no-referrer"
+                       onError={e => e.target.style.display='none'}
+                       style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                  <span style={{position:'absolute', top:4, right:4, fontSize:16, filter:'drop-shadow(0 1px 1px rgba(0,0,0,0.4))'}} aria-hidden="true">🏰</span>
+                </div>
+                {typeof c.rating === 'number' && (
+                  <div style={{fontSize:11, fontWeight:800, color:'var(--ink)'}}>⭐ {c.rating.toFixed(1)}</div>
+                )}
+                {c.reviewText && (
+                  <div style={{fontSize:10, color:'var(--ink-2)', fontWeight:600, lineHeight:'1.35', marginTop:2, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden'}}>
+                    {c.reviewText}
+                  </div>
+                )}
+                {c.completedAt && (
+                  <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2}}>{String(c.completedAt).slice(0, 10)}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 무작위 한 문장 회상 (§5.8.7) — 과거 내 문장 1개 */}
       {recall && (
@@ -398,53 +429,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         </div>
       )}
 
-      {/* 성(🏰) 컬렉션 선반 — 완독 파생 (§5.8.1). 둥지 상단 🏰×N 배지가 여기로 연결. */}
-      {castles.length > 0 && (
-        <div style={{padding:'0 12px', marginBottom:20}}>
-          <div style={{fontSize:18, fontWeight:900, marginBottom:12, paddingLeft:4}}>
-            🏰 성 컬렉션 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>(완독 {castles.length}권)</span>
-          </div>
-          <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:8, paddingLeft:4, scrollBehavior:'smooth'}}>
-            {castles.map(c => (
-              <div
-                key={c.bookId}
-                onClick={() => setSelectedBookId(c.bookId)}
-                style={{flex:'0 0 auto', width:96, cursor:'pointer'}}
-              >
-                <div
-                  className="book-cover"
-                  style={{
-                    width:96,
-                    height:134,
-                    background:`linear-gradient(135deg,${c.fb[0]},${c.fb[1]})`,
-                    borderRadius:'8px',
-                    overflow:'hidden',
-                    marginBottom:6,
-                    position:'relative',
-                    boxShadow:'0 2px 6px rgba(0,0,0,0.12)',
-                  }}
-                >
-                  <img src={c.cover} alt={c.title} loading="lazy" referrerPolicy="no-referrer"
-                       onError={e => e.target.style.display='none'}
-                       style={{width:'100%', height:'100%', objectFit:'cover'}} />
-                  <span style={{position:'absolute', top:4, right:4, fontSize:16, filter:'drop-shadow(0 1px 1px rgba(0,0,0,0.4))'}} aria-hidden="true">🏰</span>
-                </div>
-                {typeof c.rating === 'number' && (
-                  <div style={{fontSize:11, fontWeight:800, color:'var(--ink)'}}>⭐ {c.rating}</div>
-                )}
-                {c.reviewText && (
-                  <div style={{fontSize:10, color:'var(--ink-2)', fontWeight:600, lineHeight:'1.35', marginTop:2, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden'}}>
-                    {c.reviewText}
-                  </div>
-                )}
-                {c.completedAt && (
-                  <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2}}>{String(c.completedAt).slice(0, 10)}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* 성 컬렉션은 프로필 최상단(헤더 직후)으로 이동 (#205) */}
 
       {/* 내 서재 섹션 */}
       <div style={{padding:'0 12px', marginBottom:20}}>
