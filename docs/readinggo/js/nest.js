@@ -88,7 +88,7 @@ function Ceremony({ data, onClose, onComplete }) {
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
   if (!data) return null;
-  const { xpGain, streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay, wasReset, isComplete } = data;
+  const { xpGain, xpParts, streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay, wasReset, isComplete } = data;
   let leadText;
   if (!isNewDay && !wasReset) {
     leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료 🐦`;
@@ -121,6 +121,17 @@ function Ceremony({ data, onClose, onComplete }) {
             <div className="lbl">한 문장</div>
           </div>
         </div>
+
+        {xpParts && xpParts.length > 1 && (
+          <div className="xp-breakdown">
+            {xpParts.map(p => (
+              <span key={p.key} className="xp-part">
+                <span className="ico">{p.ico}</span>
+                {p.label} <b>+{p.xp}</b>
+              </span>
+            ))}
+          </div>
+        )}
 
         {sentence && (
           <div className="saved-quote">
@@ -393,13 +404,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     setModalOpen(false);
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
-    const xpGain = Math.max(15, Math.min(60, 15 + pagesAdded));
     const wasReset = ns.streak === 0;
     const prevPct = _pctOf(ns.book);
     const prevLv = getNestStage(prevPct).lv;
 
     ns.book = { ...ns.book, cur: page };
-    ns.xp += xpGain;
     if (wasReset) ns.streak = 1;
     else ns.streak += 1;
     ns.skipStreakRisk = false;
@@ -409,6 +418,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     const nestUp = newLv > prevLv;
     // 완독: 마지막 장 도달 (이번 체크인에 100% 처음 도달).
     const isComplete = newPct >= 100 && prevPct < 100;
+
+    // XP — systems.md §6.3 SSOT. 페이지 수와 무관(일일미션 고정 +20). 차감 없음.
+    const xpReward = computeCheckinXp({ isNewDay: true, isComplete, newStreak: ns.streak });
+    const xpGain = xpReward.total;
+    ns.xp += xpGain;
 
     if (sentence) {
       ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금' }, ...ns.myQuotes];
@@ -424,7 +438,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
       if (copy) showToast(`${getNestStage(newPct).short} ${copy}`);
     }
 
-    setCeremony({ xpGain, streak: ns.streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay: true, wasReset, isComplete });
+    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
   };

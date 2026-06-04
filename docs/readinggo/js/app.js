@@ -106,6 +106,7 @@ function LoginScreen({ onLogin }) {
   );
 }
 
+let _rgVisitGranted = false;  // 데모: 방문 XP 세션 1회 적립 가드
 function App() {
   const { useState, useCallback, useMemo, useEffect } = React;
   // Phase 1: Supabase 설정 시 로그인 게이트 + 실데이터. 미설정/미로그인은 localStorage 폴백.
@@ -141,6 +142,23 @@ function App() {
   const [castleCount, setCastleCount] = useState(() => {
     try { return _supa ? 0 : DataStore.castles.list().length; } catch { return 0; }
   });
+
+  // XP 적립 이벤트 버스 — 방문·반응 XP(grantXp → 'rg:xp')를 상단바 appState.xp 에 반영.
+  useEffect(() => {
+    const onXp = (e) => {
+      const amt = e && e.detail ? e.detail.amount : 0;
+      if (amt) setAppState(s => ({ ...s, xp: (s.xp || 0) + amt }));
+    };
+    window.addEventListener('rg:xp', onXp);
+    return () => window.removeEventListener('rg:xp', onXp);
+  }, []);
+
+  // 단순 방문 보상 — 하루 첫 열람(데모: 세션 1회). 3단계 위계 중 가장 낮은 티어.
+  useEffect(() => {
+    if (_rgVisitGranted) return;
+    _rgVisitGranted = true;
+    grantXp(XP_RULES.visit, 'visit');
+  }, []);
 
   // 인증 상태 구독 (Supabase 모드)
   useEffect(() => {
@@ -402,9 +420,12 @@ function App() {
                 <span className="ico">🔥</span>
                 <span>{appState.streak}</span>
               </button>
-              <span className="stat gold" title="이번 주 XP">
+              <span className="stat gold" title="누적 XP">
                 <span className="ico">⚡</span>
                 <span>{appState.xp}</span>
+              </span>
+              <span className="stat lv" title="레벨 (systems.md §6.3)">
+                <span>Lv.{calcLevel(appState.xp)}</span>
               </span>
               <span className="stat shield" title="방패 개수">
                 <span className="ico">🪶</span>

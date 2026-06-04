@@ -4,6 +4,9 @@
    ========================================================= */
 const { useState, useEffect, useRef, useCallback } = React;
 
+// 데모: 반응(짹) XP 일일 상한용 카운터(세션 단위). 운영 빌드는 일자 기준 서버 집계.
+let _rgReactToday = 0;
+
 /* ── 스포일러 블라인드 (페이지 기반, social.md §5.7.1 SSOT) ──
    전역 토글 컨텍스트: revealAll=true 면 모든 블라인드 해제. */
 const SpoilerContext = React.createContext(false);
@@ -90,7 +93,14 @@ function SentenceCard({ item, bookId }) {
   }, [sentenceId]);
   const toggleLike = () => {
     if (isMine || !canReact) return;
-    Promise.resolve(DataStore.claps.toggle(sentenceId)).then(setLiked).catch(() => {});
+    Promise.resolve(DataStore.claps.toggle(sentenceId)).then((isLiked) => {
+      setLiked(isLiked);
+      // 반응(engagement) XP — 짹을 *새로 켤 때만*, 일일 상한 적용. 해제 시 차감 없음(v7).
+      if (isLiked) {
+        const xp = reactionXpFor(_rgReactToday);
+        if (xp > 0) { _rgReactToday += 1; grantXp(xp, 'reaction'); }
+      }
+    }).catch(() => {});
   };
   const toggleBookmark = () => {
     if (isMine || !canReact) return;
