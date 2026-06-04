@@ -128,6 +128,9 @@ function App() {
   useEffect(() => { window.RG_openBook = (id) => setBookDetailId(id); return () => { window.RG_openBook = null; }; }, []);
   // 스트릭 캘린더(#173) — 🔥 탭으로 열림.
   const [streakOpen, setStreakOpen] = useState(false);
+  // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
+  const [collectionOpen, setCollectionOpen] = useState(false);
+  useEffect(() => { window.RG_openCollection = () => setCollectionOpen(true); return () => { window.RG_openCollection = null; }; }, []);
   const [appState, setAppState] = useState(() => ({
     ...INITIAL_STATE,
     // village sent 상태는 로컬 복사
@@ -508,6 +511,12 @@ function App() {
         {/* 스트릭 캘린더 (#173) — 🔥 탭 */}
         {streakOpen && ReactDOM.createPortal(
           <StreakCalendarModal streak={appState.streak} onClose={() => setStreakOpen(false)} />,
+          document.body
+        )}
+
+        {/* 한 문장 모아보기 (#171) */}
+        {collectionOpen && ReactDOM.createPortal(
+          <SentenceCollectionModal onClose={() => setCollectionOpen(false)} />,
           document.body
         )}
 

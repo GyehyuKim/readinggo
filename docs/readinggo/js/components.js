@@ -417,3 +417,76 @@ function StreakCalendarModal({ streak, onClose }) {
   );
 }
 window.StreakCalendarModal = StreakCalendarModal;
+
+/* ── SentenceCollectionModal: 내 한 문장 모아보기(전체/책별/좋아요) + 읽었음 카운터(#171) ── */
+function SentenceCollectionModal({ onClose }) {
+  const [mine, setMine] = useState(undefined);
+  const [favIds, setFavIds] = useState(new Set());
+  const [filter, setFilter] = useState('all'); // all | book | fav
+  useEffect(() => {
+    let alive = true;
+    const DS = window.SupabaseDataStore || window.DataStore || {};
+    Promise.all([
+      Promise.resolve((DS.sentences && DS.sentences.listMine) ? DS.sentences.listMine() : []).catch(() => []),
+      Promise.resolve((DS.bookmarks && DS.bookmarks.list) ? DS.bookmarks.list() : []).catch(() => []),
+    ]).then(([sents, bms]) => {
+      if (!alive) return;
+      setMine((sents || []).map(s => ({
+        id: s.id, text: s.text, page: s.page,
+        bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '',
+        bookId: (s.user_book && s.user_book.book_id) || '',
+        isPrivate: !!s.is_private,
+      })));
+      setFavIds(new Set((bms || []).map(b => b.sentence_id)));
+    }).catch(() => { if (alive) setMine([]); });
+    return () => { alive = false; };
+  }, []);
+  const list = mine || [];
+  const favCount = list.filter(s => favIds.has(s.id)).length;
+  const filtered = filter === 'fav' ? list.filter(s => favIds.has(s.id)) : list;
+  const byBook = {};
+  if (filter === 'book') filtered.forEach(s => { const k = s.bookTitle || '기타'; (byBook[k] = byBook[k] || []).push(s); });
+  const renderLine = (s) => (
+    <div key={s.id} onClick={() => { if (s.bookId && window.RG_openBook) window.RG_openBook(s.bookId); }}
+      style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8, cursor: s.bookId ? 'pointer' : 'default' }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>
+        {s.bookTitle ? s.bookTitle + ' · ' : ''}{s.page}p{s.isPrivate ? ' · 🔒' : ''}{favIds.has(s.id) ? ' · ❤️' : ''}
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
+    </div>
+  );
+  return (
+    <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" role="dialog" aria-label="내 한 문장 모아보기">
+        <div className="sheet-grip" />
+        <button onClick={onClose} aria-label="닫기" style={{ position: 'absolute', top: 10, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, fontSize: 16, cursor: 'pointer', color: 'var(--ink-2)', lineHeight: 1, zIndex: 2 }}>✕</button>
+        <div style={{ padding: '8px 20px 20px', maxHeight: '74vh', overflowY: 'auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--ink)' }}>📓 내 한 문장</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>읽었음 {list.length}개 · ❤️ 좋아요 {favCount}개</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, justifyContent: 'center' }}>
+            {[['all', '전체'], ['book', '책별'], ['fav', '좋아요']].map(([id, label]) => (
+              <button key={id} onClick={() => setFilter(id)} style={{ padding: '6px 14px', borderRadius: 16, border: filter === id ? 'none' : '1px solid var(--line)', background: filter === id ? 'var(--brand)' : 'transparent', color: filter === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+            ))}
+          </div>
+          {mine === undefined ? (
+            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20 }}>불러오는 중…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20 }}>{filter === 'fav' ? '좋아요한 문장이 없어요' : '아직 한 문장이 없어요'}</div>
+          ) : filter === 'book' ? (
+            Object.keys(byBook).map(title => (
+              <div key={title} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>{title} <span style={{ color: 'var(--ink-3)', fontWeight: 700 }}>({byBook[title].length})</span></div>
+                {byBook[title].map(renderLine)}
+              </div>
+            ))
+          ) : (
+            filtered.map(renderLine)
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+window.SentenceCollectionModal = SentenceCollectionModal;

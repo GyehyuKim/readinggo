@@ -433,8 +433,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
       {/* 내 한 문장 */}
       <div className="section-head">
         <h3>🔖 내 한 문장 <span className="my-q-count">{nestState.myQuotes.length}</span></h3>
-        {nestState.myQuotes.length > 3 && (
-          <button className="more" onClick={() => showToast(`📓 내 한 문장 ${nestState.myQuotes.length}개. 곧 보관함 화면이 열려요`)}>
+        {nestState.myQuotes.length > 0 && (
+          <button className="more" onClick={() => window.RG_openCollection && window.RG_openCollection()}>
             전체 {nestState.myQuotes.length}개 보기 →
           </button>
         )}
