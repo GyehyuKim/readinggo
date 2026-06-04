@@ -130,11 +130,19 @@
       async addToday({ userBookId, page }) {
         const id = await uid();
         const today = _today();
+        // 활동 히트맵(#195)용 일별 읽은 쪽수: 직전 current_page 대비 증분을 그날 누적.
+        let pagesToday = 0;
         if (typeof page === 'number') {
+          try {
+            const ub = unwrap(await sb().from('user_books').select('current_page').eq('id', userBookId).maybeSingle());
+            const delta = Math.max(0, page - ((ub && ub.current_page) || 0));
+            const prev = unwrap(await sb().from('reading_sessions').select('pages_read_today').eq('user_book_id', userBookId).eq('session_date', today).maybeSingle());
+            pagesToday = ((prev && prev.pages_read_today) || 0) + delta;
+          } catch (e) {}
           await sb().from('user_books').update({ current_page: page }).eq('id', userBookId);
         }
         const row = unwrap(await sb().from('reading_sessions').upsert({
-          user_book_id: userBookId, user_id: id, session_date: today, current_page: page,
+          user_book_id: userBookId, user_id: id, session_date: today, current_page: page, pages_read_today: pagesToday,
         }, { onConflict: 'user_book_id,session_date' }).select().single());
         await A.streak.bumpOnCheckIn();
         return row;
@@ -157,6 +165,16 @@
           shieldDates = (sh || []).map(r => String(r.consumed_at).slice(0, 10));
         } catch (e) {}
         return { readDates, shieldDates };
+      },
+      // 활동 히트맵(#195) — 최근 days 일, 날짜별 읽은 쪽수 합계. [{date, pages}]
+      async heatmap(days) {
+        const id = await uid();
+        const since = new Date(Date.now() - (days || 180) * 86400 * 1000).toISOString().slice(0, 10);
+        const rows = unwrap(await sb().from('reading_sessions').select('session_date, pages_read_today')
+          .eq('user_id', id).gte('session_date', since)) || [];
+        const byDate = {};
+        rows.forEach((r) => { byDate[r.session_date] = (byDate[r.session_date] || 0) + (r.pages_read_today || 0); });
+        return Object.keys(byDate).map((date) => ({ date, pages: byDate[date] }));
       },
     },
 
@@ -479,17 +497,29 @@
     admin: {
       async stats() {
         const today = _today();
-        const [users, sentences, completed, todaySessions] = await Promise.all([
+        const since7 = new Date(Date.now() - 6 * 86400 * 1000).toISOString().slice(0, 10);
+        const [users, realUsers, sentences, completed, todaySessions, sess7, signup7] = await Promise.all([
           sb().from('users').select('*', { count: 'exact', head: true }),
+          sb().from('users').select('*', { count: 'exact', head: true }).eq('is_npc', false), // A: NPC 제외 실사용자
           sb().from('sentences').select('*', { count: 'exact', head: true }),
           sb().from('user_books').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
           sb().from('reading_sessions').select('*', { count: 'exact', head: true }).eq('session_date', today),
+          sb().from('reading_sessions').select('session_date').gte('session_date', since7),    // B: 7일 추세
+          sb().from('users').select('created_at').gte('created_at', since7 + 'T00:00:00'),
         ]);
+        // B: 최근 7일 일별 체크인·가입 추세
+        const days = [];
+        for (let i = 6; i >= 0; i--) days.push(new Date(Date.now() - i * 86400 * 1000).toISOString().slice(0, 10));
+        const sessByDay = {}, signupByDay = {};
+        ((sess7 && sess7.data) || []).forEach((r) => { sessByDay[r.session_date] = (sessByDay[r.session_date] || 0) + 1; });
+        ((signup7 && signup7.data) || []).forEach((r) => { const d = String(r.created_at).slice(0, 10); signupByDay[d] = (signupByDay[d] || 0) + 1; });
         return {
           users: users.count || 0,
+          realUsers: realUsers.count || 0,
           sentences: sentences.count || 0,
           completed: completed.count || 0,
           todaySessions: todaySessions.count || 0,
+          trend: days.map((d) => ({ date: d, sessions: sessByDay[d] || 0, signups: signupByDay[d] || 0 })),
         };
       },
       // 문의 목록 (admin 전용, RLS는 is_admin) (#문의)

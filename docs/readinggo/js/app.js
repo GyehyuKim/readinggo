@@ -173,6 +173,20 @@ function App() {
     return () => { alive = false; };
   }, [authUser]);
 
+  // 멀티 디바이스 정합(#191) — 탭이 다시 보일 때 Supabase 상태 재로드(다른 기기 변경 반영, stale view 방지)
+  useEffect(() => {
+    if (!_supa) return;
+    let busy = false;
+    const onVis = async () => {
+      if (document.hidden || busy || !window.SupabaseDataStore) return;
+      busy = true;
+      try { const next = await buildStateFromSupabase(); if (next) { setAppState(s => ({ ...s, ...next })); if (typeof next.castleCount === 'number') setCastleCount(next.castleCount); } }
+      catch (e) {} finally { busy = false; }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [_supa]);
+
   const switchTab = useCallback((tab) => {
     setActiveTab(tab);
     setSelectedTownId(null);

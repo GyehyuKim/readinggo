@@ -651,10 +651,13 @@ function AdminDashboardModal({ onClose }) {
   const _stColor = { open: '#E5484D', answered: '#F59E0B', closed: '#9097A0' };
   const rows = [
     ['👤 가입자', stats && stats.users],
+    ['🙋 실사용자', stats && stats.realUsers],   // NPC 제외 (#190 A)
     ['📝 한 문장', stats && stats.sentences],
     ['🏰 완독', stats && stats.completed],
     ['⚡ 오늘 체크인', stats && stats.todaySessions],
   ];
+  const trend = (stats && stats.trend) || [];
+  const trendMax = Math.max(1, ...trend.map((t) => t.sessions));
   return (
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label="운영 대시보드">
@@ -672,6 +675,22 @@ function AdminDashboardModal({ onClose }) {
                   <div style={{fontSize:11,color:'var(--ink-3)',fontWeight:700,marginTop:6}}>{label}</div>
                 </div>
               ))}
+            </div>
+          )}
+          {/* 최근 7일 추세 (#190 B) — 일별 체크인(막대) + 가입(점) */}
+          {trend.length > 0 && (
+            <div style={{ marginTop: 22 }}>
+              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>📈 최근 7일 (체크인 막대 · 가입 +N)</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
+                {trend.map((t) => (
+                  <div key={t.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                    <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700, minHeight: 12 }}>{t.signups > 0 ? '+' + t.signups : ''}</div>
+                    <div title={`${t.date} · 체크인 ${t.sessions} · 가입 ${t.signups}`}
+                      style={{ width: '70%', height: Math.round((t.sessions / trendMax) * 48) + 2, background: 'var(--brand)', borderRadius: 3 }} />
+                    <div style={{ fontSize: 9, color: 'var(--ink-3)', fontWeight: 700 }}>{t.date.slice(5)}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {/* 문의 목록 */}
@@ -792,3 +811,52 @@ function TinderCards({ items, title, onClose }) {
   );
 }
 window.TinderCards = TinderCards;
+
+/* ── ActivityHeatmap: 독서 활동 잔디 (#195) ──
+   최근 N일(기본 182=26주) 일별 읽은 쪽수를 GitHub식 히트맵으로. DataStore.sessions.heatmap. */
+function ActivityHeatmap({ days }) {
+  const N = days || 182;
+  const [map, setMap] = useState(null);
+  useEffect(() => {
+    const DS = window.DataStore || {};
+    if (!(DS.sessions && DS.sessions.heatmap)) { setMap({}); return; }
+    Promise.resolve(DS.sessions.heatmap(N)).then((rows) => {
+      const m = {}; (rows || []).forEach((r) => { m[r.date] = r.pages; }); setMap(m);
+    }).catch(() => setMap({}));
+  }, []);
+  if (map === null) return <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: 8 }}>활동 불러오는 중…</div>;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today.getTime() - (N - 1) * 86400000);
+  start.setDate(start.getDate() - start.getDay());
+  const cells = [];
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    cells.push({ date: ds, pages: map[ds] || 0 });
+  }
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const maxP = Math.max(1, ...cells.map((c) => c.pages));
+  const lvl = (p) => p <= 0 ? 0 : p >= maxP * 0.66 ? 3 : p >= maxP * 0.33 ? 2 : 1;
+  const COLOR = ['var(--line, #ebedf0)', '#9be9a8', '#40c463', '#216e39'];
+  const totalPages = cells.reduce((s, c) => s + c.pages, 0);
+  const activeDays = cells.filter((c) => c.pages > 0).length;
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <div style={{ fontSize: 15, fontWeight: 900 }}>🌱 독서 활동</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{Math.round(N / 7)}주 · {activeDays}일 · {totalPages}쪽</div>
+      </div>
+      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', paddingBottom: 4 }}>
+        {weeks.map((w, wi) => (
+          <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {w.map((c) => (
+              <div key={c.date} title={`${c.date} · ${c.pages}쪽`}
+                style={{ width: 11, height: 11, borderRadius: 2, background: COLOR[lvl(c.pages)], flexShrink: 0 }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+window.ActivityHeatmap = ActivityHeatmap;

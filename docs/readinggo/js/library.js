@@ -376,6 +376,11 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         </div>
       )}
 
+      {/* 독서 활동 잔디 (#195) */}
+      <div style={{padding:'0 12px', marginBottom:20}}>
+        <ActivityHeatmap days={182} />
+      </div>
+
       {/* 좋아요한 문장 (#11) — 즐겨찾기한 내 한 문장만 모아보기 */}
       {favs && favs.length > 0 && (
         <div style={{padding:'0 12px', marginBottom:20}}>
