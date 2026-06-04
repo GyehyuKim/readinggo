@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED (2026-06-04 아카이브)** — 정본 스펙은 `docs/readinggo/specs/`. 이 파일은 v6 이전 레거시(역사 보존용). 공통 핸드링으로 이 파일을 수정하지 마세요.
+
 # ReadingGo Spec — 분할됨 (Moved)
 
 > **2026-05-28 분할 완료.** 본 파일은 redirect 안내용으로만 남는다.

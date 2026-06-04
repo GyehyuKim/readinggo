@@ -1,6 +1,6 @@
 # 신규 가입 여정 — 유저 시나리오
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6. 원 위치: §4 A~H.
+> **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6. 원 위치: §4 A~H.
 > **v7 갱신 (2026-06-01)**: "모이"→"한 문장", 결정 마찰 카피 제거, 탭 **둥지/마을/소셜/프로필**, 홈은 **둥지 자람**(The Path 제거), 리액션 **짹**, 알림은 **Phase 2 PWA 이후**, Capacitor 언급 제거(web-first).
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 준수.
 

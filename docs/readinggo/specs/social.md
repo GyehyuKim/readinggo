@@ -1,6 +1,6 @@
 # 소셜 탭 — 화면 스펙
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6. 원 위치: §5.7.
+> **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6. 원 위치: §5.7.
 > **v7 갱신 (2026-06-01)**: "모이"→"한 문장", **페이지 기반 스포일러 블라인드(§5.7.1) 신설** (`is_private` 폐기), 리액션 **짹** 확정. 피드는 **전체 공개**. 짹 XP는 [systems.md §6.3](./systems.md).
 > **v7.1 갱신 (2026-06-04, QA 2차)**: 피드 **팔로우/최근/추천 3탭**, `is_private` 재도입 + 감상 `note_private`. [decisions §8.1](./meta/decisions.md).
 > **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, Instagram 모델 — §5.7.1). [decisions §8.3](./meta/decisions.md).
@@ -42,6 +42,7 @@
 | 본인 카드 | 짹·책갈피 비활성 |
 | 감상(`my_note`) | **피드 비노출** — 본인 프로필·책 상세에서만 ([profile.md §5.8.4](./profile.md)). 공개여부는 `note_private` 토글(§5.7.1) |
 | 빈 상태 | "아직 한 문장이 없어요. 오늘의 문장을 남겨보세요 🐦" |
+| 카드 리뷰 (v7.2, #186) | 피드 상단 **'🃏 카드로 넘겨보기'** → 한 문장을 틴더식 스와이프 카드로. **우=좋아요**(짹+책갈피)·**좌=넘김**·**아래=유예**. 내 문장으로 책 리뷰 / 타인 문장으로 예습·복습. Pointer Events 직접 구현(Stack Lock, 라이브러리 없음) |
 
 > v7 폐기: ~~주간 리그~~([systems.md §6.5](./systems.md)), ~~"모이"~~.
 

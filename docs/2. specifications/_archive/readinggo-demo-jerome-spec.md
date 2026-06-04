@@ -1,3 +1,5 @@
+> ⚠️ **DEPRECATED (2026-06-04 아카이브)** — 정본 스펙은 `docs/readinggo/specs/`. 이 파일은 v6 이전 레거시(역사 보존용). 공통 핸드링으로 이 파일을 수정하지 마세요.
+
 # ReadingGo Phase 0 데모 구현 스펙 — jerome 버전
 
 > v4.1 스펙(PR #87)을 받아 구현한 Phase 0 웹 데모(`readinggo-v4.html`)에서 확정된

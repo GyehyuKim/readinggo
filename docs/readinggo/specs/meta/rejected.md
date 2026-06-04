@@ -1,6 +1,6 @@
 # 의도적 기각 결정 (보존)
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §14. 변경 이력은 git log 참조.
+> **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §14. 변경 이력은 git log 참조.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 14. 의도적 기각 결정 (보존)
