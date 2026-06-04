@@ -250,42 +250,56 @@ function NestTheatre({ progressPct, streak, prevTwigs }) {
 function ReadingMode({ book, onClose, onArchive }) {
   const [secs, setSecs] = _useState(0);
   const [running, setRunning] = _useState(true);
-  const [page, setPage] = _useState(book.cur || 0);
+  const [page, setPage] = _useState(String(book.cur || 0)); // 문자열 — 빈칸 허용(페이지 미상)
   const [text, setText] = _useState('');
   const [saved, setSaved] = _useState([]);
+  const [closing, setClosing] = _useState(false);            // 종료 확인 단계
+  const [finalPage, setFinalPage] = _useState(String(book.cur || 0));
   const ubRef = _useRef(null);
+  const total = book.total || 0;
   _useEffect(() => {
     Promise.resolve(DataStore.activeBook.get()).then((ub) => { if (ub) ubRef.current = ub.id; }).catch(() => {});
   }, []);
   _useEffect(() => {
-    if (!running) return;
+    if (!running || closing) return;
     const t = setInterval(() => setSecs((s) => s + 1), 1000);
     const onVis = () => { if (document.hidden) setRunning(false); };
     document.addEventListener('visibilitychange', onVis);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
-  }, [running]);
+  }, [running, closing]);
   const fmt = (s) => {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
     return (h > 0 ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
   };
+  const pageNum = (s) => { const n = parseInt(s, 10); return isNaN(n) ? null : Math.max(0, total ? Math.min(total, n) : n); };
+  const bump = (d) => setPage((s) => String(Math.max(0, (parseInt(s, 10) || 0) + d)));
   const save = () => {
     const t = text.trim();
     if (!t) { showToast('한 문장을 적어주세요'); return; }
+    const p = pageNum(page); // 비어있으면 null(페이지 없이 저장)
     const ubId = ubRef.current;
-    if (DataStore.sessions && DataStore.sessions.addToday) Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page })).catch(() => {});
-    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page, text: t })).then(() => {
-      setSaved((list) => [{ text: t, page }, ...list]);
+    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: p, text: t })).then(() => {
+      setSaved((list) => [{ text: t, page: p }, ...list]);
       setText('');
-      showToast('📍 ' + page + 'p 한 문장 저장됨');
-      if (onArchive) onArchive({ text: t, bookId: book.id, page, when: '방금' });
+      showToast(p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨');
+      if (onArchive) onArchive({ text: t, bookId: book.id, page: p, when: '방금' });
     }).catch(() => showToast('저장 실패 — 다시 시도'));
+  };
+  // 독서 종료: 최종 읽은 쪽 확인 → 진도/스트릭 반영(체크인) → 닫기. 미입력 시 마지막 페이지 유지.
+  const finish = () => {
+    const fp = pageNum(finalPage);
+    const ubId = ubRef.current;
+    const done = () => { showToast('📖 ' + fmt(secs) + ' 독서 완료' + (fp != null ? ' · ' + fp + 'p' : '')); onClose(); };
+    if (DataStore.sessions && DataStore.sessions.addToday) {
+      Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: fp != null ? fp : (book.cur || 0) })).then(done).catch(done);
+    } else done();
   };
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#F4F2EC', fontSize: 20, cursor: 'pointer' }}>←</button>
+        <button onClick={() => setRunning((r) => !r)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 12px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{running ? '⏸' : '▶'}</button>
         <div style={{ fontSize: 22, fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: 1 }}>⏱ {fmt(secs)}</div>
-        <button onClick={() => setRunning((r) => !r)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 14px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{running ? '⏸ 일시정지' : '▶ 계속'}</button>
+        <button onClick={() => { setFinalPage(page); setClosing(true); }} style={{ background: 'var(--brand)', border: 'none', color: '#fff', borderRadius: 16, padding: '6px 14px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>독서 종료</button>
       </div>
       <div style={{ padding: '20px 18px 10px', textAlign: 'center' }}>
         <div style={{ fontSize: 17, fontWeight: 900 }}>{book.title}</div>
@@ -294,25 +308,43 @@ function ReadingMode({ book, onClose, onArchive }) {
       {/* 상시 입력칸 */}
       <div style={{ padding: '8px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, justifyContent: 'center' }}>
-          <span style={{ fontSize: 13, opacity: 0.8 }}>📍 이 문장의 페이지</span>
-          <button onClick={() => setPage((p) => Math.max(0, p - 1))} style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 16, cursor: 'pointer' }}>−</button>
-          <input type="number" value={page} onChange={(e) => setPage(Math.max(0, Math.min(book.total || 9999, parseInt(e.target.value, 10) || 0)))} style={{ width: 64, textAlign: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#F4F2EC', fontSize: 15, fontWeight: 800, padding: '6px 0' }} />
-          <button onClick={() => setPage((p) => Math.min(book.total || 9999, p + 1))} style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 16, cursor: 'pointer' }}>+</button>
+          <span style={{ fontSize: 13, opacity: 0.8 }}>📍 이 문장 페이지</span>
+          <button onClick={() => bump(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>−</button>
+          <input type="number" inputMode="numeric" value={page} placeholder="—" onChange={(e) => setPage(e.target.value)} onBlur={() => setPage((s) => s === '' ? '' : String(pageNum(s) ?? ''))} style={{ width: 60, textAlign: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#F4F2EC', fontSize: 15, fontWeight: 800, padding: '6px 0' }} />
+          <button onClick={() => bump(1)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>+</button>
+          {total > 0 && <span style={{ fontSize: 11, opacity: 0.5 }}>/ {total}p</span>}
         </div>
         <textarea value={text} onChange={(e) => { if (e.target.value.length <= 1000) setText(e.target.value); }} placeholder="떠오른 한 문장을 바로 옮겨 적어요…" rows={3}
           style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
-        <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>✨ 한 문장 저장 ({text.length}/1000)</button>
+        <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>✨ 한 문장 저장{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
       </div>
       {/* 이번 세션 아카이브 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 24px' }}>
         {saved.length > 0 && <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 800, margin: '8px 0' }}>이번 독서에서 모은 {saved.length}문장</div>}
         {saved.map((s, i) => (
           <div key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>{s.page}p</div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>{s.page != null ? s.page + 'p' : '페이지 미상'}</div>
             <div style={{ fontSize: 14, lineHeight: 1.5, fontStyle: 'italic' }}>"{s.text}"</div>
           </div>
         ))}
       </div>
+      {/* 종료 확인 — 최종 읽은 쪽 */}
+      {closing && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={(e) => { if (e.target === e.currentTarget) setClosing(false); }}>
+          <div style={{ background: '#22252B', borderRadius: 16, padding: 24, width: '100%', maxWidth: 320 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>📖 어디까지 읽으셨어요?</div>
+            <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 14 }}>오늘 {fmt(secs)} 읽음 · {saved.length}문장 기록</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+              <button onClick={() => setFinalPage((s) => String(Math.max(0, (parseInt(s, 10) || 0) - 1)))} style={{ width: 36, height: 36, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>−</button>
+              <input type="number" inputMode="numeric" value={finalPage} onChange={(e) => setFinalPage(e.target.value)} style={{ width: 80, textAlign: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#F4F2EC', fontSize: 18, fontWeight: 900, padding: '8px 0' }} />
+              <button onClick={() => setFinalPage((s) => String((parseInt(s, 10) || 0) + 1))} style={{ width: 36, height: 36, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>+</button>
+              {total > 0 && <span style={{ fontSize: 12, opacity: 0.5 }}>/ {total}p</span>}
+            </div>
+            <button onClick={finish} style={{ width: '100%', padding: 13, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>완료</button>
+            <button onClick={() => setClosing(false)} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 12, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>계속 읽기</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
