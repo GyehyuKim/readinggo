@@ -49,6 +49,7 @@ verifier exit 0 → DONE 파일 작성. exit 1 → 다음 iteration.
 
 - [`nest-align/`](./nest-align/) — `nest.js` 와 `nest.md` 정합. Phase 0 데모 핵심 경로.
 - [`drift-defense/`](./drift-defense/) — Spec drift GitHub Action. Pattern A (Mechanical gate), warn-only.
+- [`spec-align-full/`](./spec-align-full/) — **전체 SSOT 9파일 line-by-line ↔ 코드 추적**(`_traceability.md`) + 코드 정합. Verifier: `tests/spec-align/align_v7.py` + 추적표 완전성.
 
 ## 주의
 
