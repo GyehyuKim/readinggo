@@ -181,6 +181,8 @@ const SearchModal = ({
           style={{
             flex: 1,
             overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            WebkitOverflowScrolling: 'touch',
             padding: '8px 0',
           }}
         >
