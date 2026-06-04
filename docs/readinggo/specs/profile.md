@@ -1,6 +1,6 @@
 # 내서재(프로필) — 화면 스펙
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6. 원 위치: §5.8-5.9.
+> **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6. 원 위치: §5.8-5.9.
 > **v7 갱신 (2026-06-01)**: "모이"→"한 문장", **완독 별점·소감 신설**, **성(🏰) 컬렉션 전시 신설**, **책장 전체 공개**, AI 추천 **나↔책 한정**(친구 매칭 아님), 락인 정당화 카드 제거. 스포일러는 [social.md §5.7.1](./social.md) 규칙 참조.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 준수.
 

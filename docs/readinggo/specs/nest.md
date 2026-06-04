@@ -1,6 +1,6 @@
 # 둥지 탭 — 화면 스펙
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6. 원 위치: §5.1-5.4.
+> **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6. 원 위치: §5.1-5.4.
 > **v7 갱신 (2026-06-01)**: The Path(세션 노드)·첫 7일 가속·운영자 졸업 짹 **제거**. 둥지 시각화 = **"둥지가 자란다"**(진척률 5단계). **성(🏰) 컬렉션 신설**(완독=🏰 1개). "모이"→"한 문장". XP 수치는 [systems.md](./systems.md) SSOT.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 준수.
 

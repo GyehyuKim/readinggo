@@ -1,6 +1,6 @@
 # 시스템 로직 (스트릭·방패·XP·휴식코스·NPC)
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6. 원 위치: §6.
+> **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6. 원 위치: §6.
 > **v7 갱신 (2026-06-01)**: **XP 차감 폐지**, 박수/짹 → **짹 1종으로 통합**, **주간 리그 삭제**, **휴식코스 신설**(상세 미정). "모이"→"한 문장". 둥지·성은 XP와 무관(진척률/완독). 이 파일이 **XP 수치 SSOT** — 타 파일은 링크 참조.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 준수.
 

@@ -1,6 +1,6 @@
 # 백엔드 스펙 (플랫폼·인증·DataStore 계약·데이터 모델)
 
-> **Split from** `docs/2. specifications/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §7.
+> **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §7.
 > **v7 갱신 (2026-06-01)**: web-first 재정의. Capacitor 보류 → 순수 웹(Phase 0/1). 운영자 짹·스포일러 컬럼(`is_private`)·`chapter_id` 자동매핑 제거, 완독 별점·소감·마을 테이블 추가, **DataStore 계약(§7.2) 신설**. 변경 이력은 git log 참조.
 > **v7.1 갱신 (2026-06-04, QA 2차)**: `is_private` 재도입 + `note_private`, **DB CHECK 제약**(`04_constraints.sql`), 닉네임 규칙 `{2,20}`, 이메일 **autoconfirm**(베타 한정). [decisions §8.1](./meta/decisions.md).
 > **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, `06_privacy_v2.sql`), `admin.stats()`·`claps.isMine`·`friends.unfollow/isFollowing`·`users.public*`·`sessions.calendar` 계약 추가, 마을 Supabase 연동·이메일 브랜딩. [decisions §8.2/§8.3](./meta/decisions.md).

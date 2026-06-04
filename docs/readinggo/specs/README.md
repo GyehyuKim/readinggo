@@ -2,7 +2,7 @@
 
 > **기준**: **v7 (2026-06-01) — web-first 재정의 + v6 롤백.** 용어는 §0.5, Phase·스택은 §3, 데이터·DataStore 계약은 [backend.md](./backend.md). 분할 기반은 v6 (2026-05-28, #107 머지본)
 > **분할일**: 2026-05-28
-> **원본**: `docs/2. specifications/readinggo-spec.md` (1,651줄 단일 파일)을 강의 Week 11 *thin spec* 처방 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week11-spec-honest-synthesis))에 따라 피처별로 분할.
+> **원본**: `docs/2. specifications/_archive/readinggo-spec.md` (1,651줄 단일 파일)을 강의 Week 11 *thin spec* 처방 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week11-spec-honest-synthesis))에 따라 피처별로 분할.
 > **편집 정책**: 변경은 *해당 피처 파일* PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ---
