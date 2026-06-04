@@ -143,6 +143,21 @@
         return unwrap(await sb().from('reading_sessions').select('*').eq('user_book_id', userBookId)
           .order('session_date', { ascending: false }));
       },
+      // 스트릭 캘린더용 — 최근 days 일의 읽은 날짜 + 방패 쓴 날짜 (#173)
+      async calendar(days) {
+        const id = await uid();
+        const since = new Date(Date.now() - (days || 35) * 86400 * 1000).toISOString().slice(0, 10);
+        let readDates = [], shieldDates = [];
+        try {
+          const sess = unwrap(await sb().from('reading_sessions').select('session_date').eq('user_id', id).gte('session_date', since));
+          readDates = (sess || []).map(r => r.session_date);
+        } catch (e) {}
+        try {
+          const sh = unwrap(await sb().from('shield_log').select('consumed_at').eq('user_id', id).gte('consumed_at', since));
+          shieldDates = (sh || []).map(r => String(r.consumed_at).slice(0, 10));
+        } catch (e) {}
+        return { readDates, shieldDates };
+      },
     },
 
     /* 한 문장 (sentences) */

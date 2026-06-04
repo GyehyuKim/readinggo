@@ -126,6 +126,8 @@ function App() {
   // 책 정보 모달(#11) — 한 문장의 책 제목 탭으로 열림.
   const [bookDetailId, setBookDetailId] = useState(null);
   useEffect(() => { window.RG_openBook = (id) => setBookDetailId(id); return () => { window.RG_openBook = null; }; }, []);
+  // 스트릭 캘린더(#173) — 🔥 탭으로 열림.
+  const [streakOpen, setStreakOpen] = useState(false);
   const [appState, setAppState] = useState(() => ({
     ...INITIAL_STATE,
     // village sent 상태는 로컬 복사
@@ -377,10 +379,10 @@ function App() {
                 <span className="ico">🏰</span>
                 <span>×{castleCount}</span>
               </button>
-              <span className="stat fire" title="연속 출석">
+              <button className="stat fire" title="스트릭 캘린더 — 탭" onClick={() => setStreakOpen(true)} style={{ cursor: 'pointer', font: 'inherit' }}>
                 <span className="ico">🔥</span>
                 <span>{appState.streak}</span>
-              </span>
+              </button>
               <span className="stat gold" title="이번 주 XP">
                 <span className="ico">⚡</span>
                 <span>{appState.xp}</span>
@@ -500,6 +502,12 @@ function App() {
         {/* 책 정보 모달 (#11) — 한 문장 책 제목 탭 */}
         {bookDetailId && ReactDOM.createPortal(
           <BookInfoModal bookId={bookDetailId} onClose={() => setBookDetailId(null)} />,
+          document.body
+        )}
+
+        {/* 스트릭 캘린더 (#173) — 🔥 탭 */}
+        {streakOpen && ReactDOM.createPortal(
+          <StreakCalendarModal streak={appState.streak} onClose={() => setStreakOpen(false)} />,
           document.body
         )}
 
