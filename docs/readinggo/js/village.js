@@ -3,8 +3,37 @@
    마을 탭: 목록 / 찾기 / 추천 / 지난 마을
    ========================================================= */
 
+/* Supabase village row → VillageView 내부 town 형태 변환 */
+function _villageRowToTown(v, collection, myUserId) {
+  const parts = Array.isArray(v.parts) ? v.parts : [];
+  const totalParts = parts.length || 1;
+  const isMyVillage = myUserId && v.created_by === myUserId;
+  return {
+    id: v.id,
+    bookId: v.book_id || '',
+    name: v.name || '',
+    description: v.description || '',
+    collection: collection || 'active',
+    visibility: v.visibility || 'public',
+    inviteCode: v.invite_code || null,
+    capacity: null,
+    myRole: isMyVillage ? 'admin' : 'member',
+    coAdmins: [],
+    memberCount: v.member_count || 0,
+    currentPart: 1,
+    totalParts: totalParts,
+    dday: 0,
+    isOpen: true,
+    leader: '',
+    currentRange: parts[0] ? (parts[0].title || '') : '',
+    status: 'active',
+    milestones: parts.map(p => ({ part: p.part_order, dueDate: p.due_date || null, completed: false })),
+    members: [],
+  };
+}
+
 function VillageView({ state, onSelectTown }) {
-  const { useMemo, useState } = React;
+  const { useMemo, useState, useEffect } = React;
   const [isFinderOpen, setIsFinderOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [finderTab, setFinderTab] = useState('code');
@@ -22,7 +51,44 @@ function VillageView({ state, onSelectTown }) {
   const [createBookId, setCreateBookId] = useState((state.book && state.book.id) || 'b001');
   const [createError, setCreateError] = useState('');
 
-  const towns = state.towns || [];
+  // Supabase 연동: 내 마을 + 공개 마을을 비동기 로드. 실패 시 데모 데이터 유지.
+  const [towns, setTowns] = useState(state.towns || []);
+  const [myVillageIds, setMyVillageIds] = useState([]);
+
+  useEffect(() => {
+    const DS = window.DataStore;
+    if (!DS || !DS.villages || !DS.villages.listMine) return;
+    let alive = true;
+
+    Promise.all([
+      Promise.resolve(DS.villages.listMine()).catch(() => null),
+      Promise.resolve(DS.villages.listPublic && DS.villages.listPublic({ limit: 30 })).catch(() => null),
+    ]).then(([mine, pub]) => {
+      if (!alive) return;
+
+      // mine: active collection (내가 속한 마을)
+      const mineIds = [];
+      const mineTowns = [];
+      (mine || []).forEach(v => {
+        if (!v) return;
+        mineIds.push(v.id);
+        mineTowns.push(_villageRowToTown(v, 'active', v.created_by));
+      });
+
+      // pub: recommended collection, 내 마을 제외 (#170)
+      const pubTowns = (pub || [])
+        .filter(v => v && !mineIds.includes(v.id))
+        .map(v => _villageRowToTown(v, 'recommended', null));
+
+      const merged = [...mineTowns, ...pubTowns];
+      if (merged.length > 0) {
+        setTowns(merged);
+        setMyVillageIds(mineIds);
+      }
+    });
+
+    return () => { alive = false; };
+  }, []);
   const codeInputRef = React.useRef(null);
 
   const getDday = (dday) => {
@@ -143,36 +209,60 @@ function VillageView({ state, onSelectTown }) {
       return;
     }
 
-    // Phase0: create town in-memory and navigate into it
-    const id = 'town_' + Math.random().toString(36).slice(2,9);
     const normalizedCapacity = capacityValue || null;
-    const invite = createVisibility === 'private' ? Array.from({length:6}).map(()=>String.fromCharCode(65+Math.floor(Math.random()*26))).join('') : null;
-    const newTown = {
-      id,
-      bookId: createBookId,
-      name: createTitle.trim(),
-      collection: 'active',
-      visibility: createVisibility,
-      inviteCode: invite,
-      capacity: normalizedCapacity,
-      myRole: 'admin',
-      coAdmins: [],
-      memberCount: 1,
-      currentPart: 1,
-      totalParts: partCount,
-      dday: 0,
-      isOpen: true,
-      leader: '@jerome',
-      currentRange: '프롤로그',
-      status: 'active',
-      milestones: Array.from({ length: partCount }).map((_,i)=>({ part: i+1, dueDate: null, completed: false })),
-      members: [ { name: 'jerome', nest: '🏠', avatar: '🐦', todayRecorded: false, quote: '', cumulativePage: state.book ? state.book.cur || 0 : 0, streak: 0, xp: state.xp || 0 } ],
-    };
-    state.towns = state.towns || [];
-    state.towns.push(newTown);
-    showToast(`마을을 만들었어요: ${newTown.name}`);
-    closeCreateTown();
-    onSelectTown(newTown.id);
+    const parts = Array.from({ length: partCount }).map((_, i) => ({ part_order: i + 1, title: null, end_page: null, due_date: null }));
+
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.create) {
+      // Supabase 연동: 실제 마을 생성
+      Promise.resolve(DS.villages.create({
+        bookId: createBookId,
+        name: createTitle.trim(),
+        visibility: createVisibility,
+        parts,
+      })).then(v => {
+        if (!v) { setCreateError('마을 생성에 실패했어요. 다시 시도해주세요.'); return; }
+        const newTown = _villageRowToTown(v, 'active', v.created_by);
+        newTown.myRole = 'admin';
+        newTown.memberCount = 1;
+        setTowns(prev => [...prev, newTown]);
+        setMyVillageIds(prev => [...prev, newTown.id]);
+        showToast(`마을을 만들었어요: ${newTown.name}`);
+        closeCreateTown();
+        onSelectTown(newTown.id);
+      }).catch(e => {
+        setCreateError('마을 생성 중 오류가 발생했어요: ' + ((e && e.message) || ''));
+      });
+    } else {
+      // 폴백: in-memory (데모 모드)
+      const id = 'town_' + Math.random().toString(36).slice(2,9);
+      const invite = createVisibility === 'private' ? Array.from({length:6}).map(()=>String.fromCharCode(65+Math.floor(Math.random()*26))).join('') : null;
+      const newTown = {
+        id,
+        bookId: createBookId,
+        name: createTitle.trim(),
+        collection: 'active',
+        visibility: createVisibility,
+        inviteCode: invite,
+        capacity: normalizedCapacity,
+        myRole: 'admin',
+        coAdmins: [],
+        memberCount: 1,
+        currentPart: 1,
+        totalParts: partCount,
+        dday: 0,
+        isOpen: true,
+        leader: '@jerome',
+        currentRange: '프롤로그',
+        status: 'active',
+        milestones: Array.from({ length: partCount }).map((_,i)=>({ part: i+1, dueDate: null, completed: false })),
+        members: [ { name: 'jerome', nest: '🏠', avatar: '🐦', todayRecorded: false, quote: '', cumulativePage: state.book ? state.book.cur || 0 : 0, streak: 0, xp: state.xp || 0 } ],
+      };
+      setTowns(prev => [...prev, newTown]);
+      showToast(`마을을 만들었어요: ${newTown.name}`);
+      closeCreateTown();
+      onSelectTown(newTown.id);
+    }
   };
 
   const submitInviteCode = () => {
@@ -182,14 +272,31 @@ function VillageView({ state, onSelectTown }) {
       return;
     }
 
-    const matchedTown = towns.find((town) => (town.inviteCode || '').toUpperCase() === normalized);
-    if (!matchedTown) {
-      setFinderError('마을을 찾을 수 없어요. 코드를 다시 확인해주세요.');
+    // 로컬 목록에서 먼저 찾기
+    const localMatch = towns.find((town) => (town.inviteCode || '').toUpperCase() === normalized);
+    if (localMatch) {
+      setFinderError('');
+      setPreviewTown(localMatch);
       return;
     }
 
-    setFinderError('');
-    setPreviewTown(matchedTown);
+    // Supabase에서 invite_code로 조회
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.listPublic) {
+      Promise.resolve(DS.villages.listPublic({ limit: 200 })).then(rows => {
+        const matched = (rows || []).find(v => (v.invite_code || '').toUpperCase() === normalized);
+        if (!matched) {
+          setFinderError('마을을 찾을 수 없어요. 코드를 다시 확인해주세요.');
+          return;
+        }
+        setFinderError('');
+        setPreviewTown(_villageRowToTown(matched, 'recommended', null));
+      }).catch(() => {
+        setFinderError('마을을 찾을 수 없어요. 코드를 다시 확인해주세요.');
+      });
+    } else {
+      setFinderError('마을을 찾을 수 없어요. 코드를 다시 확인해주세요.');
+    }
   };
 
   const openTownPreview = (town) => {
@@ -203,17 +310,37 @@ function VillageView({ state, onSelectTown }) {
     const town = previewTown;
     const isPast = (town.collection || '') === 'past' || town.status === 'completed';
     if (isPast) { setFinderError('이 마을은 완료되어 참여할 수 없습니다.'); return; }
-    const already = (town.members || []).some(m => m.name === 'jerome');
-    if (already) { setFinderError('이미 참여 중인 마을입니다.'); return; }
+    const alreadyMine = myVillageIds.includes(town.id);
+    if (alreadyMine) { setFinderError('이미 참여 중인 마을입니다.'); return; }
     if (town.capacity && (town.memberCount || (town.members||[]).length) >= town.capacity) { setFinderError('정원이 마감되었습니다.'); return; }
 
-    // add member (Phase0 in-memory simulation)
-    town.members = town.members || [];
-    town.members.push({ name: 'jerome', nest: '🏠', avatar: '🐦', todayRecorded: false, quote: '', cumulativePage: state.book ? state.book.cur || 0 : 0, streak: 0, xp: state.xp || 0 });
-    town.memberCount = (town.memberCount || 0) + 1;
-    showToast('마을에 참여했습니다');
-    onSelectTown(town.id);
-    closeFinder();
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.join) {
+      // Supabase 연동: 실제 참여
+      Promise.resolve(DS.villages.join(town.id)).then(() => {
+        const joinedTown = { ...town, collection: 'active', myRole: 'member', memberCount: (town.memberCount || 0) + 1 };
+        setTowns(prev => {
+          const without = prev.filter(t => t.id !== town.id);
+          return [...without, joinedTown];
+        });
+        setMyVillageIds(prev => [...prev, town.id]);
+        showToast('마을에 참여했습니다');
+        onSelectTown(town.id);
+        closeFinder();
+      }).catch(e => {
+        setFinderError('참여 중 오류가 발생했어요: ' + ((e && e.message) || ''));
+      });
+    } else {
+      // 폴백: in-memory (데모 모드)
+      const joinedTown = { ...town, collection: 'active', myRole: 'member', memberCount: (town.memberCount || 0) + 1 };
+      setTowns(prev => {
+        const without = prev.filter(t => t.id !== town.id);
+        return [...without, joinedTown];
+      });
+      showToast('마을에 참여했습니다');
+      onSelectTown(town.id);
+      closeFinder();
+    }
   };
 
   return (

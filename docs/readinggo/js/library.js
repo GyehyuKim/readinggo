@@ -51,14 +51,26 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       setBmarks(prev => { const n = new Set(prev || []); if (on) n.add(q.id); else n.delete(q.id); return n; });
     }).catch(() => {});
   };
-  // 한 문장/감상 공개·비공개 토글 (QA #12). priv: id -> {is_private, note_private} 로컬 override.
-  const [priv, setPriv] = _useState({});
-  const isPriv = (q, field) => { const o = priv[q.id]; return (o && o[field] !== undefined) ? o[field] : (field === 'is_private' ? !!q.isPrivate : !!q.notePrivate); };
-  const togglePriv = (q, field) => {
+  // visibility 3단계: public(전체) | followers(친구만) | private(나만) (#179)
+  const _VIS_CYCLE = ['public', 'followers', 'private'];
+  const _VIS_ICON = { public: '🌐', followers: '👥', private: '🔒' };
+  const _VIS_LABEL = { public: '전체 공개', followers: '친구만', private: '나만 보기' };
+  const [vis, setVis] = _useState({});
+  const getVis = (q) => vis[q.id] || q.visibility || (q.isPrivate ? 'private' : 'public');
+  const cycleVis = (q) => {
     if (!q.id || !(DataStore.sentences && DataStore.sentences.setVisibility)) return;
-    const next = !isPriv(q, field);
-    setPriv(m => ({ ...m, [q.id]: { ...(m[q.id] || {}), [field]: next } }));
-    Promise.resolve(DataStore.sentences.setVisibility(q.id, { [field]: next })).catch(() => {});
+    const next = _VIS_CYCLE[(_VIS_CYCLE.indexOf(getVis(q)) + 1) % _VIS_CYCLE.length];
+    setVis(m => ({ ...m, [q.id]: next }));
+    Promise.resolve(DataStore.sentences.setVisibility(q.id, { visibility: next })).catch(() => {});
+  };
+  // note_private 별도 유지 (감상만 비공개)
+  const [priv, setPriv] = _useState({});
+  const isPrivNote = (q) => { const o = priv[q.id]; return (o && o.note_private !== undefined) ? o.note_private : !!q.notePrivate; };
+  const togglePrivNote = (q) => {
+    if (!q.id || !(DataStore.sentences && DataStore.sentences.setVisibility)) return;
+    const next = !isPrivNote(q);
+    setPriv(m => ({ ...m, [q.id]: { ...(m[q.id] || {}), note_private: next } }));
+    Promise.resolve(DataStore.sentences.setVisibility(q.id, { note_private: next })).catch(() => {});
   };
 
   // 교보 상세는 ISBN 이 아닌 교보 고유번호(S…)를 써서 ISBN 직링크가 깨짐 → 검색결과로(QA #1-B).
@@ -160,9 +172,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                       <span>{q.page}p · {q.when}</span>
                       {q.id && (
                         <span style={{display:'flex', gap:8, alignItems:'center'}}>
-                          <button onClick={() => togglePriv(q, 'is_private')} title={isPriv(q,'is_private') ? '비공개(나만 보기) — 탭하면 공개' : '공개 — 탭하면 비공개'}
+                          <button onClick={() => cycleVis(q)} title={_VIS_LABEL[getVis(q)]}
                             style={{background:'none', border:'none', cursor:'pointer', fontSize:13, padding:0, lineHeight:1}}>
-                            {isPriv(q,'is_private') ? '🔒' : '🌐'}
+                            {_VIS_ICON[getVis(q)]}
                           </button>
                           <button onClick={() => toggleFav(q)} title="좋아요(즐겨찾기)"
                             style={{background:'none', border:'none', cursor:'pointer', fontSize:14, padding:0, lineHeight:1}}>
@@ -201,9 +213,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                                 💬 {note}
                               </div>
                               {q.id && (
-                                <button onClick={() => togglePriv(q, 'note_private')}
+                                <button onClick={() => togglePrivNote(q)}
                                   style={{marginTop:4, background:'none', border:'none', color:'var(--ink-3)', fontSize:11, fontWeight:700, cursor:'pointer', padding:'2px 0'}}>
-                                  {isPriv(q,'note_private') ? '🔒 감상 비공개' : '🌐 감상 공개'}
+                                  {isPrivNote(q) ? '🔒 감상 비공개' : '🌐 감상 공개'}
                                 </button>
                               )}
                             </div>

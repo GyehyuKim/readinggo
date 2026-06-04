@@ -173,9 +173,12 @@
       async setNote(sentenceId, my_note) {
         return unwrap(await sb().from('sentences').update({ my_note }).eq('id', sentenceId).select().single());
       },
-      // 한 문장/감상 공개·비공개 토글 (QA #12). patch = { is_private } 또는 { note_private }.
+      // 한 문장/감상 공개·비공개 토글 (QA #12).
+      // patch: { visibility?: 'public'|'followers'|'private', note_private?: boolean }
+      // note_private(감상 비공개)는 유지. is_private는 deprecated — visibility로 대체(v7.2).
       async setVisibility(sentenceId, patch) {
-        return unwrap(await sb().from('sentences').update(patch).eq('id', sentenceId).select().single());
+        // patch: { visibility?: 'public'|'followers'|'private', note_private?: boolean }
+        return unwrap(await sb().from('sentences').update(patch).eq('id', sentenceId).eq('user_id', await uid()).select().single());
       },
       async listByBook(userBookId) {
         return unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)
@@ -444,6 +447,11 @@
       },
       async members(villageId) {
         return unwrap(await sb().from('village_members').select('joined_at, user:users(*)').eq('village_id', villageId));
+      },
+      async listPublic({ limit } = {}) {
+        let q = sb().from('villages').select('*, parts:village_parts(*)').eq('visibility', 'public').order('created_at', { ascending: false });
+        if (limit) q = q.limit(limit);
+        return unwrap(await q) || [];
       },
     },
 
