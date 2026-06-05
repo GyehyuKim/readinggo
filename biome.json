@@ -1,0 +1,19 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+  "files": { "includes": ["docs/readinggo/js/**/*.js", "worker/**/*.mjs", "netlify/functions/**"] },
+  "formatter": { "enabled": false },
+  "javascript": {
+    "globals": ["React", "ReactDOM", "DataStore", "SupabaseDataStore", "Fuse", "showToast", "RG_SB", "RG_ME", "RG_CONFIG"]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "suspicious": {
+        "noDebugger": "error",
+        "noDuplicateObjectKeys": "error",
+        "noDoubleEquals": "off"
+      }
+    }
+  }
+}
