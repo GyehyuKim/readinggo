@@ -33,6 +33,27 @@ jobs:
       - name: Spec-align invariants
         run: python tests/spec-align/align_v7.py
 
+  contract:
+    name: contract (DataStore 계약 — UI 호출↔어댑터)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # 피처가 호출하는 DataStore.X.method() 가 supabase 어댑터에 실제 존재하는지 정적 검증 (#257).
+      - name: DataStore contract
+        run: node tests/contract/datastore-contract.mjs
+
+  lint:
+    name: lint (biome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 최소 룰셋(noDebugger·중복키)으로 시작 — 점진 강화 (#258).
+      - name: Biome lint
+        run: npx @biomejs/biome@2 lint
+
   issue-link:
     name: issue-link (PR↔이슈 연결 강제)
     if: github.event_name == 'pull_request'   # PR 에만 적용 (main push 는 skip)
