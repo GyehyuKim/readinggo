@@ -299,12 +299,24 @@ function ReadingMode({ book, onClose, onArchive, onChecked }) {
   };
   // 독서 종료: 최종 읽은 쪽 확인 → 진도/스트릭 반영(체크인) → 닫기. 미입력 시 마지막 페이지 유지.
   const finish = () => {
-    const fp = pageNum(finalPage);
+    const fp = pageNum(finalPage); // pageNum 이 total 로 클램프 → 초과 입력 방지
     const ubId = ubRef.current;
-    const done = () => { showToast('📖 ' + fmt(secs) + ' 독서 완료' + (fp != null ? ' · ' + fp + 'p' : '')); if (onChecked) onChecked(); onClose(); };
+    const finalP = fp != null ? fp : (book.cur || 0);
+    const reached100 = total > 0 && finalP >= total; // 마지막 쪽 도달 → 완독 (망령 책 방지 #265)
+    const done = () => {
+      showToast(reached100 ? '🏰 완독을 축하해요! 성이 하나 늘었어요' : ('📖 ' + fmt(secs) + ' 독서 완료' + (fp != null ? ' · ' + fp + 'p' : '')));
+      if (onChecked) onChecked();
+      onClose();
+    };
+    // 체크인(진도/스트릭) 후, 100% 도달 시 완독 처리까지 이어서 실행.
+    const afterSession = () => {
+      if (reached100 && ubId && DataStore.books && DataStore.books.complete) {
+        Promise.resolve(DataStore.books.complete(ubId)).then(done).catch(done);
+      } else done();
+    };
     if (DataStore.sessions && DataStore.sessions.addToday) {
-      Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: fp != null ? fp : (book.cur || 0) })).then(done).catch(done);
-    } else done();
+      Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: finalP })).then(afterSession).catch(afterSession);
+    } else afterSession();
   };
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>

@@ -29,6 +29,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .catch(() => showToast('저장 실패'));
     setEditMeta(false);
   };
+  // 수동 완독 표시 (#265 안전망): 읽기 모드가 100% 트리거를 놓쳤거나 total 미상이던 '망령 책' 복구용.
+  const markDone = () => {
+    if (!book.ubId || !(DataStore.books && DataStore.books.complete)) return;
+    if (!window.confirm(`'${book.title}'을(를) 완독으로 표시할까요?`)) return;
+    Promise.resolve(DataStore.books.complete(book.ubId))
+      .then(() => showToast('🏰 완독으로 표시했어요 — 새로고침하면 반영돼요'))
+      .catch(() => showToast('완독 처리 실패 — 다시 시도'));
+  };
   const saveNote = (q) => {
     if (!q.id || !(DataStore.sentences && DataStore.sentences.setNote)) { setEditingId(null); return; }
     Promise.resolve(DataStore.sentences.setNote(q.id, draft))
@@ -170,7 +178,15 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </div>
           )}
 
-          <a href={kyoboUrl} target="_blank" rel="noopener noreferrer" 
+          {/* 수동 완독 표시 (#265): 미완독 등록 책에만 노출 — 100% 트리거를 놓친 '망령 책' 복구. */}
+          {!bookshelfEntry && book.ubId && (
+            <button onClick={markDone}
+              style={{display:'block', width:'100%', textAlign:'center', padding:'11px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
+              🏰 완독으로 표시
+            </button>
+          )}
+
+          <a href={kyoboUrl} target="_blank" rel="noopener noreferrer"
              style={{display:'block', textAlign:'center', padding:'12px 14px', background:'var(--brand-tint)', border:'1.5px solid var(--brand)', borderRadius:'8px', color:'var(--brand-3)', fontSize:13, fontWeight:800, textDecoration:'none', marginBottom:14, cursor:'pointer'}}>
             교보문고에서 보기 →
           </a>
