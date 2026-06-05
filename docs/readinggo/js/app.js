@@ -330,11 +330,22 @@ function App() {
     const isbn13 = book.isbn13 || book.isbn || '';
     (async () => {
       try {
+        // 알라딘 검색(ItemSearch)은 쪽수를 주지 않음 → 쪽수 없으면 isbn 개별 조회(ItemLookUp)로 1회 보강 (QA7 #1)
+        let totalPages = book.total_pages || 0;
+        if (!totalPages && isbn13) {
+          const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
+          if (proxy) {
+            try {
+              const r = await fetch(`${proxy}?isbn=${encodeURIComponent(isbn13)}`);
+              if (r.ok) { const d = await r.json(); const it = d && d.items && d.items[0]; if (it && it.total_pages) totalPages = Number(it.total_pages) || 0; }
+            } catch (e) { /* 프록시 실패 시 쪽수 미상으로 진행(#204 수동 폴백) */ }
+          }
+        }
         const mine = await Promise.resolve(DataStore.myBooks.list());
         let ub = (mine || []).find(u => u.book && ((isbn13 && u.book.isbn13 === isbn13) || u.book.title === book.title));
         if (!ub) {
           ub = await Promise.resolve(DataStore.myBooks.add({
-            book: { isbn13: isbn13, title: book.title, author: book.author, publisher: book.publisher, total_pages: book.total_pages, cover_url: book.cover_url },
+            book: { isbn13: isbn13, title: book.title, author: book.author, publisher: book.publisher, total_pages: totalPages, cover_url: book.cover_url },
             current_page: 0,
           }));
         }
@@ -345,10 +356,10 @@ function App() {
             book: {
               id: ub.book_id, title: book.title,
               author: (book.author || '') + (book.publisher ? ' · ' + book.publisher : ''),
-              cur: ub.current_page || 0, total: book.total_pages || 0, days: 1,
+              cur: ub.current_page || 0, total: totalPages, days: 1,
               cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
             },
-            nest: { ...s.nest, lv: getNestStage(book.total_pages ? Math.round((ub.current_page || 0) / book.total_pages * 100) : 0).lv },
+            nest: { ...s.nest, lv: getNestStage(totalPages ? Math.round((ub.current_page || 0) / totalPages * 100) : 0).lv },
           }));
           showToast(`📖 ${book.title} 등록 완료`);
         }

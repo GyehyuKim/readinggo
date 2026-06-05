@@ -584,7 +584,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
 
       {/* 읽기 모드 진입 (#184·#203) — 2줄 가운데 정렬, 주 CTA */}
       <button className="checkin-cta" onClick={() => setReadingOpen(true)}
-        style={{ background: '#2A2D33', marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, lineHeight: 1.3 }}>
+        style={{ background: 'var(--brand)', marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, lineHeight: 1.3 }}>
         <span style={{ fontSize: 16, fontWeight: 900 }}>📖 읽기 모드</span>
         <span style={{ fontSize: 12, opacity: 0.72, fontWeight: 700 }}>타이머 + 한 문장 모으기</span>
       </button>
