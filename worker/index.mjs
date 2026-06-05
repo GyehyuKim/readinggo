@@ -18,6 +18,10 @@ export default {
     const url = new URL(request.url);
     const p = url.pathname;
     if (p === '/aladin' || p === '/.netlify/functions/aladin') {
+      // CORS 제한(#255): 타 사이트 브라우저 JS의 교차출처 호출 차단(TTBKey 쿼터 남용 방지).
+      // 동일출처 GET은 Origin 헤더 미전송 → 통과. 다른 출처면 Origin이 우리 도메인과 달라 403.
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return aladinProxy(url.searchParams, env);
     }
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.

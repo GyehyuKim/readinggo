@@ -495,32 +495,10 @@
 
     /* 운영 대시보드 집계 — is_admin=true 전용 (#161) */
     admin: {
+      // 집계 단일 RPC(#256) — SECURITY DEFINER + is_admin() 가드(13_admin_stats.sql). 비admin은 {}.
       async stats() {
-        const today = _today();
-        const since7 = new Date(Date.now() - 6 * 86400 * 1000).toISOString().slice(0, 10);
-        const [users, realUsers, sentences, completed, todaySessions, sess7, signup7] = await Promise.all([
-          sb().from('users').select('*', { count: 'exact', head: true }),
-          sb().from('users').select('*', { count: 'exact', head: true }).eq('is_npc', false), // A: NPC 제외 실사용자
-          sb().from('sentences').select('*', { count: 'exact', head: true }),
-          sb().from('user_books').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-          sb().from('reading_sessions').select('*', { count: 'exact', head: true }).eq('session_date', today),
-          sb().from('reading_sessions').select('session_date').gte('session_date', since7),    // B: 7일 추세
-          sb().from('users').select('created_at').eq('is_npc', false).gte('created_at', since7 + 'T00:00:00'), // 가입 추세 — NPC(가상 가입) 제외 (#206)
-        ]);
-        // B: 최근 7일 일별 체크인·가입 추세
-        const days = [];
-        for (let i = 6; i >= 0; i--) days.push(new Date(Date.now() - i * 86400 * 1000).toISOString().slice(0, 10));
-        const sessByDay = {}, signupByDay = {};
-        ((sess7 && sess7.data) || []).forEach((r) => { sessByDay[r.session_date] = (sessByDay[r.session_date] || 0) + 1; });
-        ((signup7 && signup7.data) || []).forEach((r) => { const d = String(r.created_at).slice(0, 10); signupByDay[d] = (signupByDay[d] || 0) + 1; });
-        return {
-          users: users.count || 0,
-          realUsers: realUsers.count || 0,
-          sentences: sentences.count || 0,
-          completed: completed.count || 0,
-          todaySessions: todaySessions.count || 0,
-          trend: days.map((d) => ({ date: d, sessions: sessByDay[d] || 0, signups: signupByDay[d] || 0 })),
-        };
+        const r = unwrap(await sb().rpc('admin_stats'));
+        return r || {};
       },
       // 문의 목록 (admin 전용, RLS는 is_admin) (#문의)
       async inquiries() {
