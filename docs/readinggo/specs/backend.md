@@ -54,7 +54,7 @@ settings.get() / settings.update({reminder_hour, ...})
 
 // 책 / 검색
 books.search(query)                        → Book[]          // DB ilike(즉시) — 클라에서 데모 Fuse + 알라딘 결과와 병합·중복제거(isbn13). 외국 작가 표기변이는 알라딘 위임 (QA3 #148)
-// 알라딘 프록시(Netlify fn): ItemSearch·ItemLookUp 모두 OptResult=packing 필수 → subInfo.itemPage(쪽수) 수신 (QA6 #218). 누락 시 total_pages=null → 수동 폴백(#204)
+// 알라딘 프록시(Netlify fn): **ItemSearch(검색)는 packing을 줘도 itemPage 미제공** — 쪽수는 **ItemLookUp(?isbn=)만** 반환. 등록 시 쪽수 없으면 isbn 개별 조회로 1회 보강 (QA7 #233). 그래도 없으면 total_pages=null → 수동 입력 폴백(#204)
 books.get(bookId)                          → Book
 myBooks.list()                             → UserBook[]      // 읽는 중 + 완독 + 보관
 myBooks.add({book, current_page})          → UserBook
