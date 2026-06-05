@@ -1,6 +1,7 @@
 name: test
 
 on:
+  workflow_dispatch:        # 수동 배포 — 크레딧 모아 한 번에 (Netlify 무료 한도 절약)
   push:
     branches: [main]
   pull_request:
@@ -49,15 +50,40 @@ jobs:
             exit 1
           fi
 
+  detect:
+    name: detect (서빙 파일 변경 감지 — 배포 낭비 차단)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      servable: ${{ steps.f.outputs.servable }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      # 실제 서빙되는 파일(js·index.html·data·함수·toml)이 바뀐 머지만 배포 → spec/docs-only 머지는 스킵(Netlify 크레딧 절약).
+      - id: f
+        run: |
+          if git diff --name-only HEAD^ HEAD | grep -qE '^docs/readinggo/(js/|data/|index\.html|fonts/)|^netlify/functions/|^netlify\.toml$'; then
+            echo "servable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "스킵: 서빙 파일 변경 없음(spec/docs-only) → 배포 안 함"
+            echo "servable=false" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy:
-    name: deploy (Netlify · main 머지 시 자동)
-    needs: [contracts, spec-align]          # 테스트 통과해야만 배포
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # PR 아닌 main push만
+    name: deploy (Netlify · 서빙 변경 시 / 수동)
+    needs: [contracts, spec-align, detect]
+    # 테스트 통과 + (수동 트리거 || 서빙 파일이 바뀐 main push)에만 배포.
+    if: >
+      always() &&
+      needs.contracts.result == 'success' && needs.spec-align.result == 'success' &&
+      ( github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect.outputs.servable == 'true') )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       # NETLIFY_AUTH_TOKEN 1개만 GitHub repo Secrets 에 추가하면 동작 (site id 는 비밀 아님).
       - name: Deploy docs/readinggo to Netlify (prod)
-        run: npx netlify-cli@latest deploy --dir=docs/readinggo --prod --site 1fe57f63-c532-4887-afbc-da1749a08d64 --auth "$NETLIFY_AUTH_TOKEN" --message "auto-deploy ${{ github.sha }}"
+        run: npx netlify-cli@latest deploy --dir=docs/readinggo --prod --site 1fe57f63-c532-4887-afbc-da1749a08d64 --auth "$NETLIFY_AUTH_TOKEN" --message "deploy ${{ github.sha }}"
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
