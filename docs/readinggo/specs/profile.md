@@ -106,7 +106,8 @@
 - **7일 추세 차트 (v7.2, #206)**: **체크인 = 막대**(각 막대 하단에 체크인 수) + **가입 = 선그래프**(SVG, 각 포인트에 가입 수) — 두 계열을 시각적으로 분리. **가입 수는 NPC(is_npc) 제외**(실 신규만)
 - **문의 답변 (v7.2, #208)**: 각 문의에 `response`(있으면 표시) + "🤖 AI 답변 생성" 자리. LLM(Hermes/Gemini) 자동응답은 키·배포 후 활성화 — 현재 스캐폴드
 - DataStore: `admin.stats()` → `{users, realUsers, sentences, completed, todaySessions, trend[{date,sessions,signups}]}` ([backend.md §7.2](./backend.md))
-- 보안: RLS 우회 없음(anon count 허용 범위), is_admin 체크는 클라 UI 조건부 렌더. C단계(리텐션 코호트·인기책·퍼널)는 Phase 2(#190)
+- **C단계 (v7.2, #190)**: **인기책 TOP**(등록·완독 수)·**활성 사용자 7/30일**(리텐션 프록시). 전역 집계라 RPC `admin_popular_books`/`admin_active_users`(SECURITY DEFINER + 본문 `is_admin()` 가드, `12_admin_insights.sql`). 리텐션 **코호트**·퍼널은 후속
+- 보안: stats 집계는 anon count 허용 범위, 전역 RPC는 is_admin() 가드로 비admin 차단. is_admin 체크는 클라 UI 조건부 렌더
 
 #### 5.8.10 독서 활동 히트맵 (#195)
 - 프로필에 **GitHub식 잔디** — 최근 **26주(182일)** 일별 읽은 쪽수를 농도 4단계로 시각화
