@@ -675,12 +675,16 @@ window.SentenceCollectionModal = SentenceCollectionModal;
 function AdminDashboardModal({ onClose }) {
   const [stats, setStats] = useState(null);
   const [inqs, setInqs] = useState(undefined); // 문의 목록
+  const [popular, setPopular] = useState(null); // 인기책 TOP (#190)
+  const [active, setActive] = useState(null);   // 활성 사용자 7/30일 (#190)
   useEffect(() => {
     const DS = window.SupabaseDataStore;
     if (!DS || !DS.admin || !DS.admin.stats) { setStats({}); setInqs([]); return; }
     Promise.resolve(DS.admin.stats()).then(setStats).catch(() => setStats({}));
     if (DS.admin.inquiries) Promise.resolve(DS.admin.inquiries()).then((r) => setInqs(r || [])).catch(() => setInqs([]));
     else setInqs([]);
+    if (DS.admin.popularBooks) Promise.resolve(DS.admin.popularBooks(5)).then((r) => setPopular(r || [])).catch(() => setPopular([]));
+    if (DS.admin.activeUsers) Promise.resolve(DS.admin.activeUsers()).then(setActive).catch(() => setActive(null));
   }, []);
   // 문의 상태 순환 (open→answered→closed→open)
   const cycleStatus = (q) => {
@@ -774,6 +778,32 @@ function AdminDashboardModal({ onClose }) {
               </div>
             );
           })()}
+          {/* 활성 사용자 — 리텐션 프록시 (#190 C) */}
+          {active && (
+            <div style={{ marginTop: 22, display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--brand)' }}>{active.d7}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>최근 7일 활성</div>
+              </div>
+              <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--brand)' }}>{active.d30}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>최근 30일 활성</div>
+              </div>
+            </div>
+          )}
+          {/* 인기책 TOP (#190 C) */}
+          {popular && popular.length > 0 && (
+            <div style={{ marginTop: 22 }}>
+              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>🔥 인기책 TOP {popular.length}</div>
+              {popular.map((b, i) => (
+                <div key={b.bookId || i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: i < popular.length - 1 ? '1px solid var(--line-2)' : 'none' }}>
+                  <div style={{ width: 20, fontWeight: 900, color: 'var(--ink-3)', textAlign: 'center' }}>{i + 1}</div>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>등록 {b.registered} · 완독 {b.completed}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {/* 문의 목록 */}
           <div style={{ marginTop: 22 }}>
             <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>✉️ 문의 {inqs && inqs.length ? '(' + inqs.length + ')' : ''}</div>

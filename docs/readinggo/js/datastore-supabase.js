@@ -530,6 +530,16 @@
       async inquirySetStatus(id, status) {
         return unwrap(await sb().from('inquiries').update({ status }).eq('id', id).select().single());
       },
+      // 인기책 TOP / 활성 사용자(리텐션 프록시) — RPC(SECURITY DEFINER + is_admin 가드) (#190, 12_admin_insights.sql)
+      async popularBooks(lim = 5) {
+        const rows = unwrap(await sb().rpc('admin_popular_books', { lim }));
+        return (rows || []).map((x) => ({ bookId: x.book_id, title: x.title, registered: x.registered, completed: x.completed }));
+      },
+      async activeUsers() {
+        const rows = unwrap(await sb().rpc('admin_active_users'));
+        const r = (rows && rows[0]) || {};
+        return { d7: r.d7 || 0, d30: r.d30 || 0 };
+      },
     },
 
     /* 문의 — 누구나(로그인) 작성 → admin이 대시보드에서 확인 */
