@@ -1,0 +1,21 @@
+# ReadingGo — Cloudflare Worker (Netlify 대체)
+# 배포: npx wrangler deploy
+# 시크릿(1회): npx wrangler secret put ALADIN_TTB_KEY
+#              npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+name = "readinggo"
+main = "worker/index.mjs"
+compatibility_date = "2026-06-01"
+
+# 정적 사이트(docs/readinggo)를 Worker가 서빙. /aladin 외 모든 경로는 에셋.
+[assets]
+directory = "docs/readinggo"
+binding = "ASSETS"
+
+# 비밀 아님(클라에도 공개). service_role 키만 `wrangler secret put` 로.
+[vars]
+SUPABASE_URL = "https://cttllwwkaddghqttyhkg.supabase.co"
+ARCHIVE_DAILY_CAP = "3000"
+
+# 일일 인기도서 아카이브 (#239) — UTC 18:00 = KST 03:00
+[triggers]
+crons = ["0 18 * * *"]
