@@ -33,6 +33,12 @@ function _villageRowToTown(v, collection, myUserId) {
       _bookData = { title: v.book.title || '', cover: v.book.cover_url || '', author: v.book.author || '' };
     }
   }
+  // 현재 파트(1) 마감일 → 오늘 기준 dday 계산
+  const _todayStr = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })();
+  const _currentDue = parts[0] && parts[0].due_date;
+  const dday = _currentDue
+    ? Math.round((new Date(_currentDue + 'T00:00:00') - new Date(_todayStr + 'T00:00:00')) / 86400000)
+    : 0;
   return {
     id: v.id,
     bookId,
@@ -48,7 +54,7 @@ function _villageRowToTown(v, collection, myUserId) {
     memberCount: (Array.isArray(v.village_members) && v.village_members[0] ? (v.village_members[0].count || 0) : 0) || v.member_count || (isMyVillage ? 1 : 0),
     currentPart: 1,
     totalParts: totalParts,
-    dday: 0,
+    dday,
     isOpen: true,
     leader: '',
     currentRange: parts[0] ? (parts[0].title || '') : '',
@@ -168,7 +174,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
         if (aPriority !== bPriority) return aPriority - bPriority;
         return (b.memberCount || 0) - (a.memberCount || 0);
       });
-  }, [towns, state.book]);
+  }, [towns, state.book, myVillageIds]);
 
   const createBookOptions = useMemo(() => {
     const query = createBookQuery.trim().toLowerCase();
@@ -352,10 +358,13 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
     setPreviewTown(town);
   };
 
+  const _isUUID = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const handleJoinTown = () => {
     if (!previewTown) return;
     // edge checks: cannot join past/completed, cannot join if already member, capacity
     const town = previewTown;
+    if (!_isUUID(town.id)) { setFinderError('데모 마을은 참여할 수 없어요. 직접 마을을 만들어보세요!'); return; }
     const isPast = (town.collection || '') === 'past' || town.status === 'completed';
     if (isPast) { setFinderError('이 마을은 완료되어 참여할 수 없습니다.'); return; }
     const alreadyMine = myVillageIds.includes(town.id);
@@ -1020,7 +1029,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
       )}
 
       {previewTown && (() => {
-        const book = getBook(previewTown.bookId);
+        const book = resolveBook(previewTown);
         const currentMilestone = (previewTown.milestones || []).find((milestone) => milestone.part === previewTown.currentPart);
         return (
           <div
@@ -1083,13 +1092,16 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
                 </div>
 
                 {(() => {
+                  const isSeed = !_isUUID(previewTown.id);
                   const isMember = myVillageIds.includes(previewTown.id);
                   const isFull = previewTown.capacity && (previewTown.memberCount || (previewTown.members||[]).length) >= previewTown.capacity;
                   const isPast = (previewTown.collection || '') === 'past' || previewTown.status === 'completed';
                   let label = '참여하기';
-                  if (isPast) label = '완료된 마을';
+                  if (isSeed) label = '데모 마을';
+                  else if (isPast) label = '완료된 마을';
                   else if (isMember) label = '참여 중';
                   else if (isFull) label = '정원 마감';
+                  const disabled = isSeed || isPast || isMember || isFull;
 
                   return (
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
@@ -1108,15 +1120,15 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
                       </button>
                       <button
                         onClick={handleJoinTown}
-                        disabled={isPast || isMember || isFull}
+                        disabled={disabled}
                         style={{
                           padding:'12px 14px',
                           border:'none',
                           borderRadius:12,
-                          background: (isPast || isMember || isFull) ? 'var(--line-2)' : 'var(--brand)',
-                          color: (isPast || isMember || isFull) ? 'var(--ink-3)' : 'white',
+                          background: disabled ? 'var(--line-2)' : 'var(--brand)',
+                          color: disabled ? 'var(--ink-3)' : 'white',
                           fontWeight:900,
-                          cursor: (isPast || isMember || isFull) ? 'not-allowed' : 'pointer',
+                          cursor: disabled ? 'not-allowed' : 'pointer',
                         }}
                       >
                         {label}
