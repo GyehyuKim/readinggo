@@ -48,6 +48,7 @@ function VillageView({ state, onSelectTown }) {
   const [createVisibility, setCreateVisibility] = useState('public');
   const [createCapacity, setCreateCapacity] = useState('');
   const [createPartCount, setCreatePartCount] = useState('3');
+  const [createPartDueDates, setCreatePartDueDates] = useState(['', '', '']);
   const [createBookId, setCreateBookId] = useState((state.book && state.book.id) || 'b001');
   const [createError, setCreateError] = useState('');
 
@@ -182,6 +183,7 @@ function VillageView({ state, onSelectTown }) {
     setCreateVisibility('public');
     setCreateCapacity('');
     setCreatePartCount('3');
+    setCreatePartDueDates(['', '', '']);
     setCreateBookId((state.book && state.book.id) || 'b001');
     setCreateError('');
     setIsCreateOpen(true);
@@ -212,7 +214,7 @@ function VillageView({ state, onSelectTown }) {
     }
 
     const normalizedCapacity = capacityValue || null;
-    const parts = Array.from({ length: partCount }).map((_, i) => ({ part_order: i + 1, title: null, end_page: null, due_date: null }));
+    const parts = Array.from({ length: partCount }).map((_, i) => ({ part_order: i + 1, title: null, end_page: null, due_date: createPartDueDates[i] || null }));
 
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.create) {
@@ -854,35 +856,87 @@ function VillageView({ state, onSelectTown }) {
 
                 <div>
                   <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>마일스톤</div>
-                  <input
-                    value={createPartCount}
-                    onChange={(e) => setCreatePartCount(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="파트 수"
-                    inputMode="numeric"
-                    style={{
-                      width:'100%',
-                      padding:'12px 14px',
-                      borderRadius:12,
-                      border:'1.5px solid var(--line)',
-                      background:'var(--paper)',
-                      fontSize:14,
-                      fontWeight:700,
-                      boxSizing:'border-box',
-                      marginBottom:8,
-                    }}
-                  />
-                  <div style={{padding:'12px 14px', borderRadius:14, background:'var(--card)', border:'1px solid var(--line)'}}>
-                    <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:8}}>자동 분할 미리보기</div>
-                    <div style={{display:'flex', flexDirection:'column', gap:6}}>
-                      {Array.from({ length: Math.max(1, parseInt(createPartCount, 10) || 1) }).slice(0, 3).map((_, index) => (
-                        <div key={index} style={{fontSize:12, color:'var(--ink-2)', fontWeight:700}}>
-                          파트 {index + 1} · 마감일은 개설 후 지정
-                        </div>
-                      ))}
-                      {(parseInt(createPartCount, 10) || 0) > 3 && (
-                        <div style={{fontSize:12, color:'var(--ink-2)', fontWeight:700}}>+ 나머지 파트는 동일한 방식으로 이어집니다</div>
-                      )}
-                    </div>
+                  <div style={{display:'flex', gap:8, marginBottom:8}}>
+                    <input
+                      value={createPartCount}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setCreatePartCount(val);
+                        const count = Math.max(1, parseInt(val, 10) || 1);
+                        setCreatePartDueDates(prev => {
+                          const next = Array.from({ length: count }).map((_, i) => prev[i] || '');
+                          return next;
+                        });
+                      }}
+                      placeholder="파트 수"
+                      inputMode="numeric"
+                      style={{
+                        flex:1,
+                        padding:'12px 14px',
+                        borderRadius:12,
+                        border:'1.5px solid var(--line)',
+                        background:'var(--paper)',
+                        fontSize:14,
+                        fontWeight:700,
+                        boxSizing:'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const count = Math.max(1, parseInt(createPartCount, 10) || 1);
+                        const today = new Date();
+                        const totalDays = 28;
+                        const newDates = Array.from({ length: count }).map((_, i) => {
+                          const d = new Date(today);
+                          d.setDate(d.getDate() + Math.round((i + 1) * totalDays / count));
+                          return d.toISOString().split('T')[0];
+                        });
+                        setCreatePartDueDates(newDates);
+                      }}
+                      style={{
+                        padding:'10px 12px',
+                        border:'1.5px solid var(--line)',
+                        borderRadius:12,
+                        background:'var(--card)',
+                        fontWeight:800,
+                        fontSize:12,
+                        color:'var(--ink-2)',
+                        cursor:'pointer',
+                        whiteSpace:'nowrap',
+                      }}
+                    >
+                      균등 자동 분할
+                    </button>
+                  </div>
+                  <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                    {Array.from({ length: Math.max(1, parseInt(createPartCount, 10) || 1) }).map((_, index) => (
+                      <div key={index} style={{display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'var(--card)', border:'1px solid var(--line)'}}>
+                        <span style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', minWidth:44, flexShrink:0}}>파트 {index + 1}</span>
+                        <span style={{fontSize:11, color:'var(--ink-3)', flexShrink:0}}>마감</span>
+                        <input
+                          type="date"
+                          value={createPartDueDates[index] || ''}
+                          onChange={(e) => {
+                            setCreatePartDueDates(prev => {
+                              const next = [...prev];
+                              next[index] = e.target.value;
+                              return next;
+                            });
+                          }}
+                          style={{
+                            flex:1,
+                            padding:'6px 10px',
+                            borderRadius:8,
+                            border:'1.5px solid var(--line)',
+                            background:'var(--paper)',
+                            fontSize:13,
+                            fontWeight:700,
+                            boxSizing:'border-box',
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 

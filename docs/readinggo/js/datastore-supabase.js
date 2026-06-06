@@ -453,8 +453,21 @@
     villages: {
       async create({ bookId, name, visibility, parts }) {
         const id = await uid();
+        // bookId 가 로컬 TSV ID("b104" 등)인 경우 Supabase books 테이블 UUID로 해소.
+        let supaBookId = bookId;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(bookId || ''));
+        if (!isUuid) {
+          const localBook = typeof window !== 'undefined' && window.getBook ? window.getBook(bookId) : null;
+          if (localBook && localBook.isbn) {
+            const sbBook = await A.books.upsert({
+              isbn13: localBook.isbn, title: localBook.title, author: localBook.author,
+              publisher: localBook.pub, total_pages: localBook.total, cover_url: localBook.cover,
+            }).catch(() => null);
+            if (sbBook && sbBook.id) supaBookId = sbBook.id;
+          }
+        }
         const v = unwrap(await sb().from('villages').insert({
-          book_id: bookId, name, visibility: visibility || 'public', created_by: id,
+          book_id: supaBookId, name, visibility: visibility || 'public', created_by: id,
         }).select().single());
         if (Array.isArray(parts) && parts.length) {
           await sb().from('village_parts').insert(parts.map((p, i) => ({

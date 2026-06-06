@@ -41,6 +41,10 @@ function TownDetailView({ state, townId, onBack }) {
   const [selectedMember, setSelectedMember] = useState(null);
   const [activeSubtab, setActiveSubtab] = useState('members');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editVisibility, setEditVisibility] = useState('public');
 
   const town = state.towns.find(t => t.id === townId);
   const book = town ? getBook(town.bookId) : null;
@@ -96,6 +100,37 @@ function TownDetailView({ state, townId, onBack }) {
     const done = () => { showToast('마을에서 나왔어요'); setIsSettingsOpen(false); onBack(); };
     if (window.DataStore && window.DataStore.villages && window.DataStore.villages.leave) {
       Promise.resolve(window.DataStore.villages.leave(town.id)).then(done).catch(() => showToast('나가기 실패 — 잠시 후 다시'));
+    } else { done(); }
+  };
+
+  // 마을 삭제 (관리자 전용) — ⚠️ 확인 다이얼로그 필수
+  const deleteVillage = () => {
+    if (!window.confirm(`⚠️ '${town.name}' 마을을 삭제할까요?\n삭제하면 모든 데이터가 사라지고 복구할 수 없습니다.`)) return;
+    const done = () => { showToast('마을이 삭제됐어요'); setIsSettingsOpen(false); onBack(); };
+    if (window.DataStore && window.DataStore.villages && window.DataStore.villages.delete) {
+      Promise.resolve(window.DataStore.villages.delete(town.id)).then(done).catch(() => showToast('삭제 실패 — 잠시 후 다시'));
+    } else { done(); }
+  };
+
+  // 마을 정보 수정 (관리자 전용) — in-memory
+  const openEditInfo = () => {
+    setEditName(town.name || '');
+    setEditDesc(town.description || '');
+    setEditVisibility(town.visibility || 'public');
+    setIsEditingInfo(true);
+  };
+
+  const saveEditInfo = () => {
+    if (!editName.trim()) { showToast('마을 이름을 입력해주세요'); return; }
+    const done = () => {
+      town.name = editName.trim();
+      town.description = editDesc.trim();
+      town.visibility = editVisibility;
+      showToast('마을 정보를 수정했어요');
+      setIsEditingInfo(false);
+    };
+    if (window.DataStore && window.DataStore.villages && window.DataStore.villages.update) {
+      Promise.resolve(window.DataStore.villages.update(town.id, { name: editName.trim(), description: editDesc.trim(), visibility: editVisibility })).then(done).catch(() => showToast('수정 실패 — 잠시 후 다시'));
     } else { done(); }
   };
 
@@ -447,12 +482,78 @@ function TownDetailView({ state, townId, onBack }) {
                   </div>
                 </div>
                 <div style={{padding:10,background:'var(--card)',borderRadius:10}}>
-                  <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>이 마을 알림 받기</div>
-                  <div style={{display:'flex',gap:16}}>
-                    <label style={{fontSize:13, display:'flex', alignItems:'center', gap:5}}><input type="checkbox" defaultChecked={!town.notificationPrefs || town.notificationPrefs.poke !== false}/> 🪱 콕찌르기 받기</label>
-                    <label style={{fontSize:13, display:'flex', alignItems:'center', gap:5}}><input type="checkbox" defaultChecked={!town.notificationPrefs || town.notificationPrefs.board !== false}/> 💬 게시판 새 글</label>
+                  <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>알림 설정</div>
+                  <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+                    {town.visibility === 'private' && (
+                      <label style={{fontSize:12, display:'flex', alignItems:'center', gap:5, color:'var(--ink-2)', fontWeight:700}}>
+                        <input type="checkbox" defaultChecked={!town.notificationPrefs || town.notificationPrefs.poke !== false}/> 🪱 콕찌르기
+                      </label>
+                    )}
+                    <label style={{fontSize:12, display:'flex', alignItems:'center', gap:5, color:'var(--ink-2)', fontWeight:700}}>
+                      <input type="checkbox" defaultChecked={!town.notificationPrefs || town.notificationPrefs.board !== false}/> 💬 게시판 새 주제
+                    </label>
+                    <label style={{fontSize:12, display:'flex', alignItems:'center', gap:5, color:'var(--ink-2)', fontWeight:700}}>
+                      <input type="checkbox" defaultChecked={!town.notificationPrefs || town.notificationPrefs.deadline !== false}/> 🗓 파트 마감 D-3·D-1
+                    </label>
+                    <label style={{fontSize:12, display:'flex', alignItems:'center', gap:5, color:'var(--ink-2)', fontWeight:700}}>
+                      <input type="checkbox" defaultChecked={!town.notificationPrefs || town.notificationPrefs.complete !== false}/> 🎉 멤버 완독
+                    </label>
                   </div>
                 </div>
+
+                {/* 관리자 전용 섹션 */}
+                {town.myRole === 'admin' && (
+                  <div style={{padding:10, background:'var(--card)', borderRadius:10, border:'1px solid var(--brand-tint)'}}>
+                    <div style={{fontSize:12, fontWeight:800, color:'var(--brand-3)', marginBottom:8}}>👑 관리자</div>
+                    {!isEditingInfo ? (
+                      <button
+                        onClick={openEditInfo}
+                        style={{padding:'8px 0', width:'100%', background:'none', border:'none', color:'var(--ink-1)', fontWeight:800, fontSize:13, cursor:'pointer', textAlign:'left'}}
+                      >
+                        ✏️ 마을 정보 수정
+                      </button>
+                    ) : (
+                      <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                        <input
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          placeholder="마을 이름"
+                          style={{padding:'8px 10px', borderRadius:8, border:'1.5px solid var(--brand)', background:'var(--paper)', fontSize:13, fontWeight:700, boxSizing:'border-box'}}
+                        />
+                        <textarea
+                          value={editDesc}
+                          onChange={e => setEditDesc(e.target.value)}
+                          placeholder="소개 (선택)"
+                          rows={2}
+                          style={{padding:'8px 10px', borderRadius:8, border:'1.5px solid var(--line)', background:'var(--paper)', fontSize:13, fontWeight:600, boxSizing:'border-box', resize:'none'}}
+                        />
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:6}}>
+                          {['public', 'private'].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => setEditVisibility(v)}
+                              style={{padding:'7px 10px', border:'1.5px solid '+(editVisibility===v?'var(--brand)':'var(--line)'), background:editVisibility===v?'var(--brand-tint)':'var(--card)', borderRadius:8, fontWeight:800, fontSize:12, cursor:'pointer'}}
+                            >
+                              {v === 'public' ? '공개' : '비공개'}
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{display:'flex', gap:8}}>
+                          <button onClick={() => setIsEditingInfo(false)} style={{flex:1, padding:'8px 0', border:'1.5px solid var(--line)', borderRadius:8, background:'var(--card)', fontWeight:800, fontSize:13, cursor:'pointer'}}>취소</button>
+                          <button onClick={saveEditInfo} style={{flex:1, padding:'8px 0', border:'none', borderRadius:8, background:'var(--brand)', color:'white', fontWeight:800, fontSize:13, cursor:'pointer'}}>저장</button>
+                        </div>
+                      </div>
+                    )}
+                    <div style={{height:'1px', background:'var(--line)', margin:'8px 0'}} />
+                    <button
+                      onClick={deleteVillage}
+                      style={{padding:'8px 0', width:'100%', background:'none', border:'none', color:'#E5484D', fontWeight:800, fontSize:13, cursor:'pointer', textAlign:'left'}}
+                    >
+                      🗑️ 마을 삭제
+                    </button>
+                  </div>
+                )}
+
                 <div style={{padding:10,background:'var(--card)',borderRadius:10}}>
                   <button onClick={leaveVillage} style={{padding:'8px 0', width:'100%', background:'none', border:'none', color:'#E5484D', fontWeight:800, fontSize:14, cursor:'pointer'}}>🚪 마을 나가기</button>
                 </div>
