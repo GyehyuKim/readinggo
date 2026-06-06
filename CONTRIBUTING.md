@@ -291,6 +291,18 @@ git fetch --prune
 
 ---
 
+## 8.5 DB 마이그레이션 (Supabase)
+
+DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일로 관리한다.
+**파일 머지 ≠ 라이브 DB 반영** — 누군가 한 번 실행해야 한다. 이 적용이 한 사람 병목이 되지 않게 한다.
+
+- **동료 적용 (권장)**: Supabase 대시보드 → SQL Editor 에 `NN_*.sql` 붙여넣고 Run → PR/이슈에 "✅ 적용 완료 (날짜·이름)" 코멘트. 프로젝트가 안 보이면 gyehyu에게 **Developer 역할 초대** 요청.
+- **Management PAT(`sbp_`) 키는 공유·커밋 금지.** 권한 위임은 키가 아니라 **대시보드 멤버 초대**로 한다.
+- 마이그레이션은 **멱등**하게 작성 (`create or replace` · `drop ... if exists` · `if not exists`).
+- 상세 절차·초대 방법·번호 규약: [`docs/readinggo/supabase/README.md`](./docs/readinggo/supabase/README.md).
+
+---
+
 ## 9. LLM 행동 규칙 (Claude Code · Cursor · 기타)
 
 이 섹션은 AI 도구가 이 프로젝트에서 코드/문서 작업을 대신 수행할 때 **예외 없이** 따라야 하는
