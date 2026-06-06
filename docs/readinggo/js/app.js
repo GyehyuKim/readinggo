@@ -237,6 +237,7 @@ function App() {
       nest: { ...s.nest, lv: nestLv },
       myQuotes: ns.myQuotes,
     }));
+    window.dispatchEvent(new CustomEvent('rg:today-checked'));
     // Phase 1: 백엔드 영속(로그인 시). 낙관적 UI 유지 + 백그라운드 persist.
     // sessions.addToday 가 스트릭 bump 까지 연동(양 어댑터). 활성 책 없으면 no-op.
     (async () => {

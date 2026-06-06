@@ -55,6 +55,8 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
   });
   const [inviteQuery, setInviteQuery] = useState('');
   const [inviteResults, setInviteResults] = useState([]);
+  const [isEditingMilestones, setIsEditingMilestones] = useState(false);
+  const [milestoneDates, setMilestoneDates] = useState([]);
 
   const town = (state.towns || []).find(t => t.id === townId);
   const book = town ? resolveBook(town) : null;
@@ -89,6 +91,22 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
       }));
     }).catch(fallback);
   }, [townId]);
+
+  // 오늘 독서 체크인 시 내 불빛 켜기
+  useEffect(() => {
+    const handler = () => {
+      const me = window.RG_ME;
+      const myHandle = me && (me.handle || me.displayName);
+      if (!myHandle) return;
+      setMembersList(prev => prev.map(m => {
+        const mName = String(m.name || '').replace(/^@/, '').toLowerCase();
+        const myName = String(myHandle).replace(/^@/, '').toLowerCase();
+        return mName === myName ? { ...m, todayRecorded: true } : m;
+      }));
+    };
+    window.addEventListener('rg:today-checked', handler);
+    return () => window.removeEventListener('rg:today-checked', handler);
+  }, []);
 
   // 게시판 주제 비동기 로드 (Supabase)
   useEffect(() => {
@@ -192,22 +210,30 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
   };
 
   // Board handlers — optimistic 업데이트 + background Supabase 저장
+  // topics 변경 시 onTownUpdate로 villageTowns 동기화 → 네비게이션 후 재마운트에도 유지
+  const syncTopics = (next) => { if (onTownUpdate) onTownUpdate({ id: townId, _topics: next }); };
+
   const addTopic = (title, desc, days) => {
     if (!title || title.trim().length===0) { showToast('주제는 필수입니다'); return; }
     const localId = 't' + Math.random().toString(36).slice(2,8);
-    setTopics(prev => [{ id: localId, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: myHandle, createdAt: '방금', opinions: [] }, ...prev]);
+    const newTopic = { id: localId, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: myHandle, createdAt: '방금', opinions: [] };
+    const next = [newTopic, ...topics];
+    setTopics(next);
+    syncTopics(next);
     showToast('주제가 등록되었습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.addTopic) {
       Promise.resolve(DS.villages.addTopic(townId, { title: title.slice(0,100), description: desc ? desc.slice(0,200) : null, dueDays: days }))
-        .then(row => { if (row && row.id) setTopics(prev => prev.map(x => x.id===localId ? {...x, id: row.id} : x)); })
+        .then(row => { if (row && row.id) setTopics(prev => { const n = prev.map(x => x.id===localId ? {...x, id: row.id} : x); syncTopics(n); return n; }); })
         .catch(() => {});
     }
   };
   const updateTopic = (id, title, desc, days) => {
     const t = topics.find(x=>x.id===id); if(!t) return;
     if (!canEditTopic(t)) { showToast('내가 등록한 주제만 수정할 수 있어요'); return; }
-    setTopics(prev => prev.map(x => x.id===id ? {...x, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', due: days} : x));
+    const next = topics.map(x => x.id===id ? {...x, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', due: days} : x);
+    setTopics(next);
+    syncTopics(next);
     showToast('주제를 수정했습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.updateTopic) {
@@ -218,19 +244,23 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     if (!text || text.trim().length===0) { showToast('의견을 입력하세요'); return; }
     const localId = 'o'+Math.random().toString(36).slice(2,8);
     const newOp = { id: localId, author: author||myHandle, text: text.slice(0,300), createdAt: '방금' };
-    setTopics(prev => prev.map(t => t.id===topicId ? {...t, opinions: [...(t.opinions||[]), newOp]} : t));
+    const next = topics.map(t => t.id===topicId ? {...t, opinions: [...(t.opinions||[]), newOp]} : t);
+    setTopics(next);
+    syncTopics(next);
     showToast('의견이 등록되었습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.addOpinion) {
       Promise.resolve(DS.villages.addOpinion(topicId, text.slice(0,300)))
-        .then(row => { if (row && row.id) setTopics(prev => prev.map(t => t.id===topicId ? {...t, opinions: t.opinions.map(o => o.id===localId ? {...o, id: row.id} : o)} : t)); })
+        .then(row => { if (row && row.id) setTopics(prev => { const n = prev.map(t => t.id===topicId ? {...t, opinions: t.opinions.map(o => o.id===localId ? {...o, id: row.id} : o)} : t); syncTopics(n); return n; }); })
         .catch(() => {});
     }
   };
   const deleteTopic = (topicId) => {
     const t = topics.find(x=>x.id===topicId);
     if (t && !canEditTopic(t)) { showToast('내가 등록한 주제만 삭제할 수 있어요'); return; }
-    setTopics(prev => prev.filter(x=>x.id!==topicId));
+    const next = topics.filter(x=>x.id!==topicId);
+    setTopics(next);
+    syncTopics(next);
     showToast('주제를 삭제했습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.deleteTopic) {
@@ -241,7 +271,9 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     const t = topics.find(x=>x.id===topicId); if(!t) return;
     const o = t.opinions.find(x=>x.id===opinionId);
     if (o && !canEditOpinion(o)) { showToast('내가 쓴 의견만 삭제할 수 있어요'); return; }
-    setTopics(prev => prev.map(x => x.id===topicId ? {...x, opinions: x.opinions.filter(op=>op.id!==opinionId)} : x));
+    const next = topics.map(x => x.id===topicId ? {...x, opinions: x.opinions.filter(op=>op.id!==opinionId)} : x);
+    setTopics(next);
+    syncTopics(next);
     showToast('의견이 삭제되었습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.deleteOpinion) {
@@ -323,6 +355,15 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         const totalPages = book.total || 1;
         const isPrivate = town.visibility === 'private';
 
+        // 현재 파트 챕터 목표 페이지 (book.toc 또는 town.milestones에서 파생)
+        const toc = book.toc || [];
+        const currentMilestone = (town.milestones || []).find(m => m.part === town.currentPart);
+        const currentChapterToc = toc.find(ch => ch[0] === town.currentPart);
+        // 목표 퍼센트: endPage / totalPages × 100 (출판사마다 쪽수 달라도 공평한 비교)
+        const _endPage = (currentMilestone && currentMilestone.endPage) || (currentChapterToc && currentChapterToc[3]) || null;
+        const targetPercent = _endPage ? Math.round(_endPage / totalPages * 100) : null;
+        const chapterTitle = (currentMilestone && currentMilestone.title) || (currentChapterToc && currentChapterToc[1]) || null;
+
         // 진척률 계산: 읽은 페이지 / 책 전체 페이지 × 100
         const getProgress = (m) => Math.min(100, ((m.cumulativePage || 0) / totalPages) * 100);
 
@@ -339,8 +380,21 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         const gridMembers = regularMembers.slice(0, 15);
         const listMembers = regularMembers.slice(15);
 
+        const achievedCount = targetPercent ? regularMembers.filter(m => getProgress(m) >= targetPercent).length : 0;
+
         return (
           <div style={{padding:'0 16px 40px'}}>
+            {/* 현재 파트 달성 현황 배너 */}
+            {targetPercent && (
+              <div style={{marginBottom:10, padding:'8px 12px', borderRadius:10, background:'var(--brand-tint)', border:'1px solid var(--brand)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4}}>
+                <div>
+                  <span style={{fontSize:12, fontWeight:900, color:'var(--brand-3)'}}>파트 {town.currentPart}</span>
+                  {chapterTitle && <span style={{fontSize:11, color:'var(--ink-2)', fontWeight:700}}> · {chapterTitle}</span>}
+                  <span style={{fontSize:11, color:'var(--ink-3)'}}> (목표 {targetPercent}%)</span>
+                </div>
+                <span style={{fontSize:12, fontWeight:900, color:'var(--brand-3)'}}>✅ {achievedCount}/{regularMembers.length}명 달성</span>
+              </div>
+            )}
             <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:12}}>
               👥 참여자 ({regularMembers.length}명)
             </div>
@@ -414,6 +468,12 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                         <div style={{fontSize:12,fontWeight:900,color:'var(--brand-3)',marginTop:4}}>
                           진도 {Math.round(progress)}%
                         </div>
+                        {/* 파트 달성 배지 */}
+                        {targetPercent && (
+                          <div style={{fontSize:10,fontWeight:800,marginTop:3,color:getProgress(m)>=targetPercent?'var(--brand-3)':'var(--ink-3)'}}>
+                            {getProgress(m)>=targetPercent?'✅ 달성':'⏳ 미달성'}
+                          </div>
+                        )}
                       </button>
 
                       {/* 콕찌르기 — 카드 내부 하단. 비공개 마을 + 불 꺼진 멤버 전용 */}
@@ -574,7 +634,7 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
       )}
 
       {/* Settings sheet */}
-      {isSettingsOpen && (
+      {isSettingsOpen && ReactDOM.createPortal(
         <div className="modal-backdrop show" onClick={()=>setIsSettingsOpen(false)}>
           <div className="sheet" role="dialog" aria-label="설정" onClick={(e)=>e.stopPropagation()}>
             <div className="sheet-grip" />
@@ -661,6 +721,59 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                       </div>
                     )}
                     <div style={{height:'1px', background:'var(--line)', margin:'8px 0'}} />
+                    {/* 파트 마감일 편집 */}
+                    {(() => {
+                      const toc = book.toc || [];
+                      if (toc.length === 0) return null;
+                      const saveMilestones = () => {
+                        const newMs = toc.map((ch, i) => ({
+                          part: ch[0], title: ch[1], startPage: ch[2], endPage: ch[3],
+                          dueDate: milestoneDates[i] || null, completed: false,
+                        }));
+                        if (onTownUpdate) onTownUpdate({ id: townId, milestones: newMs });
+                        setIsEditingMilestones(false);
+                        showToast('파트 마감일이 저장되었습니다');
+                      };
+                      return (
+                        <div style={{marginBottom:8}}>
+                          {!isEditingMilestones ? (
+                            <button onClick={() => {
+                              setMilestoneDates(toc.map((ch, i) => {
+                                const ms = (town.milestones || []).find(m => m.part === ch[0]);
+                                return (ms && ms.dueDate) || '';
+                              }));
+                              setIsEditingMilestones(true);
+                            }} style={{padding:'8px 0', width:'100%', background:'none', border:'none', color:'var(--ink-1)', fontWeight:800, fontSize:13, cursor:'pointer', textAlign:'left'}}>
+                              📅 파트 마감일 수정
+                            </button>
+                          ) : (
+                            <div>
+                              <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>📅 챕터별 마감일</div>
+                              <div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:8}}>
+                                {toc.map((ch, i) => (
+                                  <div key={i} style={{borderRadius:10, background:'var(--paper)', border:'1px solid var(--line)', overflow:'hidden'}}>
+                                    <div style={{display:'flex', alignItems:'center', gap:6, padding:'6px 10px', borderBottom:'1px solid var(--line-2)'}}>
+                                      <span style={{fontSize:10, fontWeight:900, color:'white', background:'var(--brand)', borderRadius:5, padding:'1px 6px', flexShrink:0}}>{ch[0]}</span>
+                                      <span style={{fontSize:11, fontWeight:800, flex:1, color:'var(--ink-1)'}}>{ch[1]}</span>
+                                      <span style={{fontSize:10, color:'var(--ink-3)'}}>{ch[2]}–{ch[3]}p</span>
+                                    </div>
+                                    <div style={{display:'flex', alignItems:'center', gap:6, padding:'6px 10px'}}>
+                                      <span style={{fontSize:11, color:'var(--ink-3)', flexShrink:0}}>마감</span>
+                                      <input type="date" value={milestoneDates[i]||''} onChange={e => setMilestoneDates(prev => { const n=[...prev]; n[i]=e.target.value; return n; })} style={{flex:1, padding:'4px 8px', borderRadius:6, border:'1.5px solid var(--line)', background:'var(--paper)', fontSize:12, fontWeight:700}} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{display:'flex', gap:6}}>
+                                <button onClick={() => setIsEditingMilestones(false)} style={{flex:1, padding:'7px 0', border:'1.5px solid var(--line)', borderRadius:8, background:'var(--card)', fontWeight:800, fontSize:12, cursor:'pointer'}}>취소</button>
+                                <button onClick={saveMilestones} style={{flex:1, padding:'7px 0', border:'none', borderRadius:8, background:'var(--brand)', color:'white', fontWeight:800, fontSize:12, cursor:'pointer'}}>저장</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    <div style={{height:'1px', background:'var(--line)', margin:'8px 0'}} />
                     {/* 유저 검색 초대 */}
                     <div style={{marginBottom:8}}>
                       <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>👤 유저 초대</div>
@@ -691,7 +804,9 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                                   };
                                   setMembersList(prev => {
                                     if (prev.some(m => m.name === newMember.name)) return prev;
-                                    return [...prev, newMember];
+                                    const next = [...prev, newMember];
+                                    if (onTownUpdate) onTownUpdate({ id: townId, members: next });
+                                    return next;
                                   });
                                   showToast(`@${u.handle || u.display_name} 초대 완료!`);
                                   setInviteResults([]);
@@ -728,7 +843,7 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
     </section>
   );
@@ -769,7 +884,7 @@ function TopicEditor({ open, editing, onClose, initial, onSave }) {
 
   if (!open) return null;
 
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-backdrop show" onClick={onClose}>
       <div className="sheet" role="dialog" aria-label="주제 등록" onClick={e=>e.stopPropagation()}>
         <div className="sheet-grip" />
@@ -788,7 +903,7 @@ function TopicEditor({ open, editing, onClose, initial, onSave }) {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
 
 window.TownDetailView = TownDetailView;
