@@ -45,7 +45,7 @@ function _villageRowToTown(v, collection, myUserId) {
     capacity: null,
     myRole: isMyVillage ? 'admin' : 'member',
     coAdmins: [],
-    memberCount: v.member_count || 0,
+    memberCount: (Array.isArray(v.village_members) && v.village_members[0] ? (v.village_members[0].count || 0) : 0) || v.member_count || (isMyVillage ? 1 : 0),
     currentPart: 1,
     totalParts: totalParts,
     dday: 0,
@@ -183,7 +183,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
     return towns.filter((town) => {
       if ((town.collection || 'active') === 'past') return false;
       if ((town.visibility || 'public') !== 'public') return false;
-      if (myVillageIds.includes(town.id)) return false; // #170: 이미 참여/생성한 마을 제외
+      // 검색 시에는 내 마을도 포함 (미리보기에서 "이미 참여 중" 표시)
 
       const book = resolveBook(town);
       const haystack = [town.name, town.currentRange, book.title, book.author, town.bookId]

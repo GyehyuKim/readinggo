@@ -476,9 +476,9 @@
           })));
         }
         await sb().from('village_members').insert({ village_id: v.id, user_id: id });
-        // parts + book 포함해서 다시 조회 — insert 응답에는 parts/book 미포함
+        // parts + book + member count 포함해서 다시 조회 — insert 응답에는 미포함
         return unwrap(await sb().from('villages')
-          .select('*, book:books(isbn13), parts:village_parts(*)')
+          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
           .eq('id', v.id).single()) || v;
       },
       async join(villageId) {
@@ -494,13 +494,13 @@
       async listMine() {
         const id = await uid();
         const rows = unwrap(await sb().from('village_members')
-          .select('village:villages(*, book:books(isbn13), parts:village_parts(*))')
+          .select('village:villages(*, book:books(isbn13), parts:village_parts(*), village_members(count))')
           .eq('user_id', id));
         return (rows || []).map(r => r.village).filter(Boolean);
       },
       async get(villageId) {
         return unwrap(await sb().from('villages')
-          .select('*, book:books(isbn13), parts:village_parts(*)')
+          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
           .eq('id', villageId).single());
       },
       async members(villageId) {
@@ -508,7 +508,7 @@
       },
       async listPublic({ limit } = {}) {
         let q = sb().from('villages')
-          .select('*, book:books(isbn13), parts:village_parts(*)')
+          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
           .eq('visibility', 'public').order('created_at', { ascending: false });
         if (limit) q = q.limit(limit);
         return unwrap(await q) || [];

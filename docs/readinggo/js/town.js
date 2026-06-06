@@ -37,7 +37,7 @@ function _getVillageMottoLine(town, myHandle) {
 }
 
 function TownDetailView({ state, townId, onBack, onTownUpdate }) {
-  const { useState } = React;
+  const { useState, useEffect } = React;
   const [selectedMember, setSelectedMember] = useState(null);
   const [activeSubtab, setActiveSubtab] = useState('members');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -45,20 +45,45 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editVisibility, setEditVisibility] = useState('public');
+  const [membersKey, setMembersKey] = useState(0);
 
   const town = (state.towns || []).find(t => t.id === townId);
-  const book = town ? getBook(town.bookId) : null;
+  const book = town ? resolveBook(town) : null;
   if (!town || !book) return (<section className="view active"><div>마을을 찾을 수 없습니다</div></section>);
 
-  // Local board data (Phase0 in-memory). Seed per-town if absent.
+  // Local board data (Phase0 in-memory) — 빈 배열로 시작, 하드코딩 샘플 없음
   if (!town._topics) {
-    const sampleAuthor = (town.members && town.members[1] && town.members[1].name) || (town.members && town.members[0] && town.members[0].name) || 'anonymous';
-    town._topics = [
-      { id: 't1', title: '1부에서 인상 깊었던 문장', desc: '', status: 'open', due: 2, createdBy: town.leader, opinions: [
-        { id: 'o1', author: sampleAuthor, text: '저는 p.87의 문장이 인상 깊었습니다.', createdAt: '1일 전' }
-      ]},
-    ];
+    town._topics = [];
   }
+
+  // 마을 멤버 비동기 로드 (Supabase) — 나를 포함한 실제 멤버 표시
+  useEffect(() => {
+    const DS = window.DataStore;
+    if (!DS || !DS.villages || !DS.villages.members) {
+      // DataStore 없으면 현재 유저를 fallback 멤버로
+      const me = window.RG_ME;
+      if (me && (!town.members || town.members.length === 0)) {
+        town.members = [{ name: me.handle || me.name || '나', nest: '🪺', streak: 0, cumulativePage: 0, todayRecorded: false }];
+        setMembersKey(k => k + 1);
+      }
+      return;
+    }
+    Promise.resolve(DS.villages.members(townId)).then(rows => {
+      if (!rows || !rows.length) {
+        const me = window.RG_ME;
+        if (me) {
+          town.members = [{ name: me.handle || me.name || '나', nest: '🪺', streak: 0, cumulativePage: 0, todayRecorded: false }];
+          setMembersKey(k => k + 1);
+        }
+        return;
+      }
+      town.members = rows.map(r => {
+        const u = r.user || {};
+        return { name: u.handle || u.name || u.email || '멤버', nest: u.nest_emoji || '🪺', streak: u.streak || 0, cumulativePage: 0, todayRecorded: false };
+      });
+      setMembersKey(k => k + 1);
+    }).catch(() => {});
+  }, [townId]);
 
   const myHandle = (window.RG_ME && window.RG_ME.handle) || '';
   const leaderHandle = String(town.leader || '').replace(/^@/, '');
