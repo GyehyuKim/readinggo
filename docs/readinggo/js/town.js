@@ -55,6 +55,8 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
   });
   const [inviteQuery, setInviteQuery] = useState('');
   const [inviteResults, setInviteResults] = useState([]);
+  const [isEditingMilestones, setIsEditingMilestones] = useState(false);
+  const [milestoneDates, setMilestoneDates] = useState([]);
 
   const town = (state.towns || []).find(t => t.id === townId);
   const book = town ? resolveBook(town) : null;
@@ -353,6 +355,14 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         const totalPages = book.total || 1;
         const isPrivate = town.visibility === 'private';
 
+        // 현재 파트 챕터 목표 페이지 (book.toc 또는 town.milestones에서 파생)
+        const toc = book.toc || [];
+        const currentMilestone = (town.milestones || []).find(m => m.part === town.currentPart);
+        const currentChapterToc = toc.find(ch => ch[0] === town.currentPart);
+        // endPage: milestone에 저장된 값 우선, 없으면 toc에서
+        const targetPage = (currentMilestone && currentMilestone.endPage) || (currentChapterToc && currentChapterToc[3]) || null;
+        const chapterTitle = (currentMilestone && currentMilestone.title) || (currentChapterToc && currentChapterToc[1]) || null;
+
         // 진척률 계산: 읽은 페이지 / 책 전체 페이지 × 100
         const getProgress = (m) => Math.min(100, ((m.cumulativePage || 0) / totalPages) * 100);
 
@@ -369,8 +379,21 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         const gridMembers = regularMembers.slice(0, 15);
         const listMembers = regularMembers.slice(15);
 
+        const achievedCount = targetPage ? regularMembers.filter(m => (m.cumulativePage||0) >= targetPage).length : 0;
+
         return (
           <div style={{padding:'0 16px 40px'}}>
+            {/* 현재 파트 달성 현황 배너 */}
+            {targetPage && (
+              <div style={{marginBottom:10, padding:'8px 12px', borderRadius:10, background:'var(--brand-tint)', border:'1px solid var(--brand)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4}}>
+                <div>
+                  <span style={{fontSize:12, fontWeight:900, color:'var(--brand-3)'}}>파트 {town.currentPart}</span>
+                  {chapterTitle && <span style={{fontSize:11, color:'var(--ink-2)', fontWeight:700}}> · {chapterTitle}</span>}
+                  <span style={{fontSize:11, color:'var(--ink-3)'}}> (~{targetPage}p)</span>
+                </div>
+                <span style={{fontSize:12, fontWeight:900, color:'var(--brand-3)'}}>✅ {achievedCount}/{regularMembers.length}명 달성</span>
+              </div>
+            )}
             <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:12}}>
               👥 참여자 ({regularMembers.length}명)
             </div>
@@ -444,6 +467,12 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                         <div style={{fontSize:12,fontWeight:900,color:'var(--brand-3)',marginTop:4}}>
                           진도 {Math.round(progress)}%
                         </div>
+                        {/* 파트 달성 배지 */}
+                        {targetPage && (
+                          <div style={{fontSize:10,fontWeight:800,marginTop:3,color:(m.cumulativePage||0)>=targetPage?'var(--brand-3)':'var(--ink-3)'}}>
+                            {(m.cumulativePage||0)>=targetPage?'✅ 달성':'⏳ 미달성'}
+                          </div>
+                        )}
                       </button>
 
                       {/* 콕찌르기 — 카드 내부 하단. 비공개 마을 + 불 꺼진 멤버 전용 */}
@@ -690,6 +719,59 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                         </div>
                       </div>
                     )}
+                    <div style={{height:'1px', background:'var(--line)', margin:'8px 0'}} />
+                    {/* 파트 마감일 편집 */}
+                    {(() => {
+                      const toc = book.toc || [];
+                      if (toc.length === 0) return null;
+                      const saveMilestones = () => {
+                        const newMs = toc.map((ch, i) => ({
+                          part: ch[0], title: ch[1], startPage: ch[2], endPage: ch[3],
+                          dueDate: milestoneDates[i] || null, completed: false,
+                        }));
+                        if (onTownUpdate) onTownUpdate({ id: townId, milestones: newMs });
+                        setIsEditingMilestones(false);
+                        showToast('파트 마감일이 저장되었습니다');
+                      };
+                      return (
+                        <div style={{marginBottom:8}}>
+                          {!isEditingMilestones ? (
+                            <button onClick={() => {
+                              setMilestoneDates(toc.map((ch, i) => {
+                                const ms = (town.milestones || []).find(m => m.part === ch[0]);
+                                return (ms && ms.dueDate) || '';
+                              }));
+                              setIsEditingMilestones(true);
+                            }} style={{padding:'8px 0', width:'100%', background:'none', border:'none', color:'var(--ink-1)', fontWeight:800, fontSize:13, cursor:'pointer', textAlign:'left'}}>
+                              📅 파트 마감일 수정
+                            </button>
+                          ) : (
+                            <div>
+                              <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>📅 챕터별 마감일</div>
+                              <div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:8}}>
+                                {toc.map((ch, i) => (
+                                  <div key={i} style={{borderRadius:10, background:'var(--paper)', border:'1px solid var(--line)', overflow:'hidden'}}>
+                                    <div style={{display:'flex', alignItems:'center', gap:6, padding:'6px 10px', borderBottom:'1px solid var(--line-2)'}}>
+                                      <span style={{fontSize:10, fontWeight:900, color:'white', background:'var(--brand)', borderRadius:5, padding:'1px 6px', flexShrink:0}}>{ch[0]}</span>
+                                      <span style={{fontSize:11, fontWeight:800, flex:1, color:'var(--ink-1)'}}>{ch[1]}</span>
+                                      <span style={{fontSize:10, color:'var(--ink-3)'}}>{ch[2]}–{ch[3]}p</span>
+                                    </div>
+                                    <div style={{display:'flex', alignItems:'center', gap:6, padding:'6px 10px'}}>
+                                      <span style={{fontSize:11, color:'var(--ink-3)', flexShrink:0}}>마감</span>
+                                      <input type="date" value={milestoneDates[i]||''} onChange={e => setMilestoneDates(prev => { const n=[...prev]; n[i]=e.target.value; return n; })} style={{flex:1, padding:'4px 8px', borderRadius:6, border:'1.5px solid var(--line)', background:'var(--paper)', fontSize:12, fontWeight:700}} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{display:'flex', gap:6}}>
+                                <button onClick={() => setIsEditingMilestones(false)} style={{flex:1, padding:'7px 0', border:'1.5px solid var(--line)', borderRadius:8, background:'var(--card)', fontWeight:800, fontSize:12, cursor:'pointer'}}>취소</button>
+                                <button onClick={saveMilestones} style={{flex:1, padding:'7px 0', border:'none', borderRadius:8, background:'var(--brand)', color:'white', fontWeight:800, fontSize:12, cursor:'pointer'}}>저장</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div style={{height:'1px', background:'var(--line)', margin:'8px 0'}} />
                     {/* 유저 검색 초대 */}
                     <div style={{marginBottom:8}}>

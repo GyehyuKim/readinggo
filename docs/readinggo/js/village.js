@@ -87,14 +87,31 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
   const [createDescription, setCreateDescription] = useState('');
   const [createVisibility, setCreateVisibility] = useState('public');
   const [createCapacity, setCreateCapacity] = useState('');
-  const [createPartCount, setCreatePartCount] = useState('3');
-  const [createPartDueDates, setCreatePartDueDates] = useState(['', '', '']);
+  const [createPartCount, setCreatePartCount] = useState(() => {
+    const book = BOOK_BY_ID[(state.book && state.book.id) || 'b001'];
+    return book && book.toc ? String(book.toc.length) : '3';
+  });
+  const [createPartDueDates, setCreatePartDueDates] = useState(() => {
+    const book = BOOK_BY_ID[(state.book && state.book.id) || 'b001'];
+    const len = (book && book.toc) ? book.toc.length : 3;
+    return Array(len).fill('');
+  });
   const [createBookId, setCreateBookId] = useState((state.book && state.book.id) || 'b001');
   const [createError, setCreateError] = useState('');
 
   // Supabase 연동: 내 마을 + 공개 마을을 비동기 로드. 실패 시 데모 데이터 유지.
   const [towns, setTowns] = useState(state.towns || []);
   const [myVillageIds, setMyVillageIds] = useState([]);
+
+  // 책 변경 시 TOC 기반으로 파트 날짜 배열 재초기화
+  useEffect(() => {
+    const book = BOOK_BY_ID[createBookId];
+    const toc = book && book.toc;
+    if (toc && toc.length > 0) {
+      setCreatePartCount(String(toc.length));
+      setCreatePartDueDates(Array(toc.length).fill(''));
+    }
+  }, [createBookId]);
 
   useEffect(() => {
     const DS = window.DataStore;
@@ -259,7 +276,6 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
       return;
     }
 
-    const partCount = Math.max(1, parseInt(createPartCount, 10) || 0);
     const capacityValue = createCapacity.trim() ? parseInt(createCapacity, 10) : null;
 
     if (createCapacity.trim() && (!capacityValue || capacityValue < 2)) {
@@ -273,7 +289,12 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
     }
 
     const normalizedCapacity = capacityValue || null;
-    const parts = Array.from({ length: partCount }).map((_, i) => ({ part_order: i + 1, title: null, end_page: null, due_date: createPartDueDates[i] || null }));
+    const _createBook = BOOK_BY_ID[createBookId];
+    const _createToc = _createBook && _createBook.toc || [];
+    const partCount = _createToc.length > 0 ? _createToc.length : Math.max(1, parseInt(createPartCount, 10) || 1);
+    const parts = _createToc.length > 0
+      ? _createToc.map((ch, i) => ({ part_order: ch[0], title: ch[1], start_page: ch[2], end_page: ch[3], due_date: createPartDueDates[i] || null }))
+      : Array.from({ length: partCount }).map((_, i) => ({ part_order: i + 1, title: null, end_page: null, due_date: createPartDueDates[i] || null }));
 
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.create) {
@@ -293,7 +314,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
         newTown.memberCount = 1;
         newTown.totalParts = partCount;
         newTown.currentPart = 1;
-        newTown.milestones = Array.from({ length: partCount }).map((_, i) => ({ part: i + 1, dueDate: createPartDueDates[i] || null, completed: false }));
+        newTown.milestones = parts.map(p => ({ part: p.part_order, title: p.title, startPage: p.start_page, endPage: p.end_page, dueDate: p.due_date || null, completed: false }));
         setTowns(prev => [...prev, newTown]);
         setMyVillageIds(prev => [...prev, newTown.id]);
         showToast(`마을을 만들었어요: ${newTown.name}`);
@@ -324,7 +345,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
         leader: '@jerome',
         currentRange: '프롤로그',
         status: 'active',
-        milestones: Array.from({ length: partCount }).map((_,i)=>({ part: i+1, dueDate: null, completed: false })),
+        milestones: parts.map(p => ({ part: p.part_order, title: p.title, startPage: p.start_page, endPage: p.end_page, dueDate: p.due_date || null, completed: false })),
         members: [ { name: 'jerome', nest: '🏠', avatar: '🐦', todayRecorded: false, quote: '', cumulativePage: state.book ? state.book.cur || 0 : 0, streak: 0, xp: state.xp || 0 } ],
       };
       setTowns(prev => [...prev, newTown]);
@@ -918,91 +939,66 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
                   <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginTop:6}}>직접 설정 시 최소 2명 이상</div>
                 </div>
 
-                <div>
-                  <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>마일스톤</div>
-                  <div style={{display:'flex', gap:8, marginBottom:8}}>
-                    <input
-                      value={createPartCount}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, '');
-                        setCreatePartCount(val);
-                        const count = Math.max(1, parseInt(val, 10) || 1);
-                        setCreatePartDueDates(prev => {
-                          const next = Array.from({ length: count }).map((_, i) => prev[i] || '');
-                          return next;
-                        });
-                      }}
-                      placeholder="파트 수"
-                      inputMode="numeric"
-                      style={{
-                        flex:1,
-                        padding:'12px 14px',
-                        borderRadius:12,
-                        border:'1.5px solid var(--line)',
-                        background:'var(--paper)',
-                        fontSize:14,
-                        fontWeight:700,
-                        boxSizing:'border-box',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const count = Math.max(1, parseInt(createPartCount, 10) || 1);
-                        const today = new Date();
-                        const totalDays = 28;
-                        const newDates = Array.from({ length: count }).map((_, i) => {
-                          const d = new Date(today);
-                          d.setDate(d.getDate() + Math.round((i + 1) * totalDays / count));
-                          return d.toISOString().split('T')[0];
-                        });
-                        setCreatePartDueDates(newDates);
-                      }}
-                      style={{
-                        padding:'10px 12px',
-                        border:'1.5px solid var(--line)',
-                        borderRadius:12,
-                        background:'var(--card)',
-                        fontWeight:800,
-                        fontSize:12,
-                        color:'var(--ink-2)',
-                        cursor:'pointer',
-                        whiteSpace:'nowrap',
-                      }}
-                    >
-                      균등 자동 분할
-                    </button>
-                  </div>
-                  <div style={{display:'flex', flexDirection:'column', gap:8}}>
-                    {Array.from({ length: Math.max(1, parseInt(createPartCount, 10) || 1) }).map((_, index) => (
-                      <div key={index} style={{display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'var(--card)', border:'1px solid var(--line)'}}>
-                        <span style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', minWidth:44, flexShrink:0}}>파트 {index + 1}</span>
-                        <span style={{fontSize:11, color:'var(--ink-3)', flexShrink:0}}>마감</span>
-                        <input
-                          type="date"
-                          value={createPartDueDates[index] || ''}
-                          onChange={(e) => {
-                            setCreatePartDueDates(prev => {
-                              const next = [...prev];
-                              next[index] = e.target.value;
-                              return next;
-                            });
-                          }}
-                          style={{
-                            flex:1,
-                            padding:'6px 10px',
-                            borderRadius:8,
-                            border:'1.5px solid var(--line)',
-                            background:'var(--paper)',
-                            fontSize:13,
-                            fontWeight:700,
-                            boxSizing:'border-box',
-                          }}
-                        />
+                {/* 마일스톤 — TOC 있는 책은 챕터 자동 조회, 없으면 수동 */}
+                {(() => {
+                  const selBook = BOOK_BY_ID[createBookId];
+                  const toc = selBook && selBook.toc || [];
+                  const autoSplit = () => {
+                    const count = toc.length || Math.max(1, parseInt(createPartCount, 10) || 1);
+                    const today = new Date();
+                    setCreatePartDueDates(Array.from({ length: count }).map((_, i) => {
+                      const d = new Date(today);
+                      d.setDate(d.getDate() + Math.round((i + 1) * 28 / count));
+                      return d.toISOString().split('T')[0];
+                    }));
+                  };
+                  const dateInputStyle = { flex:1, padding:'6px 10px', borderRadius:8, border:'1.5px solid var(--line)', background:'var(--paper)', fontSize:13, fontWeight:700, boxSizing:'border-box' };
+
+                  if (toc.length > 0) {
+                    return (
+                      <div>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+                          <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)'}}>📚 챕터별 마일스톤 <span style={{fontSize:11, fontWeight:600, color:'var(--ink-3)'}}>({toc.length}챕터 자동 조회)</span></div>
+                          <button type="button" onClick={autoSplit} style={{padding:'6px 10px', border:'1.5px solid var(--line)', borderRadius:10, background:'var(--card)', fontWeight:800, fontSize:11, color:'var(--ink-2)', cursor:'pointer', whiteSpace:'nowrap'}}>균등 자동 분할</button>
+                        </div>
+                        <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                          {toc.map((ch, i) => (
+                            <div key={i} style={{borderRadius:12, background:'var(--card)', border:'1px solid var(--line)', overflow:'hidden'}}>
+                              <div style={{display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderBottom:'1px solid var(--line-2)'}}>
+                                <span style={{fontSize:10, fontWeight:900, color:'white', background:'var(--brand)', borderRadius:6, padding:'2px 7px', flexShrink:0}}>{ch[0]}</span>
+                                <span style={{fontSize:12, fontWeight:800, flex:1, color:'var(--ink-1)'}}>{ch[1]}</span>
+                                <span style={{fontSize:11, color:'var(--ink-3)', flexShrink:0}}>{ch[2]}–{ch[3]}p</span>
+                              </div>
+                              <div style={{display:'flex', alignItems:'center', gap:6, padding:'8px 12px'}}>
+                                <span style={{fontSize:11, color:'var(--ink-3)', flexShrink:0}}>마감</span>
+                                <input type="date" value={createPartDueDates[i] || ''} onChange={(e) => setCreatePartDueDates(prev => { const n=[...prev]; n[i]=e.target.value; return n; })} style={dateInputStyle} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    );
+                  }
+                  // TOC 없는 책 — 수동 파트 입력
+                  return (
+                    <div>
+                      <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>마일스톤</div>
+                      <div style={{display:'flex', gap:8, marginBottom:8}}>
+                        <input value={createPartCount} onChange={(e) => { const v=e.target.value.replace(/[^0-9]/g,''); setCreatePartCount(v); const c=Math.max(1,parseInt(v,10)||1); setCreatePartDueDates(prev=>Array.from({length:c}).map((_,i)=>prev[i]||'')); }} placeholder="파트 수" inputMode="numeric" style={{flex:1,padding:'12px 14px',borderRadius:12,border:'1.5px solid var(--line)',background:'var(--paper)',fontSize:14,fontWeight:700,boxSizing:'border-box'}} />
+                        <button type="button" onClick={autoSplit} style={{padding:'10px 12px',border:'1.5px solid var(--line)',borderRadius:12,background:'var(--card)',fontWeight:800,fontSize:12,color:'var(--ink-2)',cursor:'pointer',whiteSpace:'nowrap'}}>균등 자동 분할</button>
+                      </div>
+                      <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                        {Array.from({length:Math.max(1,parseInt(createPartCount,10)||1)}).map((_,i)=>(
+                          <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 12px',borderRadius:12,background:'var(--card)',border:'1px solid var(--line)'}}>
+                            <span style={{fontSize:12,fontWeight:800,color:'var(--ink-2)',minWidth:44,flexShrink:0}}>파트 {i+1}</span>
+                            <span style={{fontSize:11,color:'var(--ink-3)',flexShrink:0}}>마감</span>
+                            <input type="date" value={createPartDueDates[i]||''} onChange={(e)=>setCreatePartDueDates(prev=>{const n=[...prev];n[i]=e.target.value;return n;})} style={dateInputStyle} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {createDescription.trim() && (
                   <div style={{padding:'12px 14px', borderRadius:14, background:'var(--brand-tint)', color:'var(--brand-3)', fontSize:13, fontWeight:800}}>
