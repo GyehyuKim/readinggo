@@ -501,6 +501,11 @@
         await sb().from('village_members').delete().eq('village_id', villageId).eq('user_id', id);
         return true;
       },
+      async delete(villageId) {
+        const id = await uid();
+        unwrap(await sb().from('villages').delete().eq('id', villageId).eq('created_by', id));
+        return true;
+      },
       async listMine() {
         const id = await uid();
         const rows = unwrap(await sb().from('village_members')
