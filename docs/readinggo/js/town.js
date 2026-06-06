@@ -359,8 +359,9 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         const toc = book.toc || [];
         const currentMilestone = (town.milestones || []).find(m => m.part === town.currentPart);
         const currentChapterToc = toc.find(ch => ch[0] === town.currentPart);
-        // endPage: milestone에 저장된 값 우선, 없으면 toc에서
-        const targetPage = (currentMilestone && currentMilestone.endPage) || (currentChapterToc && currentChapterToc[3]) || null;
+        // 목표 퍼센트: endPage / totalPages × 100 (출판사마다 쪽수 달라도 공평한 비교)
+        const _endPage = (currentMilestone && currentMilestone.endPage) || (currentChapterToc && currentChapterToc[3]) || null;
+        const targetPercent = _endPage ? Math.round(_endPage / totalPages * 100) : null;
         const chapterTitle = (currentMilestone && currentMilestone.title) || (currentChapterToc && currentChapterToc[1]) || null;
 
         // 진척률 계산: 읽은 페이지 / 책 전체 페이지 × 100
@@ -379,17 +380,17 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         const gridMembers = regularMembers.slice(0, 15);
         const listMembers = regularMembers.slice(15);
 
-        const achievedCount = targetPage ? regularMembers.filter(m => (m.cumulativePage||0) >= targetPage).length : 0;
+        const achievedCount = targetPercent ? regularMembers.filter(m => getProgress(m) >= targetPercent).length : 0;
 
         return (
           <div style={{padding:'0 16px 40px'}}>
             {/* 현재 파트 달성 현황 배너 */}
-            {targetPage && (
+            {targetPercent && (
               <div style={{marginBottom:10, padding:'8px 12px', borderRadius:10, background:'var(--brand-tint)', border:'1px solid var(--brand)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4}}>
                 <div>
                   <span style={{fontSize:12, fontWeight:900, color:'var(--brand-3)'}}>파트 {town.currentPart}</span>
                   {chapterTitle && <span style={{fontSize:11, color:'var(--ink-2)', fontWeight:700}}> · {chapterTitle}</span>}
-                  <span style={{fontSize:11, color:'var(--ink-3)'}}> (~{targetPage}p)</span>
+                  <span style={{fontSize:11, color:'var(--ink-3)'}}> (목표 {targetPercent}%)</span>
                 </div>
                 <span style={{fontSize:12, fontWeight:900, color:'var(--brand-3)'}}>✅ {achievedCount}/{regularMembers.length}명 달성</span>
               </div>
@@ -468,9 +469,9 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                           진도 {Math.round(progress)}%
                         </div>
                         {/* 파트 달성 배지 */}
-                        {targetPage && (
-                          <div style={{fontSize:10,fontWeight:800,marginTop:3,color:(m.cumulativePage||0)>=targetPage?'var(--brand-3)':'var(--ink-3)'}}>
-                            {(m.cumulativePage||0)>=targetPage?'✅ 달성':'⏳ 미달성'}
+                        {targetPercent && (
+                          <div style={{fontSize:10,fontWeight:800,marginTop:3,color:getProgress(m)>=targetPercent?'var(--brand-3)':'var(--ink-3)'}}>
+                            {getProgress(m)>=targetPercent?'✅ 달성':'⏳ 미달성'}
                           </div>
                         )}
                       </button>
