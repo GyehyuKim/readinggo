@@ -35,6 +35,14 @@ function TownDetailView({ state, townId, onBack }) {
   const [sentLikes, setSentLikes] = useState({});
   const toggleSentLike = (name) => setSentLikes(s => ({ ...s, [name]: !s[name] }));
 
+  // 콕찌르기 — Phase0 in-memory (KST 자정 리셋은 세션 재시작으로 대체)
+  const [pokedToday, setPokedToday] = useState({});
+  const handlePoke = (memberName) => {
+    if (pokedToday[memberName]) return;
+    setPokedToday(prev => ({ ...prev, [memberName]: true }));
+    showToast(`@${memberName}에게 🪱 콕 찔렀어요! 오늘도 같이 읽어요 🐦`);
+  };
+
   // 마을 공유 (#8) — 공유 URL + Web Share API, 미지원 시 클립보드 폴백
   const shareVillage = async () => {
     const base = window.location.origin;
@@ -57,9 +65,6 @@ function TownDetailView({ state, townId, onBack }) {
       Promise.resolve(window.DataStore.villages.leave(town.id)).then(done).catch(() => showToast('나가기 실패 — 잠시 후 다시'));
     } else { done(); }
   };
-
-  // Ranking
-  const ranking = [...town.members].sort((a,b)=>b.cumulativePage-a.cumulativePage).map((m,i)=>({...m,rank:i+1}));
 
   // Board handlers (in-memory)
   const [renderKey, setRenderKey] = useState(0);
@@ -121,27 +126,167 @@ function TownDetailView({ state, townId, onBack }) {
         </div>
       </div>
 
-      {activeSubtab==='members' && (
-        <div style={{padding:'0 16px 40px'}}>
-          <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:12}}>👥 참여자 둥지 ({town.members.length}명)</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-            {town.members.map(m=> <div key={m.name} onClick={()=>goProfile(m.name)} style={{cursor:'pointer',textAlign:'center',padding:10,borderRadius:10,background:m.todayRecorded?'var(--brand-tint)':'var(--line-2)'}}><div style={{fontSize:28}}>{m.nest}</div><div style={{fontSize:11,fontWeight:700,color:'var(--brand-3)'}}>@{m.name}</div></div>)}
-          </div>
+      {activeSubtab==='members' && (() => {
+        const totalPages = book.total || 1;
+        const isPrivate = town.visibility === 'private';
 
-          <div style={{marginTop:20}}>
-            <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:8}}>🏆 파트별 랭킹</div>
-            <div style={{background:'var(--card)',borderRadius:12,border:'1.5px solid var(--line)'}}>
-              {ranking.map((member,idx)=> (
-                <div key={member.name} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderBottom:idx<ranking.length-1?'1px solid var(--line-2)':'none'}}>
-                  <div style={{width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>{member.rank<=3?['🥇','🥈','🥉'][member.rank-1]:member.rank}</div>
-                  <div style={{flex:1}}><button onClick={()=>goProfile(member.name)} style={{background:'none',border:'none',padding:0,fontSize:13,fontWeight:700,color:'var(--brand-3)',cursor:'pointer'}}>@{member.name}</button><div style={{fontSize:11,color:'var(--ink-2)'}}>{member.nest} · 🔥 {member.streak}</div></div>
-                  <div style={{textAlign:'right'}}><div style={{fontSize:15,fontWeight:900}}>{member.cumulativePage}</div><div style={{fontSize:10,color:'var(--ink-3)'}}>페이지</div></div>
-                </div>
-              ))}
+        // 진척률 계산: 읽은 페이지 / 책 전체 페이지 × 100
+        const getProgress = (m) => Math.min(100, ((m.cumulativePage || 0) / totalPages) * 100);
+
+        // 랭킹: 전체 책 진척률 내림차순 → 동점 시 스트릭 높은 순.
+        const regularMembers = (town.members || [])
+          .slice()
+          .sort((a, b) => {
+            const diff = getProgress(b) - getProgress(a);
+            return diff !== 0 ? diff : (b.streak || 0) - (a.streak || 0);
+          })
+          .map((m, i) => ({ ...m, rank: i + 1 }));
+
+        // 15명 이하: 전원 3열 그리드. 16명 이상: 상위 15위 그리드 + 나머지 한 줄 목록
+        const gridMembers = regularMembers.slice(0, 15);
+        const listMembers = regularMembers.slice(15);
+
+        return (
+          <div style={{padding:'0 16px 40px'}}>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:12}}>
+              👥 참여자 ({regularMembers.length}명)
             </div>
+
+            {/* 3열 랭킹 그리드 — align-items:stretch 로 같은 row 높이 균일 */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,alignItems:'start'}}>
+              {gridMembers.map(m => {
+                const progress = getProgress(m);
+                const isLit = !!m.todayRecorded;
+                const isSelf = _norm(m.name) === _norm(myHandle);
+                const canPoke = isPrivate && !isLit && !isSelf;
+                const hasPoked = !!pokedToday[m.name];
+
+                return (
+                  <div key={m.name} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                    {/* 순위 번호 (카드 외부 상단) */}
+                    <div style={{fontSize:13,fontWeight:900,color:'var(--ink-2)',alignSelf:'center'}}>
+                      {m.rank <= 3 ? ['🥇','🥈','🥉'][m.rank - 1] : `${m.rank}위`}
+                    </div>
+
+                    {/* 멤버 카드 — position:relative 로 불빛 우측상단 절대배치 */}
+                    <div
+                      style={{
+                        position:'relative',
+                        width:'100%',
+                        borderRadius:14,
+                        border:'1.5px solid ' + (isLit ? 'var(--brand)' : 'var(--line)'),
+                        background: isLit ? 'var(--brand-tint)' : 'var(--card)',
+                        boxShadow: isLit ? '0 0 14px rgba(34,122,83,0.22)' : 'none',
+                        transition:'box-shadow 0.15s ease',
+                        padding:'10px 6px 10px',
+                        boxSizing:'border-box',
+                        display:'flex',
+                        flexDirection:'column',
+                        alignItems:'center',
+                        minHeight:100,
+                      }}
+                    >
+                      {/* 불빛 — 우측 상단 코너 절대배치 */}
+                      <span style={{
+                        position:'absolute',
+                        top:6,
+                        right:7,
+                        fontSize:9,
+                        color: isLit ? '#F5A623' : 'var(--ink-3)',
+                        lineHeight:1,
+                      }}>
+                        {isLit ? '●' : '○'}
+                      </span>
+
+                      {/* 카드 본체: 프로필 이동 영역 */}
+                      <button
+                        onClick={() => goProfile(m.name)}
+                        style={{
+                          width:'100%',
+                          background:'transparent',
+                          border:'none',
+                          cursor:'pointer',
+                          textAlign:'center',
+                          padding:0,
+                          flex:1,
+                        }}
+                      >
+                        {/* 둥지 이모지 */}
+                        <div style={{fontSize:26,lineHeight:1,marginBottom:4}}>{m.nest}</div>
+                        {/* 닉네임 */}
+                        <div style={{fontSize:11,fontWeight:800,color:'var(--ink-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',padding:'0 2px'}}>
+                          {m.name}
+                        </div>
+                        {/* 진도 XX% */}
+                        <div style={{fontSize:12,fontWeight:900,color:'var(--brand-3)',marginTop:4}}>
+                          진도 {Math.round(progress)}%
+                        </div>
+                      </button>
+
+                      {/* 콕찌르기 — 카드 내부 하단. 비공개 마을 + 불 꺼진 멤버 전용 */}
+                      {canPoke && (
+                        <button
+                          onClick={() => handlePoke(m.name)}
+                          disabled={hasPoked}
+                          style={{
+                            marginTop:6,
+                            width:'100%',
+                            padding:'4px 0',
+                            border:'1.5px solid ' + (hasPoked ? 'var(--line-2)' : 'var(--line)'),
+                            borderRadius:20,
+                            background: hasPoked ? 'var(--line-2)' : 'var(--paper)',
+                            color: hasPoked ? 'var(--ink-3)' : 'var(--ink-2)',
+                            fontWeight:700,
+                            fontSize:10,
+                            cursor: hasPoked ? 'default' : 'pointer',
+                            whiteSpace:'nowrap',
+                          }}
+                        >
+                          {hasPoked ? '✓ 콕 찔렀어요' : '🪱 콕찌르기'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 16위+ 한 줄 목록 */}
+            {listMembers.length > 0 && (
+              <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:8}}>
+                {listMembers.map(m => {
+                  const progress = getProgress(m);
+                  const isLit = !!m.todayRecorded;
+                  const isSelf = _norm(m.name) === _norm(myHandle);
+                  const canPoke = isPrivate && !isLit && !isSelf;
+                  const hasPoked = !!pokedToday[m.name];
+                  return (
+                    <div key={m.name} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:12,background:'var(--card)',border:'1px solid var(--line-2)'}}>
+                      <span style={{fontSize:12,fontWeight:900,color:'var(--ink-2)',minWidth:28}}>{m.rank}위</span>
+                      <span style={{fontSize:20}}>{m.nest}</span>
+                      <span style={{fontSize:10,color: isLit ? '#F5A623' : 'var(--ink-3)'}}>{isLit ? '●' : '○'}</span>
+                      <button onClick={()=>goProfile(m.name)} style={{flex:1,background:'none',border:'none',textAlign:'left',fontSize:13,fontWeight:700,color:'var(--brand-3)',cursor:'pointer'}}>
+                        {m.name}
+                      </button>
+                      <span style={{fontSize:13,fontWeight:900,color:'var(--brand-3)'}}>진도 {Math.round(progress)}%</span>
+                      {canPoke && (
+                        <button
+                          onClick={() => handlePoke(m.name)}
+                          disabled={hasPoked}
+                          style={{padding:'4px 10px',border:'1.5px solid '+(hasPoked?'var(--line-2)':'var(--line)'),borderRadius:20,background:hasPoked?'var(--line-2)':'var(--paper)',color:hasPoked?'var(--ink-3)':'var(--ink-2)',fontWeight:700,fontSize:10,cursor:hasPoked?'default':'pointer',whiteSpace:'nowrap'}}
+                        >
+                          {hasPoked ? '✓ 콕 찔렀어요' : '🪱 콕찌르기'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {activeSubtab==='sentence' && (
         <div style={{padding:'0 16px 40px'}}>

@@ -41,6 +41,10 @@ docs/readinggo/supabase/package-lock.json
 # Netlify CLI cache
 .netlify/
 
+# ReadingGo 로컬 테스트 전용 (CDN 오프라인 대체 — 커밋 금지)
+docs/readinggo/vendor/
+docs/readinggo/index-local.html
+
 # Personal notices
 notice-*.txt
 
