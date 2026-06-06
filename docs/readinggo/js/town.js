@@ -90,6 +90,22 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     }).catch(fallback);
   }, [townId]);
 
+  // 오늘 독서 체크인 시 내 불빛 켜기
+  useEffect(() => {
+    const handler = () => {
+      const me = window.RG_ME;
+      const myHandle = me && (me.handle || me.displayName);
+      if (!myHandle) return;
+      setMembersList(prev => prev.map(m => {
+        const mName = String(m.name || '').replace(/^@/, '').toLowerCase();
+        const myName = String(myHandle).replace(/^@/, '').toLowerCase();
+        return mName === myName ? { ...m, todayRecorded: true } : m;
+      }));
+    };
+    window.addEventListener('rg:today-checked', handler);
+    return () => window.removeEventListener('rg:today-checked', handler);
+  }, []);
+
   // 게시판 주제 비동기 로드 (Supabase)
   useEffect(() => {
     const DS = window.DataStore;
@@ -574,7 +590,7 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
       )}
 
       {/* Settings sheet */}
-      {isSettingsOpen && (
+      {isSettingsOpen && ReactDOM.createPortal(
         <div className="modal-backdrop show" onClick={()=>setIsSettingsOpen(false)}>
           <div className="sheet" role="dialog" aria-label="설정" onClick={(e)=>e.stopPropagation()}>
             <div className="sheet-grip" />
@@ -691,7 +707,9 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                                   };
                                   setMembersList(prev => {
                                     if (prev.some(m => m.name === newMember.name)) return prev;
-                                    return [...prev, newMember];
+                                    const next = [...prev, newMember];
+                                    if (onTownUpdate) onTownUpdate({ id: townId, members: next });
+                                    return next;
                                   });
                                   showToast(`@${u.handle || u.display_name} 초대 완료!`);
                                   setInviteResults([]);
@@ -728,7 +746,7 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
     </section>
   );
@@ -769,7 +787,7 @@ function TopicEditor({ open, editing, onClose, initial, onSave }) {
 
   if (!open) return null;
 
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-backdrop show" onClick={onClose}>
       <div className="sheet" role="dialog" aria-label="주제 등록" onClick={e=>e.stopPropagation()}>
         <div className="sheet-grip" />
@@ -788,7 +806,7 @@ function TopicEditor({ open, editing, onClose, initial, onSave }) {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
 
 window.TownDetailView = TownDetailView;
