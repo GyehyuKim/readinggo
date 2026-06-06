@@ -208,22 +208,30 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
   };
 
   // Board handlers — optimistic 업데이트 + background Supabase 저장
+  // topics 변경 시 onTownUpdate로 villageTowns 동기화 → 네비게이션 후 재마운트에도 유지
+  const syncTopics = (next) => { if (onTownUpdate) onTownUpdate({ id: townId, _topics: next }); };
+
   const addTopic = (title, desc, days) => {
     if (!title || title.trim().length===0) { showToast('주제는 필수입니다'); return; }
     const localId = 't' + Math.random().toString(36).slice(2,8);
-    setTopics(prev => [{ id: localId, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: myHandle, createdAt: '방금', opinions: [] }, ...prev]);
+    const newTopic = { id: localId, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: myHandle, createdAt: '방금', opinions: [] };
+    const next = [newTopic, ...topics];
+    setTopics(next);
+    syncTopics(next);
     showToast('주제가 등록되었습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.addTopic) {
       Promise.resolve(DS.villages.addTopic(townId, { title: title.slice(0,100), description: desc ? desc.slice(0,200) : null, dueDays: days }))
-        .then(row => { if (row && row.id) setTopics(prev => prev.map(x => x.id===localId ? {...x, id: row.id} : x)); })
+        .then(row => { if (row && row.id) setTopics(prev => { const n = prev.map(x => x.id===localId ? {...x, id: row.id} : x); syncTopics(n); return n; }); })
         .catch(() => {});
     }
   };
   const updateTopic = (id, title, desc, days) => {
     const t = topics.find(x=>x.id===id); if(!t) return;
     if (!canEditTopic(t)) { showToast('내가 등록한 주제만 수정할 수 있어요'); return; }
-    setTopics(prev => prev.map(x => x.id===id ? {...x, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', due: days} : x));
+    const next = topics.map(x => x.id===id ? {...x, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', due: days} : x);
+    setTopics(next);
+    syncTopics(next);
     showToast('주제를 수정했습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.updateTopic) {
@@ -234,19 +242,23 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     if (!text || text.trim().length===0) { showToast('의견을 입력하세요'); return; }
     const localId = 'o'+Math.random().toString(36).slice(2,8);
     const newOp = { id: localId, author: author||myHandle, text: text.slice(0,300), createdAt: '방금' };
-    setTopics(prev => prev.map(t => t.id===topicId ? {...t, opinions: [...(t.opinions||[]), newOp]} : t));
+    const next = topics.map(t => t.id===topicId ? {...t, opinions: [...(t.opinions||[]), newOp]} : t);
+    setTopics(next);
+    syncTopics(next);
     showToast('의견이 등록되었습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.addOpinion) {
       Promise.resolve(DS.villages.addOpinion(topicId, text.slice(0,300)))
-        .then(row => { if (row && row.id) setTopics(prev => prev.map(t => t.id===topicId ? {...t, opinions: t.opinions.map(o => o.id===localId ? {...o, id: row.id} : o)} : t)); })
+        .then(row => { if (row && row.id) setTopics(prev => { const n = prev.map(t => t.id===topicId ? {...t, opinions: t.opinions.map(o => o.id===localId ? {...o, id: row.id} : o)} : t); syncTopics(n); return n; }); })
         .catch(() => {});
     }
   };
   const deleteTopic = (topicId) => {
     const t = topics.find(x=>x.id===topicId);
     if (t && !canEditTopic(t)) { showToast('내가 등록한 주제만 삭제할 수 있어요'); return; }
-    setTopics(prev => prev.filter(x=>x.id!==topicId));
+    const next = topics.filter(x=>x.id!==topicId);
+    setTopics(next);
+    syncTopics(next);
     showToast('주제를 삭제했습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.deleteTopic) {
@@ -257,7 +269,9 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     const t = topics.find(x=>x.id===topicId); if(!t) return;
     const o = t.opinions.find(x=>x.id===opinionId);
     if (o && !canEditOpinion(o)) { showToast('내가 쓴 의견만 삭제할 수 있어요'); return; }
-    setTopics(prev => prev.map(x => x.id===topicId ? {...x, opinions: x.opinions.filter(op=>op.id!==opinionId)} : x));
+    const next = topics.map(x => x.id===topicId ? {...x, opinions: x.opinions.filter(op=>op.id!==opinionId)} : x);
+    setTopics(next);
+    syncTopics(next);
     showToast('의견이 삭제되었습니다');
     const DS = window.DataStore;
     if (DS && DS.villages && DS.villages.deleteOpinion) {
