@@ -3,6 +3,39 @@
    마을 내부: 멤버 / 한 문장 / 게시판 + 설정 시트 (Phase0: 로컬 모의)
    ========================================================= */
 
+/* 상황별 재치 문구 — spec §5.5.4 우선순위 순 */
+function _getVillageMottoLine(town, myHandle) {
+  const members = town.members || [];
+  const total = members.length;
+  if (total === 0) return '';
+
+  const dday = town.dday || 0;
+  const myMember = members.find(m => String(m.name || '').replace(/^@/, '') === String(myHandle || '').replace(/^@/, ''));
+  const myDone = myMember ? !!myMember.todayRecorded : false;
+  const doneCount = members.filter(m => m.todayRecorded).length;
+  const doneRatio = total > 0 ? doneCount / total : 0;
+
+  // 우선순위 1: D-1 + 내가 미완료
+  if (dday >= -1 && dday < 0 && !myDone) return '내일이 마감이에요 😱 오늘 꼭 읽어요!';
+  // 우선순위 2: D-3 이내 + 내가 미완료
+  if (dday >= -3 && dday < 0 && !myDone) return `마감 D${dday}! 지금 펼치면 딱 좋아요 📚`;
+  // 우선순위 3: 내 완료 O
+  if (myDone) {
+    if (doneCount === total) return '오늘 마을 전체가 짹! 완벽한 하루예요 🌟';
+    if (doneRatio > 0.5) return '잘 하고 있어요! 나머지도 곧 따라올 거예요 🐦';
+    if (doneCount === 1) return '오늘의 첫 번째 불꽃은 바로 나예요 🔥';
+    return '오늘은 내가 선두예요 ✨ 마을 불씨가 됐어요!';
+  }
+  // 우선순위 3: 내 완료 X
+  const avgProgress = total > 0 ? members.reduce((s, m) => s + (m.cumulativePage || 0), 0) / total : 0;
+  const bookTotal = 1; // 상대 비교용 — 70% 기준은 완료 인원 비율로 대체
+  if (doneRatio > 0.7) return '멤버들이 쌩쌩 달리는 중 💨 뒤처지지 마세요!';
+  if (doneRatio > 0.5) return '절반 넘게 읽었는데 나만 아직이에요 😅 얼른요!';
+  if (doneCount === 0) return '오늘 마을 전체 정전 🌑 첫 불꽃이 되어볼까요?';
+  if (doneRatio < 0.3) return '오늘 마을이 조용해요. 같이 시작해봐요 📖';
+  return '오늘도 같이 읽어요 🐦';
+}
+
 function TownDetailView({ state, townId, onBack }) {
   const { useState } = React;
   const [selectedMember, setSelectedMember] = useState(null);
@@ -109,14 +142,36 @@ function TownDetailView({ state, townId, onBack }) {
         <button onClick={()=>setIsSettingsOpen(true)} style={{background:'transparent',border:'none',fontSize:18,cursor:'pointer'}}>⚙️</button>
       </div>
 
-      {/* Milestone + tabs */}
-      <div style={{padding:'16px',marginBottom:8}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-          <div style={{fontSize:13,fontWeight:700}}>{town.currentPart} / {town.totalParts} 파트 · {town.currentRange}</div>
-          <div style={{fontSize:12,color:'var(--ink-3)'}}>리더: <button onClick={()=>goProfile(town.leader)} style={{background:'none',border:'none',padding:0,color:'var(--brand-3)',fontWeight:800,fontSize:12,cursor:'pointer'}}>{town.leader}</button></div>
-        </div>
-        <div style={{height:8,background:'var(--line)',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${((town.currentPart-1)/town.totalParts)*100}%`,background:'var(--brand)'}}/></div>
-      </div>
+      {/* 헤더 2줄: 파트·D-day·진행바 / 오늘 완료 인원·재치문구 (spec §5.5.4) */}
+      {(() => {
+        const totalParts = Math.max(town.totalParts || 1, 1);
+        const partProgress = Math.min(100, Math.max(0, ((town.currentPart - 1) / totalParts) * 100));
+        const members = town.members || [];
+        const todayDone = members.filter(m => m.todayRecorded).length;
+        const totalMembers = members.length;
+        const dday = town.dday || 0;
+        const ddayLabel = dday === 0 ? '오늘 마감' : dday < 0 ? `D${dday}` : `D+${dday}`;
+        const motto = _getVillageMottoLine(town, myHandle);
+        return (
+          <div style={{padding:'12px 16px 8px', borderBottom:'1px solid var(--line)', marginBottom:4}}>
+            {/* 1줄: 파트 · 챕터범위 · D-day + 진행 바 */}
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6}}>
+              <div style={{fontSize:13, fontWeight:800, color:'var(--ink-1)'}}>
+                {town.currentPart}/{totalParts} 파트 {town.currentRange ? `· ${town.currentRange}` : ''}
+              </div>
+              <div style={{fontSize:12, fontWeight:800, color:'var(--accent)'}}>{ddayLabel}</div>
+            </div>
+            <div style={{height:8, borderRadius:999, background:'var(--line-2)', overflow:'hidden', marginBottom:8}}>
+              <div style={{width:`${partProgress}%`, height:'100%', borderRadius:999, background:'linear-gradient(90deg, var(--brand) 0%, var(--brand-2) 100%)'}} />
+            </div>
+            {/* 2줄: 오늘 완료 인원 · 재치문구 */}
+            <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
+              <span style={{fontSize:12, fontWeight:800, color:'var(--ink-2)'}}>오늘 {todayDone}/{totalMembers} 완료</span>
+              {motto && <span style={{fontSize:12, color:'var(--ink-3)', fontWeight:600}}>· {motto}</span>}
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{padding:'0 16px',position:'sticky',top:0,zIndex:20,background:'var(--paper)',borderBottom:'1px solid var(--line)',marginBottom:12}}>
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,paddingBottom:10}}>
@@ -288,14 +343,49 @@ function TownDetailView({ state, townId, onBack }) {
         );
       })()}
 
-      {activeSubtab==='sentence' && (
-        <div style={{padding:'0 16px 40px'}}>
-          <div style={{fontSize:13,fontWeight:700,color:'var(--ink-2)',marginBottom:12}}>📖 마을 지정 책 한 문장</div>
-          <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            {(town.members||[]).filter(m=>m.quote).map(m=> { const liked = !!sentLikes[m.name]; return (<div key={m.name} style={{padding:14,borderRadius:14,background:'var(--card)',border:'1.5px solid var(--line)'}}><div style={{fontSize:12,fontWeight:800,color:'var(--ink-2)',marginBottom:6}}><button onClick={()=>goProfile(m.name)} style={{background:'none',border:'none',padding:0,color:'var(--brand-3)',fontWeight:800,fontSize:12,cursor:'pointer'}}>@{m.name}</button> · {m.todayRecorded?'오늘 기록':'기록 있음'}</div><div style={{fontSize:14,fontWeight:700,lineHeight:1.5,marginBottom:8}}>{m.quote}</div><button onClick={()=>toggleSentLike(m.name)} style={{background:liked?'var(--brand-tint)':'transparent',border:'1.5px solid '+(liked?'var(--brand)':'var(--line)'),borderRadius:16,padding:'5px 12px',fontSize:13,fontWeight:800,color:liked?'var(--brand-3)':'var(--ink-3)',cursor:'pointer'}}>🐦 짹 {liked?(m.claps||0)+1:(m.claps||0)||''}</button></div>); })}
+      {activeSubtab==='sentence' && (() => {
+        const allMembers = town.members || [];
+        const todayQuotes = allMembers.filter(m => m.quote && m.todayRecorded);
+        const yesterdayQuotes = allMembers.filter(m => m.quote && !m.todayRecorded);
+        const todayCount = todayQuotes.length;
+        const totalCount = allMembers.length;
+
+        const QuoteCard = ({ m }) => {
+          const liked = !!sentLikes[m.name];
+          return (
+            <div style={{padding:14, borderRadius:14, background:'var(--card)', border:'1.5px solid var(--line)'}}>
+              <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>
+                <button onClick={() => goProfile(m.name)} style={{background:'none', border:'none', padding:0, color:'var(--brand-3)', fontWeight:800, fontSize:12, cursor:'pointer'}}>@{m.name}</button>
+                {m.page ? ` · p.${m.page}` : ''}
+              </div>
+              <div style={{fontSize:14, fontWeight:700, lineHeight:1.5, marginBottom:8}}>{m.quote}</div>
+              <button onClick={() => toggleSentLike(m.name)} style={{background:liked?'var(--brand-tint)':'transparent', border:'1.5px solid '+(liked?'var(--brand)':'var(--line)'), borderRadius:16, padding:'5px 12px', fontSize:13, fontWeight:800, color:liked?'var(--brand-3)':'var(--ink-3)', cursor:'pointer'}}>
+                🐦 짹 {liked ? (m.claps||0)+1 : (m.claps||0) || ''}
+              </button>
+            </div>
+          );
+        };
+
+        return (
+          <div style={{padding:'0 16px 40px'}}>
+            {/* 오늘 기록 카운터 */}
+            <div style={{fontSize:13, fontWeight:800, color:'var(--ink-2)', marginBottom:12}}>
+              오늘 {todayCount}/{totalCount}명 기록
+            </div>
+            {/* 오늘 기록 */}
+            <div style={{display:'flex', flexDirection:'column', gap:12}}>
+              {todayQuotes.length > 0
+                ? todayQuotes.map(m => <QuoteCard key={m.name} m={m} />)
+                : <div style={{padding:'18px 14px', borderRadius:14, border:'1px dashed var(--line-2)', color:'var(--ink-2)', fontSize:13, fontWeight:700}}>오늘 기록한 멤버가 없어요</div>
+              }
+            </div>
+            {/* 어제 기록 — 접히는 섹션 */}
+            {yesterdayQuotes.length > 0 && (
+              <YesterdaySentenceSection quotes={yesterdayQuotes} QuoteCard={QuoteCard} />
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {activeSubtab==='board' && (
         <div style={{padding:'0 16px 80px'}}>
@@ -373,6 +463,26 @@ function TownDetailView({ state, townId, onBack }) {
       )}
 
     </section>
+  );
+}
+
+function YesterdaySentenceSection({ quotes, QuoteCard }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  return (
+    <div style={{marginTop:16}}>
+      <button
+        onClick={() => setIsOpen(v => !v)}
+        style={{width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 0', background:'transparent', border:'none', cursor:'pointer', fontSize:13, fontWeight:800, color:'var(--ink-2)'}}
+      >
+        어제 기록 보기
+        <span style={{fontSize:12, transform: isOpen ? 'rotate(180deg)' : 'none', transition:'transform 0.15s ease'}}>▾</span>
+      </button>
+      {isOpen && (
+        <div style={{display:'flex', flexDirection:'column', gap:12, marginTop:8}}>
+          {quotes.map(m => <QuoteCard key={m.name} m={m} />)}
+        </div>
+      )}
+    </div>
   );
 }
 
