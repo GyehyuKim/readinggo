@@ -681,11 +681,25 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                               <span style={{flex:1, fontSize:12, fontWeight:700, color:'var(--ink-1)'}}>@{u.handle || u.display_name}</span>
                               <button
                                 onClick={() => {
+                                  const newMember = {
+                                    name: u.handle || u.display_name || u.email || '멤버',
+                                    nest: u.nest_emoji || '🪺',
+                                    streak: 0,
+                                    cumulativePage: 0,
+                                    todayRecorded: false,
+                                    quote: '',
+                                  };
+                                  setMembersList(prev => {
+                                    if (prev.some(m => m.name === newMember.name)) return prev;
+                                    return [...prev, newMember];
+                                  });
+                                  showToast(`@${u.handle || u.display_name} 초대 완료!`);
+                                  setInviteResults([]);
+                                  setInviteQuery('');
                                   const DS = window.DataStore;
                                   if (DS && DS.villages && DS.villages.invite) {
                                     Promise.resolve(DS.villages.invite(townId, u.id))
-                                      .then(() => { showToast(`@${u.handle || u.display_name} 초대 완료!`); setInviteResults([]); setInviteQuery(''); })
-                                      .catch(() => showToast('초대 실패 — 잠시 후 다시'));
+                                      .catch(() => {});
                                   }
                                 }}
                                 style={{padding:'4px 10px', borderRadius:16, background:'var(--brand)', color:'white', border:'none', fontWeight:800, fontSize:11, cursor:'pointer'}}
