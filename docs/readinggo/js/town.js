@@ -195,7 +195,7 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
   const openEditTopic = (topic) => { setEditingTopicId(topic.id); setTopicDraft({title:topic.title,desc:topic.desc,due:topic.due}); setTopicEditorOpen(true); };
 
   return (
-    <section className="view active">
+    <section className="view active" style={{animation: 'fadeIn .2s ease both'}}>
       <div style={{padding:'12px 16px', borderBottom:'1.5px solid var(--line)', display:'flex', alignItems:'center', gap:10, marginBottom:12}}>
         <button onClick={onBack} style={{background:'transparent',border:'none',fontSize:20,cursor:'pointer',padding:4}}>←</button>
         <div style={{flex:1}}>
@@ -499,13 +499,21 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
           <div className="sheet" role="dialog" aria-label="설정" onClick={(e)=>e.stopPropagation()}>
             <div className="sheet-grip" />
             <div style={{padding:12}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}> <div style={{fontSize:16,fontWeight:900}}>설정</div> <button onClick={()=>setIsSettingsOpen(false)} style={{background:'transparent',border:'none'}}>✕</button></div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <button onClick={()=>setIsSettingsOpen(false)} style={{background:'transparent',border:'none',fontSize:20,cursor:'pointer',padding:4}}>←</button>
+                <div style={{fontSize:16,fontWeight:900}}>설정</div>
+                <div style={{width:32}} />
+              </div>
               <div style={{display:'grid',gap:10}}>
                 <div style={{padding:10,background:'var(--card)',borderRadius:10}}>
-                  <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>마을 초대</div>
+                  <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>
+                    마을 초대 {town.visibility === 'private' ? '🔒 비공개' : '🌐 공개'}
+                  </div>
                   <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
                     <span style={{fontSize:12, color:'var(--ink-3)'}}>초대 코드</span>
-                    <strong style={{letterSpacing:1}}>{town.inviteCode||'공개 마을(코드 없음)'}</strong>
+                    <strong style={{letterSpacing:2, fontFamily:'monospace'}}>
+                      {town.inviteCode || (town.visibility === 'private' ? '(미생성)' : '(없음)')}
+                    </strong>
                     <button onClick={shareVillage} style={{marginLeft:'auto', padding:'6px 14px', borderRadius:16, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer'}}>📤 공유하기</button>
                   </div>
                 </div>

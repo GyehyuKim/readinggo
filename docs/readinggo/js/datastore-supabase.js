@@ -466,8 +466,11 @@
             if (sbBook && sbBook.id) supaBookId = sbBook.id;
           }
         }
+        // 공개/비공개 모두 6자리 랜덤 코드 생성 (영문 대문자 + 숫자)
+        const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
         const v = unwrap(await sb().from('villages').insert({
           book_id: supaBookId, name, visibility: visibility || 'public', created_by: id,
+          invite_code: inviteCode,
         }).select().single());
         if (Array.isArray(parts) && parts.length) {
           await sb().from('village_parts').insert(parts.map((p, i) => ({
@@ -512,6 +515,13 @@
           .eq('visibility', 'public').order('created_at', { ascending: false });
         if (limit) q = q.limit(limit);
         return unwrap(await q) || [];
+      },
+      async findByCode(code) {
+        // 공개·비공개 모두 invite_code 직접 조회 (전체 스캔 없음)
+        return unwrap(await sb().from('villages')
+          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
+          .eq('invite_code', String(code).toUpperCase().trim())
+          .maybeSingle());
       },
     },
 

@@ -334,15 +334,11 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
       return;
     }
 
-    // Supabase에서 invite_code로 조회
+    // Supabase에서 invite_code 직접 조회 (공개·비공개 모두)
     const DS = window.DataStore;
-    if (DS && DS.villages && DS.villages.listPublic) {
-      Promise.resolve(DS.villages.listPublic({ limit: 200 })).then(rows => {
-        const matched = (rows || []).find(v => (v.invite_code || '').toUpperCase() === normalized);
-        if (!matched) {
-          setFinderError('마을을 찾을 수 없어요. 코드를 다시 확인해주세요.');
-          return;
-        }
+    if (DS && DS.villages && DS.villages.findByCode) {
+      Promise.resolve(DS.villages.findByCode(normalized)).then(matched => {
+        if (!matched) { setFinderError('마을을 찾을 수 없어요. 코드를 다시 확인해주세요.'); return; }
         setFinderError('');
         setPreviewTown(_villageRowToTown(matched, 'recommended', null));
       }).catch(() => {
