@@ -315,7 +315,11 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
         newTown.totalParts = partCount;
         newTown.currentPart = 1;
         newTown.milestones = parts.map(p => ({ part: p.part_order, title: p.title, startPage: p.start_page, endPage: p.end_page, dueDate: p.due_date || null, completed: false }));
-        setTowns(prev => [...prev, newTown]);
+        setTowns(prev => {
+          const next = [...prev, newTown];
+          if (onTownsChange) onTownsChange(next); // villageTowns 즉시 동기화 → TownDetailView timing fix
+          return next;
+        });
         setMyVillageIds(prev => [...prev, newTown.id]);
         showToast(`마을을 만들었어요: ${newTown.name}`);
         closeCreateTown();
@@ -348,7 +352,11 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
         milestones: parts.map(p => ({ part: p.part_order, title: p.title, startPage: p.start_page, endPage: p.end_page, dueDate: p.due_date || null, completed: false })),
         members: [ { name: 'jerome', nest: '🏠', avatar: '🐦', todayRecorded: false, quote: '', cumulativePage: state.book ? state.book.cur || 0 : 0, streak: 0, xp: state.xp || 0 } ],
       };
-      setTowns(prev => [...prev, newTown]);
+      setTowns(prev => {
+        const next = [...prev, newTown];
+        if (onTownsChange) onTownsChange(next); // villageTowns 즉시 동기화 → TownDetailView timing fix
+        return next;
+      });
       showToast(`마을을 만들었어요: ${newTown.name}`);
       closeCreateTown();
       onSelectTown(newTown.id);
