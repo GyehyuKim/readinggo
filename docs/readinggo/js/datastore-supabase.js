@@ -466,12 +466,19 @@
             if (sbBook && sbBook.id) supaBookId = sbBook.id;
           }
         }
-        // 공개/비공개 모두 6자리 랜덤 코드 생성 (영문 대문자 + 숫자)
-        const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-        const v = unwrap(await sb().from('villages').insert({
-          book_id: supaBookId, name, visibility: visibility || 'public', created_by: id,
-          invite_code: inviteCode,
-        }).select().single());
+        // 공개/비공개 모두 6자리 랜덤 코드 생성 (영문 대문자 + 숫자), UNIQUE 충돌 시 최대 5회 재시도
+        let v = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+          const res = await sb().from('villages').insert({
+            book_id: supaBookId, name, visibility: visibility || 'public', created_by: id,
+            invite_code: inviteCode,
+          }).select().single();
+          if (!res.error) { v = res.data; break; }
+          if (res.error.code !== '23505') throw res.error; // UNIQUE 위반 외 에러는 즉시 throw
+          // 23505 = unique_violation → 새 코드로 재시도
+        }
+        if (!v) throw new Error('초대 코드 생성 실패 (5회 시도 초과)');
         if (Array.isArray(parts) && parts.length) {
           await sb().from('village_parts').insert(parts.map((p, i) => ({
             village_id: v.id, part_order: i + 1, title: p.title || null,
