@@ -50,6 +50,8 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     const t = (state.towns || []).find(x => x.id === townId);
     return (t && t._topics) || [];
   });
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteResults, setInviteResults] = useState([]);
 
   const town = (state.towns || []).find(t => t.id === townId);
   const book = town ? resolveBook(town) : null;
@@ -90,6 +92,30 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         };
       });
       setMembersKey(k => k + 1);
+    }).catch(() => {});
+  }, [townId]);
+
+  // 게시판 주제 비동기 로드 (Supabase)
+  useEffect(() => {
+    const DS = window.DataStore;
+    if (!DS || !DS.villages || !DS.villages.listTopics) return;
+    Promise.resolve(DS.villages.listTopics(townId)).then(rows => {
+      if (!rows || !rows.length) return;
+      setTopics(rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        desc: r.description || '',
+        status: 'open',
+        due: r.due_days || 3,
+        createdBy: (r.author && (r.author.handle || r.author.display_name)) || '',
+        createdAt: r.created_at ? new Date(r.created_at).toLocaleDateString('ko-KR') : '방금',
+        opinions: (r.opinions || []).map(o => ({
+          id: o.id,
+          author: (o.author && (o.author.handle || o.author.display_name)) || '',
+          text: o.text,
+          createdAt: o.created_at ? new Date(o.created_at).toLocaleDateString('ko-KR') : '방금',
+        })),
+      })));
     }).catch(() => {});
   }, [townId]);
 
@@ -170,30 +196,51 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     } else { done(); }
   };
 
-  // Board handlers — React state 기반, setTopics로 불변 업데이트
+  // Board handlers — optimistic 업데이트 + background Supabase 저장
   const addTopic = (title, desc, days) => {
     if (!title || title.trim().length===0) { showToast('주제는 필수입니다'); return; }
-    const id = 't' + Math.random().toString(36).slice(2,8);
-    setTopics(prev => [{ id, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: myHandle, createdAt: '방금', opinions: [] }, ...prev]);
+    const localId = 't' + Math.random().toString(36).slice(2,8);
+    setTopics(prev => [{ id: localId, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', status:'open', due: days, createdBy: myHandle, createdAt: '방금', opinions: [] }, ...prev]);
     showToast('주제가 등록되었습니다');
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.addTopic) {
+      Promise.resolve(DS.villages.addTopic(townId, { title: title.slice(0,100), description: desc ? desc.slice(0,200) : null, dueDays: days }))
+        .then(row => { if (row && row.id) setTopics(prev => prev.map(x => x.id===localId ? {...x, id: row.id} : x)); })
+        .catch(() => {});
+    }
   };
   const updateTopic = (id, title, desc, days) => {
     const t = topics.find(x=>x.id===id); if(!t) return;
     if (!canEditTopic(t)) { showToast('내가 등록한 주제만 수정할 수 있어요'); return; }
     setTopics(prev => prev.map(x => x.id===id ? {...x, title: title.slice(0,100), desc: desc ? desc.slice(0,200):'', due: days} : x));
     showToast('주제를 수정했습니다');
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.updateTopic) {
+      Promise.resolve(DS.villages.updateTopic(id, { title: title.slice(0,100), description: desc ? desc.slice(0,200) : null, dueDays: days })).catch(() => {});
+    }
   };
   const addOpinion = (topicId, text, author) => {
     if (!text || text.trim().length===0) { showToast('의견을 입력하세요'); return; }
-    const newOp = { id: 'o'+Math.random().toString(36).slice(2,8), author: author||myHandle, text: text.slice(0,300), createdAt: '방금' };
+    const localId = 'o'+Math.random().toString(36).slice(2,8);
+    const newOp = { id: localId, author: author||myHandle, text: text.slice(0,300), createdAt: '방금' };
     setTopics(prev => prev.map(t => t.id===topicId ? {...t, opinions: [...(t.opinions||[]), newOp]} : t));
     showToast('의견이 등록되었습니다');
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.addOpinion) {
+      Promise.resolve(DS.villages.addOpinion(topicId, text.slice(0,300)))
+        .then(row => { if (row && row.id) setTopics(prev => prev.map(t => t.id===topicId ? {...t, opinions: t.opinions.map(o => o.id===localId ? {...o, id: row.id} : o)} : t)); })
+        .catch(() => {});
+    }
   };
   const deleteTopic = (topicId) => {
     const t = topics.find(x=>x.id===topicId);
     if (t && !canEditTopic(t)) { showToast('내가 등록한 주제만 삭제할 수 있어요'); return; }
     setTopics(prev => prev.filter(x=>x.id!==topicId));
     showToast('주제를 삭제했습니다');
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.deleteTopic) {
+      Promise.resolve(DS.villages.deleteTopic(topicId)).catch(() => {});
+    }
   };
   const deleteOpinion = (topicId, opinionId) => {
     const t = topics.find(x=>x.id===topicId); if(!t) return;
@@ -201,6 +248,22 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
     if (o && !canEditOpinion(o)) { showToast('내가 쓴 의견만 삭제할 수 있어요'); return; }
     setTopics(prev => prev.map(x => x.id===topicId ? {...x, opinions: x.opinions.filter(op=>op.id!==opinionId)} : x));
     showToast('의견이 삭제되었습니다');
+    const DS = window.DataStore;
+    if (DS && DS.villages && DS.villages.deleteOpinion) {
+      Promise.resolve(DS.villages.deleteOpinion(opinionId)).catch(() => {});
+    }
+  };
+
+  // 유저 검색 초대 (관리자 전용)
+  const handleInviteSearch = () => {
+    if (!inviteQuery.trim()) return;
+    const DS = window.DataStore;
+    if (DS && DS.users && DS.users.search) {
+      Promise.resolve(DS.users.search(inviteQuery.trim())).then(rows => {
+        setInviteResults(rows || []);
+        if (!rows || !rows.length) showToast('검색 결과가 없어요');
+      }).catch(() => showToast('검색 실패'));
+    }
   };
 
   // Topic editor control (parent-controlled)
@@ -602,6 +665,43 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                         </div>
                       </div>
                     )}
+                    <div style={{height:'1px', background:'var(--line)', margin:'8px 0'}} />
+                    {/* 유저 검색 초대 */}
+                    <div style={{marginBottom:8}}>
+                      <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>👤 유저 초대</div>
+                      <div style={{display:'flex', gap:6}}>
+                        <input
+                          value={inviteQuery}
+                          onChange={e => setInviteQuery(e.target.value)}
+                          onKeyDown={e => { if(e.key==='Enter') handleInviteSearch(); }}
+                          placeholder="핸들 검색..."
+                          style={{flex:1, padding:'6px 8px', borderRadius:8, border:'1.5px solid var(--line)', fontSize:12, background:'var(--paper)', boxSizing:'border-box'}}
+                        />
+                        <button onClick={handleInviteSearch} style={{padding:'6px 10px', borderRadius:8, background:'var(--brand-tint)', border:'1.5px solid var(--brand)', color:'var(--brand-3)', fontWeight:800, fontSize:12, cursor:'pointer', whiteSpace:'nowrap'}}>검색</button>
+                      </div>
+                      {inviteResults.length > 0 && (
+                        <div style={{marginTop:6, display:'flex', flexDirection:'column', gap:4}}>
+                          {inviteResults.map(u => (
+                            <div key={u.id} style={{display:'flex', alignItems:'center', gap:8, padding:'6px 8px', borderRadius:8, background:'var(--paper)', border:'1px solid var(--line-2)'}}>
+                              <span style={{flex:1, fontSize:12, fontWeight:700, color:'var(--ink-1)'}}>@{u.handle || u.display_name}</span>
+                              <button
+                                onClick={() => {
+                                  const DS = window.DataStore;
+                                  if (DS && DS.villages && DS.villages.invite) {
+                                    Promise.resolve(DS.villages.invite(townId, u.id))
+                                      .then(() => { showToast(`@${u.handle || u.display_name} 초대 완료!`); setInviteResults([]); setInviteQuery(''); })
+                                      .catch(() => showToast('초대 실패 — 잠시 후 다시'));
+                                  }
+                                }}
+                                style={{padding:'4px 10px', borderRadius:16, background:'var(--brand)', color:'white', border:'none', fontWeight:800, fontSize:11, cursor:'pointer'}}
+                              >
+                                초대
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <div style={{height:'1px', background:'var(--line)', margin:'8px 0'}} />
                     <button
                       onClick={deleteVillage}

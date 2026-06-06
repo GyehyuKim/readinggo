@@ -33,11 +33,14 @@ function _villageRowToTown(v, collection, myUserId) {
       _bookData = { title: v.book.title || '', cover: v.book.cover_url || '', author: v.book.author || '' };
     }
   }
-  // 현재 파트(1) 마감일 → 오늘 기준 dday 계산
   const _todayStr = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })();
-  const _currentDue = parts[0] && parts[0].due_date;
-  const dday = _currentDue
-    ? Math.round((new Date(_currentDue + 'T00:00:00') - new Date(_todayStr + 'T00:00:00')) / 86400000)
+  // 만료된 파트 수로 currentPart 계산 (마감일이 오늘 이전인 파트 = 완료된 파트)
+  const _expiredCount = parts.filter(p => p.due_date && new Date(p.due_date + 'T00:00:00') < new Date(_todayStr + 'T00:00:00')).length;
+  const currentPart = Math.min(_expiredCount + 1, totalParts);
+  // currentPart 기준 마감일로 dday 계산
+  const _currentPartDue = parts[currentPart - 1] && parts[currentPart - 1].due_date;
+  const dday = _currentPartDue
+    ? Math.round((new Date(_currentPartDue + 'T00:00:00') - new Date(_todayStr + 'T00:00:00')) / 86400000)
     : 0;
   // 마지막 파트 마감일이 오늘 이전이면 자동 완료(지난 마을) 처리 — active 마을만 대상
   const _lastPart = parts[parts.length - 1];
@@ -53,17 +56,17 @@ function _villageRowToTown(v, collection, myUserId) {
     collection: autoCollection,
     visibility: v.visibility || 'public',
     inviteCode: v.invite_code || null,
-    capacity: null,
+    capacity: v.capacity || null,
     myRole: isMyVillage ? 'admin' : 'member',
     coAdmins: [],
     memberCount: (Array.isArray(v.village_members) && v.village_members[0] ? (v.village_members[0].count || 0) : 0) || v.member_count || (isMyVillage ? 1 : 0),
-    currentPart: 1,
-    totalParts: totalParts,
+    currentPart,
+    totalParts,
     dday,
     isOpen: true,
     leader: '',
-    currentRange: parts[0] ? (parts[0].title || '') : '',
-    status: 'active',
+    currentRange: parts[currentPart - 1] ? (parts[currentPart - 1].title || `파트 ${currentPart}`) : '',
+    status: _isExpired ? 'completed' : (v.status || 'active'),
     milestones: parts.map(p => ({ part: p.part_order, dueDate: p.due_date || null, completed: false })),
     members: [],
   };
@@ -129,6 +132,12 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
       if (merged.length > 0) {
         setTowns(merged);
         setMyVillageIds(mineIds);
+      }
+      // 완료 상태 Supabase 동기화: 만료된 mine 마을의 status를 'completed'로 업데이트
+      if (DS.villages.update) {
+        mineTowns.filter(t => t.status === 'completed').forEach(t => {
+          Promise.resolve(DS.villages.update(t.id, { status: 'completed' })).catch(() => {});
+        });
       }
     });
 
@@ -273,6 +282,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
         bookId: createBookId,
         name: createTitle.trim(),
         visibility: createVisibility,
+        capacity: normalizedCapacity,
         parts,
       })).then(v => {
         if (!v) { setCreateError('마을 생성에 실패했어요. 다시 시도해주세요.'); return; }

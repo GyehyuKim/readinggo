@@ -451,7 +451,7 @@
 
     /* 마을 (스키마=backend, 기능 UI=윤지). 계약 기본 구현. */
     villages: {
-      async create({ bookId, name, visibility, parts }) {
+      async create({ bookId, name, visibility, capacity, parts }) {
         const id = await uid();
         // bookId 가 로컬 TSV ID("b104" 등)인 경우 Supabase books 테이블 UUID로 해소.
         let supaBookId = bookId;
@@ -473,6 +473,7 @@
           const res = await sb().from('villages').insert({
             book_id: supaBookId, name, visibility: visibility || 'public', created_by: id,
             invite_code: inviteCode,
+            ...(capacity != null && { capacity }),
           }).select().single();
           if (!res.error) { v = res.data; break; }
           if (res.error.code !== '23505') throw res.error; // UNIQUE 위반 외 에러는 즉시 throw
@@ -488,11 +489,17 @@
         await sb().from('village_members').insert({ village_id: v.id, user_id: id });
         // parts + book + member count 포함해서 다시 조회 — insert 응답에는 미포함
         return unwrap(await sb().from('villages')
-          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
+          .select('*, book:books(isbn13, title, author, cover_url), parts:village_parts(*), village_members(count)')
           .eq('id', v.id).single()) || v;
       },
       async join(villageId) {
         const id = await uid();
+        // 정원 체크: capacity 설정된 마을은 현재 인원이 정원 미만이어야 참여 가능
+        const vRow = unwrap(await sb().from('villages').select('capacity, village_members(count)').eq('id', villageId).maybeSingle());
+        if (vRow && vRow.capacity) {
+          const cnt = (Array.isArray(vRow.village_members) && vRow.village_members[0]) ? (vRow.village_members[0].count || 0) : 0;
+          if (cnt >= vRow.capacity) throw new Error('정원이 마감되었습니다.');
+        }
         await sb().from('village_members').upsert({ village_id: villageId, user_id: id }, { onConflict: 'village_id,user_id' });
         return true;
       },
@@ -509,13 +516,13 @@
       async listMine() {
         const id = await uid();
         const rows = unwrap(await sb().from('village_members')
-          .select('village:villages(*, book:books(isbn13), parts:village_parts(*), village_members(count))')
+          .select('village:villages(*, book:books(isbn13, title, author, cover_url), parts:village_parts(*), village_members(count))')
           .eq('user_id', id));
         return (rows || []).map(r => r.village).filter(Boolean);
       },
       async get(villageId) {
         return unwrap(await sb().from('villages')
-          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
+          .select('*, book:books(isbn13, title, author, cover_url), parts:village_parts(*), village_members(count)')
           .eq('id', villageId).single());
       },
       async members(villageId) {
@@ -582,7 +589,7 @@
       },
       async listPublic({ limit } = {}) {
         let q = sb().from('villages')
-          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
+          .select('*, book:books(isbn13, title, author, cover_url), parts:village_parts(*), village_members(count)')
           .eq('visibility', 'public').order('created_at', { ascending: false });
         if (limit) q = q.limit(limit);
         return unwrap(await q) || [];
@@ -590,9 +597,65 @@
       async findByCode(code) {
         // 공개·비공개 모두 invite_code 직접 조회 (전체 스캔 없음)
         return unwrap(await sb().from('villages')
-          .select('*, book:books(isbn13), parts:village_parts(*), village_members(count)')
+          .select('*, book:books(isbn13, title, author, cover_url), parts:village_parts(*), village_members(count)')
           .eq('invite_code', String(code).toUpperCase().trim())
           .maybeSingle());
+      },
+      // 마을 정보 수정 (관리자 전용)
+      async update(villageId, fields) {
+        const id = await uid();
+        const patch = {};
+        if (fields.name !== undefined) patch.name = fields.name;
+        if (fields.description !== undefined) patch.description = fields.description;
+        if (fields.visibility !== undefined) patch.visibility = fields.visibility;
+        if (fields.status !== undefined) patch.status = fields.status;
+        if (fields.capacity !== undefined) patch.capacity = fields.capacity;
+        if (!Object.keys(patch).length) return true;
+        unwrap(await sb().from('villages').update(patch).eq('id', villageId).eq('created_by', id));
+        return true;
+      },
+      // 관리자가 유저를 직접 마을에 초대
+      async invite(villageId, userId) {
+        await sb().from('village_members').upsert(
+          { village_id: villageId, user_id: userId },
+          { onConflict: 'village_id,user_id' }
+        );
+        return true;
+      },
+      // 게시판 주제 목록 (의견 포함)
+      async listTopics(villageId) {
+        const rows = unwrap(await sb().from('village_topics')
+          .select('*, author:users(id, handle, display_name), opinions:village_opinions(*, author:users(id, handle, display_name))')
+          .eq('village_id', villageId)
+          .order('created_at', { ascending: false }));
+        return rows || [];
+      },
+      async addTopic(villageId, { title, description, dueDays }) {
+        const id = await uid();
+        return unwrap(await sb().from('village_topics').insert({
+          village_id: villageId, title, description: description || null, due_days: dueDays || 3, created_by: id,
+        }).select('*, author:users(id, handle, display_name), opinions:village_opinions(*)').single());
+      },
+      async updateTopic(topicId, { title, description, dueDays }) {
+        const id = await uid();
+        unwrap(await sb().from('village_topics')
+          .update({ title, description: description || null, due_days: dueDays || 3 })
+          .eq('id', topicId).eq('created_by', id));
+        return true;
+      },
+      async deleteTopic(topicId) {
+        unwrap(await sb().from('village_topics').delete().eq('id', topicId));
+        return true;
+      },
+      async addOpinion(topicId, text) {
+        const id = await uid();
+        return unwrap(await sb().from('village_opinions').insert({
+          topic_id: topicId, author_id: id, text,
+        }).select('*, author:users(id, handle, display_name)').single());
+      },
+      async deleteOpinion(opinionId) {
+        unwrap(await sb().from('village_opinions').delete().eq('id', opinionId));
+        return true;
       },
     },
 
