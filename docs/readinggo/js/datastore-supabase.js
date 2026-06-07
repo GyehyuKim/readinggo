@@ -616,10 +616,10 @@
       },
       // 관리자가 유저를 직접 마을에 초대
       async invite(villageId, userId) {
-        await sb().from('village_members').upsert(
+        unwrap(await sb().from('village_members').upsert(
           { village_id: villageId, user_id: userId },
           { onConflict: 'village_id,user_id' }
-        );
+        ));
         return true;
       },
       // 게시판 주제 목록 (의견 포함)
