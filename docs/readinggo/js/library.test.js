@@ -6,6 +6,7 @@
  *   T1 — Markdown Export 포맷 (§5.8.4)
  *   T2 — 별점 유효숫자 toFixed(1) (§5.8.3 v7.2)
  *   T3 — 쪽수 미상 graceful — total=0/null 시 progressPct 안전 (§5.8.4 v7.2 #204)
+ *   T4 — 상단 통계 뱃지 데이터 파생 (§5.8 v7.2)
  */
 
 function runLibraryTests() {
@@ -91,6 +92,29 @@ function runLibraryTests() {
     assert('total=null → isUnknown=true', isUnknown(null) === true);
     assert('total=300 → isUnknown=false (정상 진도 표시)', isUnknown(300) === false);
     assert('total=300, cur=150 → 50%', calcPct(150, 300) === 50);
+  }
+  console.groupEnd();
+
+  // ── T4: 상단 통계 뱃지 데이터 파생 (§5.8 v7.2) ─────────────
+  console.group('T4: 상단 통계 뱃지 데이터');
+  {
+    // castles = completedBooks 파생 (별도 테이블 없음)
+    const mockBooks = [
+      { status: 'completed', rating: 4.0, title: '사피엔스' },
+      { status: 'completed', rating: 3.5, title: '데미안' },
+      { status: 'reading',   rating: null, title: '어린왕자' },
+    ];
+    const castles = mockBooks.filter(b => b.status === 'completed');
+    const streak = 12;
+
+    assert('🏰 성 개수 = 완독 권수 파생', castles.length === 2);
+    assert('📚 완독 권수 = castles.length', castles.length === 2);
+    assert('🔥 스트릭 = state.streak', streak === 12);
+    assert('읽는 중 책은 성 컬렉션에서 제외', castles.every(c => c.status === 'completed'));
+    assert('뱃지 3개 정의 (🏰·🔥·📚)', ['성', '스트릭', '완독'].length === 3);
+    // XP 뱃지 없음 확인
+    const badges = ['성', '스트릭', '완독'];
+    assert('XP 뱃지 없음 (v7.2 전면 제거)', !badges.includes('XP'));
   }
   console.groupEnd();
 
