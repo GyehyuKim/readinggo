@@ -207,20 +207,44 @@ function stageMicrocopy(pct, stage) {
   return `🪵 ${stage.name} — 첫 가지를 놓았어요. 한 쪽이면 둥지가 자라요.`;
 }
 
-function NestTheatre({ progressPct, streak, prevTwigs }) {
+// health(0~100) → 4단계 시각 상태 클래스 + 탈색량(--decay). (§6.2)
+// 데모 기본 health=100 → h-strong(decay 0): 균열·낙엽 비활성, 풀컬러.
+function nestVisualState(h) {
+  if (h >= 70) return { cls: 'h-strong',  decay: 0    };
+  if (h >= 40) return { cls: 'h-shaky',   decay: 0.28 };
+  if (h >= 20) return { cls: 'h-cracked', decay: 0.58 };
+  return            { cls: 'h-ruin',    decay: 0.86 };
+}
+
+// 균열 SVG (h-cracked/h-ruin 에서 CSS opacity 로 페이드 인). 이미지 둥지 위 오버레이.
+const NEST_CRACK_SVG = (
+  <svg viewBox="0 0 200 200" aria-hidden="true">
+    <g fill="none" stroke="#3a2c1a" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.72">
+      <path d="M100 62 L93 96 L104 120 L97 152" />
+      <path d="M93 96 L72 110" />
+      <path d="M104 120 L126 132" />
+      <path d="M97 152 L80 170" />
+      <path d="M97 152 L114 168" />
+    </g>
+    <g fill="none" stroke="#6b513099" strokeWidth="1.2" strokeLinecap="round" opacity="0.6">
+      <path d="M93 96 L100 78" />
+      <path d="M126 132 L138 124" />
+    </g>
+  </svg>
+);
+
+function NestTheatre({ progressPct, streak, prevTwigs, health = 100 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progressPct)));
   const stage = getNestStage(pct);
   const { cur, next } = nestInfo(stage.lv);
-  const twigs = twigsForProgress(pct);
-  const nestSvg = _useMemo(
-    () => drawNest(twigs, stage.lv, prevTwigs),
-    [twigs, stage.lv, prevTwigs]
-  );
+  // 둥지 일러스트는 진척률(stage.lv)로 그린다. health 는 §6.2 시각 상태(흔들림/균열)용.
+  const hp = Math.max(0, Math.min(100, Math.round(health)));
+  const hstate = nestVisualState(hp);
 
   return (
     <div
-      className="nest-theatre h-strong"
-      style={{'--health': pct, '--decay': 0, '--stage-color': stage.color, background: stage.bg}}
+      className={`nest-theatre nest-img-mode ${hstate.cls}`}
+      style={{'--health': pct, '--decay': hstate.decay, '--stage-color': stage.color}}
     >
       <div className="nest-stagebar">
         <span className="nest-stage-pill">
@@ -230,8 +254,25 @@ function NestTheatre({ progressPct, streak, prevTwigs }) {
         <span className="nest-day-chip">🔥 {streak}일</span>
       </div>
 
-      <div className="nest-svg-wrap">
-        <div dangerouslySetInnerHTML={{ __html: nestSvg }} />
+      <div className="nest-svg-wrap nest-img-stack">
+        {[1, 2, 3, 4, 5].map(lv => (
+          <img
+            key={lv}
+            className={'nest-img' + (lv === stage.lv ? ' on' : '')}
+            src={`assets/nest/lv${lv}.png`}
+            alt=""
+            referrerPolicy="no-referrer"
+            draggable="false"
+          />
+        ))}
+        <div className="crack-overlay">{NEST_CRACK_SVG}</div>
+        <div className="fall-layer" aria-hidden="true">
+          <span className="fall-twig">🍂</span>
+          <span className="fall-twig">🪶</span>
+          <span className="fall-twig">🍂</span>
+          <span className="fall-twig">🌿</span>
+          <span className="fall-twig">🍂</span>
+        </div>
       </div>
 
       <div className="nest-meta">

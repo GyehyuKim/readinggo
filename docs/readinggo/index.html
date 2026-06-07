@@ -391,6 +391,43 @@ input,textarea{font-family:inherit;}
   transition: filter .8s ease;
 }
 
+/* ── 이미지 기반 둥지 (클레이 아트 에셋) ───────────────────
+   PNG 배경이 크림(--paper)이라 시어터 배경도 크림으로 맞춰
+   이음매 없이 붙인다. 단계 전환은 opacity 크로스페이드. */
+.nest-theatre.nest-img-mode{
+  background: var(--paper);
+}
+.nest-svg-wrap.nest-img-stack{
+  height: 210px;
+}
+.nest-svg-wrap.nest-img-stack .nest-img{
+  position: absolute; inset: 0; margin: auto;
+  width: 210px; height: 210px; object-fit: contain;
+  opacity: 0; transition: opacity .55s ease;
+  filter: saturate(calc(1 - var(--decay) * 0.7)) brightness(calc(1 - var(--decay) * 0.06));
+  -webkit-user-drag: none; user-select: none;
+  pointer-events: none;
+}
+.nest-svg-wrap.nest-img-stack .nest-img.on{ opacity: 1; }
+
+/* ── 이미지 둥지 Health 모션 (§6.2 4단계 흔들림/균열) ──────
+   wobble/wobbleSoft 키프레임은 SVG 둥지와 공유(기존 정의 재사용).
+   여기서는 .nest-img(현재 단계)에 연결. h-strong 은 잔잔한 idle 호흡. */
+.nest-img-stack .nest-img.on{
+  transform-box: border-box; transform-origin: 50% 90%;
+}
+.nest-theatre.h-strong  .nest-img-stack .nest-img.on{ animation: nestImgIdle 3.4s ease-in-out infinite; }
+.nest-theatre.h-shaky   .nest-img-stack .nest-img.on{ animation: wobbleSoft 4.2s ease-in-out infinite; }
+.nest-theatre.h-cracked .nest-img-stack .nest-img.on{ animation: wobble 1.8s ease-in-out infinite; }
+.nest-theatre.h-ruin    .nest-img-stack .nest-img.on{ animation: wobble 1.1s ease-in-out infinite; }
+@keyframes nestImgIdle{
+  0%,100%{ transform: translateY(0) rotate(0); }
+  50%   { transform: translateY(-3px) rotate(-.5deg); }
+}
+/* crack-overlay 를 이미지 둥지 본체(아래쪽)에 맞춤 */
+.nest-img-stack .crack-overlay{ width: 200px; height: 200px; top: 57%; }
+.nest-img-stack .crack-overlay svg{ width: 100%; height: 100%; display:block; }
+
 .nest-svg-wrap svg.nest-art .twig{
   transform-box: fill-box;
   transform-origin: center;
