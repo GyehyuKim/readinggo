@@ -367,7 +367,7 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         <button onClick={()=>setIsSettingsOpen(true)} style={{background:'transparent',border:'none',fontSize:18,cursor:'pointer'}}>⚙️</button>
       </div>
 
-      {/* 헤더 2줄: 파트·D-day·진행바 / 오늘 완료 인원·재치문구 (spec §5.5.4) */}
+      {/* 헤더 2줄: 파트·D-day·진행바 / 오늘 완료 인원·평균 진척률·재치문구 (spec §5.5.4) */}
       {(() => {
         const totalParts = Math.max(town.totalParts || 1, 1);
         const partProgress = Math.min(100, Math.max(0, ((town.currentPart - 1) / totalParts) * 100));
@@ -377,6 +377,11 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
         const dday = town.dday || 0;
         const ddayLabel = dday === 0 ? '오늘 마감' : dday < 0 ? `D${dday}` : `D+${dday}`;
         const motto = _getVillageMottoLine({ ...town, members: membersList }, myHandle);
+        // 평균 진척률: 읽은 페이지 / 책 전체 페이지 × 100 (spec §5.5.4 헤더 2줄)
+        const _totalPages = book.total || 1;
+        const avgProgress = members.length > 0
+          ? Math.round(members.reduce((s, m) => s + Math.min(100, ((m.cumulativePage || 0) / _totalPages) * 100), 0) / members.length)
+          : 0;
         return (
           <div style={{padding:'12px 16px 8px', borderBottom:'1px solid var(--line)', marginBottom:4}}>
             {/* 1줄: 파트 · 챕터범위 · D-day + 진행 바 */}
@@ -389,10 +394,11 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
             <div style={{height:8, borderRadius:999, background:'var(--line-2)', overflow:'hidden', marginBottom:8}}>
               <div style={{width:`${partProgress}%`, height:'100%', borderRadius:999, background:'linear-gradient(90deg, var(--brand) 0%, var(--brand-2) 100%)'}} />
             </div>
-            {/* 2줄: 오늘 완료 인원 · 재치문구 */}
-            <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
+            {/* 2줄: 오늘 완료 인원 · 평균 진척률 · 재치문구 (spec §5.5.4) */}
+            <div style={{display:'flex', alignItems:'center', gap:6, flexWrap:'wrap'}}>
               <span style={{fontSize:12, fontWeight:800, color:'var(--ink-2)'}}>오늘 {todayDone}/{totalMembers} 완료</span>
-              {motto && <span style={{fontSize:12, color:'var(--ink-3)', fontWeight:600}}>· {motto}</span>}
+              {members.length > 0 && <span style={{fontSize:12, fontWeight:800, color:'var(--ink-2)'}}>· 평균 {avgProgress}%</span>}
+              {motto && <span style={{fontSize:12, color:'var(--ink-3)', fontWeight:600, fontStyle:'italic'}}>"{motto}"</span>}
             </div>
           </div>
         );
@@ -725,6 +731,21 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                     <strong style={{letterSpacing:2, fontFamily:'monospace'}}>
                       {town.inviteCode || (town.visibility === 'private' ? '(미생성)' : '(없음)')}
                     </strong>
+                    {town.inviteCode && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(town.inviteCode);
+                            showToast(`초대 코드 복사됨: ${town.inviteCode}`);
+                          } catch (e) {
+                            showToast(`초대 코드: ${town.inviteCode}`);
+                          }
+                        }}
+                        style={{padding:'6px 14px', borderRadius:16, border:'1.5px solid var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:12, cursor:'pointer', whiteSpace:'nowrap'}}
+                      >
+                        📋 코드 복사
+                      </button>
+                    )}
                     <button onClick={shareVillage} style={{marginLeft:'auto', padding:'6px 14px', borderRadius:16, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer'}}>📤 공유하기</button>
                   </div>
                 </div>
