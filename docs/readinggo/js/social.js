@@ -22,6 +22,17 @@ function SocialView({ state }) {
   const [fq, setFq] = useState('');
   const [fres, setFres] = useState([]);
   const [followed, setFollowed] = useState({});    // userId -> true
+  const [top3, setTop3] = useState([]);            // 이번 주 신규 시작러 Top3 (§5.7)
+
+  // 이번 주 새로 시작한 책 Top3 — 공개 집계 RPC (§5.7). 마운트 1회 로드.
+  useEffect(() => {
+    let alive = true;
+    if (!(DataStore.books && DataStore.books.startedThisWeek)) return;
+    Promise.resolve(DataStore.books.startedThisWeek(3))
+      .then(rows => { if (alive) setTop3(rows || []); })
+      .catch(() => { if (alive) setTop3([]); });
+    return () => { alive = false; };
+  }, []);
 
   // 친구 찾기: @닉 검색(users.search) → 팔로우 (#250)
   useEffect(() => {
@@ -98,6 +109,29 @@ function SocialView({ state }) {
             </div>
           ))}
           {fq.trim() && fres.length === 0 && <div style={{ padding: 12, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>검색 결과 없음</div>}
+        </div>
+      )}
+      {/* 이번 주 신규 시작러 Top3 (§5.7) — 비어있으면 미표시 */}
+      {top3.length > 0 && (
+        <div style={{ padding: '0 16px 12px' }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', marginBottom: 8 }}>📚 이번 주 새로 시작한 책</div>
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto' }}>
+              {top3.map((b, i) => (
+                <button key={b.bookId || i} onClick={() => { if (b.bookId && window.RG_openBook) window.RG_openBook(b.bookId); }}
+                  style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: 'none', cursor: (b.bookId && window.RG_openBook) ? 'pointer' : 'default', padding: 0, maxWidth: 200 }}>
+                  <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--brand-3)', minWidth: 18 }}>{i + 1}위</span>
+                  {b.cover_url
+                    ? <img src={b.cover_url} alt="" style={{ width: 28, height: 40, objectFit: 'cover', borderRadius: 4, flex: '0 0 auto' }} />
+                    : null}
+                  <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</span>
+                    <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{b.starters}명 시작</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
       {/* 전체 / 팔로우 탭 (#7) */}
