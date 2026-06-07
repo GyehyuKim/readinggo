@@ -404,25 +404,11 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           <div style={{fontSize:13, opacity:0.9, marginTop:4, minHeight:18}}>
             {(window.RG_ME && window.RG_ME.bio) || '한 줄 소개를 설정에서 적어보세요'}
           </div>
-          {/* 통계 뱃지 — 🏰 성 개수 · 🔥 스트릭 · 완독 권수 (§5.8 v7.2, XP 전면 제거) */}
-          <div style={{display:'flex', justifyContent:'center', gap:8, marginTop:12, flexWrap:'wrap'}}>
-            {[
-              { icon: '🏰', value: castles.length, unit: '권', label: '성' },
-              { icon: '🔥', value: state.streak || 0, unit: '일', label: '스트릭' },
-              { icon: '📚', value: castles.length, unit: '권', label: '완독' },
-            ].map(({ icon, value, unit, label }) => (
-              <div key={label} style={{
-                display:'flex', flexDirection:'column', alignItems:'center',
-                background:'rgba(255,255,255,0.18)', borderRadius:12,
-                padding:'6px 14px', minWidth:56,
-              }}>
-                <span style={{fontSize:18, lineHeight:1}}>{icon}</span>
-                <span style={{fontSize:15, fontWeight:900, lineHeight:'1.2', marginTop:2}}>
-                  {value}<span style={{fontSize:11, fontWeight:700, marginLeft:1}}>{unit}</span>
-                </span>
-                <span style={{fontSize:10, opacity:0.85, fontWeight:700}}>{label}</span>
-              </div>
-            ))}
+          {/* 통계 뱃지 한 줄 — 🏰 ×N · 🔥 N · ⚡ N (§5.8 v7.2) */}
+          <div style={{display:'flex', justifyContent:'center', gap:16, marginTop:10, fontSize:14, fontWeight:800, opacity:0.95}}>
+            <span>🏰 ×{castles.length}</span>
+            <span>🔥 {state.streak || 0}</span>
+            <span>⚡ {(state.xp || 0).toLocaleString()}</span>
           </div>
         </div>
       </div>
