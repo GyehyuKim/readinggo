@@ -657,6 +657,11 @@
         unwrap(await sb().from('village_opinions').delete().eq('id', opinionId));
         return true;
       },
+      // 마을 패치 — UI 변경사항 로컬 영속 (항상 localStorage, 어댑터 무관)
+      patches: {
+        load() { try { return JSON.parse(localStorage.getItem('rg_town_patches_v1') || '{}'); } catch(e) { return {}; } },
+        save(p) { try { localStorage.setItem('rg_town_patches_v1', JSON.stringify(p)); } catch(e) {} },
+      },
     },
 
     /* 운영 대시보드 집계 — is_admin=true 전용 (#161) */
