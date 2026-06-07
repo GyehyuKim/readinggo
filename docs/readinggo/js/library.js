@@ -84,6 +84,31 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 교보 상세는 ISBN 이 아닌 교보 고유번호(S…)를 써서 ISBN 직링크가 깨짐 → 검색결과로(QA #1-B).
   const kyoboUrl = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn || book.title)}`;
 
+  // Markdown Export (§5.8.4): # 책 — 저자 + ## YYYY-MM-DD (p.N) + > 문장
+  const exportMarkdown = () => {
+    const lines = [`# ${book.title} — ${book.author}`, ''];
+    const sorted = (bookQuotes || []).slice().sort((a, b) => (a.page || 0) - (b.page || 0));
+    sorted.forEach(q => {
+      const date = q.when ? String(q.when).slice(0, 10) : '날짜 미상';
+      lines.push(`## ${date} (p.${q.page ?? '?'})`);
+      lines.push(`> ${q.text || ''}`);
+      const note = noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '');
+      if (note) { lines.push(''); lines.push(note); }
+      lines.push('');
+    });
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${book.title.replace(/[\\/:*?"<>|]/g, '_')}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('📄 Markdown 저장됨');
+  };
+
   return (
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label={book.title}>
@@ -146,7 +171,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               ) : (
                 <>
                   <div style={{fontSize:13, color:'var(--ink)', fontWeight:700, marginBottom:8}}>
-                    {typeof bookshelfEntry.rating === 'number' ? `⭐ ${bookshelfEntry.rating} / 5` : '별점 없음'}
+                    {typeof bookshelfEntry.rating === 'number' ? `⭐ ${bookshelfEntry.rating.toFixed(1)} / 5` : '별점 없음'}
                   </div>
                   {bookshelfEntry.comment && (
                     <div style={{fontSize:13, color:'var(--ink)', lineHeight:'1.5'}}>{bookshelfEntry.comment}</div>
@@ -164,17 +189,25 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </div>
           )}
 
-          {/* 진도 정보 (읽는 중일 때) */}
+          {/* 진도 정보 (읽는 중일 때) — 쪽수 미상 graceful (§5.8.4 v7.2 #204) */}
           {prog.cur > 0 && !bookshelfEntry && (
             <div style={{background:'var(--paper-2)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
               <div style={{fontSize:12, color:'var(--ink-3)', fontWeight:800, marginBottom:6}}>진도</div>
-              <div style={{display:'flex', alignItems:'center', gap:10}}>
-                <div style={{flex:1, height:8, background:'var(--line)', borderRadius:4, overflow:'hidden'}}>
-                  <div style={{height:'100%', background:'var(--brand)', width:`${progressPct}%`, transition:'width 0.3s ease'}} />
+              {book.total > 0 ? (
+                <>
+                  <div style={{display:'flex', alignItems:'center', gap:10}}>
+                    <div style={{flex:1, height:8, background:'var(--line)', borderRadius:4, overflow:'hidden'}}>
+                      <div style={{height:'100%', background:'var(--brand)', width:`${progressPct}%`, transition:'width 0.3s ease'}} />
+                    </div>
+                    <span style={{fontSize:13, fontWeight:800, color:'var(--ink)', minWidth:50}}>{prog.cur} / {book.total}p</span>
+                  </div>
+                  <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginTop:6}}>{progressPct}%</div>
+                </>
+              ) : (
+                <div style={{fontSize:13, color:'var(--ink-3)', fontWeight:700}}>
+                  📖 {prog.cur}p 읽음 · <span style={{color:'var(--ink-3)'}}>쪽수 미상</span>
                 </div>
-                <span style={{fontSize:13, fontWeight:800, color:'var(--ink)', minWidth:50}}>{prog.cur} / {book.total}p</span>
-              </div>
-              <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginTop:6}}>{progressPct}%</div>
+              )}
             </div>
           )}
 
@@ -190,6 +223,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
              style={{display:'block', textAlign:'center', padding:'12px 14px', background:'var(--brand-tint)', border:'1.5px solid var(--brand)', borderRadius:'8px', color:'var(--brand-3)', fontSize:13, fontWeight:800, textDecoration:'none', marginBottom:14, cursor:'pointer'}}>
             교보문고에서 보기 →
           </a>
+
+          {/* Markdown Export (§5.8.4) — 내 한 문장이 1개 이상 있을 때만 노출 */}
+          {bookQuotes.length > 0 && (
+            <button onClick={exportMarkdown}
+              style={{display:'block', width:'100%', textAlign:'center', padding:'12px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14, boxSizing:'border-box'}}>
+              ⬇️ 내 한 문장 Markdown 내보내기
+            </button>
+          )}
 
           {bookQuotes.length > 0 && (
             <>
@@ -491,7 +532,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             {currentBooks.map(b => {
               const isCompleted = b.status === 'completed';
               const progText = isCompleted
-                ? (typeof b.rating === 'number' ? `⭐ ${b.rating} / 5 · 완독` : '완독')
+                ? (typeof b.rating === 'number' ? `⭐ ${b.rating.toFixed(1)} / 5 · 완독` : '완독')
                 : (b.cur > 0 ? `${b.cur} / ${b.total}p` : '아직 안 펼침');
               return (
                 <div
