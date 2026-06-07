@@ -910,29 +910,43 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                             <div key={u.id} style={{display:'flex', alignItems:'center', gap:8, padding:'6px 8px', borderRadius:8, background:'var(--paper)', border:'1px solid var(--line-2)'}}>
                               <span style={{flex:1, fontSize:12, fontWeight:700, color:'var(--ink-1)'}}>@{u.handle || u.display_name}</span>
                               <button
-                                onClick={() => {
-                                  const newMember = {
-                                    name: u.handle || u.display_name || u.email || '멤버',
-                                    nest: u.nest_emoji || '🪺',
-                                    streak: 0,
-                                    cumulativePage: 0,
-                                    todayRecorded: false,
-                                    quote: '',
-                                  };
-                                  setMembersList(prev => {
-                                    if (prev.some(m => m.name === newMember.name)) return prev;
-                                    const next = [...prev, newMember];
-                                    if (onTownUpdate) onTownUpdate({ id: townId, members: next });
-                                    return next;
-                                  });
+                                onClick={async () => {
+                                  const DS = window.DataStore;
+                                  if (DS && DS.villages && DS.villages.invite) {
+                                    // Supabase 모드: DB 저장 먼저, 성공 후 UI 반영
+                                    try {
+                                      await DS.villages.invite(townId, u.id);
+                                    } catch(e) {
+                                      showToast('초대 실패 — ' + ((e && e.message) || '잠시 후 다시 시도해주세요'));
+                                      return;
+                                    }
+                                    // 성공 후 DB에서 최신 멤버 목록 재조회
+                                    if (DS.villages.members) {
+                                      try {
+                                        const rows = await DS.villages.members(townId);
+                                        if (rows && rows.length) {
+                                          const next = rows.map(r => {
+                                            const uu = r.user || {};
+                                            return { name: uu.handle || uu.display_name || '멤버', nest: uu.nest_emoji || '🪺', streak: (uu.streak && uu.streak.current) || 0, cumulativePage: uu.cumulativePage || 0, todayRecorded: !!uu.todayRecorded, quote: '' };
+                                          });
+                                          setMembersList(next);
+                                          if (onTownUpdate) onTownUpdate({ id: townId, members: next });
+                                        }
+                                      } catch(e) {}
+                                    }
+                                  } else {
+                                    // Phase 0 폴백: in-memory
+                                    const newMember = { name: u.handle || u.display_name || u.email || '멤버', nest: u.nest_emoji || '🪺', streak: 0, cumulativePage: 0, todayRecorded: false, quote: '' };
+                                    setMembersList(prev => {
+                                      if (prev.some(m => m.name === newMember.name)) return prev;
+                                      const next = [...prev, newMember];
+                                      if (onTownUpdate) onTownUpdate({ id: townId, members: next });
+                                      return next;
+                                    });
+                                  }
                                   showToast(`@${u.handle || u.display_name} 초대 완료!`);
                                   setInviteResults([]);
                                   setInviteQuery('');
-                                  const DS = window.DataStore;
-                                  if (DS && DS.villages && DS.villages.invite) {
-                                    Promise.resolve(DS.villages.invite(townId, u.id))
-                                      .catch(() => {});
-                                  }
                                 }}
                                 style={{padding:'4px 10px', borderRadius:16, background:'var(--brand)', color:'white', border:'none', fontWeight:800, fontSize:11, cursor:'pointer'}}
                               >
