@@ -99,6 +99,11 @@
         if (typeof opts.review_text !== 'undefined') patch.review_text = opts.review_text;
         return unwrap(await sb().from('user_books').update(patch).eq('id', userBookId).select().single());
       },
+      // social.md §5.7 "이번 주 신규 시작러 Top3" — 공개 집계 RPC(17_social_newcomers.sql).
+      async startedThisWeek(lim = 3) {
+        const rows = unwrap(await sb().rpc('social_newcomers_weekly', { lim }));
+        return (rows || []).map((x) => ({ bookId: x.book_id, title: x.title, author: x.author, cover_url: x.cover_url, starters: Number(x.starters) || 0 }));
+      },
     },
 
     /* 내 책 / 활성 책 */

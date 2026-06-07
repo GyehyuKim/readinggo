@@ -332,6 +332,21 @@ const DataStore = {
         return ub;
       });
     },
+    // social.md §5.7 "이번 주 신규 시작러 Top3" — 이번 주(월~) started_at 기준 책별 집계.
+    startedThisWeek(lim = 3) {
+      return localStorageAdapter.mutate(s => {
+        const ws = new Date(); ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7)); ws.setHours(0, 0, 0, 0);
+        const by = {};
+        (s.user_books || []).forEach(ub => {
+          const t = ub.started_at ? new Date(ub.started_at) : null;
+          if (!t || t < ws) return;
+          const b = ub.book || {};
+          if (!by[ub.book_id]) by[ub.book_id] = { bookId: ub.book_id, title: b.title || '', author: b.author || '', cover_url: b.cover_url || b.cover || '', starters: 0 };
+          by[ub.book_id].starters += 1;
+        });
+        return Object.values(by).sort((a, b) => b.starters - a.starters).slice(0, lim);
+      });
+    },
   },
   castles: {
     list() {

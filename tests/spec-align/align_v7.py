@@ -106,6 +106,8 @@ INVARIANTS = [
         ["social.js"], r"NPC_QUOTES"),
     ("B", "present", "소셜 피드 실데이터 (feed/추천 탭)",
         ["social.js"], r"feedRecommended|\.feed\(|feedFollowing"),
+    ("B", "present", "이번 주 신규 시작러 Top3 (social.md §5.7, startedThisWeek)",
+        ["social.js"], r"startedThisWeek"),
     ("B", "absent", "서재 데모 상수 잔재 (INITIAL_BOOKSHELF/INITIAL_PROGRESS/RG_BOOKS/WISHLIST/getBook)",
         ["library.js"], r"INITIAL_BOOKSHELF|INITIAL_PROGRESS|RG_BOOKS|WISHLIST|getBook\("),
     ("B", "present", "서재 실 myBooks 배선 (myBooks.list)",
