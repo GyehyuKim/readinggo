@@ -39,10 +39,23 @@ const NEST_STAGES = [
   { lv: 4, max: 99,  name: "다정한 집",     short: "🏡", color: "#1CB0F6", bg: "#EFF6FF" },
   { lv: 5, max: 100, name: "참새의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
 ];
-// 진척률(0~100) → 단계 객체. 경계 포함(<=).
+// 진척률(0~100) → 단계 객체. 경계 포함(<=). (레거시 — 책 진척률 표시용)
 function getNestStage(progressPct){
   const p = Math.max(0, Math.min(100, progressPct || 0));
   return NEST_STAGES.find(s => p <= s.max) || NEST_STAGES[NEST_STAGES.length - 1];
+}
+// 누적 XP → 둥지 단계 (#313). 둥지는 책이 아니라 전체 활동(XP/레벨)에 연동.
+// 레벨(calcLevel)을 5단계에 매핑: Lv1=🪵 … Lv5+=🏰(최대). 책을 바꿔도 유지.
+function getNestStageByXp(xp){
+  const lv = Math.min(NEST_STAGES.length, calcLevel(xp));
+  return NEST_STAGES[lv - 1];
+}
+// 현재 레벨 내 다음 레벨까지 진행도 % (둥지 진척 바·마이크로카피용). 최대단계 도달 후도 레벨 진행 표시.
+function nestXpProgress(xp){
+  const x = Math.max(0, xp || 0);
+  const lv = calcLevel(x);
+  const base = xpForLevel(lv), next = xpForLevel(lv + 1);
+  return next > base ? Math.max(0, Math.min(100, Math.round((x - base) / (next - base) * 100))) : 100;
 }
 
 /* ── 진화 마이크로카피 4종 (nest.md §5.2) ─────────
@@ -149,8 +162,8 @@ const INITIAL_STATE = {
   streak: 12,
   xp: 340,
   shield: 2,
-  // 둥지 단계는 활성 책 진척률에서 파생 (§5.2). cur/total 로 초기 단계 계산.
-  nest: { lv: getNestStage(Math.round(_ap.cur / _ab.total * 100)).lv },
+  // 둥지 단계는 누적 XP에서 파생 (#313, §5.2). xp(위 340)와 동일 값 사용.
+  nest: { lv: getNestStageByXp(340).lv },
   myQuotes: [
     { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제" },
     { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전" },
@@ -496,6 +509,7 @@ const ALL_BOOKS = RG_BOOKS.map(b => ({
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
 window.INITIAL_PROGRESS=INITIAL_PROGRESS;
 window.NEST_STAGES=NEST_STAGES; window.getNestStage=getNestStage;
+window.getNestStageByXp=getNestStageByXp; window.nestXpProgress=nestXpProgress;
 window.NEST_STAGE_TRANSITIONS=NEST_STAGE_TRANSITIONS; window.getEvolutionCopy=getEvolutionCopy;
 window.XP_RULES=XP_RULES; window.calcLevel=calcLevel; window.xpForLevel=xpForLevel; window.computeCheckinXp=computeCheckinXp;
 window.reactionXpFor=reactionXpFor; window.grantXp=grantXp;

@@ -27,11 +27,11 @@ async function buildStateFromSupabase() {
       cur: ub.current_page || 0, total, days: 1,
       cover: ub.book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
     };
-    out.nest = { lv: getNestStage(total > 0 ? Math.round((ub.current_page || 0) / total * 100) : 0).lv };
+    out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지 = 누적 XP (#313), 책 무관
   } else {
     // 활성 책 없음(Supabase 모드): 데모책(b008) 환영 방지 — 빈 sentinel 로 '책 등록' 유도.
     out.book = { id: '', title: '', author: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
-    out.nest = { lv: 0 };
+    out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지는 책 없어도 XP로 유지 (#313)
   }
   if (Array.isArray(mine) && mine.length) {
     out.myQuotes = mine.map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', note: s.my_note || '', visibility: s.visibility || 'public', isPrivate: s.visibility === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
@@ -319,7 +319,7 @@ function App() {
   }, []);
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
-  // 둥지 단계(nest.lv)는 활성 책 진척률에서 파생 → NestView가 계산해 넘긴다(§5.2).
+  // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
   const handleCheckin = useCallback((ns, nestLv, xpGain, sentence) => {
     setAppState(s => ({
       ...s,
@@ -399,8 +399,7 @@ function App() {
       // 현재 책 진도 저장
       INITIAL_PROGRESS[s.book.id] = { cur: s.book.cur, days: s.book.days };
       const prog = INITIAL_PROGRESS[bookId] || { cur: 1, days: 1 };
-      // 둥지 단계는 새 활성 책 진척률로 재계산 (§5.2/§5.3).
-      const nestLv = getNestStage(bk.total ? Math.round(prog.cur / bk.total * 100) : 0).lv;
+      // 둥지는 책과 무관 — 책 전환 시 유지 (#313). nest 재계산 안 함.
       return {
         ...s,
         book: {
@@ -409,7 +408,6 @@ function App() {
           cur: prog.cur, total: bk.total, days: prog.days,
           cover: bk.cover, fb: bk.fb, toc: bk.toc,
         },
-        nest: { ...s.nest, lv: nestLv },
       };
     });
     showToast(`📖 ${bk.title} — 활성 책으로 설정`);
@@ -470,7 +468,7 @@ function App() {
               cur: ub.current_page || 0, total: totalPages, days: 1,
               cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
             },
-            nest: { ...s.nest, lv: getNestStage(totalPages ? Math.round((ub.current_page || 0) / totalPages * 100) : 0).lv },
+            // 둥지는 책과 무관 — 유지 (#313)
           }));
           showToast(`📖 ${book.title} 등록 완료`);
         }
@@ -495,7 +493,7 @@ function App() {
         cur: item.cur || 0, total: item.total || 0, days: 1,
         cover: item.cover, fb: item.fb || ['#9AA7B2', '#C7D0D8'], toc: [],
       },
-      nest: { ...s.nest, lv: getNestStage(item.total ? Math.round((item.cur || 0) / item.total * 100) : 0).lv },
+      // 둥지는 책과 무관 — 유지 (#313)
     }));
     showToast(`📖 ${item.title} — 활성 책으로 변경`);
     switchTab('nest');

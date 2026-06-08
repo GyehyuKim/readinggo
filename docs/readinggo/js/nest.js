@@ -233,9 +233,10 @@ const NEST_CRACK_SVG = (
   </svg>
 );
 
-function NestTheatre({ progressPct, streak, prevTwigs, health = 100 }) {
-  const pct = Math.max(0, Math.min(100, Math.round(progressPct)));
-  const stage = getNestStage(pct);
+function NestTheatre({ xp, streak, prevTwigs, health = 100 }) {
+  // 둥지 = 누적 활동(XP). 책 진척률 아님 (#313). pct = 현재 레벨 내 진행도.
+  const pct = nestXpProgress(xp);
+  const stage = getNestStageByXp(xp);
   const { cur, next } = nestInfo(stage.lv);
   // 둥지 일러스트는 진척률(stage.lv)로 그린다. health 는 §6.2 시각 상태(흔들림/균열)용.
   const hp = Math.max(0, Math.min(100, Math.round(health)));
@@ -467,11 +468,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     skipStreakRisk: false,   // 데모 '하루 거르기' — 방패 1회 흡수 후 다음 거르기에 스트릭 리셋
   });
   // 직전 진척률 가지 수 — 새 가지 stack 애니메이션 기준.
-  const prevTwigsRef = _useRef(twigsForProgress(_pctOf(state.book)));
+  const prevTwigsRef = _useRef(twigsForProgress(nestXpProgress(state.xp)));
 
-  // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드 → 둥지는 새 책 진척률로 재계산.
+  // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드. 둥지(XP 기반)는 유지 — 책과 무관(#313).
   _useEffect(() => {
-    prevTwigsRef.current = twigsForProgress(_pctOf(state.book));
+    prevTwigsRef.current = twigsForProgress(nestXpProgress(state.xp));
     setNestState({
       streak: state.streak,
       xp: state.xp,
@@ -528,8 +529,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
     const wasReset = ns.streak === 0;
-    const prevPct = _pctOf(ns.book);
-    const prevLv = getNestStage(prevPct).lv;
+    const prevPct = _pctOf(ns.book);            // 책 진척(완독 판정용)
+    const prevXp = ns.xp;
+    const prevLv = getNestStageByXp(prevXp).lv; // 둥지 단계 = 누적 XP (#313)
 
     ns.book = { ...ns.book, cur: page };
     if (wasReset) ns.streak = 1;
@@ -537,28 +539,29 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     ns.skipStreakRisk = false;
 
     const newPct = _pctOf(ns.book);
-    const newLv = getNestStage(newPct).lv;
-    const nestUp = newLv > prevLv;
     // 완독: 마지막 장 도달 (이번 체크인에 100% 처음 도달).
     const isComplete = newPct >= 100 && prevPct < 100;
 
-    // XP — systems.md §6.3 SSOT. 페이지 수와 무관(일일미션 고정 +20). 차감 없음.
+    // XP — systems.md §6.3 SSOT. 둥지 단계도 이 XP 누적에 연동(#313). 차감 없음.
     const xpReward = computeCheckinXp({ isNewDay: true, isComplete, newStreak: ns.streak });
     const xpGain = xpReward.total;
     ns.xp += xpGain;
+
+    const newLv = getNestStageByXp(ns.xp).lv;   // XP 증가 후 둥지 단계
+    const nestUp = newLv > prevLv;
 
     if (sentence) {
       ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금' }, ...ns.myQuotes];
     }
 
-    prevTwigsRef.current = twigsForProgress(prevPct);
+    prevTwigsRef.current = twigsForProgress(nestXpProgress(prevXp));
     setNestState(ns);
     onCheckin(ns, newLv, xpGain, sentence);
 
     // 단계 상승 시 진화 마이크로카피 toast (§5.2)
     if (nestUp) {
       const copy = getEvolutionCopy(prevLv, newLv);
-      if (copy) showToast(`${getNestStage(newPct).short} ${copy}`);
+      if (copy) showToast(`${getNestStageByXp(ns.xp).short} ${copy}`);
     }
 
     setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay: true, wasReset, isComplete });
@@ -658,9 +661,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         </div>
       </div>
 
-      {/* 둥지 시어터 — 활성 책 진척률 5단계 */}
+      {/* 둥지 시어터 — 누적 활동(XP) 5단계, 책과 무관 (#313) */}
       <NestTheatre
-        progressPct={nestState.book.total ? (nestState.book.cur / nestState.book.total * 100) : 0}
+        xp={nestState.xp}
         streak={nestState.streak}
         prevTwigs={prevTwigsRef.current}
       />
