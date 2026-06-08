@@ -84,6 +84,14 @@ INVARIANTS = [
     ("설정: 관리자 — 마을 삭제",             "town.js", TOWN, r"deleteVillage|마을 삭제"),
     ("설정: 관리자 — 삭제 confirm",          "town.js", TOWN, r"deleteVillage[\s\S]{0,200}confirm|confirm[\s\S]{0,200}삭제"),
     ("설정: 관리자 전용 섹션 노출 조건",      "town.js", TOWN, r"myRole.*admin|isAdmin"),
+
+    # claude-20260607 자동구현: 4개 신규 기능 (spec §5.5.4 §5.5.1 §5.5.6)
+    ("헤더 2줄: 평균 진척률 표시",            "town.js", TOWN, r"avgProgress|평균.*%|평균\s+\{"),
+    ("헤더 2줄: 평균 계산 (cumulativePage)",  "town.js", TOWN, r"avgProgress.*cumulativePage|cumulativePage.*avgProgress|reduce.*cumulativePage"),
+    ("미리보기: 관리자 👑 항상 표시",         "village.js", VILLAGE, r"관리자.*👑"),
+    ("지난 마을: 완료 날짜 자동 계산",        "village.js", VILLAGE, r"completedLabel|_completedLabel"),
+    ("지난 마을: statusLabel 자동 설정",      "village.js", VILLAGE, r"statusLabel.*완료|완료.*statusLabel"),
+    ("설정: 초대 코드 복사 버튼",             "town.js", TOWN, r"코드 복사|clipboard.*inviteCode|inviteCode.*clipboard"),
 ]
 
 

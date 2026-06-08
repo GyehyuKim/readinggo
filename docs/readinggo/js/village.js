@@ -47,6 +47,13 @@ function _villageRowToTown(v, collection, myUserId) {
   const _isExpired = _lastPart && _lastPart.due_date
     && new Date(_lastPart.due_date + 'T00:00:00') < new Date(_todayStr + 'T00:00:00');
   const autoCollection = (collection === 'active' && _isExpired) ? 'past' : (collection || 'active');
+  // 완료 날짜 자동 계산: 마지막 파트 마감일 기준 YYYY.MM 형식 (spec §5.5.1 지난 마을)
+  const _completedLabel = _isExpired && _lastPart && _lastPart.due_date
+    ? (() => {
+        const d = new Date(_lastPart.due_date + 'T00:00:00');
+        return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+      })()
+    : null;
   return {
     id: v.id,
     bookId,
@@ -67,6 +74,9 @@ function _villageRowToTown(v, collection, myUserId) {
     leader: '',
     currentRange: parts[currentPart - 1] ? (parts[currentPart - 1].title || `파트 ${currentPart}`) : '',
     status: _isExpired ? 'completed' : (v.status || 'active'),
+    statusLabel: _isExpired ? '완료' : '진행 중',
+    completedLabel: _completedLabel,
+    completedBooks: _isExpired ? 1 : null,
     milestones: parts.map(p => ({ part: p.part_order, dueDate: p.due_date || null, completed: false })),
     members: [],
   };
@@ -1088,7 +1098,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
                   <div style={{flex:1, minWidth:0}}>
                     <div style={{fontSize:16, fontWeight:900, lineHeight:1.35}}>{previewTown.name}</div>
                     <div style={{fontSize:12, color:'var(--ink-2)', fontWeight:700, marginTop:4}}>
-                      관리자: {previewTown.leader} {previewTown.visibility === 'private' ? '👑' : ''}
+                      관리자: {previewTown.leader || '(미지정)'} 👑
                     </div>
                     <div style={{fontSize:12, color:'var(--ink-2)', fontWeight:700, marginTop:4}}>
                       인원: {previewTown.memberCount} / {previewTown.capacity || 10}명
