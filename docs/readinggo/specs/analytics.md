@@ -34,6 +34,7 @@ rgTrack('book_opened',         { book_id, entry_point })          // 읽기 모�
 rgTrack('highlight_selected',  { book_id, page, sentence_length }) // 한 문장 저장 (nest.js save)
 rgTrack('answer_saved',        { book_id, lens, answer_length })   // 독서모임 답변 (nest.js, lens='why')
 rgTrack('reading_session_end', { book_id, duration_sec, pages_logged }) // 독서 종료 (nest.js finish)
+rgTrack('app_error',           { message, tab })                        // 컴포넌트 크래시 (app.js ErrorBoundary, #310)
 
 // ⏳ 후속 (해당 기능 구현 시)
 rgTrack('lens_switched',       { book_id, from_lens, to_lens })   // 렌즈 도입 후 (companion.md §6)

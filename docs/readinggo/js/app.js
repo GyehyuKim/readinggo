@@ -89,6 +89,35 @@ function BootSplash({ text }) {
   );
 }
 
+// 전역 에러 바운더리 (#310) — 탭 뷰 한 곳이 크래시해도 앱 셸(상단바·탭바)은 유지.
+// <main> 안에서 key={activeTab}로 감싸 탭 전환 시 자동 리셋.
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error, info) {
+    try { if (window.rgTrack) window.rgTrack('app_error', { message: String((error && error.message) || error).slice(0, 200), tab: this.props.label || '' }); } catch (e) {}
+    console.error('[ReadingGo] ErrorBoundary 포착:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 44, marginBottom: 12 }}>🐦</div>
+          <div style={{ fontWeight: 900, fontSize: 17, color: 'var(--ink)', marginBottom: 6 }}>이 화면을 여는 데 문제가 생겼어요</div>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6, marginBottom: 20 }}>잠깐 길을 잃었네요. 다시 시도하거나 둥지로 돌아가요.</div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button onClick={() => this.setState({ hasError: false })}
+              style={{ padding: '12px 20px', borderRadius: 12, border: '1.5px solid var(--line)', background: '#fff', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>다시 시도</button>
+            <button onClick={() => { this.setState({ hasError: false }); if (this.props.onReset) this.props.onReset(); }}
+              style={{ padding: '12px 20px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>🏠 둥지로 가기</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function LoginScreen({ onLogin, onBack }) {
   const { useState } = React;
   const [email, setEmail] = useState('');
@@ -567,6 +596,7 @@ function App() {
 
         {/* 메인 스크롤 영역 — 스포일러 전역 토글을 4영역 공통 제공 (§5.7.1) */}
         <main className="main">
+          <ErrorBoundary key={activeTab} label={activeTab} onReset={() => switchTab('nest')}>
           <SpoilerContext.Provider value={spoilerReveal}>
           {activeTab === 'nest' && (
             <NestView
@@ -611,6 +641,7 @@ function App() {
             />
           )}
           </SpoilerContext.Provider>
+          </ErrorBoundary>
         </main>
 
         {/* 하단 탭바 */}
