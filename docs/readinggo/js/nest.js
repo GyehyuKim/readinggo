@@ -300,7 +300,21 @@ function NestTheatre({ progressPct, streak, prevTwigs, health = 100 }) {
 /* ── ReadingMode: 읽기 모드 (#184) — 독서 타이머 + 상시 한 문장 입력 ──
    둥지에서 활성 책으로 진입. 북모리식 몰입 캡처: 타이머가 도는 동안
    입력칸이 항상 열려 있어 떠오른 한 문장을 즉시 아카이브한다. */
-function ReadingMode({ book, onClose, onArchive, onChecked }) {
+// 혼자만의 독서모임 (companion.md) — Worker 실 API 전 DEMO 목 질문. 키 수급 후 RG_COMPANION_DEMO=false.
+const RG_COMPANION_DEMO = true;
+const COMPANION_QS = [
+  '왜 이 문장이 마음에 걸렸어요?',
+  '이 문장, 지금 내 상황이랑 연결되는 게 있어요?',
+  '이 문장에 동의해요, 아니면 고개를 갸웃했어요?',
+  '이 문장을 누군가에게 들려준다면 누구일까요?',
+  '이 문장에서 어떤 장면이나 기억이 떠올랐어요?',
+];
+function pickCompanionQ(text) {
+  const i = (text ? text.length : 0) % COMPANION_QS.length;
+  return COMPANION_QS[i];
+}
+
+function ReadingMode({ book, onClose, onArchive, onCheckin }) {
   const [secs, setSecs] = _useState(0);
   const [running, setRunning] = _useState(true);
   const [page, setPage] = _useState(String(book.cur || 0)); // 문자열 — 빈칸 허용(페이지 미상)
@@ -308,6 +322,7 @@ function ReadingMode({ book, onClose, onArchive, onChecked }) {
   const [saved, setSaved] = _useState([]);
   const [closing, setClosing] = _useState(false);            // 종료 확인 단계
   const [finalPage, setFinalPage] = _useState(String(book.cur || 0));
+  const [companion, setCompanion] = _useState(null);         // 혼자만의 독서모임 — 저장 직후 질문 (#305)
   const ubRef = _useRef(null);
   const total = book.total || 0;
   _useEffect(() => {
@@ -331,33 +346,33 @@ function ReadingMode({ book, onClose, onArchive, onChecked }) {
     if (!t) { showToast('한 문장을 적어주세요'); return; }
     const p = pageNum(page); // 비어있으면 null(페이지 없이 저장)
     const ubId = ubRef.current;
-    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: p, text: t })).then(() => {
+    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: p, text: t })).then((row) => {
       setSaved((list) => [{ text: t, page: p }, ...list]);
       setText('');
       showToast(p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨');
       if (onArchive) onArchive({ text: t, bookId: book.id, page: p, when: '방금' });
+      // 혼자만의 독서모임 — 저장 직후 "왜 남겼어?" (companion.md §2, DEMO_MODE)
+      if (RG_COMPANION_DEMO) setCompanion({ sentenceId: row && row.id, question: pickCompanionQ(t), answer: '' });
     }).catch(() => showToast('저장 실패 — 다시 시도'));
   };
-  // 독서 종료: 최종 읽은 쪽 확인 → 진도/스트릭 반영(체크인) → 닫기. 미입력 시 마지막 페이지 유지.
+  // 독서모임 답변 저장 → 해당 문장의 감상(my_note)으로 영속 (양 어댑터 setNote)
+  const answerCompanion = () => {
+    const a = ((companion && companion.answer) || '').trim();
+    if (!a) { setCompanion(null); return; }
+    if (companion.sentenceId && DataStore.sentences && DataStore.sentences.setNote) {
+      Promise.resolve(DataStore.sentences.setNote(companion.sentenceId, a)).catch(() => {});
+    }
+    showToast('🐦 답을 남겼어요');
+    setCompanion(null);
+  };
+  // 독서 종료: 최종 읽은 쪽을 부모 체크인 파이프라인(handleCheckin)에 위임 (#300).
+  // → 진도/스트릭/XP 갱신 + 둥지 갱신(onCheckin) + 완독 시 세리머니(별점·소감 카드)까지 단일 경로로.
+  // 한 문장은 읽는 중 save()로 이미 저장되므로 sentence=null. (완독 처리=세리머니 onComplete→books.complete)
   const finish = () => {
     const fp = pageNum(finalPage); // pageNum 이 total 로 클램프 → 초과 입력 방지
-    const ubId = ubRef.current;
     const finalP = fp != null ? fp : (book.cur || 0);
-    const reached100 = total > 0 && finalP >= total; // 마지막 쪽 도달 → 완독 (망령 책 방지 #265)
-    const done = () => {
-      showToast(reached100 ? '🏰 완독을 축하해요! 성이 하나 늘었어요' : ('📖 ' + fmt(secs) + ' 독서 완료' + (fp != null ? ' · ' + fp + 'p' : '')));
-      if (onChecked) onChecked();
-      onClose();
-    };
-    // 체크인(진도/스트릭) 후, 100% 도달 시 완독 처리까지 이어서 실행.
-    const afterSession = () => {
-      if (reached100 && ubId && DataStore.books && DataStore.books.complete) {
-        Promise.resolve(DataStore.books.complete(ubId)).then(done).catch(done);
-      } else done();
-    };
-    if (DataStore.sessions && DataStore.sessions.addToday) {
-      Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: finalP })).then(afterSession).catch(afterSession);
-    } else afterSession();
+    if (onCheckin) onCheckin({ page: finalP, sentence: null });
+    onClose();
   };
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
@@ -383,6 +398,23 @@ function ReadingMode({ book, onClose, onArchive, onChecked }) {
           style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
         <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>✨ 한 문장 저장{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
       </div>
+      {/* 혼자만의 독서모임 — 저장 직후 "왜 남겼어?" (#305, companion.md §2, DEMO_MODE) */}
+      {companion && (
+        <div style={{ margin: '4px 18px 0', background: 'rgba(63,209,127,0.12)', border: '1px solid rgba(63,209,127,0.35)', borderRadius: 12, padding: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
+            <span>🐦</span><span>혼자만의 독서모임</span>
+          </div>
+          <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.5, marginBottom: 10 }}>{companion.question}</div>
+          <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
+            placeholder="떠오르는 대로 답해보세요" rows={2}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={() => setCompanion(null)} style={{ flex: '0 0 auto', padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>건너뛰기</button>
+            <button onClick={answerCompanion} style={{ flex: 1, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>답 남기기</button>
+          </div>
+        </div>
+      )}
+
       {/* 이번 세션 아카이브 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 24px' }}>
         {saved.length > 0 && <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 800, margin: '8px 0' }}>이번 독서에서 모은 {saved.length}문장</div>}
@@ -705,7 +737,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           book={nestState.book}
           onClose={() => setReadingOpen(false)}
           onArchive={(q) => setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] }))}
-          onChecked={() => setCheckedToday(true)}
+          onCheckin={handleCheckin}
         />,
         document.body
       )}
