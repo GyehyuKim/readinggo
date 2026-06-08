@@ -170,9 +170,21 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                 </div>
               ) : (
                 <>
-                  <div style={{fontSize:13, color:'var(--ink)', fontWeight:700, marginBottom:8}}>
-                    {typeof bookshelfEntry.rating === 'number' ? `⭐ ${bookshelfEntry.rating.toFixed(1)} / 5` : '별점 없음'}
-                  </div>
+                  {typeof bookshelfEntry.rating === 'number' ? (
+                    <div style={{fontSize:13, color:'var(--ink)', fontWeight:700, marginBottom:8}}>
+                      ⭐ {bookshelfEntry.rating.toFixed(1)} / 5
+                    </div>
+                  ) : (
+                    // 미입력 — 빈 별 실루엣 노출(탭하면 입력 모드 진입) (#314). 기존엔 '별점 없음' 텍스트만 떠서 입력 불가.
+                    <div style={{display:'flex', gap:3, alignItems:'center', marginBottom:8}}>
+                      {[1,2,3,4,5].map(n => (
+                        <button key={n} type="button" aria-label={`${n}점 주기`}
+                          onClick={() => { setRt(n); setRv(book.comment || ''); setEditMeta(true); }}
+                          style={{background:'none', border:'none', cursor:'pointer', padding:0, fontSize:24, lineHeight:'26px', color:'var(--line-2, #d0d4da)'}}>★</button>
+                      ))}
+                      <span style={{marginLeft:6, fontSize:12, color:'var(--ink-3)', fontWeight:700}}>별점 주기</span>
+                    </div>
+                  )}
                   {bookshelfEntry.comment && (
                     <div style={{fontSize:13, color:'var(--ink)', lineHeight:'1.5'}}>{bookshelfEntry.comment}</div>
                   )}
