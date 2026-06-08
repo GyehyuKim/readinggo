@@ -50,6 +50,34 @@ async function buildStateFromSupabase() {
   return out;
 }
 
+// 게스트(로그아웃) 상태에서 localStorage 에 담아둔 pending 책·문장을 로그인 직후
+// Supabase 로 흡수 (backend.md §7.7). 데모 시드는 동기화하지 않고 pending 만 올린다.
+async function syncPendingToSupabase() {
+  const la = window.localStorageAdapter;
+  const DS = window.SupabaseDataStore;
+  if (!la || !DS) return;
+  let pend = {};
+  try { pend = (la.read() && la.read().pending) || {}; } catch (e) { return; }
+  const pb = pend.book, ps = pend.sentence;
+  if (!pb || !pb.title) return;
+  try {
+    const ub = await DS.myBooks.add({
+      book: {
+        isbn13: pb.isbn13 || '', title: pb.title, author: pb.author || '',
+        publisher: pb.publisher || '', total_pages: pb.total_pages || 0, cover_url: pb.cover_url || '',
+      },
+      current_page: pb.current_page || 0,
+    });
+    if (ub && ub.id) {
+      await DS.activeBook.set(ub.id);
+      try { await DS.sessions.addToday({ userBookId: ub.id, page: pb.current_page || 0 }); } catch (e) {}
+      if (ps && ps.text) { try { await DS.sentences.add({ userBookId: ub.id, page: ps.page, text: ps.text }); } catch (e) {} }
+    }
+    la.mutate(s => { s.pending = {}; return s; });
+    console.log('[ReadingGo] ✅ 게스트 pending → Supabase 동기화 완료');
+  } catch (e) { console.warn('[ReadingGo] pending 동기화 실패:', e); }
+}
+
 function BootSplash({ text }) {
   return (
     <div className="stage"><div className="app">
@@ -61,7 +89,7 @@ function BootSplash({ text }) {
   );
 }
 
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin, onBack }) {
   const { useState } = React;
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -75,11 +103,17 @@ function LoginScreen({ onLogin }) {
     finally { setBusy(false); }
   };
   return (
-    <div className="stage"><div className="app">
+    <div className="stage"><div className="app" style={{ position: 'relative' }}>
+      {onBack && (
+        <button onClick={onBack} aria-label="뒤로"
+          style={{ position: 'absolute', top: 16, left: 14, zIndex: 5, background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--ink-3)', padding: 6 }}>
+          ←
+        </button>
+      )}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '0 32px', textAlign: 'center' }}>
         <span style={{ fontSize: 54 }}>🐦</span>
         <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)' }}>reading<span style={{ color: 'var(--brand)' }}>GO</span></div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>하루 한 페이지,<br />한 문장에서 시작해요.</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>지금까지 남긴 기록을<br />계정에 안전하게 간직해요.</div>
         <button onClick={onLogin} style={{ marginTop: 8, padding: '14px 22px', borderRadius: 14, border: '1.5px solid var(--line)', background: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
           <span style={{ fontSize: 18 }}>🟢</span> Google로 시작하기
         </button>
@@ -111,8 +145,10 @@ function App() {
   const { useState, useCallback, useMemo, useEffect } = React;
   // Phase 1: Supabase 설정 시 로그인 게이트 + 실데이터. 미설정/미로그인은 localStorage 폴백.
   const _supa = !!(window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured());
-  const [authUser, setAuthUser] = useState(_supa ? undefined : 'local'); // undefined=확인중, null=로그아웃, 그외=OK
+  const [authUser, setAuthUser] = useState(_supa ? undefined : 'local'); // undefined=확인중, null=로그아웃(게스트), 그외=OK
   const [dataReady, setDataReady] = useState(!_supa);
+  const [showLogin, setShowLogin] = useState(false);        // 로그인 화면 온디맨드(벽 아님)
+  const [guestBannerOff, setGuestBannerOff] = useState(false); // 게스트 안내 배너 세션 닫기
   const [activeTab, setActiveTab] = useState('nest');
   const [selectedTownId, setSelectedTownId] = useState(null);
 
@@ -130,6 +166,8 @@ function App() {
   // 설정 모달(§5.8) — 프로필 ⚙️ 로 열림.
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => { window.RG_openSettings = () => setSettingsOpen(true); return () => { window.RG_openSettings = null; }; }, []);
+  // 로그인 화면 열기(저장 시점 트리거) — 설정/프로필/배너에서 호출.
+  useEffect(() => { window.RG_login = () => setShowLogin(true); return () => { window.RG_login = null; }; }, []);
   // 책 정보 모달(#11) — 한 문장의 책 제목 탭으로 열림.
   const [bookDetailId, setBookDetailId] = useState(null);
   useEffect(() => { window.RG_openBook = (id) => setBookDetailId(id); return () => { window.RG_openBook = null; }; }, []);
@@ -186,6 +224,7 @@ function App() {
     let alive = true;
     (async () => {
       try {
+        await syncPendingToSupabase();   // 게스트 → 로그인: pending 책·문장 흡수(§7.7)
         const next = await buildStateFromSupabase();
         if (alive && next) {
           setAppState(s => ({ ...s, ...next }));
@@ -256,6 +295,19 @@ function App() {
       myQuotes: ns.myQuotes,
     }));
     window.dispatchEvent(new CustomEvent('rg:today-checked'));
+    // 게스트(로그아웃 + Supabase 모드): 저장-worthy 한 책·문장을 pending 에 포착 →
+    // 로그인 시 syncPendingToSupabase 가 흡수(§7.7). DataStore 가 아직 localStorage 인 동안만.
+    if (_supa && window.SupabaseDataStore && window.DataStore !== window.SupabaseDataStore && sentence) {
+      try {
+        const b = ns.book || {};
+        window.localStorageAdapter.mutate(s => {
+          s.pending = s.pending || {};
+          s.pending.book = { isbn13: b.isbn13 || '', title: b.title || '', author: b.author || '', total_pages: b.total || 0, current_page: b.cur || 0, cover_url: b.cover || '' };
+          s.pending.sentence = { text: sentence, page: b.cur || 0 };
+          return s;
+        });
+      } catch (e) {}
+    }
     // Phase 1: 백엔드 영속(로그인 시). 낙관적 UI 유지 + 백그라운드 persist.
     // sessions.addToday 가 스트릭 bump 까지 연동(양 어댑터). 활성 책 없으면 no-op.
     (async () => {
@@ -419,10 +471,13 @@ function App() {
   // 활성 책 전환을 전역 노출 — 둥지 캐러셀(#185)이 호출
   useEffect(() => { window.RG_activateBook = handleActivateUserBook; return () => { window.RG_activateBook = null; }; }, [handleActivateUserBook]);
 
-  // Phase 1 로그인 게이트 (Supabase 모드에서만)
+  // Phase 1 인증 — 게스트 우선(onboarding.md §4). 로그인은 '저장' 시점에만 요구.
   if (_supa && authUser === undefined) return (<BootSplash text="확인 중..." />);
-  if (_supa && authUser === null) return (<LoginScreen onLogin={() => window.RG_SB.signInWithGoogle()} />);
-  if (_supa && !dataReady) return (<BootSplash text="불러오는 중..." />);
+  if (showLogin) return (<LoginScreen onLogin={() => window.RG_SB.signInWithGoogle()} onBack={() => setShowLogin(false)} />);
+  // 로그인 사용자만 Supabase 데이터 로드 대기. 게스트(authUser===null)는 localStorage 로 즉시 진입.
+  if (_supa && authUser && authUser !== 'local' && !dataReady) return (<BootSplash text="불러오는 중..." />);
+
+  const isGuest = _supa && authUser === null;
 
   return (
     <div className="stage">
@@ -486,6 +541,23 @@ function App() {
             </div>
           </div>
         </header>
+
+        {/* 게스트 안내 배너 — 로그인 없이 둘러보는 중. 로그인=저장 (onboarding.md §4 E). */}
+        {isGuest && !guestBannerOff && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
+            background: 'var(--brand-tint)', borderBottom: '1px solid var(--brand-soft)', fontSize: 12.5, fontWeight: 700, color: 'var(--brand-3)' }}>
+            <span style={{ fontSize: 15 }}>🐦</span>
+            <span style={{ flex: 1, lineHeight: 1.35 }}>게스트로 둘러보는 중 — 로그인하면 내 기록이 저장돼요</span>
+            <button onClick={() => setShowLogin(true)}
+              style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 999, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>
+              저장하기
+            </button>
+            <button onClick={() => setGuestBannerOff(true)} aria-label="배너 닫기"
+              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 16, padding: '0 2px' }}>
+              ×
+            </button>
+          </div>
+        )}
 
         {/* 메인 스크롤 영역 — 스포일러 전역 토글을 4영역 공통 제공 (§5.7.1) */}
         <main className="main">

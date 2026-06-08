@@ -473,15 +473,25 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             )}
           </div>
 
-          {/* 다른 기기 로그아웃 (멀티 디바이스 관리) */}
-          <button onClick={() => {
-            if (!window.confirm('이 기기만 남기고 다른 모든 기기에서 로그아웃할까요?')) return;
-            if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
-              Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
-            }
-          }} style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📱 다른 기기에서 로그아웃</button>
-          {/* 로그아웃 */}
-          <button onClick={logout} style={{ marginTop: 10, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>
+          {/* 게스트: 로그인=저장 / 로그인 사용자: 로그아웃 (onboarding.md §4 E) */}
+          {(window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured() && window.DataStore !== window.SupabaseDataStore) ? (
+            <button onClick={() => { onClose && onClose(); if (window.RG_login) window.RG_login(); }}
+              style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+              🐦 로그인하고 내 기록 저장하기
+            </button>
+          ) : (
+            <>
+              {/* 다른 기기 로그아웃 (멀티 디바이스 관리) */}
+              <button onClick={() => {
+                if (!window.confirm('이 기기만 남기고 다른 모든 기기에서 로그아웃할까요?')) return;
+                if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
+                  Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
+                }
+              }} style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📱 다른 기기에서 로그아웃</button>
+              {/* 로그아웃 */}
+              <button onClick={logout} style={{ marginTop: 10, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>
+            </>
+          )}
 
           {/* 앱 버전 (베타) */}
           <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo v{(window.RG_VERSION || '0.000')} · beta</div>
