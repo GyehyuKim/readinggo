@@ -188,6 +188,39 @@ const DataStore = {
     },
   },
 
+  /* 내 책 목록 / 추가 (Supabase 어댑터 표면 일치 §7.2) ──────
+     localStorage 모드(게스트/Phase0)에서 LibraryView·둥지 캐러셀이 호출.
+     누락 시 DataStore.myBooks.list() 가 throw → 서재 탭 전체 크래시(무가드). */
+  myBooks: {
+    list() {
+      return localStorageAdapter.mutate(s => (s.user_books || []).slice());
+    },
+    add({ book, current_page }) {
+      book = book || {};
+      return localStorageAdapter.mutate(s => {
+        s.user_books = s.user_books || [];
+        // 동일 책(isbn13 또는 title) 있으면 재사용 — 중복 등록 방지.
+        let ub = s.user_books.find(u => u.book && ((book.isbn13 && u.book.isbn13 === book.isbn13) || (book.title && u.book.title === book.title)));
+        if (!ub) {
+          ub = {
+            id: _dsId('ub'),
+            book_id: book.id || _dsId('bk'),
+            book: {
+              id: book.id || '', title: book.title || '', author: book.author || '',
+              publisher: book.publisher || '', total_pages: book.total_pages || 0,
+              cover_url: book.cover_url || '', isbn13: book.isbn13 || '',
+            },
+            status: 'reading', current_page: current_page || 0,
+            rating: null, review_text: null,
+            started_at: _today(), completed_at: null, sessions: [], sentences: [],
+          };
+          s.user_books.push(ub);
+        }
+        return ub;
+      });
+    },
+  },
+
   /* 일일 기록 (세션) ──────────────────────────────
      sessions.addToday: 그날 세션 1행 생성(같은 날 재호출 중복 방지)
      + streak.bumpOnCheckIn 연동. */
