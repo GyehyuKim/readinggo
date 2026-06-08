@@ -10,8 +10,7 @@
  */
 
 const ALLOWED_ORIGINS = [
-  'https://resilient-licorice-f4b889.netlify.app',
-  'https://readinggo.pages.dev',
+  'https://readinggo.hyuniverse.workers.dev',
   'http://localhost:3000',
   'http://127.0.0.1:5500',
 ];
