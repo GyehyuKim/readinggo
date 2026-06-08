@@ -55,3 +55,6 @@ notice-*.txt
 # Ralph loop runtime state (PROMPT.md is tracked, DONE/BLOCKED are session-local)
 loop/*/DONE
 loop/*/BLOCKED.md
+
+# 로컬 전용 파일 (미팅 메모, 다운로드 등 — 커밋 금지)
+_local/

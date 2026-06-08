@@ -149,9 +149,9 @@ PR 생성 또는 머지 요청 전 반드시 아래 순서를 따른다.
 
 ## Pages / Demo
 
-**Netlify**에서 배포 (GitHub Pages 폐기, v7 결정).
+**Cloudflare Workers**에서 배포 (Netlify → Cloudflare 이전 완료).
 
-- 사이트: `resilient-licorice-f4b889`
-- Demo URL: `https://resilient-licorice-f4b889.netlify.app`
-- Demo entrypoint: `docs/readinggo/index.html`
-- 재배포: `npx netlify-cli deploy --dir=docs/readinggo` (프로덕션 `--prod`)
+- Worker 이름: `readinggo`
+- Demo URL: `https://readinggo.hyuniverse.workers.dev`
+- Demo entrypoint: `docs/readinggo/index.html` (`wrangler.toml` `[assets]` 로 서빙)
+- 재배포: `npx wrangler deploy`
