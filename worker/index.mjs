@@ -50,15 +50,15 @@ function companionMock(sentence) {
   return qs[(sentence ? sentence.length : 0) % qs.length];
 }
 
-async function callLLM({ system, user, env }) {
+async function callLLM({ messages, env }) {
   const base = (env.LLM_BASE_URL || '').replace(/\/$/, '');
   const model = env.LLM_MODEL, key = env.UPSTAGE_API_KEY;
   if (!base || !model || !key) throw new Error('LLM env 미설정');
   const payload = {
     model,
-    messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    messages,
     temperature: 0.8,
-    max_tokens: 160,
+    max_tokens: 220,
   };
   // reasoning 토글 — LLM_REASONING_EFFORT 미설정/빈 값이면 필드 생략(추론 최소). low|medium|high면 전달.
   const eff = (env.LLM_REASONING_EFFORT || '').trim().toLowerCase();
@@ -81,14 +81,24 @@ async function companionProxy(request, env) {
   const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
   const author = String((body && body.author) || '').slice(0, 120).trim();
   const comment = String((body && body.comment) || '').slice(0, 500).trim();
+  // 멀티턴 — 이전 대화(질문/답변). 후속 질문 생성용 (#327).
+  const exchanges = Array.isArray(body && body.exchanges) ? body.exchanges.slice(0, 6) : [];
   if (!sentence) return json({ error: 'sentence 필요' }, 422);
   // 키/설정 없으면 목 질문 폴백 (데모 안전 — companion.md §4)
   if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
     return json({ question: companionMock(sentence), demo: true }, 200);
   }
-  const user = `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n남긴 한 문장: "${sentence}"${comment ? `\n메모: ${comment}` : ''}\n이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로.`;
+  const messages = [{ role: 'system', content: COMPANION_SYSTEM }];
+  messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n남긴 한 문장: "${sentence}"${comment ? `\n메모: ${comment}` : ''}` });
+  for (const e of exchanges) {
+    if (e && e.q) messages.push({ role: 'assistant', content: String(e.q).slice(0, 500) });
+    if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
+  }
+  messages.push({ role: 'user', content: exchanges.length === 0
+    ? '이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로.'
+    : '방금 답을 받아 한 걸음 더 깊이 들어가는 질문 하나를 한국어로. 같은 질문 반복 금지, 질문만.' });
   try {
-    const q = await callLLM({ system: COMPANION_SYSTEM, user, env });
+    const q = await callLLM({ messages, env });
     return json({ question: q || companionMock(sentence) }, 200);
   } catch (e) {
     // 호출 실패 → 목 질문 폴백 (무중단)

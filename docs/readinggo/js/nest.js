@@ -324,6 +324,17 @@ async function genCompanionQuestion(sentence, bookTitle, author) {
   } catch (e) { /* 폴백 */ }
   return pickCompanionQ(sentence);
 }
+// 멀티턴 후속 질문 (#327) — 이전 대화(exchanges) 전달 → 한 걸음 더 깊은 되물음. 실패 시 목 폴백.
+async function genCompanionFollowup(sentence, exchanges, bookTitle, author) {
+  try {
+    const r = await fetch('/api/companion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges }),
+    });
+    if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
+  } catch (e) { /* 폴백 */ }
+  return '그 답에서 한 걸음 더 들어가면, 무엇이 떠오르나요?';
+}
 
 function ReadingMode({ book, onClose, onArchive, onCheckin }) {
   const [secs, setSecs] = _useState(0);
@@ -373,7 +384,7 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
   // 동의 상태에 맞춰 질문 시작 — 'yes'면 solar-pro3, 그 외(거부)면 로컬 목 (외부 전송 없음). (#294/§4)
   const startCompanion = (sid, t) => {
     const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
-    setCompanion({ sentenceId: sid, text: t, question: null, loading: true, answer: '' });
+    setCompanion({ sentenceId: sid, text: t, question: null, loading: true, answer: '', exchanges: [] });
     const gen = (consent === 'yes') ? genCompanionQuestion(t, book.title, book.author) : Promise.resolve(pickCompanionQ(t));
     gen.then((q) => setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
   };
@@ -382,16 +393,30 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
     rgTrack('data_consent', { value: v });
     if (companion) startCompanion(companion.sentenceId, companion.text);
   };
-  // 독서모임 답변 저장 → 해당 문장의 감상(my_note)으로 영속 (양 어댑터 setNote)
+  // 대화 전체(Q/A)를 해당 문장 감상(my_note)으로 영속 (양 어댑터 setNote)
+  const persistCompanionNote = (sid, exchanges) => {
+    if (!sid || !(DataStore.sentences && DataStore.sentences.setNote)) return;
+    const note = (exchanges || []).map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
+    Promise.resolve(DataStore.sentences.setNote(sid, note)).catch(() => {});
+  };
+  // 답 남기기 — 멀티턴(#327). 최대 3턴, 그 후/비동의 시 마무리. 매 답마다 대화 저장.
+  const MAX_TURNS = 3;
   const answerCompanion = () => {
-    const a = ((companion && companion.answer) || '').trim();
-    if (!a) { setCompanion(null); return; }
-    if (companion.sentenceId && DataStore.sentences && DataStore.sentences.setNote) {
-      Promise.resolve(DataStore.sentences.setNote(companion.sentenceId, a)).catch(() => {});
-    }
+    if (!companion) return;
+    const a = (companion.answer || '').trim();
+    if (!a) { setCompanion((c) => c ? { ...c, done: true } : c); return; }
+    const ex = [...(companion.exchanges || []), { q: companion.question, a }];
     rgTrack('answer_saved', { book_id: book.id, lens: 'why', answer_length: a.length });
-    showToast('🐦 답을 남겼어요');
-    setCompanion(null);
+    persistCompanionNote(companion.sentenceId, ex);
+    const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
+    if (ex.length >= MAX_TURNS || consent !== 'yes') {
+      setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, exchanges: ex, question: null, answer: '', loading: false, done: true } : c);
+      showToast('🐦 좋은 대화였어요');
+      return;
+    }
+    setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, exchanges: ex, question: null, answer: '', loading: true } : c);
+    genCompanionFollowup(companion.text, ex, book.title, book.author).then((q) =>
+      setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, question: q, loading: false } : c));
   };
   // 독서 종료: 최종 읽은 쪽을 부모 체크인 파이프라인(handleCheckin)에 위임 (#300).
   // → 진도/스트릭/XP 갱신 + 둥지 갱신(onCheckin) + 완독 시 세리머니(별점·소감 카드)까지 단일 경로로.
@@ -444,6 +469,13 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
                   <span>🐦</span><span>혼자만의 독서모임</span>
                 </div>
+                {/* 지난 대화 (질문→내 답) 누적 표시 */}
+                {(companion.exchanges || []).map((e, ei) => (
+                  <div key={ei} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.5 }}>{e.q}</div>
+                    <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4, paddingLeft: 8, borderLeft: '2px solid rgba(255,255,255,0.18)', lineHeight: 1.5 }}>{e.a}</div>
+                  </div>
+                ))}
                 {companion.needsConsent ? (
                   // 첫 사용 — 데이터 활용 동의 (#294). 거부 시 로컬 목 질문(외부 전송·수집 없음).
                   <>
@@ -453,6 +485,8 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
                       <button onClick={() => decideConsent('yes')} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>좋아요</button>
                     </div>
                   </>
+                ) : companion.done ? (
+                  <div style={{ fontSize: 12, opacity: 0.6, fontStyle: 'italic', paddingTop: 2 }}>🐦 대화 저장됨 · 다음에 또 이어가요</div>
                 ) : companion.loading ? (
                   <div style={{ fontSize: 13, opacity: 0.7, fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
                 ) : (
@@ -462,8 +496,8 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
                       placeholder="떠오르는 대로 답해보세요" rows={2}
                       style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                      <button onClick={() => setCompanion(null)} style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>건너뛰기</button>
-                      <button onClick={answerCompanion} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>답 남기기</button>
+                      <button onClick={() => { persistCompanionNote(companion.sentenceId, companion.exchanges); setCompanion((c) => c ? { ...c, done: true } : c); }} style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>마치기</button>
+                      <button onClick={answerCompanion} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{(companion.exchanges || []).length >= MAX_TURNS - 1 ? '답 남기고 마치기' : '답하고 이어가기'}</button>
                     </div>
                   </>
                 )}
