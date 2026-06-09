@@ -728,7 +728,7 @@ function TownDetailView({ state, townId, onBack, onTownUpdate }) {
                   </div>
                   <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
                     <span style={{fontSize:12, color:'var(--ink-3)'}}>초대 코드</span>
-                    <strong style={{letterSpacing:2, fontFamily:'monospace'}}>
+                    <strong style={{letterSpacing:2, fontFamily:"'Moneygraphy Pixel', monospace"}}>
                       {town.inviteCode || (town.visibility === 'private' ? '(미생성)' : '(없음)')}
                     </strong>
                     {town.inviteCode && (
