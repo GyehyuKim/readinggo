@@ -75,7 +75,7 @@
 - 한 문장 타임라인 (날짜 desc, 페이지/문장 + `my_note` 있으면 함께). 스포일러 블라인드 적용
 - **한 문장 사후 감상**: 각 한 문장에 긴 감상(`my_note`)을 **작성 시점 이후 언제든 추가·편집**. 한 문장은 짧게(인용 ≤200자), 감상은 넉넉하게(권장 500자). 타임라인 항목 탭 → 감상 입력 (`DataStore.sentences.setNote`). 본인만 작성, 본인 프로필·책 상세에서만 표시. UX 참고: [북모리 캡쳐 분석](../bookmory-capture-analysis.md) (인용 위 감상 입력·페이지 메타·사후편집)
 - **교보문고 링크**: `https://search.kyobobook.co.kr/search?keyword={isbn}` — "교보문고에서 보기 →" (Phase 1+ 어필리에이트 파라미터)
-- **Export**: Markdown 다운로드 (`# {책} — {저자}` + `## YYYY-MM-DD (p.N)` + `> {문장}`). Phase 2 이미지 카드
+- **Export (v7.4, #315 — 북모리 양식 벤치마킹)**: Markdown 다운로드. **책 메타**(제목·저자/역자·출판사·쪽수·ISBN·표지) + **완독 정보**(별점·소감·완독일, 완독 시) + **한 문장**(`### p.N · YYYY-MM-DD` + `> 문장` + 감상). 날짜는 `created_at` 복원(미파싱 시 생략). **책 소개(description)는 후속**(알라딘 ItemLookUp OptResult 확장, #302 합류). Phase 2 이미지 카드
 - 책 삭제: 길게 누름 → 확인 모달. 누적 기록 soft delete
 
 #### 5.8.5 책갈피 (관심 한 문장)

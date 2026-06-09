@@ -84,13 +84,38 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 교보 상세는 ISBN 이 아닌 교보 고유번호(S…)를 써서 ISBN 직링크가 깨짐 → 검색결과로(QA #1-B).
   const kyoboUrl = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn || book.title)}`;
 
-  // Markdown Export (§5.8.4): # 책 — 저자 + ## YYYY-MM-DD (p.N) + > 문장
+  // Markdown Export (§5.8.4, #315) — 책 메타 + 완독정보 + 한 문장(페이지·날짜·감상). 북모리 양식 벤치마킹.
   const exportMarkdown = () => {
-    const lines = [`# ${book.title} — ${book.author}`, ''];
+    // 날짜 정규화: ISO/타임스탬프 → YYYY-MM-DD. 파싱 실패 시 빈 문자열(‘날짜 미상’ 대신 생략).
+    const fmtDate = (v) => {
+      if (!v) return '';
+      if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+      const t = (typeof v === 'number') ? v : Date.parse(v);
+      if (!t || isNaN(t)) return '';
+      const d = new Date(t);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const lines = [`# ${book.title}`, ''];
+    // 책 메타
+    if (book.author) lines.push(`**${book.author}**`);
+    const meta = [book.pub, (book.total > 0 ? `${book.total}쪽` : ''), (book.isbn ? `ISBN ${book.isbn}` : '')].filter(Boolean);
+    if (meta.length) lines.push(meta.join(' · '));
+    if (book.cover) { lines.push(''); lines.push(`![표지](${book.cover})`); }
+    // 완독 정보
+    if (book.status === 'completed') {
+      lines.push('', '---', '', '## 📖 완독 정보');
+      const r = (typeof book.rating === 'number') ? `⭐ ${book.rating.toFixed(1)} / 5` : '';
+      const cd = fmtDate(book.completedAt);
+      const head = [r, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · ');
+      if (head) lines.push(head);
+      if (book.comment) lines.push(`> ${book.comment}`);
+    }
+    // 한 문장
     const sorted = (bookQuotes || []).slice().sort((a, b) => (a.page || 0) - (b.page || 0));
+    lines.push('', '---', '', `## ✍️ 내 한 문장 (${sorted.length})`, '');
     sorted.forEach(q => {
-      const date = q.when ? String(q.when).slice(0, 10) : '날짜 미상';
-      lines.push(`## ${date} (p.${q.page ?? '?'})`);
+      const date = fmtDate(q.createdAt || q.when);
+      lines.push(`### p.${q.page ?? '?'}${date ? ` · ${date}` : ''}`);
       lines.push(`> ${q.text || ''}`);
       const note = noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '');
       if (note) { lines.push(''); lines.push(note); }

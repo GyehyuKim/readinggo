@@ -34,7 +34,7 @@ async function buildStateFromSupabase() {
     out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지는 책 없어도 XP로 유지 (#313)
   }
   if (Array.isArray(mine) && mine.length) {
-    out.myQuotes = mine.map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', note: s.my_note || '', visibility: s.visibility || 'public', isPrivate: s.visibility === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
+    out.myQuotes = mine.map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', createdAt: s.created_at || '', note: s.my_note || '', visibility: s.visibility || 'public', isPrivate: s.visibility === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
   }
   // 소셜 isMine 판정 + 스포일러 동기맵: 현재 사용자 + 내 책별 현재 페이지 preload
   try {
@@ -364,7 +364,7 @@ function App() {
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
           xp: (typeof xpDb === 'number') ? xpDb : s.xp,
           myQuotes: Array.isArray(mineDb)
-            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', note: x.my_note || '', isPrivate: !!x.is_private, notePrivate: !!x.note_private }))
+            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', isPrivate: !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
         }));
       } catch (e) { console.warn('[ReadingGo] 체크인 영속 실패:', e); }
