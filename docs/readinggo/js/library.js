@@ -116,22 +116,12 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
         <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1, zIndex:2}}>✕</button>
         
         <div style={{textAlign:'center', padding:'16px 20px 0'}}>
-          <div
+          <BookCover
             className="book-cover"
-            style={{
-              width:100,
-              height:140,
-              background:`linear-gradient(135deg,${book.fb[0]},${book.fb[1]})`,
-              borderRadius:'8px',
-              margin:'0 auto 12px',
-              display:'flex',
-              alignItems:'center',
-              justifyContent:'center',
-              overflow:'hidden',
-            }}
-          >
-            <img src={book.cover} alt={book.title} style={{width:'100%',height:'100%',objectFit:'cover'}} />
-          </div>
+            title={book.title} author={book.author} cover={book.cover} fb={book.fb}
+            radius={8}
+            style={{ width:100, height:140, margin:'0 auto 12px' }}
+          />
           <h2 style={{fontSize:18, fontWeight:900, margin:'0 0 4px', color:'var(--ink)'}}>{book.title}</h2>
           <p style={{fontSize:13, color:'var(--ink-2)', fontWeight:700, margin:'0 0 12px'}}>{book.author} · {book.pub}</p>
         </div>
@@ -558,13 +548,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
                   onClick={() => setSelectedBookId(b.id)}
                   style={{cursor:'pointer'}}
                 >
-                  <div
-                    className="shelf-cover"
-                    style={{background: `linear-gradient(135deg,${(b.fb && b.fb[0]) || '#9AA7B2'},${(b.fb && b.fb[1]) || '#C7D0D8'})`}}
-                  >
-                    <img src={b.cover} alt={b.title} loading="lazy" referrerPolicy="no-referrer"
-                         onError={e => e.target.style.display='none'} />
-                  </div>
+                  <BookCover className="shelf-cover" title={b.title} author={b.author} cover={b.cover} fb={b.fb} />
                   <div className="shelf-meta">
                     <div className="shelf-title">{b.title}</div>
                     <div className="shelf-prog">{progText}</div>

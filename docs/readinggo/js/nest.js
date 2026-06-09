@@ -639,15 +639,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           </>
         )}
         <div className="book-card">
-          <div className="book-cover" style={{background:`linear-gradient(135deg,${nestState.book.fb[0]},${nestState.book.fb[1]})`}}>
-            <img
-              src={nestState.book.cover}
-              alt={nestState.book.title}
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              onError={e => e.target.style.display = 'none'}
-            />
-          </div>
+          <BookCover className="book-cover" title={nestState.book.title} author={nestState.book.author} cover={nestState.book.cover} fb={nestState.book.fb} />
           <div className="book-meta">
             <p className="book-title">{nestState.book.title}</p>
             <p className="book-author">{nestState.book.author}</p>

@@ -54,6 +54,31 @@ function rgTrack(event, props) {
   } catch (e) { /* analytics 실패는 무시 */ }
 }
 
+// 공용 북커버 (#316 A) — 표지 없거나 로드 실패 시 제목·저자 타이포 placeholder.
+// 기존 인라인 `<div className="book-cover" style={{background:grad}}><img/></div>` 드롭인 대체.
+function BookCover({ title, author, cover, fb, className, style, radius }) {
+  const [failed, setFailed] = useState(false);
+  const c0 = (fb && fb[0]) || '#9AA7B2', c1 = (fb && fb[1]) || '#C7D0D8';
+  const wrap = { background: `linear-gradient(135deg,${c0},${c1})`, position: 'relative', overflow: 'hidden', ...(radius != null ? { borderRadius: radius } : {}), ...(style || {}) };
+  if (cover && !failed) {
+    return (
+      <div className={className || ''} style={wrap}>
+        <img src={cover} alt={title || ''} loading="lazy" referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </div>
+    );
+  }
+  return (
+    <div className={className || ''} style={wrap}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '11%', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.28)' }}>
+        <div style={{ fontWeight: 900, fontSize: 11, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{title || '제목 미상'}</div>
+        {author && <div style={{ fontWeight: 700, fontSize: 9, opacity: 0.9, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{author}</div>}
+      </div>
+    </div>
+  );
+}
+
 /* ── Confetti ─────────────────────────────────────────── */
 function Confetti({ active, nestUp }) {
   const boxRef = useRef(null);
@@ -512,6 +537,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
 
 window.showToast = showToast;
 window.rgTrack = rgTrack;
+window.BookCover = BookCover;
 window.Toast = Toast;
 window.Confetti = Confetti;
 window.SentenceCard = SentenceCard;
