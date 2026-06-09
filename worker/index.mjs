@@ -24,6 +24,12 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return aladinProxy(url.searchParams, env);
     }
+    // LLM 독서 파트너 — 참새 질문 생성 (#287). 키는 서버에서만 사용(클라 노출 금지).
+    if (p === '/api/companion') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      return companionProxy(request, env);
+    }
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.
     return env.ASSETS.fetch(request);
   },
@@ -33,6 +39,60 @@ export default {
     ctx.waitUntil(archive(env));
   },
 };
+
+/* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
+   provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
+   키 없거나 실패 시 목 질문으로 graceful fallback (데모/피치 무중단). */
+const COMPANION_SYSTEM = '당신은 사용자와 친한 독서모임 진행자입니다. 사용자가 방금 남긴 한 문장을 보고, 왜 그 문장이 마음에 남았는지 스스로 더 깊이 들여다보게 하는 질문을 한국어로 딱 하나 던지세요. 규칙: 문장의 실제 내용을 짚되 책 분석이 아니라 그 사람의 경험·감정·기억과 연결되게. 열린 질문, 40자 내외. 칭찬·요약·설명 금지, 질문만 출력.';
+
+function companionMock(sentence) {
+  const qs = ['왜 이 문장이 마음에 걸렸어요?', '이 문장, 지금 내 상황이랑 연결되는 게 있어요?', '이 문장에서 어떤 장면이나 기억이 떠올랐어요?', '이 문장을 누군가에게 들려준다면 누구일까요?'];
+  return qs[(sentence ? sentence.length : 0) % qs.length];
+}
+
+async function callLLM({ system, user, env }) {
+  const base = (env.LLM_BASE_URL || '').replace(/\/$/, '');
+  const model = env.LLM_MODEL, key = env.UPSTAGE_API_KEY;
+  if (!base || !model || !key) throw new Error('LLM env 미설정');
+  const payload = {
+    model,
+    messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    temperature: 0.8,
+    max_tokens: 160,
+  };
+  // reasoning 토글 — LLM_REASONING_EFFORT 미설정/빈 값이면 필드 생략(추론 최소). low|medium|high면 전달.
+  const eff = (env.LLM_REASONING_EFFORT || '').trim().toLowerCase();
+  if (eff === 'low' || eff === 'medium' || eff === 'high') payload.reasoning_effort = eff;
+  const r = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error('LLM HTTP ' + r.status);
+  const d = await r.json();
+  return ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+}
+
+async function companionProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
+  const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
+  if (!sentence) return json({ error: 'sentence 필요' }, 422);
+  // 키/설정 없으면 목 질문 폴백 (데모 안전 — companion.md §4)
+  if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
+    return json({ question: companionMock(sentence), demo: true }, 200);
+  }
+  const user = `책: ${bookTitle || '(제목 미상)'}\n남긴 한 문장: "${sentence}"\n이 문장에 대해 질문 하나만 한국어로.`;
+  try {
+    const q = await callLLM({ system: COMPANION_SYSTEM, user, env });
+    return json({ question: q || companionMock(sentence) }, 200);
+  } catch (e) {
+    // 호출 실패 → 목 질문 폴백 (무중단)
+    return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
+  }
+}
 
 /* ── 알라딘 프록시 (aladin.js 포팅) ─────────────────────── */
 async function aladinProxy(q, env) {

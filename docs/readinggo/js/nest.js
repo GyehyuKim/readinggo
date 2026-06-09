@@ -301,8 +301,7 @@ function NestTheatre({ xp, streak, prevTwigs, health = 100 }) {
 /* ── ReadingMode: 읽기 모드 (#184) — 독서 타이머 + 상시 한 문장 입력 ──
    둥지에서 활성 책으로 진입. 북모리식 몰입 캡처: 타이머가 도는 동안
    입력칸이 항상 열려 있어 떠오른 한 문장을 즉시 아카이브한다. */
-// 혼자만의 독서모임 (companion.md) — Worker 실 API 전 DEMO 목 질문. 키 수급 후 RG_COMPANION_DEMO=false.
-const RG_COMPANION_DEMO = true;
+// 혼자만의 독서모임 (companion.md §4) — Worker /api/companion(solar-pro3) 호출. 실패/키없음 시 목 폴백.
 const COMPANION_QS = [
   '왜 이 문장이 마음에 걸렸어요?',
   '이 문장, 지금 내 상황이랑 연결되는 게 있어요?',
@@ -313,6 +312,17 @@ const COMPANION_QS = [
 function pickCompanionQ(text) {
   const i = (text ? text.length : 0) % COMPANION_QS.length;
   return COMPANION_QS[i];
+}
+// 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 목 질문 폴백 — 데모 무중단.
+async function genCompanionQuestion(sentence, bookTitle) {
+  try {
+    const r = await fetch('/api/companion', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '' }),
+    });
+    if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
+  } catch (e) { /* 폴백 */ }
+  return pickCompanionQ(sentence);
 }
 
 function ReadingMode({ book, onClose, onArchive, onCheckin }) {
@@ -353,8 +363,11 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
       showToast(p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨');
       if (onArchive) onArchive({ text: t, bookId: book.id, page: p, when: '방금' });
       rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length });
-      // 혼자만의 독서모임 — 저장 직후 "왜 남겼어?" (companion.md §2, DEMO_MODE)
-      if (RG_COMPANION_DEMO) setCompanion({ sentenceId: row && row.id, question: pickCompanionQ(t), answer: '' });
+      // 혼자만의 독서모임 — 저장 직후 solar-pro3가 질문 (companion.md §4). 로딩 → 질문, 실패 시 목.
+      const sid = row && row.id;
+      setCompanion({ sentenceId: sid, question: null, loading: true, answer: '' });
+      genCompanionQuestion(t, book.title).then((q) =>
+        setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
     }).catch(() => showToast('저장 실패 — 다시 시도'));
   };
   // 독서모임 답변 저장 → 해당 문장의 감상(my_note)으로 영속 (양 어댑터 setNote)
@@ -381,7 +394,11 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <button onClick={() => setRunning((r) => !r)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 12px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{running ? '⏸' : '▶'}</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {/* #4 나가기 — 체크인 없이 읽기 모드 종료. 적어둔 한 문장은 이미 저장됨. */}
+          <button onClick={onClose} aria-label="나가기" title="나가기 (기록 없이)" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 12px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>✕</button>
+          <button onClick={() => setRunning((r) => !r)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 12px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{running ? '⏸' : '▶'}</button>
+        </div>
         <div style={{ fontSize: 22, fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: 1 }}>⏱ {fmt(secs)}</div>
         <button onClick={() => { setFinalPage(page); setClosing(true); }} style={{ background: 'var(--brand)', border: 'none', color: '#fff', borderRadius: 16, padding: '6px 14px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>독서 종료</button>
       </div>
@@ -408,14 +425,20 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
             <span>🐦</span><span>혼자만의 독서모임</span>
           </div>
-          <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.5, marginBottom: 10 }}>{companion.question}</div>
-          <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
-            placeholder="떠오르는 대로 답해보세요" rows={2}
-            style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button onClick={() => setCompanion(null)} style={{ flex: '0 0 auto', padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>건너뛰기</button>
-            <button onClick={answerCompanion} style={{ flex: 1, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>답 남기기</button>
-          </div>
+          {companion.loading ? (
+            <div style={{ fontSize: 13, opacity: 0.7, padding: '4px 0 2px', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+          ) : (
+            <>
+              <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.5, marginBottom: 10 }}>{companion.question}</div>
+              <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
+                placeholder="떠오르는 대로 답해보세요" rows={2}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => setCompanion(null)} style={{ flex: '0 0 auto', padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>건너뛰기</button>
+                <button onClick={answerCompanion} style={{ flex: 1, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>답 남기기</button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

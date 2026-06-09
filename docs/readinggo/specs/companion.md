@@ -53,12 +53,16 @@
 
 ---
 
-## 4. DEMO_MODE / 실 API (구현 접근 A)
+## 4. LLM 연결 — Upstage Solar (구현 완료, #287)
 
-- **DEMO_MODE = true (현재)**: 목 질문으로 동작. **API 키 없이 데모·피치 가능.**
-- **실 API**: Anthropic 키 수급 후 `worker/index.mjs`에 `/api/companion` 라우트 추가 + `wrangler secret put ANTHROPIC_API_KEY` → `DEMO_MODE = false`.
-- **Stack Lock**: 클라이언트에 API 키 노출 금지. Worker 프록시 경유 (`workers/companion-proxy.js` → `worker/index.mjs` 통합). 모델·비용은 #287/§analytics.
-- 프로토타입: `prototypes/reading-companion.html` (참조 — 메인 앱 통합 시 컴포넌트화).
+- **provider-agnostic 클라이언트**: `worker/index.mjs`의 `callLLM()`이 `LLM_BASE_URL`·`LLM_MODEL`·`UPSTAGE_API_KEY`를 **전부 env에서** 읽음(하드코딩 금지). OpenAI 호환 `chat/completions`. → Gemini·Ollama 전환 시 env만 교체.
+- **현재 모델**: `solar-pro3` (Upstage, `https://api.upstage.ai/v1`). 인터랙티브 질문 품질용. 대량 프로파일링은 더 싼 티어로(후속, `LLM_MODEL`만 교체).
+- **reasoning 토글**: `LLM_REASONING_EFFORT` — 미설정/빈 값=추론 최소(기본). `low|medium|high` 설정 시 `reasoning_effort`로 전달. 질문이 밋밋하면 env만 올림(코드 수정 없음).
+- **라우트**: `POST /api/companion` (`worker/index.mjs`). 입력 `{sentence, bookTitle}` → 출력 `{question}`. system = 독서 회고 진행자(한국어 질문 1개).
+- **키 보호**: 키는 **서버(Worker secret)에서만**. `wrangler secret put UPSTAGE_API_KEY`. 클라 번들·React CDN 노출 금지. `LLM_BASE_URL`·`LLM_MODEL`은 `wrangler.toml [vars]`.
+- **graceful fallback**: 키 없음/호출 실패 시 **목 질문으로 폴백**(서버·클라 양쪽). 데모·피치 무중단.
+- 클라(`nest.js`): 저장 직후 `genCompanionQuestion()`이 `/api/companion` 호출(로딩→질문, 실패 시 목).
+- 레거시 `workers/companion-proxy.js`(Anthropic)는 참조용 — 실제 경로는 `worker/index.mjs`.
 
 ---
 

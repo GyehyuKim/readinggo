@@ -2,6 +2,7 @@
 # 배포: npx wrangler deploy
 # 시크릿(1회): npx wrangler secret put ALADIN_TTB_KEY
 #              npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#              npx wrangler secret put UPSTAGE_API_KEY   (LLM 독서 파트너 #287)
 name = "readinggo"
 main = "worker/index.mjs"
 compatibility_date = "2026-06-01"
@@ -11,10 +12,14 @@ compatibility_date = "2026-06-01"
 directory = "docs/readinggo"
 binding = "ASSETS"
 
-# 비밀 아님(클라에도 공개). service_role 키만 `wrangler secret put` 로.
+# 비밀 아님(클라에도 공개). service_role·UPSTAGE 키만 `wrangler secret put` 로.
 [vars]
 SUPABASE_URL = "https://cttllwwkaddghqttyhkg.supabase.co"
 ARCHIVE_DAILY_CAP = "3000"
+# LLM 독서 파트너 (#287) — provider-agnostic. 키(UPSTAGE_API_KEY)는 secret, 아래 둘은 설정값.
+LLM_BASE_URL = "https://api.upstage.ai/v1"
+LLM_MODEL = "solar-pro3"
+# LLM_REASONING_EFFORT = "low"   # 미설정=추론 최소. 질문이 밋밋하면 low|medium|high 로.
 
 # 일일 인기도서 아카이브 (#239) — UTC 18:00 = KST 03:00
 [triggers]
