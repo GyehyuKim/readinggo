@@ -364,12 +364,23 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
       showToast(p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨');
       if (onArchive) onArchive({ text: t, bookId: book.id, page: p, when: '방금' });
       rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length });
-      // 혼자만의 독서모임 — 저장 직후 solar-pro3가 질문 (companion.md §4). 로딩 → 질문, 실패 시 목.
-      // 대화는 해당 문장 카드 하단에 붙는다(#327) — companion.sentenceId == saved.id 매칭.
-      setCompanion({ sentenceId: sid, question: null, loading: true, answer: '' });
-      genCompanionQuestion(t, book.title, book.author).then((q) =>
-        setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
+      // 혼자만의 독서모임 — 저장 직후. 첫 사용 시 데이터 활용 동의 먼저(#294), 그 뒤 질문.
+      const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
+      if (consent === null) setCompanion({ sentenceId: sid, text: t, needsConsent: true, answer: '' });
+      else startCompanion(sid, t);
     }).catch(() => showToast('저장 실패 — 다시 시도'));
+  };
+  // 동의 상태에 맞춰 질문 시작 — 'yes'면 solar-pro3, 그 외(거부)면 로컬 목 (외부 전송 없음). (#294/§4)
+  const startCompanion = (sid, t) => {
+    const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
+    setCompanion({ sentenceId: sid, text: t, question: null, loading: true, answer: '' });
+    const gen = (consent === 'yes') ? genCompanionQuestion(t, book.title, book.author) : Promise.resolve(pickCompanionQ(t));
+    gen.then((q) => setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
+  };
+  const decideConsent = (v) => {
+    if (window.RG_consent) window.RG_consent.set(v);
+    rgTrack('data_consent', { value: v });
+    if (companion) startCompanion(companion.sentenceId, companion.text);
   };
   // 독서모임 답변 저장 → 해당 문장의 감상(my_note)으로 영속 (양 어댑터 setNote)
   const answerCompanion = () => {
@@ -433,7 +444,16 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
                   <span>🐦</span><span>혼자만의 독서모임</span>
                 </div>
-                {companion.loading ? (
+                {companion.needsConsent ? (
+                  // 첫 사용 — 데이터 활용 동의 (#294). 거부 시 로컬 목 질문(외부 전송·수집 없음).
+                  <>
+                    <div style={{ fontSize: 13, lineHeight: 1.55, marginBottom: 10, opacity: 0.9 }}>남긴 문장을 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해도 될까요? 끄면 로컬 질문만 드려요. (설정에서 언제든 변경)</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => decideConsent('no')} style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>아니요</button>
+                      <button onClick={() => decideConsent('yes')} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>좋아요</button>
+                    </div>
+                  </>
+                ) : companion.loading ? (
                   <div style={{ fontSize: 13, opacity: 0.7, fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
                 ) : (
                   <>

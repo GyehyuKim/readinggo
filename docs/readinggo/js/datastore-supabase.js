@@ -722,6 +722,12 @@
       get(key) { try { return JSON.parse(localStorage.getItem('rg_pending_' + key) || 'null'); } catch (e) { return null; } },
       set(key, value) { localStorage.setItem('rg_pending_' + key, JSON.stringify(value)); return value; },
     },
+
+    /* 데이터 활용 동의 (#294) — 클라 측 플래그(디바이스 설정). Phase 1 profiles.data_consent 승격 후속. */
+    consent: {
+      get() { try { return localStorage.getItem('rg_data_consent'); } catch (e) { return null; } },
+      set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
+    },
   };
 
   window.SupabaseDataStore = A;

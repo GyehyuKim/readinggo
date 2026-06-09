@@ -381,6 +381,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [hdl, setHdl] = useState(me.handle || '');
   const [hbusy, setHbusy] = useState(false);
   const [hmsg, setHmsg] = useState('');
+  const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes'); // 데이터 활용 동의 (#294)
   const [bio, setBio] = useState(me.bio || '');
   const [bmsg, setBmsg] = useState('');
   const saveBio = async () => {
@@ -527,6 +528,19 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             </>
           )}
 
+          {/* 데이터 수집·AI 활용 동의 (#294, analytics.md §5) */}
+          <div style={{ marginTop: 14, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>독서 대화 AI·분석 활용</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>한 문장·대화를 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해요. 끄면 로컬 질문만(외부 전송·수집 없음).</div>
+            </div>
+            <button onClick={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '🐦 고마워요! 더 나은 질문을 드릴게요' : '로컬 모드로 전환됐어요'); }}
+              aria-label="데이터 활용 동의 토글"
+              style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer', background: consentOn ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s' }}>
+              <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
+            </button>
+          </div>
+
           {/* 앱 버전 (베타) */}
           <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo v{(window.RG_VERSION || '0.000')} · beta</div>
         </div>
@@ -538,6 +552,11 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
 window.showToast = showToast;
 window.rgTrack = rgTrack;
 window.BookCover = BookCover;
+// 데이터 수집·AI 활용 동의 (#294, analytics.md §5). DataStore.consent 어댑터 위임(직접 localStorage 금지).
+window.RG_consent = {
+  get() { return (window.DataStore && window.DataStore.consent) ? window.DataStore.consent.get() : null; },
+  set(v) { if (window.DataStore && window.DataStore.consent) window.DataStore.consent.set(v); },
+};
 window.Toast = Toast;
 window.Confetti = Confetti;
 window.SentenceCard = SentenceCard;

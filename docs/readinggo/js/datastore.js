@@ -482,6 +482,12 @@ const DataStore = {
       });
     },
   },
+
+  /* 데이터 활용 동의 (#294) — 클라 측 플래그. 'yes' | 'no' | null(미질문). */
+  consent: {
+    get() { try { return localStorage.getItem('rg_data_consent'); } catch (e) { return null; } },
+    set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
+  },
 };
 
 window.DataStore = DataStore;

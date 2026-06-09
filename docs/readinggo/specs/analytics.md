@@ -82,11 +82,13 @@ WHERE consented = true;
 
 ---
 
-## 5. 사용자 동의 설계
+## 5. 사용자 동의 설계 (✅ 구현 #294)
+
+> 단일 동의(데모): companion **첫 사용 시 1회** 묻고 설정에서 토글. 거부 시 companion은 **로컬 목 질문만**(외부 전송·수집 없음) — 기능은 유지(이탈 방지·리텐션). 거부권 필수(PIPA). AI 처리/익명 수집 분리는 후속.
 
 ### 5.1 동의 시점
 
-온보딩 마지막 단계 (E 스텝 직전) 또는 독서 파트너 첫 실행 시.
+**구현**: companion 첫 사용 직후(한 문장 저장 → 동의 묻기) + 설정 토글. (온보딩 E 통합은 후속)
 
 ### 5.2 동의 문구
 
@@ -106,8 +108,8 @@ WHERE consented = true;
 ### 5.3 동의 상태 저장
 
 ```js
-// Phase 0: localStorage
-state.dataConsent = true | false | null  // null = 아직 안 물어봄
+// Phase 0 구현(#294): localStorage 'rg_data_consent' = 'yes' | 'no' | null(미질문)
+window.RG_consent.get() / .set('yes'|'no')   // components.js
 
 // Phase 1: Supabase users 테이블
 ALTER TABLE profiles ADD COLUMN data_consent boolean;
