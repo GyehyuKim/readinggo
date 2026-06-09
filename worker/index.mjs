@@ -43,7 +43,7 @@ export default {
 /* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
    provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
    키 없거나 실패 시 목 질문으로 graceful fallback (데모/피치 무중단). */
-const COMPANION_SYSTEM = '당신은 사용자와 친한 독서모임 진행자입니다. 사용자가 방금 남긴 한 문장을 보고, 왜 그 문장이 마음에 남았는지 스스로 더 깊이 들여다보게 하는 질문을 한국어로 딱 하나 던지세요. 규칙: 문장의 실제 내용을 짚되 책 분석이 아니라 그 사람의 경험·감정·기억과 연결되게. 열린 질문, 40자 내외. 칭찬·요약·설명 금지, 질문만 출력.';
+const COMPANION_SYSTEM = '당신은 사용자와 친한 독서모임 진행자입니다. 사용자가 방금 남긴 한 문장을 보고, 그 사람이 자기 생각을 더 깊이 펼치도록 대화하듯 이끄는 질문을 한국어로 하나 던지세요. 그 책과 작가에 대해 아는 바(작품 맥락·작가의 삶·시대)가 있으면 자연스럽게 한 조각 곁들여 질문을 풍부하게 하되, 핵심은 그 사람의 경험·감정·기억과 잇는 것입니다. 따뜻하고 호기심 어린 톤. 예/아니오로 닫히지 않는 열린 질문. 길이는 자연스럽게(억지로 짧게 하지 말 것), 단 질문은 하나만. 칭찬·요약·해설 나열은 금지하고 질문으로 끝맺으세요.';
 
 function companionMock(sentence) {
   const qs = ['왜 이 문장이 마음에 걸렸어요?', '이 문장, 지금 내 상황이랑 연결되는 게 있어요?', '이 문장에서 어떤 장면이나 기억이 떠올랐어요?', '이 문장을 누군가에게 들려준다면 누구일까요?'];
@@ -79,12 +79,14 @@ async function companionProxy(request, env) {
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
   const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
   const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
+  const author = String((body && body.author) || '').slice(0, 120).trim();
+  const comment = String((body && body.comment) || '').slice(0, 500).trim();
   if (!sentence) return json({ error: 'sentence 필요' }, 422);
   // 키/설정 없으면 목 질문 폴백 (데모 안전 — companion.md §4)
   if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
     return json({ question: companionMock(sentence), demo: true }, 200);
   }
-  const user = `책: ${bookTitle || '(제목 미상)'}\n남긴 한 문장: "${sentence}"\n이 문장에 대해 질문 하나만 한국어로.`;
+  const user = `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n남긴 한 문장: "${sentence}"${comment ? `\n메모: ${comment}` : ''}\n이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로.`;
   try {
     const q = await callLLM({ system: COMPANION_SYSTEM, user, env });
     return json({ question: q || companionMock(sentence) }, 200);

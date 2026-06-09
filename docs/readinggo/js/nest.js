@@ -314,11 +314,11 @@ function pickCompanionQ(text) {
   return COMPANION_QS[i];
 }
 // 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 목 질문 폴백 — 데모 무중단.
-async function genCompanionQuestion(sentence, bookTitle) {
+async function genCompanionQuestion(sentence, bookTitle, author) {
   try {
     const r = await fetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence, bookTitle: bookTitle || '' }),
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '' }),
     });
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }
@@ -358,15 +358,16 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
     const p = pageNum(page); // 비어있으면 null(페이지 없이 저장)
     const ubId = ubRef.current;
     Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: p, text: t })).then((row) => {
-      setSaved((list) => [{ text: t, page: p }, ...list]);
+      const sid = row && row.id;
+      setSaved((list) => [{ id: sid, text: t, page: p }, ...list]);
       setText('');
       showToast(p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨');
       if (onArchive) onArchive({ text: t, bookId: book.id, page: p, when: '방금' });
       rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length });
       // 혼자만의 독서모임 — 저장 직후 solar-pro3가 질문 (companion.md §4). 로딩 → 질문, 실패 시 목.
-      const sid = row && row.id;
+      // 대화는 해당 문장 카드 하단에 붙는다(#327) — companion.sentenceId == saved.id 매칭.
       setCompanion({ sentenceId: sid, question: null, loading: true, answer: '' });
-      genCompanionQuestion(t, book.title).then((q) =>
+      genCompanionQuestion(t, book.title, book.author).then((q) =>
         setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
     }).catch(() => showToast('저장 실패 — 다시 시도'));
   };
@@ -419,36 +420,35 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
           style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
         <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>✨ 한 문장 저장{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
       </div>
-      {/* 혼자만의 독서모임 — 저장 직후 "왜 남겼어?" (#305, companion.md §2, DEMO_MODE) */}
-      {companion && (
-        <div style={{ margin: '4px 18px 0', background: 'rgba(63,209,127,0.12)', border: '1px solid rgba(63,209,127,0.35)', borderRadius: 12, padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
-            <span>🐦</span><span>혼자만의 독서모임</span>
-          </div>
-          {companion.loading ? (
-            <div style={{ fontSize: 13, opacity: 0.7, padding: '4px 0 2px', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
-          ) : (
-            <>
-              <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.5, marginBottom: 10 }}>{companion.question}</div>
-              <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
-                placeholder="떠오르는 대로 답해보세요" rows={2}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={() => setCompanion(null)} style={{ flex: '0 0 auto', padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>건너뛰기</button>
-                <button onClick={answerCompanion} style={{ flex: 1, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>답 남기기</button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* 이번 세션 아카이브 */}
+      {/* 이번 세션 아카이브 — 각 문장 하단에 혼자만의 독서모임 대화 (#327) */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 24px' }}>
         {saved.length > 0 && <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 800, margin: '8px 0' }}>이번 독서에서 모은 {saved.length}문장</div>}
         {saved.map((s, i) => (
-          <div key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+          <div key={s.id || i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
             <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>{s.page != null ? s.page + 'p' : '페이지 미상'}</div>
             <div style={{ fontSize: 14, lineHeight: 1.5, fontStyle: 'italic' }}>"{s.text}"</div>
+            {/* 이 문장의 혼자만의 독서모임 대화 (문장 바로 하단) */}
+            {companion && companion.sentenceId === s.id && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
+                  <span>🐦</span><span>혼자만의 독서모임</span>
+                </div>
+                {companion.loading ? (
+                  <div style={{ fontSize: 13, opacity: 0.7, fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.55, marginBottom: 10 }}>{companion.question}</div>
+                    <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
+                      placeholder="떠오르는 대로 답해보세요" rows={2}
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button onClick={() => setCompanion(null)} style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>건너뛰기</button>
+                      <button onClick={answerCompanion} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>답 남기기</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
