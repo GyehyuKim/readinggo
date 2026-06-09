@@ -488,6 +488,11 @@ const DataStore = {
     get() { try { return localStorage.getItem('rg_data_consent'); } catch (e) { return null; } },
     set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
   },
+
+  /* 독서 파트너 대화 아카이브 (#295) — 로컬/게스트는 서버 아카이브 안 함(no-op). Supabase 모드만 실저장. */
+  companionSessions: {
+    add() { return null; },
+  },
 };
 
 window.DataStore = DataStore;

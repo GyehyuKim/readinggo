@@ -728,6 +728,20 @@
       get() { try { return localStorage.getItem('rg_data_consent'); } catch (e) { return null; } },
       set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
     },
+
+    /* 독서 파트너 대화 아카이브 (#295, 18_companion_sessions.sql) — 동의 유저의 Q/A를 익명 집계용 저장. */
+    companionSessions: {
+      async add({ bookId, sentence, comment, lens, question, answer, isResurface } = {}) {
+        const id = await uid();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(bookId || ''));
+        return unwrap(await sb().from('companion_sessions').insert({
+          user_id: id, book_id: isUuid ? bookId : null,
+          sentence: sentence || '', comment: comment || null, lens: lens || null,
+          question: question || null, answer: answer || null,
+          is_resurface: !!isResurface, consented: true,
+        }).select().single());
+      },
+    },
   };
 
   window.SupabaseDataStore = A;

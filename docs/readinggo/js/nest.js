@@ -335,6 +335,14 @@ async function genCompanionFollowup(sentence, exchanges, bookTitle, author) {
   } catch (e) { /* 폴백 */ }
   return '그 답에서 한 걸음 더 들어가면, 무엇이 떠오르나요?';
 }
+// 대화 1턴(Q/A)을 서버 아카이브 (#295) — 동의 유저만. 로컬/게스트는 어댑터가 no-op.
+function archiveCompanion(bookId, sentenceText, q, a) {
+  try {
+    if (window.RG_consent && window.RG_consent.get() === 'yes' && DataStore.companionSessions && DataStore.companionSessions.add) {
+      Promise.resolve(DataStore.companionSessions.add({ bookId, sentence: sentenceText, question: q, answer: a, lens: 'why' })).catch(() => {});
+    }
+  } catch (e) {}
+}
 
 function ReadingMode({ book, onClose, onArchive, onCheckin }) {
   const [secs, setSecs] = _useState(0);
@@ -408,6 +416,7 @@ function ReadingMode({ book, onClose, onArchive, onCheckin }) {
     const ex = [...(companion.exchanges || []), { q: companion.question, a }];
     rgTrack('answer_saved', { book_id: book.id, lens: 'why', answer_length: a.length });
     persistCompanionNote(companion.sentenceId, ex);
+    archiveCompanion(book.id, companion.text, companion.question, a); // 서버 아카이브 (#295)
     const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
     if (ex.length >= MAX_TURNS || consent !== 'yes') {
       setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, exchanges: ex, question: null, answer: '', loading: false, done: true } : c);
@@ -776,7 +785,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.title) || '책';
           return (
-            <div key={i} className="my-q-card">
+            <div key={i} className="my-q-card" style={{ cursor: 'pointer' }}
+              onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note })}>
               <div className="meta">
                 <span className="bk">{bkTitle}</span>
                 <span className="dot">·</span>
@@ -837,3 +847,81 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
 }
 
 window.NestView = NestView;
+
+/* ── CompanionModal (#326): 한 문장 대화 — 읽기 모드 밖에서 열람·이어가기 ──
+   저장된 대화(my_note의 Q/A)를 보여주고, 동의 시 한 걸음 더 이어감(멀티턴). */
+function parseNoteToExchanges(note) {
+  if (!note) return [];
+  const out = [];
+  String(note).split(/\n\n+/).forEach((b) => {
+    const m = b.match(/^Q\.\s*([\s\S]*?)\nA\.\s*([\s\S]*)$/);
+    if (m) out.push({ q: m[1].trim(), a: m[2].trim() });
+  });
+  return out;
+}
+function CompanionModal({ sentence, onClose }) {
+  const [exchanges, setExchanges] = _useState(() => parseNoteToExchanges(sentence.note));
+  const [question, setQuestion] = _useState(null);
+  const [loading, setLoading] = _useState(true);
+  const [answer, setAnswer] = _useState('');
+  const [done, setDone] = _useState(false);
+  const MAX = 3;
+  const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
+  const bt = sentence.bookTitle || '', au = sentence.author || '';
+  _useEffect(() => {
+    const past = parseNoteToExchanges(sentence.note);
+    const gen = (consent !== 'yes')
+      ? Promise.resolve(pickCompanionQ(sentence.text))
+      : (past.length ? genCompanionFollowup(sentence.text, past, bt, au) : genCompanionQuestion(sentence.text, bt, au));
+    gen.then((q) => { setQuestion(q); setLoading(false); });
+  }, []);
+  const persist = (ex) => {
+    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return;
+    Promise.resolve(DataStore.sentences.setNote(sentence.id, ex.map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n'))).catch(() => {});
+  };
+  const submit = () => {
+    const a = answer.trim();
+    if (!a) { persist(exchanges); setDone(true); return; }
+    const ex = [...exchanges, { q: question, a }];
+    setExchanges(ex); setAnswer(''); persist(ex);
+    rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
+    archiveCompanion(sentence.bookId, sentence.text, question, a); // 서버 아카이브 (#295)
+    if (ex.length >= MAX || consent !== 'yes') { setQuestion(null); setDone(true); return; }
+    setLoading(true); setQuestion(null);
+    genCompanionFollowup(sentence.text, ex, bt, au).then((q) => { setQuestion(q); setLoading(false); });
+  };
+  return ReactDOM.createPortal(
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: 'var(--card)', width: '100%', maxWidth: 430, maxHeight: '85vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 18px 8px' }}>
+          <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--brand-3)' }}>🐦 혼자만의 독서모임</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-3)', cursor: 'pointer' }}>×</button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px 18px' }}>
+          <div style={{ fontSize: 14, fontStyle: 'italic', color: 'var(--ink)', lineHeight: 1.5, padding: '10px 12px', background: 'var(--paper-2)', borderRadius: 10, marginBottom: 12 }}>"{sentence.text}"</div>
+          {exchanges.map((e, ei) => (
+            <div key={ei} style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.5 }}>{e.q}</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4, paddingLeft: 8, borderLeft: '2px solid var(--line)', lineHeight: 1.5 }}>{e.a}</div>
+            </div>
+          ))}
+          {done ? (
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>🐦 대화 저장됨</div>
+          ) : loading ? (
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+          ) : (
+            <>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55, marginBottom: 10 }}>{question}</div>
+              <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="떠오르는 대로 답해보세요" rows={2}
+                style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => { persist(exchanges); setDone(true); }} style={{ flex: '0 0 auto', padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>마치기</button>
+                <button onClick={submit} style={{ flex: 1, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{exchanges.length >= MAX - 1 ? '답 남기고 마치기' : '답하고 이어가기'}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>, document.body);
+}
+window.CompanionModal = CompanionModal;
