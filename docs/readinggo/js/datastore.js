@@ -261,7 +261,7 @@ const DataStore = {
 
   /* 한 문장 (sentences) ───────────────────────────── */
   sentences: {
-    add({ userBookId, sessionId, page, text, my_note }) {
+    add({ userBookId, sessionId, page, text, my_note, kind }) {
       return localStorageAdapter.mutate(s => {
         const ub = _ubById(s, userBookId) || _activeUB(s);
         if (!ub) return null;
@@ -274,6 +274,7 @@ const DataStore = {
           page: typeof page === 'number' ? page : (ub.current_page || 0),
           text: text || '',
           my_note: my_note || null,
+          kind: kind === 'thought' ? 'thought' : 'quote',   // 인용 vs 내 의견 (#360)
           created_at: Date.now(),
         };
         ub.sentences.push(row);

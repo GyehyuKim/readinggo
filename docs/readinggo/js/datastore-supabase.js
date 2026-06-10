@@ -191,11 +191,12 @@
 
     /* 한 문장 (sentences) */
     sentences: {
-      async add({ userBookId, sessionId, page, text, my_note }) {
+      async add({ userBookId, sessionId, page, text, my_note, kind }) {
         const id = await uid();
         return unwrap(await sb().from('sentences').insert({
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
           page: (typeof page === 'number') ? page : null, text: text || '', my_note: my_note || null,
+          kind: kind === 'thought' ? 'thought' : 'quote',   // 인용 vs 내 의견 (#360)
         }).select().single());
       },
       // 사후 감상 추가·편집 (작성 시점 무관) — profile §5.8.4

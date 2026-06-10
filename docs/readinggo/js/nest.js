@@ -314,22 +314,22 @@ function pickCompanionQ(text) {
   return COMPANION_QS[i];
 }
 // 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 목 질문 폴백 — 데모 무중단.
-async function genCompanionQuestion(sentence, bookTitle, author) {
+async function genCompanionQuestion(sentence, bookTitle, author, kind) {
   try {
     const r = await fetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '' }),
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote' }),
     });
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }
   return pickCompanionQ(sentence);
 }
 // 멀티턴 후속 질문 (#327) — 이전 대화(exchanges) 전달 → 한 걸음 더 깊은 되물음. 실패 시 목 폴백.
-async function genCompanionFollowup(sentence, exchanges, bookTitle, author) {
+async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind) {
   try {
     const r = await fetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges }),
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote' }),
     });
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }
@@ -352,6 +352,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   const [running, setRunning] = _useState(true);
   const [page, setPage] = _useState(String(book.cur || 0)); // 문자열 — 빈칸 허용(페이지 미상)
   const [text, setText] = _useState('');
+  const [kind, setKind] = _useState('quote'); // 'quote'=책 속 인용 | 'thought'=내 의견 (#360)
   const [saved, setSaved] = _useState([]);
   const [closing, setClosing] = _useState(false);            // 종료 확인 단계
   const [finalPage, setFinalPage] = _useState(String(book.cur || 0));
@@ -406,34 +407,35 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   const bump = (d) => setPage((s) => String(Math.max(0, (parseInt(s, 10) || 0) + d)));
   const save = () => {
     const t = text.trim();
-    if (!t) { showToast('한 문장을 적어주세요'); return; }
+    if (!t) { showToast(kind === 'thought' ? '내 생각을 적어주세요' : '한 문장을 적어주세요'); return; }
     const p = pageNum(page); // 비어있으면 null(페이지 없이 저장)
     const ubId = ubRef.current;
-    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: p, text: t })).then((row) => {
+    const k = kind; // 저장 시점 kind 고정 (#360)
+    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: p, text: t, kind: k })).then((row) => {
       const sid = row && row.id;
-      setSaved((list) => [{ id: sid, text: t, page: p }, ...list]);
+      setSaved((list) => [{ id: sid, text: t, page: p, kind: k }, ...list]);
       setText('');
-      showToast(p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨');
+      showToast(k === 'thought' ? '💭 내 생각 저장됨' : (p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨'));
       // id 전달 (#358) — 없으면 책상세 🗑·감상·공개 버튼이 새로고침 전까지 안 뜸(✕ 나가기는 체크인 정합 미경유).
-      if (onArchive) onArchive({ id: sid, text: t, bookId: book.id, page: p, when: '방금' });
-      rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length });
+      if (onArchive) onArchive({ id: sid, text: t, bookId: book.id, page: p, when: '방금', kind: k });
+      rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length, kind: k });
       // 혼자만의 독서모임 — 저장 직후. 첫 사용 시 데이터 활용 동의 먼저(#294), 그 뒤 질문.
       const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
-      if (consent === null) setCompanion({ sentenceId: sid, text: t, needsConsent: true, answer: '' });
-      else startCompanion(sid, t);
+      if (consent === null) setCompanion({ sentenceId: sid, text: t, kind: k, needsConsent: true, answer: '' });
+      else startCompanion(sid, t, k);
     }).catch(() => showToast('저장 실패 — 다시 시도'));
   };
   // 동의 상태에 맞춰 질문 시작 — 'yes'면 solar-pro3, 그 외(거부)면 로컬 목 (외부 전송 없음). (#294/§4)
-  const startCompanion = (sid, t) => {
+  const startCompanion = (sid, t, k) => {
     const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
-    setCompanion({ sentenceId: sid, text: t, question: null, loading: true, answer: '', exchanges: [] });
-    const gen = (consent === 'yes') ? genCompanionQuestion(t, book.title, book.author) : Promise.resolve(pickCompanionQ(t));
+    setCompanion({ sentenceId: sid, text: t, kind: k || 'quote', question: null, loading: true, answer: '', exchanges: [] });
+    const gen = (consent === 'yes') ? genCompanionQuestion(t, book.title, book.author, k) : Promise.resolve(pickCompanionQ(t));
     gen.then((q) => setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
   };
   const decideConsent = (v) => {
     if (window.RG_consent) window.RG_consent.set(v);
     rgTrack('data_consent', { value: v });
-    if (companion) startCompanion(companion.sentenceId, companion.text);
+    if (companion) startCompanion(companion.sentenceId, companion.text, companion.kind);
   };
   // 대화 전체(Q/A)를 해당 문장 감상(my_note)으로 영속 (양 어댑터 setNote)
   const persistCompanionNote = (sid, exchanges) => {
@@ -458,7 +460,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
       return;
     }
     setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, exchanges: ex, question: null, answer: '', loading: true } : c);
-    genCompanionFollowup(companion.text, ex, book.title, book.author).then((q) =>
+    genCompanionFollowup(companion.text, ex, book.title, book.author, companion.kind).then((q) =>
       setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, question: q, loading: false } : c));
   };
   // 독서 종료: 최종 읽은 쪽을 부모 체크인 파이프라인(handleCheckin)에 위임 (#300).
@@ -495,17 +497,30 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
           <button onClick={() => bump(1)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>+</button>
           {total > 0 && <span style={{ fontSize: 11, opacity: 0.5 }}>/ {total}p</span>}
         </div>
-        <textarea value={text} onChange={(e) => { if (e.target.value.length <= 1000) setText(e.target.value); }} placeholder="떠오른 한 문장을 바로 옮겨 적어요…" rows={3}
+        {/* 인용 ↔ 내 생각 토글 (#360) — 의견도 한 문장처럼 가볍게 남긴다 */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, justifyContent: 'center' }}>
+          {[['quote', '📖 책 속 문장'], ['thought', '💭 내 생각']].map(([k, label]) => (
+            <button key={k} onClick={() => setKind(k)}
+              style={{ padding: '6px 14px', borderRadius: 14, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                background: kind === k ? 'var(--brand)' : 'rgba(255,255,255,0.1)', color: kind === k ? '#fff' : 'rgba(244,242,236,0.7)' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <textarea value={text} onChange={(e) => { if (e.target.value.length <= 1000) setText(e.target.value); }}
+          placeholder={kind === 'thought' ? '지금 드는 내 생각·의견을 가볍게 적어요…' : '떠오른 한 문장을 바로 옮겨 적어요…'} rows={3}
           style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
-        <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>✨ 한 문장 저장{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
+        <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>{kind === 'thought' ? '💭 내 생각 저장' : '✨ 한 문장 저장'}{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
       </div>
       {/* 이번 세션 아카이브 — 각 문장 하단에 혼자만의 독서모임 대화 (#327) */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 24px' }}>
         {saved.length > 0 && <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 800, margin: '8px 0' }}>이번 독서에서 모은 {saved.length}문장</div>}
         {saved.map((s, i) => (
           <div key={s.id || i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>{s.page != null ? s.page + 'p' : '페이지 미상'}</div>
-            <div style={{ fontSize: 14, lineHeight: 1.5, fontStyle: 'italic' }}>"{s.text}"</div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>{s.page != null ? s.page + 'p' : '페이지 미상'}{s.kind === 'thought' ? ' · 💭 내 생각' : ''}</div>
+            {s.kind === 'thought'
+              ? <div style={{ fontSize: 14, lineHeight: 1.5 }}>💭 {s.text}</div>
+              : <div style={{ fontSize: 14, lineHeight: 1.5, fontStyle: 'italic' }}>"{s.text}"</div>}
             {/* 이 문장의 혼자만의 독서모임 대화 (문장 바로 하단) */}
             {companion && companion.sentenceId === s.id && (
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
@@ -914,7 +929,7 @@ function CompanionModal({ sentence, onClose }) {
     const past = parseNoteToExchanges(sentence.note);
     const gen = (consent !== 'yes')
       ? Promise.resolve(pickCompanionQ(sentence.text))
-      : (past.length ? genCompanionFollowup(sentence.text, past, bt, au) : genCompanionQuestion(sentence.text, bt, au));
+      : (past.length ? genCompanionFollowup(sentence.text, past, bt, au, sentence.kind) : genCompanionQuestion(sentence.text, bt, au, sentence.kind));
     gen.then((q) => { setQuestion(q); setLoading(false); });
   }, []);
   const persist = (ex) => {
@@ -930,7 +945,7 @@ function CompanionModal({ sentence, onClose }) {
     archiveCompanion(sentence.bookId, sentence.text, question, a); // 서버 아카이브 (#295)
     if (ex.length >= MAX || consent !== 'yes') { setQuestion(null); setDone(true); return; }
     setLoading(true); setQuestion(null);
-    genCompanionFollowup(sentence.text, ex, bt, au).then((q) => { setQuestion(q); setLoading(false); });
+    genCompanionFollowup(sentence.text, ex, bt, au, sentence.kind).then((q) => { setQuestion(q); setLoading(false); });
   };
   return ReactDOM.createPortal(
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
