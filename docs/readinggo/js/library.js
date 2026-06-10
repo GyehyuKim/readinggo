@@ -32,7 +32,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   const [rt, setRt] = _useState(book.rating || 0);
   const [rv, setRv] = _useState(book.comment || '');
   // 참새의 완독 회고 (#259) — 내 한 문장들을 엮어 회고 한 단락. 실패/키없음 시 목 폴백(서버에서 처리).
-  const [recap, setRecap] = _useState('');
+  // #352: 저장본(user_books.companion_recap) 우선 표시, 새로 받으면 캐시 갱신.
+  const [recap, setRecap] = _useState(book.recap || '');
   const [recapLoading, setRecapLoading] = _useState(false);
   const loadRecap = async () => {
     if (recapLoading) return;
@@ -49,7 +50,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       });
       if (r.ok) {
         const d = await r.json();
-        if (d && d.recap) { setRecap(d.recap); if (window.rgTrack) window.rgTrack('companion_recap', { bookId: book.id, n: sentences.length }); }
+        if (d && d.recap) {
+          setRecap(d.recap);
+          if (window.rgTrack) window.rgTrack('companion_recap', { bookId: book.id, n: sentences.length });
+          // 영속화 (#352) — 다음 진입 시 저장본 즉시 표시(LLM 재호출 없음). 실패해도 표시는 유지.
+          if (book.ubId && DataStore.books && DataStore.books.saveRecap) {
+            Promise.resolve(DataStore.books.saveRecap(book.ubId, d.recap)).catch(() => {});
+          }
+        }
         else showToast('회고를 불러오지 못했어요 — 잠시 후 다시');
       } else showToast('회고를 불러오지 못했어요 — 잠시 후 다시');
     } catch (e) { showToast('회고를 불러오지 못했어요 — 잠시 후 다시'); }
@@ -262,7 +270,15 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
               <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:6}}>🐦 참새의 완독 회고</div>
               {recap ? (
-                <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{recap}</div>
+                <>
+                  <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{recap}</div>
+                  {bookQuotes.length > 0 && (
+                    <button onClick={loadRecap} disabled={recapLoading}
+                      style={{marginTop:8, padding:'5px 12px', background:'none', border:'1px solid var(--brand)', borderRadius:8, color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
+                      {recapLoading ? '참새가 곱씹는 중…' : '🔄 다시 받기'}
+                    </button>
+                  )}
+                </>
               ) : bookQuotes.length === 0 ? (
                 <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5}}>이 책에 남긴 한 문장이 있으면, 참새가 그 문장들을 엮어 회고를 들려줘요.</div>
               ) : (
@@ -441,6 +457,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           total: b.total_pages || 0, isbn: b.isbn13 || '',
           cur: ub.current_page || 0, status: ub.status,
           rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at,
+          recap: ub.companion_recap || '',   // 참새 완독 회고 캐시 (#352)
         };
       }));
     }).catch(() => { if (alive) setMyBooks([]); });

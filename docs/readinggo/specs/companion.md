@@ -74,7 +74,7 @@
 - **입력 상한**: 문장 최대 20개·각 300자, review 500자 (프롬프트 폭주 방지).
 - **graceful fallback**: 키 없음/실패 시 `recapMock`(문장 수·첫 문장 기반 따뜻한 회고)으로 폴백 — 데모 무중단.
 - **클라**(`library.js` BookDetailModal): `loadRecap()`이 `/api/companion` 호출 → 회고 단락 인라인 표시. 분석 이벤트 `companion_recap`.
-- **비목표**: 회고를 서버 아카이브하거나 서재에 영구 저장하지 않음(Phase 0 단발 표시). 영구 보관은 후속.
+- **영속화 (#352, 구현 완료)**: 받은 회고를 `user_books.companion_recap`에 캐시(`books.saveRecap`, 19_companion_recap.sql) — 재진입 시 저장본 즉시 표시(LLM 재호출 없음) + "🔄 다시 받기"로 갱신. 게스트(localStorage)도 동일 표면.
 
 ---
 

@@ -99,6 +99,12 @@
         if (typeof opts.review_text !== 'undefined') patch.review_text = opts.review_text;
         return unwrap(await sb().from('user_books').update(patch).eq('id', userBookId).select().single());
       },
+      // 참새 완독 회고 캐시 (#352) — user_books.companion_recap. 본인 행만(RLS ub_mod).
+      async saveRecap(userBookId, recap) {
+        const id = await uid();
+        return unwrap(await sb().from('user_books').update({ companion_recap: recap || null })
+          .eq('id', userBookId).eq('user_id', id).select().single());
+      },
       // social.md §5.7 "이번 주 신규 시작러 Top3" — 공개 집계 RPC(17_social_newcomers.sql).
       async startedThisWeek(lim = 3) {
         const rows = unwrap(await sb().rpc('social_newcomers_weekly', { lim }));

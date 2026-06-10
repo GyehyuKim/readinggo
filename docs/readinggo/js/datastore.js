@@ -384,6 +384,15 @@ const DataStore = {
         return ub;
       });
     },
+    // 참새 완독 회고 캐시 (#352) — Supabase 어댑터와 표면 일치(§7.2)
+    saveRecap(userBookId, recap) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) return null;
+        ub.companion_recap = recap || null;
+        return ub;
+      });
+    },
     // social.md §5.7 "이번 주 신규 시작러 Top3" — 이번 주(월~) started_at 기준 책별 집계.
     startedThisWeek(lim = 3) {
       return localStorageAdapter.mutate(s => {
