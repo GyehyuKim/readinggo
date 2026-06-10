@@ -29,6 +29,8 @@ body { font-family: 'Moneygraphy Rounded', 'Noto Sans KR', sans-serif; letter-sp
 | 숫자 / 게임 라벨 / 뱃지 / 메타 | **Moneygraphy Pixel** | `letter-spacing: 0.5~1.5px`. `font-weight` 변경 불가 (단일 굵기) |
 | Fallback 한글 | Noto Sans KR | 폰트 로딩 실패 대비 |
 
+**통일 원칙 (v7.4, #323)**: 인라인 스타일에서 폰트를 **하드코딩하지 않는다** — 본문은 `font-family` 미지정(= body 상속) 또는 `'inherit'`, 숫자/코드만 `'Moneygraphy Pixel', monospace`. `'Nunito'`·생짜 `'monospace'` 등 비브랜드 폰트 금지. (onboarding.js·town.js 잔재 정리 완료)
+
 Pixel 폰트 적용 대상 (선택자 단위):
 ```css
 /* 스트릭/XP 숫자, The Path 노드 심볼, 책 진도 숫자, 페이지 입력 큰 숫자,

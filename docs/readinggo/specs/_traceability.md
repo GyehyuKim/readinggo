@@ -7,25 +7,37 @@
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
 | §5.1 상단바·진화배너·둥지자람·캐러셀 | ✅ | app.js topbar · nest.js NestTheatre/twigs/switchBook |
-| §5.2 5단계·마이크로카피4·성컬렉션 | ✅ | data.js NEST_STAGES/EVOLVE · datastore castles.list |
-| §5.1 CTA"오늘 기록하기"·§5.4 일일미션 모달 | 🚩 | CheckinModal **진입점 없음**(QA6 #217로 짹CTA 제거, 읽기모드가 체크인 대체) → nest.md §5.1/§5.4 갱신 필요 |
-| §5.4 별점0.5·완독세리머니 · §5.5 읽기모드 | ✅ | Ceremony fillPct · ReadingMode |
+| §5.2 **둥지=누적 XP 분리(v7.4)** · 5단계·성컬렉션 | ✅ | #313 getNestStageByXp/nestXpProgress · NestTheatre xp |
+| §5.1 CTA·§5.4 일일미션 = 읽기모드 대체 | ✅ | #252 — nest.md §5.5 반영(읽기모드가 체크인 대체). CheckinModal 폐기 |
+| §5.4 별점0.5·완독세리머니(읽기모드 위임) · §5.5 읽기모드(나가기✕) | ✅ | #300 finish→handleCheckin · ReadingMode |
+
+## companion.md (LLM 독서 파트너 — v7.4 신설) — owner 계휴
+| 조항 | 상태 | 근거/갭 |
+|---|---|---|
+| §4 LLM 연결(solar-pro3, provider-agnostic) | ✅ | #287 worker callLLM(env) · /api/companion · genCompanionQuestion |
+| §2 멀티턴 대화(답→후속, 최대 3턴) | ✅ | #327 genCompanionFollowup · exchanges · 문장 하단 스레드 |
+| §3 한 문장 탭→대화 모달 + 본문 편집 | ✅ | #326 CompanionModal/RG_openCompanion · #325 sentences.updateText |
+| 책·작가 맥락 프롬프트 · reasoning 토글 | ✅ | COMPANION_SYSTEM · LLM_REASONING_EFFORT |
+| DEMO 폴백(키없음/실패) | ✅ | companionMock(서버)·pickCompanionQ(클라) |
+| 대화 아카이브 companion_sessions | 🔧 | #295 18_companion_sessions.sql + companionSessions.add (SQL 1회 실행 대기) |
 
 ## social.md (소셜)
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
 | §5.7 피드 3탭·틴더카드·짹·책갈피·본인비활성 | ✅ | social.js:27-29,60 · TinderCards · claps.toggle/isMine |
 | §5.7.1 페이지 블라인드·visibility 3단계 | ✅ | components.js isSpoiler · library.js cycleVis |
-| **§5.7 "이번 주 신규 시작러 Top3"** | ❌ | social.js/components/data 어디에도 없음 → 구현 누락 |
+| §5.7 "이번 주 신규 시작러 Top3" | ✅ | #286 social_newcomers_weekly RPC · social.js 상단 스트립 |
 | **§5.7.1 친구 찾기 패널(NPC_SEARCH)** | ❌ | social UI에 친구찾기 패널 미발견(backend users.search는 있음) |
-| §5.7.1 전역 스포일러 토글 🔓 | 🚩 | 토글이 설정(⚙️)으로 이전(#3)인데 spec은 "헤더 우측 🔓 미구현(#157)" → drift |
+| §5.7.1 전역 스포일러 토글 🔓 | 🔧 | #3 토글 설정(⚙️) 이전 완료 · #177 검토완료(spec 문구 후속) |
 
 ## profile.md (프로필) — owner 계휴
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
 | §5.8 성컬렉션·bio·내문장10+더보기·별점4.0·헤더정리 | ✅ | QA5/6 (#205·#226·#228) |
 | §5.8.9 대시보드(인기책·활성·차트·문의) · §5.8.10 히트맵(채도·월) | ✅ | #190·#206·#208·#195·#207 |
-| §5.8.4 쪽수 폴백·책갈피·회상 | ✅ | #204 · bookmarks/random |
+| §5.8.4 쪽수 폴백·책갈피·회상 · export 상세화(v7.4) | ✅ | #204 · bookmarks/random · #315 export(메타·완독·날짜) |
+| §5.8.1.1 성 컬렉션 책장 상세(최근10+그리드/검색/정렬/필터, v7.4) | ✅ | #312 ArchiveShelfModal |
+| 공용 BookCover + 표지 placeholder(v7.4) | ✅ | #316 components.js BookCover (책설명 B·외서 #302 후속) |
 | §5.8.6 AI 추천/추출 | ⏳ | datastore `ai.recommendBooks()→[]`·`extractBook()→null` 빈 stub (Phase0 시뮬도 미구현) |
 
 ## village.md (마을) — owner 윤지
@@ -38,10 +50,22 @@
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
 | §6.3 XP 행동가중치·Lv · 스트릭·방패 | ✅ | #210/#212 · streak.bumpOnCheckIn · shield_log |
-| **휴식코스(Pause·동결)** | ❌ | 코드에 pause/동결 없음 → 미구현 (decisions §8.0 "채택·상세 미정", #126 승원) |
+| 둥지=누적 XP(v7.4) | ✅ | #313 systems.md §6.3 갱신 — 둥지·XP 같은 누적축 |
+| **휴식코스(Pause·동결)** | ⏳보류 | 이번 컨셉 정렬 X → parking-lot.md §1 (#126/#251 닫음, 재개조건 명시) |
 
 ## onboarding.md — owner 계휴
 | §4 가입 A→C1→C2→D3·매직링크·닉네임규칙 | ✅ | onboarding.js · signInWithEmail · RG_VALIDATE/04_constraints |
+| §4 E 게스트 우선(로그인 벽 제거·저장 시점 로그인, v7.3) | ✅ | #298 app.js showLogin·syncPendingToSupabase · 데모 시드 누수 수정 #332 |
+
+## analytics.md (행동데이터·동의 — v7.x) — owner 계휴
+| 조항 | 상태 | 근거/갭 |
+|---|---|---|
+| §3 PostHog 자동수집 + 커스텀 이벤트·identify | ✅ | #296 index.html · #293 rgTrack(book_opened/highlight_selected/answer_saved/reading_session_end) |
+| §5 데이터 활용 동의 — 진입 배너(필수/전체/상세) + 설정 토글 | ✅ | #294 DataStore.consent · #331 ConsentBanner |
+| §4 companion_sessions 아카이브 | 🔧 | #295 18_*.sql (SQL 1회 실행 대기) |
+
+## resilience — owner 계휴
+| 전역 ErrorBoundary(컴포넌트 크래시 격리) | ✅ | #310 app.js ErrorBoundary key={activeTab} |
 
 ## backend.md — owner 계휴
 | 조항 | 상태 | 근거/갭 |
@@ -58,4 +82,6 @@
 결정 이력(§8.0~8.8) — 매칭 기준 컨텍스트. 자체 구현 대상 아님.
 
 ---
-**이슈 후보 요약**: ❌ social Top3 · social 친구찾기 패널 · systems 휴식코스(#126) / 🚩 nest CTA·미션(§5.1/5.4) · social 🔓 토글 drift / ⏳ AI stub · 문의 LLM(#208).
+**v7.4 갱신 (2026-06-10)**: companion(LLM solar-pro3·멀티턴·문장대화·동의·아카이브) ✅, 둥지 책분리 ✅(#313), 성컬렉션 그리드 ✅(#312), BookCover ✅(#316), export 상세화 ✅(#315), 게스트 우선 ✅(#298), ErrorBoundary ✅(#310), PostHog 이벤트 ✅, 동의 배너 ✅(#331). 해소: nest CTA·미션(#252)·Top3(#286)·스포일러토글(#3). 보류: 휴식코스(parking-lot), 문의 LLM(#208).
+
+**남은 이슈 후보**: ❌ social 친구찾기 패널 / 🔧 companion_sessions SQL 실행(#295)·스포일러 spec 문구(#177) / ⏳ AI 추천(stub) · 외서 API(#302) · export 책설명(#316B) · 북커버 폴백(#316C).

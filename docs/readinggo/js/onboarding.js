@@ -84,7 +84,7 @@ const ScreenC1 = ({ onSelect, onManual }) => {
             placeholder="제목, 저자, ISBN 검색..."
             autoFocus
             style={{ width: '100%', border: '2px solid #E5E5E5', borderRadius: 14, padding: '11px 14px 11px 36px',
-              fontSize: 15, fontWeight: 600, outline: 'none', fontFamily: 'Nunito',
+              fontSize: 15, fontWeight: 600, outline: 'none', fontFamily: 'inherit',
               transition: 'border-color .2s' }}
             onFocus={e => e.target.style.borderColor = '#58CC02'}
             onBlur={e => e.target.style.borderColor  = '#E5E5E5'}
@@ -237,7 +237,7 @@ const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
           rows={4}
           style={{ width: '100%', border: '2px solid #E5E5E5', borderRadius: 16, padding: '14px 16px',
             fontSize: 15, fontWeight: 600, outline: 'none', resize: 'none',
-            fontFamily: 'Nunito', lineHeight: 1.6, transition: 'border-color .2s',
+            fontFamily: 'inherit', lineHeight: 1.6, transition: 'border-color .2s',
             boxSizing: 'border-box', marginBottom: 4 }}
           onFocus={focus} onBlur={blur}
         />
