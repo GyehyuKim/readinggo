@@ -418,8 +418,8 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
       setSaved((list) => [{ id: sid, text: t, page: p, kind: k }, ...list]);
       setText('');
       showToast(k === 'thought' ? '💭 내 생각 저장됨' : (p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨'));
-      // id 전달 (#358) — 없으면 책상세 🗑·감상·공개 버튼이 새로고침 전까지 안 뜸(✕ 나가기는 체크인 정합 미경유).
-      if (onArchive) onArchive({ id: sid, text: t, bookId: book.id, page: p, when: '방금', kind: k });
+      // id+bookTitle 전달 (#358·사피엔스버그) — bookTitle 누락 시 둥지 카드가 getBook 폴백(RG_BOOKS[0]=사피엔스)으로 오표시.
+      if (onArchive) onArchive({ id: sid, text: t, bookId: book.id, bookTitle: book.title || '', page: p, when: '방금', kind: k });
       rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length, kind: k });
       // 혼자만의 독서모임 — 저장 직후. 첫 사용 시 데이터 활용 동의 먼저(#294), 그 뒤 질문.
       const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
@@ -606,6 +606,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
   });
   // 직전 진척률 가지 수 — 새 가지 stack 애니메이션 기준.
   const prevTwigsRef = _useRef(twigsForProgress(nestXpProgress(state.xp)));
+  // 한 문장 삭제(#1) 이벤트 → 둥지 '내 한 문장' 목록 즉시 반영.
+  _useEffect(() => {
+    const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
+    window.addEventListener('rg:sentence-removed', onRm);
+    return () => window.removeEventListener('rg:sentence-removed', onRm);
+  }, []);
 
   // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드. 둥지(XP 기반)는 유지 — 책과 무관(#313).
   _useEffect(() => {
@@ -891,8 +897,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         </div>
       ) : (
         nestState.myQuotes.slice(0, 10).map((q, i) => {
+          // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백하므로, id가 실제 일치할 때만 그 제목을 씀(사피엔스버그).
           const _bk = getBook(q.bookId);
-          const bkTitle = q.bookTitle || (_bk && _bk.title) || '책';
+          const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
           return (
             <div key={i} className="my-q-card" style={{ cursor: 'pointer' }}
               onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note })}>
@@ -996,6 +1003,17 @@ function CompanionModal({ sentence, onClose }) {
     if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return;
     Promise.resolve(DataStore.sentences.setNote(sentence.id, ex.map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n'))).catch(() => {});
   };
+  // 한 문장 삭제 (#1) — 둥지 한 문장 상세에도 삭제. 이벤트로 둥지·서재 목록 즉시 반영.
+  const delQuote = () => {
+    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.remove)) { onClose(); return; }
+    if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return;
+    Promise.resolve(DataStore.sentences.remove(sentence.id)).then(() => {
+      if (window.rgTrack) window.rgTrack('sentence_deleted', { book_id: sentence.bookId || '' });
+      window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id: sentence.id } }));
+      showToast('🗑 한 문장을 삭제했어요');
+      onClose();
+    }).catch(() => showToast('삭제 실패 — 잠시 후 다시'));
+  };
   const submit = () => {
     const a = answer.trim();
     if (!a) { persist(exchanges); setDone(true); return; }
@@ -1025,10 +1043,14 @@ function CompanionModal({ sentence, onClose }) {
               </div>
             </div>
           ) : (
-            <div style={{ position: 'relative', fontSize: 14, fontStyle: 'italic', color: 'var(--ink)', lineHeight: 1.5, padding: '10px 30px 10px 12px', background: 'var(--paper-2)', borderRadius: 10, marginBottom: 12 }}>
+            <div style={{ position: 'relative', fontSize: 14, fontStyle: 'italic', color: 'var(--ink)', lineHeight: 1.5, padding: '10px 52px 10px 12px', background: 'var(--paper-2)', borderRadius: 10, marginBottom: 12 }}>
               "{sentence.text}"
-              <button onClick={() => { setStext(sentence.text || ''); setEditing(true); }} title="문장 수정" aria-label="문장 수정"
-                style={{ position: 'absolute', top: 6, right: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: 0.6 }}>✏️</button>
+              <span style={{ position: 'absolute', top: 6, right: 8, display: 'flex', gap: 6 }}>
+                <button onClick={() => { setStext(sentence.text || ''); setEditing(true); }} title="문장 수정" aria-label="문장 수정"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: 0.6, padding: 0 }}>✏️</button>
+                <button onClick={delQuote} title="이 한 문장 삭제" aria-label="삭제"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: 0.6, padding: 0 }}>🗑</button>
+              </span>
             </div>
           )}
           {exchanges.map((e, ei) => (
