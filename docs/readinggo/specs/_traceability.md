@@ -19,7 +19,11 @@
 | §3 한 문장 탭→대화 모달 + 본문 편집 | ✅ | #326 CompanionModal/RG_openCompanion · #325 sentences.updateText |
 | 책·작가 맥락 프롬프트 · reasoning 토글 | ✅ | COMPANION_SYSTEM · LLM_REASONING_EFFORT |
 | DEMO 폴백(키없음/실패) | ✅ | companionMock(서버)·pickCompanionQ(클라) |
-| 대화 아카이브 companion_sessions | 🔧 | #295 18_companion_sessions.sql + companionSessions.add (SQL 1회 실행 대기) |
+| 대화 아카이브 companion_sessions | ✅ | #295 18_*.sql + companionSessions.add. **실증: 동의+로그인 답변 3건 적재 확인(2026-06-11)** |
+| §4.1 완독 회고 + 영속화 | ✅ | #345 mode:recap · #352 user_books.companion_recap(19_*.sql)·saveRecap·다시받기 |
+| §2 인용 vs 내 생각 구분 수신 + 맥락 불명 되묻기 | ✅ | #359 COMPANION_SYSTEM 역할분리 · #360 kind(quote/thought, 20_*.sql)·읽기모드 토글·💭 표기 |
+| §5 시간차 되감기(둥지 카드·대화 재개) | ✅ | #346 코드=#364 머지(last_resurfaced_at 21_*.sql·resurfaceCandidate·1일게이트). spec PR은 윤지(#346 OPEN) |
+| 질문 품질(반복방지·책맥락·난이도) · 평가👍👎 · 재생성🔄 · 방향성 프리셋 | ⏳ | 백로그 #373·#371·#372·#375 (실사용 피드백 기반) |
 
 ## social.md (소셜)
 | 조항 | 상태 | 근거/갭 |
@@ -38,7 +42,9 @@
 | §5.8.4 쪽수 폴백·책갈피·회상 · export 상세화(v7.4) | ✅ | #204 · bookmarks/random · #315 export(메타·완독·날짜) · #316 책 소개(알라딘 description) |
 | §5.8.1.1 성 컬렉션 책장 상세(최근10+그리드/검색/정렬/필터, v7.4) | ✅ | #312 ArchiveShelfModal |
 | 공용 BookCover + 표지 placeholder(v7.4) | ✅ | #316 components.js BookCover · 외서 5+5(#302/#343, 알라딘5+Google5) · export 책소개(#316/#344) |
-| §5.8.6 AI 카드 — 참새의 완독 회고(v7.4) | ✅ | #259/#345 완독책 상세 회고(solar-pro3 `/api/companion` mode:recap). 다음책 추천/추출(`ai.recommendBooks`·`extractBook`)은 Phase1 ⏳ |
+| §5.8.6 AI 카드 — 참새의 완독 회고(v7.4) | ✅ | #259/#345 회고 + #352 영속화. 다음책 추천/추출(`ai.recommendBooks`·`extractBook`)은 Phase1 ⏳ |
+| 한 문장 삭제 (책상세·둥지 상세) | ✅ | #358 sentences.remove(양 어댑터)·책상세 🗑 · CompanionModal 🗑(rg:sentence-removed 이벤트) |
+| 한 문장 책 제목 오표시(getBook 폴백) 수정 | ✅ | PR #374 — onArchive bookTitle 전달 + 둥지 카드 폴백 가드 |
 
 ## village.md (마을) — owner 윤지
 | 조항 | 상태 | 근거/갭 |
@@ -62,7 +68,8 @@
 |---|---|---|
 | §3 PostHog 자동수집 + 커스텀 이벤트·identify | ✅ | #296 index.html · #293 rgTrack(book_opened/highlight_selected/answer_saved/reading_session_end) |
 | §5 데이터 활용 동의 — 진입 배너(필수/전체/상세) + 설정 토글 | ✅ | #294 DataStore.consent · #331 ConsentBanner |
-| §4 companion_sessions 아카이브 | 🔧 | #295 18_*.sql (SQL 1회 실행 대기) |
+| §4 companion_sessions 아카이브 | ✅ | #295 18_*.sql 실행 완료 · 실유저 답변 3건 적재 실증(2026-06-11) |
+| 행동데이터 분석(Supabase first-party + PostHog) | ✅ | 2026-06-11 분석: 퍼널 가입8→등록7→문장6→완독3 · 아카이브 동의타이밍 규명(#370) |
 
 ## resilience — owner 계휴
 | 전역 ErrorBoundary(컴포넌트 크래시 격리) | ✅ | #310 app.js ErrorBoundary key={activeTab} |
@@ -86,4 +93,12 @@
 
 **v7.4.1 갱신 (2026-06-10, post-merge)**: 외서 검색 5+5 ✅(#302/#343), export 책 소개 ✅(#316/#344), 공개전환 체크리스트 ✅(#178/#344), 참새 완독 회고 ✅(#259/#345). spec-align: nest.py v7.2 현실로 갱신(getNestStage·NestView=function 선언형, ActiveBookSheet→캐러셀 #185, MissionModal→CheckinModal) → 10/10. backend.md Netlify→Cloudflare Worker 잔재 정정.
 
-**남은 이슈 후보**: ❌ social 친구찾기 패널 / 🔧 companion_sessions SQL 실행(#295)·스포일러 spec 문구(#177)·spec-drift CI 워크플로우 부재(drift.py FAIL) / ⏳ AI 다음책 추천·추출(stub, Phase1) · 북커버 수동 큐레이션(#315C, parking-lot).
+**남은 이슈 후보**: ❌ social 친구찾기 패널 / ⏳ AI 다음책 추천·추출(stub, Phase1) · 북커버 수동 큐레이션(#315C, parking-lot).
+> 해소됨: companion_sessions 실행·실증 ✅ · spec-drift CI ✅(#351, drift.py PASS) · 스포일러 spec 문구(#177).
+
+---
+**v7.4.2 갱신 (2026-06-11, post-merge 2)**: 외서 빈자리 보충 ✅(#350), 회고 영속화 ✅(#352), 한 문장 삭제 ✅(#358·둥지/책상세), 즉시 관리 id 전달 ✅(#358), 인용/내 생각 구분 ✅(#359·#360), 시간차 되감기 ✅(#346/#364), 게스트 데모 정합 ✅(#366·#367), spec-drift CI ✅(#351), 행동데이터 분석 ✅. SQL: 18~21(companion_sessions·companion_recap·sentence.kind·last_resurfaced_at) 전부 실행. 게이트 8종 green(align34·nest10·village·drift·contract·worker·biome·mdlint).
+
+**신규 백로그 (실사용·분석 발견, 2026-06-11)**: #370 해자 데이터 누수(게스트 대화 미보존) · #371 질문 평가👍👎 · #372 질문 재생성🔄 · #373 질문 품질(반복·책맥락·난이도) · #375 질문 방향성 프리셋 · #374 책 오표시(OPEN PR).
+
+**owner 윤지 (코드는 머지, spec PR 대기)**: #346 되감기(코드 #364 머지) · #347 읽기 종료 시 참새(미착수).
