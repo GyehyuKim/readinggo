@@ -34,3 +34,20 @@ if (missing.length) {
   process.exit(1);
 }
 console.log('✓ 모든 DataStore 호출이 supabase 어댑터에 존재 (계약 OK)');
+
+// Regression: QA ISSUE-004 — 피처 파일의 `SupabaseDataStore || DataStore` 폴백 금지.
+// 이 패턴은 로그인 여부와 무관하게 Supabase를 우선해 게스트에서 user_id=eq.null 400을 유발.
+// 활성 어댑터는 window.DataStore 하나(부트에서 스왑). Supabase 전용 기능(타인 프로필·admin)은
+// 폴백 없는 직접 참조 + 가드만 허용. Found by /qa on 2026-06-10.
+const leaky = [];
+for (const f of files) {
+  if (f.startsWith('datastore')) continue;
+  const src = readFileSync(join(root, f), 'utf8');
+  if (/SupabaseDataStore\s*\|\|/.test(src)) leaky.push(f);
+}
+if (leaky.length) {
+  console.error('✘ 게스트 Supabase 누수 패턴(SupabaseDataStore || …) 발견 — window.DataStore 사용:');
+  for (const f of leaky) console.error(`  - ${f}`);
+  process.exit(1);
+}
+console.log('✓ SupabaseDataStore 폴백 패턴 없음 (게스트 누수 가드 OK)');
