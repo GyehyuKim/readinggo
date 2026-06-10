@@ -129,12 +129,18 @@ async function aladinProxy(q, env) {
 
   try {
     let items = (await aladinFetch(apiUrl)).map(normalize);
-    // 외서·미검색 보강 (#302) — 검색 결과가 적으면 Google Books 폴백(키 불필요, 외서·표지 풍부). ISBN 단건 조회엔 미적용.
-    if (query && items.length < 5) {
+    // 외서 균형 보강 (#302) — 검색이면 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
+    // 결과 홍수 방지: 알라딘 5칸으로 자르고, 외서 5칸을 항상 채워 균형. ISBN 단건 조회엔 미적용.
+    if (query) {
+      items = items.slice(0, 5);
       try {
-        const gb = await googleBooksSearch(query, max, env);
+        const gb = await googleBooksSearch(query, 5, env);
         const seen = new Set(items.map((it) => it.isbn13 || it.title));
-        for (const g of gb) { const k = g.isbn13 || g.title; if (k && !seen.has(k)) { seen.add(k); items.push(g); } }
+        for (const g of gb) {
+          if (items.length >= 10) break;
+          const k = g.isbn13 || g.title;
+          if (k && !seen.has(k)) { seen.add(k); items.push(g); }
+        }
       } catch (e) { /* 폴백 실패 무시 */ }
     }
     return json({ items }, 200, 86400);
