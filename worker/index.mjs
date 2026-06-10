@@ -50,7 +50,7 @@ function companionMock(sentence) {
   return qs[(sentence ? sentence.length : 0) % qs.length];
 }
 
-async function callLLM({ messages, env }) {
+async function callLLM({ messages, env, maxTokens }) {
   const base = (env.LLM_BASE_URL || '').replace(/\/$/, '');
   const model = env.LLM_MODEL, key = env.UPSTAGE_API_KEY;
   if (!base || !model || !key) throw new Error('LLM env 미설정');
@@ -58,7 +58,7 @@ async function callLLM({ messages, env }) {
     model,
     messages,
     temperature: 0.8,
-    max_tokens: 220,
+    max_tokens: maxTokens || 220,
   };
   // reasoning 토글 — LLM_REASONING_EFFORT 미설정/빈 값이면 필드 생략(추론 최소). low|medium|high면 전달.
   const eff = (env.LLM_REASONING_EFFORT || '').trim().toLowerCase();
@@ -77,6 +77,8 @@ async function companionProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  // 완독 회고 모드 (#259) — 내가 남긴 한 문장들을 참새가 엮어 따뜻한 회고 한 단락.
+  if (body && body.mode === 'recap') return companionRecap(body, env);
   const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
   const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
   const author = String((body && body.author) || '').slice(0, 120).trim();
@@ -103,6 +105,47 @@ async function companionProxy(request, env) {
   } catch (e) {
     // 호출 실패 → 목 질문 폴백 (무중단)
     return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
+  }
+}
+
+/* ── 완독 회고 — 참새가 내 한 문장들을 엮음 (#259) ─────────
+   reflective(고양감 코어): 나열·요약 금지, 무엇에 끌렸는지 되짚고 응원 한 줄로 마무리. */
+const RECAP_SYSTEM = '당신은 사용자와 친한 독서모임 진행자 "참새"입니다. 사용자가 한 권을 완독하고, 읽는 동안 마음에 남겨 둔 문장들을 모았습니다. 그 문장들을 단순히 나열하거나 요약하지 말고, 그 사람이 이 책에서 무엇에 끌렸는지를 읽어내어 따뜻하게 되짚어 주세요. 끌어올려지는 느낌(고양감)이 남도록 쓰되, 마지막 한 줄은 앞으로의 독서를 응원하거나 가볍게 생각을 열어 주는 한 문장으로 끝맺으세요. 한국어, 한 단락(3~5문장)에 마지막 응원 한 줄. 과장된 칭찬·해설 나열·이모지 남발 금지.';
+
+function recapMock(bookTitle, sentences) {
+  const n = sentences.length;
+  const first = (sentences[0] || '').slice(0, 40);
+  return `${bookTitle ? `《${bookTitle}》` : '이 책'}을(를) 끝까지 읽으며 ${n}개의 문장을 마음에 남기셨네요.`
+    + (first ? ` "${first}…" 같은 문장에 멈춰 섰던 건, 분명 그 순간 무언가가 당신을 끌어당겼기 때문일 거예요.` : '')
+    + ' 그 끌림이 곧 당신만의 독서 결입니다. 다음 책에서도 그런 문장을 만나길 응원할게요. 🐦';
+}
+
+async function companionRecap(body, env) {
+  const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
+  const author = String((body && body.author) || '').slice(0, 120).trim();
+  const review = String((body && body.review) || '').slice(0, 500).trim();
+  const rating = (typeof (body && body.rating) === 'number') ? body.rating : null;
+  const sentences = (Array.isArray(body && body.sentences) ? body.sentences : [])
+    .slice(0, 20)
+    .map((s) => String((s && s.text) || s || '').slice(0, 300).trim())
+    .filter(Boolean);
+  if (!sentences.length) return json({ error: 'sentences 필요' }, 422);
+  if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
+    return json({ recap: recapMock(bookTitle, sentences), demo: true }, 200);
+  }
+  const ctx = `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}`
+    + (rating != null ? `\n내 별점: ${rating}/5` : '')
+    + (review ? `\n완독 소감: ${review}` : '')
+    + `\n내가 남긴 한 문장(${sentences.length}):\n` + sentences.map((s, i) => `${i + 1}. "${s}"`).join('\n');
+  const messages = [
+    { role: 'system', content: RECAP_SYSTEM },
+    { role: 'user', content: ctx + '\n\n이 문장들을 엮어 완독 회고 한 단락을 한국어로 써 주세요.' },
+  ];
+  try {
+    const recap = await callLLM({ messages, env, maxTokens: 450 });
+    return json({ recap: recap || recapMock(bookTitle, sentences) }, 200);
+  } catch (e) {
+    return json({ recap: recapMock(bookTitle, sentences), demo: true, error: String((e && e.message) || e) }, 200);
   }
 }
 
