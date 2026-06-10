@@ -611,7 +611,7 @@ function BookInfoModal({ bookId, onClose }) {
   const [manualPages, setManualPages] = useState(''); // 쪽수 메타 누락 시 수동 입력 (#204)
   useEffect(() => {
     let alive = true;
-    const DS = window.SupabaseDataStore || window.DataStore || {};
+    const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
     Promise.resolve((DS.books && DS.books.getById) ? DS.books.getById(bookId) : null)
       .then(b => { if (alive) setBk(b || null); }).catch(() => { if (alive) setBk(null); });
     return () => { alive = false; };
@@ -660,7 +660,7 @@ function StreakCalendarModal({ streak, onClose }) {
   const [cal, setCal] = useState(undefined);
   useEffect(() => {
     let alive = true;
-    const DS = window.SupabaseDataStore || window.DataStore || {};
+    const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
     Promise.resolve((DS.sessions && DS.sessions.calendar) ? DS.sessions.calendar(35) : { readDates: [], shieldDates: [] })
       .then(c => { if (alive) setCal(c || { readDates: [], shieldDates: [] }); })
       .catch(() => { if (alive) setCal({ readDates: [], shieldDates: [] }); });
@@ -710,7 +710,7 @@ function SentenceCollectionModal({ onClose }) {
   const [filter, setFilter] = useState('all'); // all | book | fav
   useEffect(() => {
     let alive = true;
-    const DS = window.SupabaseDataStore || window.DataStore || {};
+    const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
     Promise.all([
       Promise.resolve((DS.sentences && DS.sentences.listMine) ? DS.sentences.listMine() : []).catch(() => []),
       Promise.resolve((DS.bookmarks && DS.bookmarks.list) ? DS.bookmarks.list() : []).catch(() => []),
