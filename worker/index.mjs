@@ -181,10 +181,11 @@ async function aladinProxy(q, env) {
     });
     // 외서 균형 보강 (#302) — 검색이면 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
     // 결과 홍수 방지: 알라딘 5칸으로 자르고, 외서 5칸을 항상 채워 균형. ISBN 단건 조회엔 미적용.
+    // 빈자리 이월(#350): 알라딘이 5칸을 못 채우면(외서 등) 남은 자리를 Google로 채워 총 10건 보장.
     if (query) {
       items = items.slice(0, 5);
       try {
-        const gb = await googleBooksSearch(query, 5, env);
+        const gb = await googleBooksSearch(query, 10 - items.length, env);
         const seen = new Set(items.map((it) => it.isbn13 || it.title));
         for (const g of gb) {
           if (items.length >= 10) break;
