@@ -22,6 +22,30 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   const [editMeta, setEditMeta] = _useState(false);
   const [rt, setRt] = _useState(book.rating || 0);
   const [rv, setRv] = _useState(book.comment || '');
+  // 참새의 완독 회고 (#259) — 내 한 문장들을 엮어 회고 한 단락. 실패/키없음 시 목 폴백(서버에서 처리).
+  const [recap, setRecap] = _useState('');
+  const [recapLoading, setRecapLoading] = _useState(false);
+  const loadRecap = async () => {
+    if (recapLoading) return;
+    setRecapLoading(true);
+    try {
+      const sentences = (bookQuotes || []).map(q => ({ text: q.text }));
+      const r = await fetch('/api/companion', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'recap', bookTitle: book.title, author: book.author || '',
+          rating: (typeof book.rating === 'number') ? book.rating : undefined,
+          review: book.comment || '', sentences,
+        }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        if (d && d.recap) { setRecap(d.recap); if (window.rgTrack) window.rgTrack('companion_recap', { bookId: book.id, n: sentences.length }); }
+        else showToast('회고를 불러오지 못했어요 — 잠시 후 다시');
+      } else showToast('회고를 불러오지 못했어요 — 잠시 후 다시');
+    } catch (e) { showToast('회고를 불러오지 못했어요 — 잠시 후 다시'); }
+    setRecapLoading(false);
+  };
   const saveMeta = () => {
     if (!book.ubId || !(DataStore.books && DataStore.books.complete)) { setEditMeta(false); return; }
     Promise.resolve(DataStore.books.complete(book.ubId, { rating: rt || null, review_text: (rv || '').trim() || null }))
@@ -224,11 +248,23 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </div>
           )}
 
-          {/* 완독 후 AI 카드 (§5.8.6) — Phase1 Gemini 전까지 '준비 중' 플레이스홀더 (#259) */}
+          {/* 참새의 완독 회고 (§5.8.6, #259) — 내 한 문장들을 참새(solar-pro3)가 엮어 회고 한 단락 */}
           {bookshelfEntry && (
             <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
-              <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:4}}>🤖 AI 다음 책 추천 · 나만의 추출 책</div>
-              <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5}}>이 책의 한 문장으로 다음 책 추천과 추출 책을 만들어 드려요. <b>준비 중</b>(Phase 1).</div>
+              <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:6}}>🐦 참새의 완독 회고</div>
+              {recap ? (
+                <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{recap}</div>
+              ) : bookQuotes.length === 0 ? (
+                <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5}}>이 책에 남긴 한 문장이 있으면, 참새가 그 문장들을 엮어 회고를 들려줘요.</div>
+              ) : (
+                <>
+                  <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5, marginBottom:8}}>이 책에서 남긴 {bookQuotes.length}개의 한 문장을 참새가 엮어 회고를 들려드려요.</div>
+                  <button onClick={loadRecap} disabled={recapLoading}
+                    style={{padding:'9px 16px', background:'var(--brand)', border:'none', borderRadius:8, color:'#fff', fontSize:13, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
+                    {recapLoading ? '참새가 곱씹는 중…' : '🐦 회고 받기'}
+                  </button>
+                </>
+              )}
             </div>
           )}
 
