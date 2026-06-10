@@ -35,11 +35,13 @@ rgTrack('highlight_selected',  { book_id, page, sentence_length }) // 한 문장
 rgTrack('answer_saved',        { book_id, lens, answer_length })   // 독서모임 답변 (nest.js, lens='why')
 rgTrack('reading_session_end', { book_id, duration_sec, pages_logged }) // 독서 종료 (nest.js finish)
 rgTrack('companion_recap',     { book_id, n })                          // 참새의 완독 회고 받기 (library.js, #259)
+rgTrack('resurface_shown',     { sentence_id, days })                   // 되감기 카드 노출 (nest.js, #346)
+rgTrack('resurface_answered',  { sentence_id, days })                   // 다시 대화하기 탭 (nest.js, #346)
+rgTrack('resurface_skipped',   { sentence_id })                         // 나중에 탭 (nest.js, #346)
 rgTrack('app_error',           { message, tab })                        // 컴포넌트 크래시 (app.js ErrorBoundary, #310)
 
 // ⏳ 후속 (해당 기능 구현 시)
 rgTrack('lens_switched',       { book_id, from_lens, to_lens })   // 렌즈 도입 후 (companion.md §6)
-rgTrack('resurface_triggered', { book_id, days_since_original })  // 시간차 되감기 (#289)
 rgTrack('import_completed',    { source: 'bookmory', count })     // BookMory 임포트 (#288)
 ```
 

@@ -636,6 +636,35 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     const ni = ((idx < 0 ? 0 : idx) + dir + readingBooks.length) % readingBooks.length;
     if (window.RG_activateBook) window.RG_activateBook(readingBooks[ni]);
   };
+  // 시간차 되감기 (#346, resurface.md) — 둥지 진입 시 백그라운드 체크, 1일 1회, 비침습 카드.
+  const [resurfaceCard, setResurfaceCard] = _useState(null);
+  _useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (!(DataStore.resurface && DataStore.sentences && DataStore.sentences.resurfaceCandidate)) return;
+        if (DataStore.resurface.shownToday()) return;
+        const cand = await Promise.resolve(DataStore.sentences.resurfaceCandidate());
+        if (!alive || !cand) return;
+        setResurfaceCard(cand);
+        DataStore.resurface.markToday(); // 노출 시점에 1일 1회 마킹 (§2.1)
+        rgTrack('resurface_shown', { sentence_id: cand.id, days: cand.daysAgo });
+      } catch (e) { /* 넛지 실패는 조용히 */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  const resurfaceTalk = () => {
+    if (!resurfaceCard) return;
+    rgTrack('resurface_answered', { sentence_id: resurfaceCard.id, days: resurfaceCard.daysAgo });
+    try { Promise.resolve(DataStore.sentences.markResurfaced(resurfaceCard.id)).catch(() => {}); } catch (e) {}
+    if (window.RG_openCompanion) window.RG_openCompanion({ id: resurfaceCard.id, text: resurfaceCard.text, bookId: resurfaceCard.bookId, bookTitle: resurfaceCard.bookTitle, page: resurfaceCard.page, note: resurfaceCard.note, kind: resurfaceCard.kind });
+    setResurfaceCard(null);
+  };
+  const resurfaceLater = () => {
+    if (!resurfaceCard) return;
+    rgTrack('resurface_skipped', { sentence_id: resurfaceCard.id });
+    setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
+  };
 
   // 같은 책 읽는 사람들 — 실 sentences(타 사용자, NPC 포함). 활성 책 변경 시 재로드. (#1)
   _useEffect(() => {
@@ -811,6 +840,35 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
       {checkedToday && (
         <div className="nudge" style={{ textAlign: 'center', fontWeight: 800 }}>
           🐦 오늘 기록 완료! <span className="em">🔥 {nestState.streak}일</span> 연속
+        </div>
+      )}
+
+      {/* 시간차 되감기 카드 (#346, resurface.md §3.1) — 비침습, 스크롤로 지나칠 수 있음 */}
+      {resurfaceCard && (
+        <div style={{ background: 'var(--brand-tint)', border: '1px solid var(--brand)', borderRadius: 12, padding: '14px 16px', margin: '10px 0' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand-3)', marginBottom: 6 }}>💬 참새</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>
+            {resurfaceCard.daysAgo}일 전, 이 문장을 남겼어요{resurfaceCard.bookTitle ? ` — 《${resurfaceCard.bookTitle}》` : ''}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.55, fontStyle: resurfaceCard.kind === 'thought' ? 'normal' : 'italic', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '8px 2px', marginBottom: 8 }}>
+            {resurfaceCard.kind === 'thought' ? `💭 ${resurfaceCard.text}` : `"${resurfaceCard.text}"`}
+          </div>
+          {resurfaceCard.lastAnswer && (
+            <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 8 }}>
+              내가 썼던 것: "{resurfaceCard.lastAnswer.length > 80 ? resurfaceCard.lastAnswer.slice(0, 80) + '…' : resurfaceCard.lastAnswer}"
+            </div>
+          )}
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 10 }}>지금은 어때요?</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={resurfaceTalk}
+              style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              다시 대화하기
+            </button>
+            <button onClick={resurfaceLater}
+              style={{ padding: '10px 18px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              나중에
+            </button>
+          </div>
         </div>
       )}
 
