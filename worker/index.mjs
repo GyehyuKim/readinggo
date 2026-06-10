@@ -43,7 +43,7 @@ export default {
 /* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
    provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
    키 없거나 실패 시 목 질문으로 graceful fallback (데모/피치 무중단). */
-const COMPANION_SYSTEM = '당신은 사용자와 친한 독서모임 진행자입니다. 사용자가 방금 남긴 한 문장을 보고, 그 사람이 자기 생각을 더 깊이 펼치도록 대화하듯 이끄는 질문을 한국어로 하나 던지세요. 그 책과 작가에 대해 아는 바(작품 맥락·작가의 삶·시대)가 있으면 자연스럽게 한 조각 곁들여 질문을 풍부하게 하되, 핵심은 그 사람의 경험·감정·기억과 잇는 것입니다. 따뜻하고 호기심 어린 톤. 예/아니오로 닫히지 않는 열린 질문. 길이는 자연스럽게(억지로 짧게 하지 말 것), 단 질문은 하나만. 칭찬·요약·해설 나열은 금지하고 질문으로 끝맺으세요.';
+const COMPANION_SYSTEM = '당신은 사용자와 친한 독서모임 진행자입니다. 사용자가 방금 남긴 한 문장을 보고, 그 사람이 자기 생각을 더 깊이 펼치도록 대화하듯 이끄는 질문을 한국어로 하나 던지세요. 입력의 역할을 혼동하지 마세요(#359): "책에서 옮겨 적은 한 문장(인용)"은 작품 속 문장이고, "내 메모(감상)"는 사용자 자신의 생각입니다. 인용을 사용자의 감상으로 단정하지 마세요. 만약 한 문장이 책 속 인용으로 보기 어렵거나(예: "즐거웠다"처럼 짧은 감상형) 작품 속 맥락을 알 수 없다면, 함부로 해석하지 말고 — 그 문장이 책의 어떤 장면·맥락에서 나온 것인지, 혹은 본인의 생각을 적은 것인지를 먼저 물어보세요. 그 책과 작가에 대해 아는 바(작품 맥락·작가의 삶·시대)가 있으면 자연스럽게 한 조각 곁들여 질문을 풍부하게 하되, 핵심은 그 사람의 경험·감정·기억과 잇는 것입니다. 따뜻하고 호기심 어린 톤. 예/아니오로 닫히지 않는 열린 질문. 길이는 자연스럽게(억지로 짧게 하지 말 것), 단 질문은 하나만. 칭찬·요약·해설 나열은 금지하고 질문으로 끝맺으세요.';
 
 function companionMock(sentence) {
   const qs = ['왜 이 문장이 마음에 걸렸어요?', '이 문장, 지금 내 상황이랑 연결되는 게 있어요?', '이 문장에서 어떤 장면이나 기억이 떠올랐어요?', '이 문장을 누군가에게 들려준다면 누구일까요?'];
@@ -91,7 +91,7 @@ async function companionProxy(request, env) {
     return json({ question: companionMock(sentence), demo: true }, 200);
   }
   const messages = [{ role: 'system', content: COMPANION_SYSTEM }];
-  messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n남긴 한 문장: "${sentence}"${comment ? `\n메모: ${comment}` : ''}` });
+  messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n책에서 옮겨 적은 한 문장(인용): "${sentence}"${comment ? `\n내 메모(감상): ${comment}` : ''}` });
   for (const e of exchanges) {
     if (e && e.q) messages.push({ role: 'assistant', content: String(e.q).slice(0, 500) });
     if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
