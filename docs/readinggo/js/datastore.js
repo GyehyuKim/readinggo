@@ -34,6 +34,13 @@ function _dayDiff(fromDate, toDate) {
   const b = new Date(toDate + 'T00:00:00');
   return Math.round((b - a) / 86400000);
 }
+function _todayMinus(n) {
+  // n일 전 날짜 (YYYY-MM-DD). 캘린더 since 계산용 (#367).
+  const d = new Date(Date.now() - (n || 0) * 86400000);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
 
 /* ── localStorageAdapter ────────────────────────────────
    rg_v41 키 하나에 §7.8 JSON 미러를 보관. 최초 로드 시 시드.
@@ -69,6 +76,15 @@ const localStorageAdapter = (function () {
         sessions: [],
         sentences: [],
       });
+
+      // 게스트 데모 세션 시드 (#367) — 스트릭 N일과 캘린더 정합. 최근 N일 연속 읽은 날.
+      const streakDays = (window.INITIAL_STATE && window.INITIAL_STATE.streak) || 0;
+      for (let i = 0; i < streakDays; i++) {
+        user_books[0].sessions.push({
+          id: _dsId('sess'), user_book_id: user_books[0].id,
+          session_date: _todayMinus(i), current_page: user_books[0].current_page, created_at: Date.now() - i * 86400000,
+        });
+      }
 
       // 게스트 데모 시드 문장 (QA ISSUE-006) — UI 시드(INITIAL_STATE.myQuotes)만 있고
       // DataStore 가 비어 피드·컬렉션이 0개로 어긋나던 문제. id 부여해 관리도 가능.
@@ -269,6 +285,18 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const ub = _ubById(s, userBookId) || _activeUB(s);
         return ub ? (ub.sessions || []).slice() : [];
+      });
+    },
+    // 스트릭 캘린더 (#367) — 최근 days일 읽은 날짜. supabase 어댑터와 표면 일치(§7.2).
+    // 로컬엔 방패 로그 미보유 → shieldDates 빈 배열. 전 책의 session_date 합집합.
+    calendar(days) {
+      return localStorageAdapter.mutate(s => {
+        const since = _todayMinus(days || 35);
+        const set = new Set();
+        (s.user_books || []).forEach(ub => (ub.sessions || []).forEach(se => {
+          if (se.session_date && se.session_date >= since) set.add(se.session_date);
+        }));
+        return { readDates: [...set], shieldDates: [] };
       });
     },
   },

@@ -236,6 +236,31 @@ function App() {
     grantXp(XP_RULES.visit, 'visit');
   }, []);
 
+  // 게스트 myQuotes hydration (#367) — INITIAL_STATE.myQuotes 시드엔 id가 없어
+  // 책상세·컬렉션의 공개/좋아요/감상/삭제 버튼(q.id 가드)이 안 떴음. 로컬 어댑터의
+  // 시드 문장(id 보유, #366)을 appState 로 끌어와 첫인상부터 기능 노출.
+  useEffect(() => {
+    if (_supa && authUser && authUser !== 'local') return; // 로그인 경로는 buildStateFromSupabase 담당
+    if (window.SupabaseDataStore && window.DataStore === window.SupabaseDataStore) return;
+    let alive = true;
+    Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : [])
+      .then(rows => {
+        if (!alive || !Array.isArray(rows) || !rows.length) return;
+        const getT = window.getBook;
+        setAppState(s => ({
+          ...s,
+          myQuotes: rows.slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => ({
+            id: r.id, text: r.text, bookId: r.book_id || '',
+            bookTitle: (getT && getT(r.book_id) || {}).title || '',
+            page: r.page, when: '', createdAt: r.created_at || '',
+            note: r.my_note || '', kind: r.kind || 'quote',
+            visibility: 'public', isPrivate: false, notePrivate: false,
+          })),
+        }));
+      }).catch(() => {});
+    return () => { alive = false; };
+  }, [authUser]);
+
   // 인증 상태 구독 (Supabase 모드)
   useEffect(() => {
     if (!_supa) return;
