@@ -83,6 +83,8 @@ async function companionProxy(request, env) {
   const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
   const author = String((body && body.author) || '').slice(0, 120).trim();
   const comment = String((body && body.comment) || '').slice(0, 500).trim();
+  // 인용 vs 내 의견 (#360) — thought면 작품 인용이 아니라 독자의 생각으로 대한다.
+  const kind = (body && body.kind === 'thought') ? 'thought' : 'quote';
   // 멀티턴 — 이전 대화(질문/답변). 후속 질문 생성용 (#327).
   const exchanges = Array.isArray(body && body.exchanges) ? body.exchanges.slice(0, 6) : [];
   if (!sentence) return json({ error: 'sentence 필요' }, 422);
@@ -91,7 +93,7 @@ async function companionProxy(request, env) {
     return json({ question: companionMock(sentence), demo: true }, 200);
   }
   const messages = [{ role: 'system', content: COMPANION_SYSTEM }];
-  messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n책에서 옮겨 적은 한 문장(인용): "${sentence}"${comment ? `\n내 메모(감상): ${comment}` : ''}` });
+  messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n${kind === 'thought' ? `읽다가 든 내 생각(감상): "${sentence}" — 이것은 책의 인용이 아니라 독자 본인의 생각입니다. 작품 맥락을 단정하지 말고 이 생각 자체를 더 깊이 여는 질문을 하세요.` : `책에서 옮겨 적은 한 문장(인용): "${sentence}"`}${comment ? `\n내 메모(감상): ${comment}` : ''}` });
   for (const e of exchanges) {
     if (e && e.q) messages.push({ role: 'assistant', content: String(e.q).slice(0, 500) });
     if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
