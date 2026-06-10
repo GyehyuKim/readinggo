@@ -3,7 +3,7 @@
 > KAIST IT경영 특수논제(AI 기반 비즈니스 진화·전략·실습) 학기 프로젝트.
 > 레포명 `glocalx` — 초기 아이디어 탐색([`old/`](./old/))을 거쳐 **ReadingGo**로 수렴했다.
 
-**🔗 라이브 데모 → https://resilient-licorice-f4b889.netlify.app**
+**🔗 라이브 데모 → <https://readinggo.hyuniverse.workers.dev>**
 
 ---
 
@@ -39,12 +39,12 @@
 
 ## 데모 보기
 
-- **온라인**: https://resilient-licorice-f4b889.netlify.app
+- **온라인**: <https://readinggo.hyuniverse.workers.dev>
 - **로컬**: 빌드 불필요(React 18 + Babel CDN). `books.tsv`를 `fetch`로 읽으므로 `file://` 직접 열기보다 **정적 서버** 권장:
   ```bash
   npx serve docs/readinggo
   ```
-- **재배포**: `npx netlify-cli deploy --dir=docs/readinggo --prod`
+- **재배포**: `npx wrangler deploy` (Cloudflare Workers — Netlify에서 이전 완료)
 - **도서 데이터**: [`docs/readinggo/data/books.tsv`](./docs/readinggo/data/books.tsv) (542권, 유일한 소스 — 코드에 책 정보 하드코딩 금지)
 
 ---

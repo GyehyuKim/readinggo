@@ -24,7 +24,7 @@
 **플랫폼 결정 (v7):**
 
 - **빌드**: 현행 React 18 CDN + Babel standalone 유지 (빌드 도구 없음). Vite 전환은 **PWA 전환 시 재검토** (현재 보류).
-- **배포**: **Netlify** — 사이트 `resilient-licorice-f4b889`, `https://resilient-licorice-f4b889.netlify.app`. (GitHub Pages 폐기.) 재배포: `npx netlify-cli deploy --dir=docs/readinggo` (프로덕션 `--prod`).
+- **배포**: **Cloudflare Workers** — Worker `readinggo`, `https://readinggo.hyuniverse.workers.dev`. (Netlify → Cloudflare 이전 완료, GitHub Pages 폐기.) 재배포: `npx wrangler deploy`.
 - **모바일/네이티브**: **Capacitor 보류** — OCR·STT·앱스토어가 필요한 Phase 3 에서 재도입 검토. 그전까지 한 줄 입력 마찰은 **OS 키보드 음성입력**(폰 키보드 마이크 = OS STT, 비용 0)으로 대체 안내.
 - **푸시 알림**: Phase 2 **PWA 전환(웹푸시)** 이후로 후순위. Phase 0/1 은 알림 없음(인앱 토스트 시뮬).
 

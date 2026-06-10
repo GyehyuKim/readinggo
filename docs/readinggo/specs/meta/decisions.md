@@ -117,7 +117,7 @@
 |---|---|---|---|
 | **#179 한 문장 공개 범위** | ⚠️ **`is_private` binary → `visibility` 3단계 확장**: `public`(전체)·`followers`(상호 팔로워)·`private`(나만). Instagram 모델. **작성자가 공개해야만 타인에게 보임.** RLS 강제(`followers`=양방향 follows). 마이그레이션 `06_privacy_v2.sql`. **SSOT=[social.md §5.7.1](../social.md)** | social/backend | §8.1 "is_private 재도입"을 **대체** |
 | **#159 로그인 방식** | **이메일 1회 가입 + 세션 유지**(Supabase 세션 자동 유지). 만료 시 재로그인. Google OAuth 병행. (§8.2 "매직링크 제외" **갱신**) | onboarding/backend | 재논의 결과 |
-| **이메일 템플릿 브랜딩** | 확인·매직링크 메일에 **ReadingGo 브랜딩 + 문의처(readinggo.admin@gmail.com)** 삽입 — 사용자가 발신 출처를 신뢰하고 클릭하도록. `admin-cli.mjs email-template set` | backend(운영) | 신규(#1 맥락) |
+| **이메일 템플릿 브랜딩** | 확인·매직링크 메일에 **ReadingGo 브랜딩 + 문의처(`readinggo.admin@gmail.com`)** 삽입 — 사용자가 발신 출처를 신뢰하고 클릭하도록. `admin-cli.mjs email-template set` | backend(운영) | 신규(#1 맥락) |
 | **#154 마을 Supabase 연동** | `village.js` 데모 하드코딩 → `DataStore.villages.listMine/listPublic/create/join` 실연동 | village(윤지) | 사용자 지시로 계휴 작업 |
 | **#170 본인 마을 제외** | 추천 공개 마을 목록에서 내가 생성/가입한 마을 `filter` 제외 | village(윤지) | — |
 | **#153 반별점 0.5** | 별 좌측 절반 탭=0.5점. nest.md §5.4 SSOT 반영 | nest(승원) | 스펙 반영(구현 승원) |

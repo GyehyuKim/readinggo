@@ -1,0 +1,38 @@
+# Spec Drift 방어 (#351) — PR마다 spec↔구현 정렬 검증.
+# 패턴 A ([LF: Spec Drift 방어 3패턴]) — tests/spec-align/drift.py 가 이 파일의 구조를 검증한다.
+name: spec-drift
+
+on:
+  pull_request:
+    paths:
+      - 'docs/readinggo/specs/**'
+      - 'docs/readinggo/js/**'
+      - 'worker/**'
+      - 'tests/**'
+      - '.github/workflows/spec-drift.yml'
+
+jobs:
+  spec-align:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # spec ↔ 구현 invariant (docs/readinggo/specs ↔ docs/readinggo/js)
+      - name: spec-align gates
+        run: |
+          python3 tests/spec-align/align_v7.py
+          python3 tests/spec-align/nest.py
+          python3 tests/spec-align/village_v7.py
+          python3 tests/spec-align/drift.py
+
+      - name: DataStore 계약 (UI 호출 ↔ supabase 어댑터)
+        run: node tests/contract/datastore-contract.mjs
+
+      - name: Worker syntax
+        run: node --check worker/index.mjs
+
+      - name: biome lint (js)
+        run: npx -y @biomejs/biome@2 lint docs/readinggo/js worker
+
+      - name: markdownlint (specs + 루트 docs)
+        run: npx -y markdownlint-cli2
