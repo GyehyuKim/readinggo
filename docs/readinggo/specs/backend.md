@@ -67,7 +67,7 @@ activeBook.set(userBookId)                                  // = users.active_us
 // 일일 기록 (세션 + 한 문장)
 sessions.addToday({userBookId, page})      → Session         // 하루 첫 기록: 세션 생성 + 스트릭/XP
 sessions.list(userBookId)                  → Session[]
-sentences.add({userBookId, sessionId, page, text, my_note?}) → Sentence
+sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): quote(기본)|thought(내 의견) — 20_sentence_kind.sql
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
 sentences.listByBook(userBookId)           → Sentence[]
 sentences.feed({cursor})                   → Sentence[]      // 최근(전체 공개) 피드 (§social)

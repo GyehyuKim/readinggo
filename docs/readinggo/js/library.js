@@ -371,9 +371,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                       </div>
                     ) : (
                       <>
-                        <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
-                          "{q.text}"
-                        </div>
+                        {/* 인용은 "이탤릭", 내 의견은 💭 (#360) */}
+                        {q.kind === 'thought' ? (
+                          <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5'}}>💭 {q.text}</div>
+                        ) : (
+                          <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
+                            "{q.text}"
+                          </div>
+                        )}
                         {(() => {
                           const note = noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '');
                           if (editingId === q.id) {
@@ -586,8 +591,10 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           </div>
           {state.myQuotes.slice(0, 10).map((q) => (
             <div key={q.id || q.text} style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:12, marginBottom:8}}>
-              <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:4}}>{q.bookTitle ? q.bookTitle + ' · ' : ''}{q.page != null ? q.page + 'p' : '페이지 미상'}</div>
-              <div style={{fontSize:13, color:'var(--ink)', fontStyle:'italic', lineHeight:1.5}}>"{q.text}"</div>
+              <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:4}}>{q.bookTitle ? q.bookTitle + ' · ' : ''}{q.page != null ? q.page + 'p' : '페이지 미상'}{q.kind === 'thought' ? ' · 💭 내 생각' : ''}</div>
+              {q.kind === 'thought'
+                ? <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.5}}>💭 {q.text}</div>
+                : <div style={{fontSize:13, color:'var(--ink)', fontStyle:'italic', lineHeight:1.5}}>"{q.text}"</div>}
             </div>
           ))}
           <button onClick={() => window.RG_openCollection && window.RG_openCollection()} style={{display:'block', width:'100%', marginTop:4, padding:'10px', background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, color:'var(--ink-3)', fontWeight:800, fontSize:13, cursor:'pointer', textAlign:'center'}}>전체 보기 · 좋아요 필터 →</button>
