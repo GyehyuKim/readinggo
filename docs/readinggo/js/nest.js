@@ -316,22 +316,22 @@ function pickCompanionQ(text) {
   return COMPANION_QS[i];
 }
 // 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 목 질문 폴백 — 데모 무중단.
-async function genCompanionQuestion(sentence, bookTitle, author, kind) {
+async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid) {
   try {
     const r = await fetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote' }),
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote', avoid: avoid || '' }),
     });
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }
   return pickCompanionQ(sentence);
 }
-// 멀티턴 후속 질문 (#327) — 이전 대화(exchanges) 전달 → 한 걸음 더 깊은 되물음. 실패 시 목 폴백.
-async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind) {
+// 멀티턴 후속 질문 (#327) — 이전 대화(exchanges) 전달 → 한 걸음 더 깊은 되물음. 실패 시 목 폴백. avoid(#372) 재생성용.
+async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind, avoid) {
   try {
     const r = await fetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote' }),
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote', avoid: avoid || '' }),
     });
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }
@@ -465,6 +465,22 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
     genCompanionFollowup(companion.text, ex, book.title, book.author, companion.kind).then((q) =>
       setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, question: q, loading: false } : c));
   };
+  // 질문 재생성 (#372) — 현재 질문을 avoid로 넘겨 다른 질문 받기.
+  const regenCompanion = () => {
+    if (!companion || companion.loading || !companion.question) return;
+    const cur = companion.question, ex = companion.exchanges || [], sid = companion.sentenceId;
+    rgTrack('companion_q_regen', { book_id: book.id });
+    setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: null, loading: true, rated: null } : c);
+    const gen = ex.length ? genCompanionFollowup(companion.text, ex, book.title, book.author, companion.kind, cur)
+      : genCompanionQuestion(companion.text, book.title, book.author, companion.kind, cur);
+    gen.then((q) => setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
+  };
+  // 질문 평가 (#371) — 👍/👎 (사유는 후속). engagement 신호 → PostHog.
+  const rateCompanion = (val) => {
+    if (!companion) return;
+    rgTrack('companion_q_rated', { book_id: book.id, value: val });
+    setCompanion((c) => c ? { ...c, rated: val } : c);
+  };
   // 독서 종료: 최종 읽은 쪽을 부모 체크인 파이프라인(handleCheckin)에 위임 (#300).
   // → 진도/스트릭/XP 갱신 + 둥지 갱신(onCheckin) + 완독 시 세리머니(별점·소감 카드)까지 단일 경로로.
   // 한 문장은 읽는 중 save()로 이미 저장되므로 sentence=null. (완독 처리=세리머니 onComplete→books.complete)
@@ -551,7 +567,15 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
                   <div style={{ fontSize: 13, opacity: 0.7, fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
                 ) : (
                   <>
-                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.55, marginBottom: 10 }}>{companion.question}</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
+                      <div style={{ flex: 1, fontSize: 14, fontWeight: 700, lineHeight: 1.55 }}>{companion.question}</div>
+                      {/* 질문 평가(#371)·재생성(#372) */}
+                      <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
+                        <button onClick={() => rateCompanion('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'up' ? 1 : 0.45 }}>👍</button>
+                        <button onClick={() => rateCompanion('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'down' ? 1 : 0.45 }}>👎</button>
+                        <button onClick={regenCompanion} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
+                      </div>
+                    </div>
                     <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
                       placeholder="떠오르는 대로 답해보세요" rows={2}
                       style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
@@ -974,6 +998,7 @@ function CompanionModal({ sentence, onClose }) {
   const [loading, setLoading] = _useState(true);
   const [answer, setAnswer] = _useState('');
   const [done, setDone] = _useState(false);
+  const [rated, setRated] = _useState(null);               // 질문 평가 👍/👎 (#371)
   const [editing, setEditing] = _useState(false);          // 한 문장 본문 편집 (#325)
   const [stext, setStext] = _useState(sentence.text || '');
   const MAX = 3;
@@ -1004,9 +1029,20 @@ function CompanionModal({ sentence, onClose }) {
     rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
     archiveCompanion(sentence.bookId, sentence.text, question, a); // 서버 아카이브 (#295)
     if (ex.length >= MAX || consent !== 'yes') { setQuestion(null); setDone(true); return; }
-    setLoading(true); setQuestion(null);
+    setLoading(true); setQuestion(null); setRated(null);
     genCompanionFollowup(sentence.text, ex, bt, au, sentence.kind).then((q) => { setQuestion(q); setLoading(false); });
   };
+  // 질문 재생성 (#372) / 평가 (#371)
+  const regen = () => {
+    if (loading || !question) return;
+    const cur = question;
+    rgTrack('companion_q_regen', { book_id: sentence.bookId || '' });
+    setLoading(true); setQuestion(null); setRated(null);
+    const gen = exchanges.length ? genCompanionFollowup(sentence.text, exchanges, bt, au, sentence.kind, cur)
+      : genCompanionQuestion(sentence.text, bt, au, sentence.kind, cur);
+    gen.then((q) => { setQuestion(q); setLoading(false); });
+  };
+  const rate = (val) => { rgTrack('companion_q_rated', { book_id: sentence.bookId || '', value: val }); setRated(val); };
   return ReactDOM.createPortal(
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ background: 'var(--card)', width: '100%', maxWidth: 430, maxHeight: '85vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1043,7 +1079,14 @@ function CompanionModal({ sentence, onClose }) {
             <div style={{ fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
           ) : (
             <>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55, marginBottom: 10 }}>{question}</div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>{question}</div>
+                <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
+                  <button onClick={() => rate('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'up' ? 1 : 0.45 }}>👍</button>
+                  <button onClick={() => rate('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'down' ? 1 : 0.45 }}>👎</button>
+                  <button onClick={regen} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
+                </div>
+              </div>
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="떠오르는 대로 답해보세요" rows={2}
                 style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

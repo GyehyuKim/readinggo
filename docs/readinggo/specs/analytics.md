@@ -35,6 +35,8 @@ rgTrack('highlight_selected',  { book_id, page, sentence_length }) // 한 문장
 rgTrack('answer_saved',        { book_id, lens, answer_length })   // 독서모임 답변 (nest.js, lens='why')
 rgTrack('reading_session_end', { book_id, duration_sec, pages_logged }) // 독서 종료 (nest.js finish)
 rgTrack('companion_recap',     { book_id, n })                          // 참새의 완독 회고 받기 (library.js, #259)
+rgTrack('companion_q_rated',   { book_id, value })                      // 참새 질문 평가 👍up/👎down (nest.js, #371)
+rgTrack('companion_q_regen',   { book_id })                             // 참새 질문 재생성 🔄 (nest.js, #372)
 rgTrack('resurface_shown',     { sentence_id, days })                   // 되감기 카드 노출 (nest.js, #346)
 rgTrack('resurface_answered',  { sentence_id, days })                   // 다시 대화하기 탭 (nest.js, #346)
 rgTrack('resurface_skipped',   { sentence_id })                         // 나중에 탭 (nest.js, #346)

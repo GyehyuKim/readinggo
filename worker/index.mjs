@@ -85,6 +85,8 @@ async function companionProxy(request, env) {
   const comment = String((body && body.comment) || '').slice(0, 500).trim();
   // 인용 vs 내 의견 (#360) — thought면 작품 인용이 아니라 독자의 생각으로 대한다.
   const kind = (body && body.kind === 'thought') ? 'thought' : 'quote';
+  // 재생성(#372) — 피할 직전 질문. 반복방지(#373)와 합류.
+  const avoid = String((body && body.avoid) || '').slice(0, 500).trim();
   // 멀티턴 — 이전 대화(질문/답변). 후속 질문 생성용 (#327).
   const exchanges = Array.isArray(body && body.exchanges) ? body.exchanges.slice(0, 6) : [];
   if (!sentence) return json({ error: 'sentence 필요' }, 422);
@@ -92,15 +94,22 @@ async function companionProxy(request, env) {
   if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
     return json({ question: companionMock(sentence), demo: true }, 200);
   }
+  // 책 맥락 보강 (#373) — 첫 질문 시 작품 소개를 서버에서 1회 조회(키는 서버 보관, best-effort).
+  let brief = '';
+  if (exchanges.length === 0 && bookTitle) { try { brief = await fetchBookBrief(bookTitle, env); } catch (e) { /* 무시 */ } }
   const messages = [{ role: 'system', content: COMPANION_SYSTEM }];
-  messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}\n${kind === 'thought' ? `읽다가 든 내 생각(감상): "${sentence}" — 이것은 책의 인용이 아니라 독자 본인의 생각입니다. 작품 맥락을 단정하지 말고 이 생각 자체를 더 깊이 여는 질문을 하세요.` : `책에서 옮겨 적은 한 문장(인용): "${sentence}"`}${comment ? `\n내 메모(감상): ${comment}` : ''}` });
+  messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}`
+    + (brief ? `\n작품 소개(참고용 — 이 맥락을 질문에 녹이세요): ${brief}` : '')
+    + `\n${kind === 'thought' ? `읽다가 든 내 생각(감상): "${sentence}" — 이것은 책의 인용이 아니라 독자 본인의 생각입니다. 작품 맥락을 단정하지 말고 이 생각 자체를 더 깊이 여는 질문을 하세요.` : `책에서 옮겨 적은 한 문장(인용): "${sentence}"`}${comment ? `\n내 메모(감상): ${comment}` : ''}` });
   for (const e of exchanges) {
     if (e && e.q) messages.push({ role: 'assistant', content: String(e.q).slice(0, 500) });
     if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
   }
-  messages.push({ role: 'user', content: exchanges.length === 0
-    ? '이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로.'
-    : '방금 답을 받아 한 걸음 더 깊이 들어가는 질문 하나를 한국어로. 같은 질문 반복 금지, 질문만.' });
+  let instr = exchanges.length === 0
+    ? '이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로. 작품 소개·작가·시대 맥락을 한 조각 녹여 구체화하세요.'
+    : '방금 답을 받아 한 걸음 더 깊이 들어가는 질문 하나를 한국어로. 위에서 이미 한 질문들과 확연히 다른 각도로 — 같거나 거의 비슷한 질문 절대 금지. 질문만.';
+  if (avoid) instr += ` 다음 질문은 이미 했으니 반드시 피하고 다르게 물으세요: "${avoid}"`;
+  messages.push({ role: 'user', content: instr });
   try {
     const q = await callLLM({ messages, env });
     return json({ question: q || companionMock(sentence) }, 200);
@@ -108,6 +117,18 @@ async function companionProxy(request, env) {
     // 호출 실패 → 목 질문 폴백 (무중단)
     return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
   }
+}
+
+// 책 맥락 한 조각 (#373) — 참새 질문에 작품 소개를 녹이기 위한 서버측 조회.
+// 알라딘 제목검색 첫 결과의 description(출판사 책 소개). best-effort, 400자 컷.
+async function fetchBookBrief(title, env) {
+  const key = env.ALADIN_TTB_KEY;
+  if (!key || !title) return '';
+  const url = `${ALADIN}ItemSearch.aspx?ttbkey=${key}&Query=${encodeURIComponent(title)}`
+    + `&QueryType=Title&SearchTarget=Book&MaxResults=1&start=1&output=js&Version=20131101&OptResult=packing`;
+  const items = await aladinFetch(url);
+  const desc = items && items[0] && String(items[0].description || '').trim();
+  return desc ? desc.slice(0, 400) : '';
 }
 
 /* ── 완독 회고 — 참새가 내 한 문장들을 엮음 (#259) ─────────
