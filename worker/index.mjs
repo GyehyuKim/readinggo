@@ -112,6 +112,7 @@ async function aladinProxy(q, env) {
   if (!key) return json({ error: 'ALADIN_TTB_KEY 미설정' }, 500);
   const isbn = (q.get('isbn') || '').trim();
   const query = (q.get('query') || q.get('q') || '').trim().slice(0, 100);
+  const max = Math.min(parseInt(q.get('max'), 10) || 10, 20);
 
   let apiUrl;
   if (isbn) {
@@ -119,7 +120,6 @@ async function aladinProxy(q, env) {
     apiUrl = `${ALADIN}ItemLookUp.aspx?ttbkey=${key}&itemIdType=ISBN13&ItemId=${encodeURIComponent(isbn)}`
       + `&output=js&Version=20131101&Cover=Big&OptResult=packing`;
   } else if (query) {
-    const max = Math.min(parseInt(q.get('max'), 10) || 10, 20);
     apiUrl = `${ALADIN}ItemSearch.aspx?ttbkey=${key}&Query=${encodeURIComponent(query)}`
       + `&QueryType=Keyword&SearchTarget=Book&MaxResults=${max}&start=1`
       + `&output=js&Version=20131101&Cover=Big&OptResult=packing`;
@@ -128,11 +128,48 @@ async function aladinProxy(q, env) {
   }
 
   try {
-    const items = (await aladinFetch(apiUrl)).map(normalize);
+    let items = (await aladinFetch(apiUrl)).map(normalize);
+    // 외서·미검색 보강 (#302) — 검색 결과가 적으면 Google Books 폴백(키 불필요, 외서·표지 풍부). ISBN 단건 조회엔 미적용.
+    if (query && items.length < 5) {
+      try {
+        const gb = await googleBooksSearch(query, max, env);
+        const seen = new Set(items.map((it) => it.isbn13 || it.title));
+        for (const g of gb) { const k = g.isbn13 || g.title; if (k && !seen.has(k)) { seen.add(k); items.push(g); } }
+      } catch (e) { /* 폴백 실패 무시 */ }
+    }
     return json({ items }, 200, 86400);
   } catch (e) {
+    // 알라딘 자체 실패 시 검색은 Google Books로 한 번 더 (외서 가용성↑).
+    if (query) {
+      try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb }, 200, 3600); } catch (e2) {}
+    }
     return json({ error: '알라딘 호출 실패', detail: String((e && e.message) || e) }, 502);
   }
+}
+
+// Google Books 검색 (#302) — 알라딘 미검색 외서 보강용.
+// ⚠️ 무키 엔드포인트는 레이트리밋(429/403)이 잦음 → GOOGLE_BOOKS_API_KEY(무료) 권장.
+async function googleBooksSearch(query, max, env) {
+  const key = env && env.GOOGLE_BOOKS_API_KEY ? `&key=${env.GOOGLE_BOOKS_API_KEY}` : '';
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${Math.min(max || 10, 20)}&printType=books&country=KR${key}`;
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const d = await r.json();
+  return (d.items || []).map((it) => {
+    const v = it.volumeInfo || {};
+    const ids = v.industryIdentifiers || [];
+    const isbn = (ids.find((x) => x.type === 'ISBN_13') || {}).identifier || (ids.find((x) => x.type === 'ISBN_10') || {}).identifier || '';
+    const cover = ((v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail)) || '').replace(/^http:/, 'https:');
+    return {
+      isbn13: /^\d{13}$/.test(isbn) ? isbn : '',
+      title: v.title || '',
+      author: (v.authors && v.authors.join(', ')) || '',
+      publisher: v.publisher || '',
+      total_pages: v.pageCount ? Number(v.pageCount) : null,
+      cover_url: cover,
+      source: 'google',
+    };
+  }).filter((b) => b.title);
 }
 
 /* ── 인기도서 아카이브 (archive-books.mjs 포팅) ─────────── */
