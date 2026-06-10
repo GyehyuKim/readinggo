@@ -84,8 +84,21 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 교보 상세는 ISBN 이 아닌 교보 고유번호(S…)를 써서 ISBN 직링크가 깨짐 → 검색결과로(QA #1-B).
   const kyoboUrl = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn || book.title)}`;
 
-  // Markdown Export (§5.8.4, #315) — 책 메타 + 완독정보 + 한 문장(페이지·날짜·감상). 북모리 양식 벤치마킹.
-  const exportMarkdown = () => {
+  // 책 소개(description) 조회 (#316) — 알라딘 프록시 ISBN 단건. graceful(실패·미배포 시 빈 값).
+  const fetchBookDesc = async () => {
+    const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
+    if (!proxy || !book.isbn) return '';
+    try {
+      const r = await fetch(`${proxy}?isbn=${encodeURIComponent(book.isbn)}`);
+      if (!r.ok) return '';
+      const d = await r.json();
+      const it = d && Array.isArray(d.items) && d.items[0];
+      return (it && it.description) ? String(it.description).trim() : '';
+    } catch (e) { return ''; }
+  };
+
+  // Markdown Export (§5.8.4, #315/#316) — 책 메타·소개 + 완독정보 + 한 문장(페이지·날짜·감상). 북모리 양식 벤치마킹.
+  const exportMarkdown = async () => {
     // 날짜 정규화: ISO/타임스탬프 → YYYY-MM-DD. 파싱 실패 시 빈 문자열(‘날짜 미상’ 대신 생략).
     const fmtDate = (v) => {
       if (!v) return '';
@@ -101,6 +114,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     const meta = [book.pub, (book.total > 0 ? `${book.total}쪽` : ''), (book.isbn ? `ISBN ${book.isbn}` : '')].filter(Boolean);
     if (meta.length) lines.push(meta.join(' · '));
     if (book.cover) { lines.push(''); lines.push(`![표지](${book.cover})`); }
+    // 책 소개 (#316) — 알라딘 description. 없으면 섹션 생략.
+    const desc = await fetchBookDesc();
+    if (desc) { lines.push('', '---', '', '## 📚 책 소개', '', desc); }
     // 완독 정보
     if (book.status === 'completed') {
       lines.push('', '---', '', '## 📖 완독 정보');
