@@ -200,6 +200,9 @@ function App() {
   // 책 정보 모달(#11) — 한 문장의 책 제목 탭으로 열림.
   const [bookDetailId, setBookDetailId] = useState(null);
   useEffect(() => { window.RG_openBook = (id) => setBookDetailId(id); return () => { window.RG_openBook = null; }; }, []);
+  // 한 문장 대화 모달 (#326) — 내 한 문장 탭으로 열림.
+  const [companionSentence, setCompanionSentence] = useState(null);
+  useEffect(() => { window.RG_openCompanion = (s) => setCompanionSentence(s); return () => { window.RG_openCompanion = null; }; }, []);
   // 스트릭 캘린더(#173) — 🔥 탭으로 열림.
   const [streakOpen, setStreakOpen] = useState(false);
   // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
@@ -691,6 +694,10 @@ function App() {
         )}
 
         {/* 책 정보 모달 (#11) — 한 문장 책 제목 탭 */}
+        {companionSentence && (
+          <CompanionModal sentence={companionSentence} onClose={() => setCompanionSentence(null)} />
+        )}
+
         {bookDetailId && ReactDOM.createPortal(
           <BookInfoModal bookId={bookDetailId} onClose={() => setBookDetailId(null)} />,
           document.body

@@ -303,6 +303,14 @@ const DataStore = {
         return se;
       });
     },
+    // 한 문장 본문 편집 (오타 수정, #325)
+    updateText(sentenceId, text) {
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (se) se.text = text || '';
+        return se;
+      });
+    },
     // 무작위 회상 (§5.8.7)
     random() {
       return localStorageAdapter.mutate(s => {
@@ -487,6 +495,11 @@ const DataStore = {
   consent: {
     get() { try { return localStorage.getItem('rg_data_consent'); } catch (e) { return null; } },
     set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
+  },
+
+  /* 독서 파트너 대화 아카이브 (#295) — 로컬/게스트는 서버 아카이브 안 함(no-op). Supabase 모드만 실저장. */
+  companionSessions: {
+    add() { return null; },
   },
 };
 

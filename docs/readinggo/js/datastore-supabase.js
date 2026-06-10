@@ -196,6 +196,10 @@
       async setNote(sentenceId, my_note) {
         return unwrap(await sb().from('sentences').update({ my_note }).eq('id', sentenceId).select().single());
       },
+      // 한 문장 본문 편집 (오타 수정, #325) — 본인 행만(RLS)
+      async updateText(sentenceId, text) {
+        return unwrap(await sb().from('sentences').update({ text: text || '' }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
+      },
       // 한 문장/감상 공개·비공개 토글 (QA #12).
       // patch: { visibility?: 'public'|'followers'|'private', note_private?: boolean }
       // note_private(감상 비공개)는 유지. is_private는 deprecated — visibility로 대체(v7.2).
@@ -727,6 +731,20 @@
     consent: {
       get() { try { return localStorage.getItem('rg_data_consent'); } catch (e) { return null; } },
       set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
+    },
+
+    /* 독서 파트너 대화 아카이브 (#295, 18_companion_sessions.sql) — 동의 유저의 Q/A를 익명 집계용 저장. */
+    companionSessions: {
+      async add({ bookId, sentence, comment, lens, question, answer, isResurface } = {}) {
+        const id = await uid();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(bookId || ''));
+        return unwrap(await sb().from('companion_sessions').insert({
+          user_id: id, book_id: isUuid ? bookId : null,
+          sentence: sentence || '', comment: comment || null, lens: lens || null,
+          question: question || null, answer: answer || null,
+          is_resurface: !!isResurface, consented: true,
+        }).select().single());
+      },
     },
   };
 
