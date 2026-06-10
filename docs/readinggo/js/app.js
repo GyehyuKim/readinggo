@@ -386,6 +386,12 @@ function App() {
     })();
   }, []);
 
+  // 읽기모드 한 문장 저장 → appState.myQuotes 즉시 반영 (#358).
+  // 종전엔 NestView 내부 상태만 갱신 → ✕ 나가기(체크인 미경유) 시 책상세·프로필에서 문장 누락.
+  const handleArchive = useCallback((q) => {
+    setAppState(s => ({ ...s, myQuotes: [q, ...s.myQuotes] }));
+  }, []);
+
   // 하루 거르기: 둥지·XP·성은 존속, 스트릭만 영향 (§5.4).
   const handleSimSkip = useCallback((ns) => {
     setAppState(s => ({
@@ -620,6 +626,7 @@ function App() {
               onGoLibrary={() => switchTab('profile')}
               onGoSocial={() => switchTab('social')}
               onOpenSearch={() => setIsSearchOpen(true)}
+              onArchive={handleArchive}
             />
           )}
           {activeTab === 'village' && !selectedTownId && (

@@ -414,7 +414,8 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
       setSaved((list) => [{ id: sid, text: t, page: p }, ...list]);
       setText('');
       showToast(p != null ? ('📍 ' + p + 'p 한 문장 저장됨') : '한 문장 저장됨');
-      if (onArchive) onArchive({ text: t, bookId: book.id, page: p, when: '방금' });
+      // id 전달 (#358) — 없으면 책상세 🗑·감상·공개 버튼이 새로고침 전까지 안 뜸(✕ 나가기는 체크인 정합 미경유).
+      if (onArchive) onArchive({ id: sid, text: t, bookId: book.id, page: p, when: '방금' });
       rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length });
       // 혼자만의 독서모임 — 저장 직후. 첫 사용 시 데이터 활용 동의 먼저(#294), 그 뒤 질문.
       const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
@@ -569,7 +570,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   );
 }
 
-function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpenSearch }) {
+function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpenSearch, onArchive }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [readingOpen, setReadingOpen] = _useState(false); // 읽기 모드 (#184)
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
@@ -854,7 +855,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         <ReadingMode
           book={nestState.book}
           onClose={() => setReadingOpen(false)}
-          onArchive={(q) => setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] }))}
+          onArchive={(q) => { setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] })); if (onArchive) onArchive(q); }}
           onCheckin={handleCheckin}
         />,
         document.body
