@@ -128,7 +128,14 @@ async function aladinProxy(q, env) {
   }
 
   try {
-    let items = (await aladinFetch(apiUrl)).map(normalize);
+    // 책 소개(description) 첨부 (#316) — export 상세화용. 알라딘 raw.description를 응답에만 실음.
+    // ⚠️ archive의 normalize→upsertBook 경로는 건드리지 않음(books 테이블에 description 컬럼 없음).
+    let items = (await aladinFetch(apiUrl)).map((it) => {
+      const n = normalize(it);
+      const desc = String(it.description || '').trim();
+      if (desc) n.description = desc;
+      return n;
+    });
     // 외서 균형 보강 (#302) — 검색이면 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
     // 결과 홍수 방지: 알라딘 5칸으로 자르고, 외서 5칸을 항상 채워 균형. ISBN 단건 조회엔 미적용.
     if (query) {

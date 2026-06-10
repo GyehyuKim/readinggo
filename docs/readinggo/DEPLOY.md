@@ -59,6 +59,16 @@ node admin-cli.mjs create-admin readinggo.admin@example.com
 ## 6. 스모크 테스트 (배포본)
 로그인 → 알라딘 검색·등록 → 체크인 → 새로고침 영속 → 소셜/서재/프로필 → admin 계정에서 데이터 확인.
 
+## 7. 공개 전환 전 체크리스트 (베타 → 일반 공개, #178)
+
+베타 동안 `mailer_autoconfirm = ON`(확인메일 없이 즉시 로그인 — 기본 메일러 발송한도·발신자명 "Supabase" 인지 문제 회피). **일반 공개 시 반드시 OFF**.
+
+- [ ] **커스텀 SMTP 설정** (SendGrid/Mailgun 등) — Supabase 대시보드 → Auth → SMTP Settings
+- [ ] 커스텀 SMTP 완료 후 → `node admin-cli.mjs auth-autoconfirm off`
+- [ ] 이메일 템플릿 커스터마이징 (ReadingGo 브랜딩 — 발신자명·제목·본문)
+
+**대안 (SMTP 없이 공개)**: 매직링크/OAuth 경로만 UI 노출(비밀번호 가입 숨김) → autoconfirm ON 유지 가능. 단, 비밀번호 가입을 통한 사칭 계정 위험 존재 → 비밀번호 가입을 완전히 막아야 안전.
+
 ## 잔여 (베타 허용, 후속)
 - isbn 없는 책 dedup(제목매칭 완화) · 실시간 짹 카운트 · 아바타 이미지 · 프로필 무한스크롤
 - admin in-app 대시보드(방문·가입·짹·인기책 집계) = #161 2단계
