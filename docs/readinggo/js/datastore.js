@@ -323,6 +323,43 @@ const DataStore = {
         return false;
       });
     },
+    // 시간차 되감기 후보 (#346, resurface.md §2) — 대화(Q/A) 저장된 문장 중 14일+ 경과,
+    // 재소환 14일+ 미경과 제외. 우선순위: 가장 긴 내 답변 → 동률 랜덤.
+    resurfaceCandidate() {
+      return localStorageAdapter.mutate(s => {
+        const now = Date.now(), TH = 14 * 86400000;
+        const cands = [];
+        s.user_books.forEach(ub => {
+          (ub.sentences || []).forEach(se => {
+            const note = se.my_note || '';
+            if (!/(^|\n)Q\.\s/.test(note) || !/(^|\n)A\.\s/.test(note)) return; // 답변 없는 문장 제외
+            const created = typeof se.created_at === 'number' ? se.created_at : Date.parse(se.created_at) || 0;
+            if (!created || now - created < TH) return;
+            if (se.last_resurfaced_at && now - se.last_resurfaced_at < TH) return;
+            const answers = [...note.matchAll(/(^|\n)A\.\s([\s\S]*?)(?=\nQ\.|\n\n|$)/g)].map(m => (m[2] || '').trim());
+            cands.push({
+              id: se.id, text: se.text, bookId: se.book_id || ub.book_id,
+              bookTitle: (ub.book && ub.book.title) || '', page: se.page, note,
+              kind: se.kind || 'quote',
+              daysAgo: Math.floor((now - created) / 86400000),
+              lastAnswer: answers[answers.length - 1] || '',
+              _longest: Math.max(0, ...answers.map(a => a.length)),
+            });
+          });
+        });
+        if (!cands.length) return null;
+        const best = Math.max(...cands.map(c => c._longest));
+        const top = cands.filter(c => c._longest === best);
+        return top[Math.floor(Math.random() * top.length)];
+      });
+    },
+    markResurfaced(sentenceId) {
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (se) se.last_resurfaced_at = Date.now();
+        return !!se;
+      });
+    },
     // 무작위 회상 (§5.8.7)
     random() {
       return localStorageAdapter.mutate(s => {
@@ -332,6 +369,13 @@ const DataStore = {
     },
     // 같은 책 피드 (Supabase 어댑터와 표면 일치) — 로컬(Phase 0)엔 타 사용자 없음 → 빈 배열.
     byBook() { return []; },
+  },
+
+  /* 시간차 되감기 노출 게이트 (#346, resurface.md §2.1·§4.2) — 1일 1회.
+     기기 로컬 넛지 억제라 양 어댑터 모두 localStorage 키 rg_resurface_last 사용. */
+  resurface: {
+    shownToday() { try { return localStorage.getItem('rg_resurface_last') === _today(); } catch (e) { return false; } },
+    markToday() { try { localStorage.setItem('rg_resurface_last', _today()); } catch (e) {} },
   },
 
   /* 스트릭 ──────────────────────────────────────── */

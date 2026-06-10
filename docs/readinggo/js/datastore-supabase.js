@@ -229,6 +229,42 @@
         return unwrap(await sb().from('sentences').select('*, user_book:user_books(book_id, book:books(title))').eq('user_id', id)
           .order('created_at', { ascending: false }));
       },
+      // 시간차 되감기 후보 (#346, resurface.md §2) — Q/A 저장 문장, 14일+ 경과, 재소환 14일+ 미경과 제외.
+      // 우선순위: 가장 긴 내 답변 → 동률 랜덤. (책 단위 7일 조건은 후속)
+      async resurfaceCandidate() {
+        const id = await uid();
+        const now = Date.now(), TH = 14 * 86400000;
+        const since = new Date(now - TH).toISOString();
+        const rows = unwrap(await sb().from('sentences')
+          .select('*, user_book:user_books(book_id, book:books(title))')
+          .eq('user_id', id).not('my_note', 'is', null).lte('created_at', since)
+          .or(`last_resurfaced_at.is.null,last_resurfaced_at.lte.${since}`)
+          .limit(100));
+        const cands = [];
+        (rows || []).forEach(se => {
+          const note = se.my_note || '';
+          if (!/(^|\n)Q\.\s/.test(note) || !/(^|\n)A\.\s/.test(note)) return; // 답변 없는 문장 제외
+          const answers = [...note.matchAll(/(^|\n)A\.\s([\s\S]*?)(?=\nQ\.|\n\n|$)/g)].map(m => (m[2] || '').trim());
+          cands.push({
+            id: se.id, text: se.text,
+            bookId: (se.user_book && se.user_book.book_id) || '',
+            bookTitle: (se.user_book && se.user_book.book && se.user_book.book.title) || '',
+            page: se.page, note, kind: se.kind || 'quote',
+            daysAgo: Math.floor((now - Date.parse(se.created_at)) / 86400000),
+            lastAnswer: answers[answers.length - 1] || '',
+            _longest: Math.max(0, ...answers.map(a => a.length)),
+          });
+        });
+        if (!cands.length) return null;
+        const best = Math.max(...cands.map(c => c._longest));
+        const top = cands.filter(c => c._longest === best);
+        return top[Math.floor(Math.random() * top.length)];
+      },
+      async markResurfaced(sentenceId) {
+        unwrap(await sb().from('sentences').update({ last_resurfaced_at: new Date().toISOString() })
+          .eq('id', sentenceId).eq('user_id', await uid()));
+        return true;
+      },
       // 전체 공개 피드 (§social). 책 제목은 user_books→books 중첩 embed.
       async feed({ cursor, limit } = {}) {
         let q = sb().from('sentences')
@@ -280,6 +316,13 @@
         if (!mine || !mine.length) return null;
         return mine[Math.floor(Math.random() * mine.length)];
       },
+    },
+
+    /* 시간차 되감기 노출 게이트 (#346, resurface.md §2.1·§4.2) — 1일 1회.
+       기기 로컬 넛지 억제라 localStorage 키 rg_resurface_last 사용(서버 저장 불필요). */
+    resurface: {
+      shownToday() { try { return localStorage.getItem('rg_resurface_last') === _today(); } catch (e) { return false; } },
+      markToday() { try { localStorage.setItem('rg_resurface_last', _today()); } catch (e) {} },
     },
 
     /* 스트릭 (클라 날짜 로직) / XP */
