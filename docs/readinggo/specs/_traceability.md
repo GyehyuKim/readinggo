@@ -35,10 +35,10 @@
 |---|---|---|
 | §5.8 성컬렉션·bio·내문장10+더보기·별점4.0·헤더정리 | ✅ | QA5/6 (#205·#226·#228) |
 | §5.8.9 대시보드(인기책·활성·차트·문의) · §5.8.10 히트맵(채도·월) | ✅ | #190·#206·#208·#195·#207 |
-| §5.8.4 쪽수 폴백·책갈피·회상 · export 상세화(v7.4) | ✅ | #204 · bookmarks/random · #315 export(메타·완독·날짜) |
+| §5.8.4 쪽수 폴백·책갈피·회상 · export 상세화(v7.4) | ✅ | #204 · bookmarks/random · #315 export(메타·완독·날짜) · #316 책 소개(알라딘 description) |
 | §5.8.1.1 성 컬렉션 책장 상세(최근10+그리드/검색/정렬/필터, v7.4) | ✅ | #312 ArchiveShelfModal |
-| 공용 BookCover + 표지 placeholder(v7.4) | ✅ | #316 components.js BookCover (책설명 B·외서 #302 후속) |
-| §5.8.6 AI 추천/추출 | ⏳ | datastore `ai.recommendBooks()→[]`·`extractBook()→null` 빈 stub (Phase0 시뮬도 미구현) |
+| 공용 BookCover + 표지 placeholder(v7.4) | ✅ | #316 components.js BookCover · 외서 5+5(#302/#343, 알라딘5+Google5) · export 책소개(#316/#344) |
+| §5.8.6 AI 카드 — 참새의 완독 회고(v7.4) | ✅ | #259/#345 완독책 상세 회고(solar-pro3 `/api/companion` mode:recap). 다음책 추천/추출(`ai.recommendBooks`·`extractBook`)은 Phase1 ⏳ |
 
 ## village.md (마을) — owner 윤지
 | 조항 | 상태 | 근거/갭 |
@@ -84,4 +84,6 @@
 ---
 **v7.4 갱신 (2026-06-10)**: companion(LLM solar-pro3·멀티턴·문장대화·동의·아카이브) ✅, 둥지 책분리 ✅(#313), 성컬렉션 그리드 ✅(#312), BookCover ✅(#316), export 상세화 ✅(#315), 게스트 우선 ✅(#298), ErrorBoundary ✅(#310), PostHog 이벤트 ✅, 동의 배너 ✅(#331). 해소: nest CTA·미션(#252)·Top3(#286)·스포일러토글(#3). 보류: 휴식코스(parking-lot), 문의 LLM(#208).
 
-**남은 이슈 후보**: ❌ social 친구찾기 패널 / 🔧 companion_sessions SQL 실행(#295)·스포일러 spec 문구(#177) / ⏳ AI 추천(stub) · 외서 API(#302) · export 책설명(#316B) · 북커버 폴백(#316C).
+**v7.4.1 갱신 (2026-06-10, post-merge)**: 외서 검색 5+5 ✅(#302/#343), export 책 소개 ✅(#316/#344), 공개전환 체크리스트 ✅(#178/#344), 참새 완독 회고 ✅(#259/#345). spec-align: nest.py v7.2 현실로 갱신(getNestStage·NestView=function 선언형, ActiveBookSheet→캐러셀 #185, MissionModal→CheckinModal) → 10/10. backend.md Netlify→Cloudflare Worker 잔재 정정.
+
+**남은 이슈 후보**: ❌ social 친구찾기 패널 / 🔧 companion_sessions SQL 실행(#295)·스포일러 spec 문구(#177)·spec-drift CI 워크플로우 부재(drift.py FAIL) / ⏳ AI 다음책 추천·추출(stub, Phase1) · 북커버 수동 큐레이션(#315C, parking-lot).

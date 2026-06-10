@@ -54,7 +54,7 @@ INVARIANTS = [
         "§5.2",
         "getNestStage 함수",
         "data.js",
-        r"const\s+getNestStage\s*=",
+        r"function\s+getNestStage\b",
     ),
     (
         "§5.2",
@@ -63,16 +63,18 @@ INVARIANTS = [
         r"(자리를 잡|살림을 차|다정한 이웃|성주)",
     ),
     (
+        # v7.2(#185): 활성 책 전환 = 좌우 리볼빙 캐러셀(시트 폐기). 구 ActiveBookSheet 대체.
         "§5.3",
-        "ActiveBookSheet 컴포넌트 (활성책 전환)",
+        "활성 책 전환 — 좌우 캐러셀 (RG_activateBook, #185)",
         "nest.js",
-        r"const\s+ActiveBookSheet\s*=",
+        r"RG_activateBook",
     ),
     (
+        # v7.2: 일일 미션(오늘 기록하기) = CheckinModal. 구 MissionModal 명칭 대체.
         "§5.4",
-        "MissionModal 컴포넌트 (일일 미션)",
+        "CheckinModal 컴포넌트 (오늘 기록하기 — 체크인)",
         "nest.js",
-        r"const\s+MissionModal\s*=",
+        r"function\s+CheckinModal\b",
     ),
     (
         "§5.2",
@@ -84,7 +86,7 @@ INVARIANTS = [
         "§5.1",
         "NestView 최상위 컴포넌트",
         "nest.js",
-        r"const\s+NestView\s*=",
+        r"function\s+NestView\b",
     ),
     (
         "§5.1",
