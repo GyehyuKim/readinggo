@@ -132,7 +132,7 @@ async function aladinProxy(q, env) {
     // 외서·미검색 보강 (#302) — 검색 결과가 적으면 Google Books 폴백(키 불필요, 외서·표지 풍부). ISBN 단건 조회엔 미적용.
     if (query && items.length < 5) {
       try {
-        const gb = await googleBooksSearch(query, max);
+        const gb = await googleBooksSearch(query, max, env);
         const seen = new Set(items.map((it) => it.isbn13 || it.title));
         for (const g of gb) { const k = g.isbn13 || g.title; if (k && !seen.has(k)) { seen.add(k); items.push(g); } }
       } catch (e) { /* 폴백 실패 무시 */ }
@@ -141,15 +141,17 @@ async function aladinProxy(q, env) {
   } catch (e) {
     // 알라딘 자체 실패 시 검색은 Google Books로 한 번 더 (외서 가용성↑).
     if (query) {
-      try { const gb = await googleBooksSearch(query, max); if (gb.length) return json({ items: gb }, 200, 3600); } catch (e2) {}
+      try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb }, 200, 3600); } catch (e2) {}
     }
     return json({ error: '알라딘 호출 실패', detail: String((e && e.message) || e) }, 502);
   }
 }
 
-// Google Books 검색 (#302) — 키 불필요 공개 엔드포인트. 알라딘 미검색 외서 보강용.
-async function googleBooksSearch(query, max) {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${Math.min(max || 10, 20)}&printType=books`;
+// Google Books 검색 (#302) — 알라딘 미검색 외서 보강용.
+// ⚠️ 무키 엔드포인트는 레이트리밋(429/403)이 잦음 → GOOGLE_BOOKS_API_KEY(무료) 권장.
+async function googleBooksSearch(query, max, env) {
+  const key = env && env.GOOGLE_BOOKS_API_KEY ? `&key=${env.GOOGLE_BOOKS_API_KEY}` : '';
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${Math.min(max || 10, 20)}&printType=books&country=KR${key}`;
   const r = await fetch(url);
   if (!r.ok) return [];
   const d = await r.json();
