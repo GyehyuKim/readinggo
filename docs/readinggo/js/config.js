@@ -11,7 +11,24 @@ window.RG_CONFIG = {
 
 // 앱 버전 — 베타 0.XXX. **publish(배포) 1회마다 +0.001 수동 증가** (≈머지 PR 수).
 // 설정 표시 + 문의 작성 시 첨부 → 운영자가 "어느 버전 문제/해결인지" 추적.
-window.RG_VERSION = '0.192';
+window.RG_VERSION = '0.193';
+
+// 참새 질문 방향성 프리셋 (#375, companion.md §4.4) — 사람마다 선호하는 질문 결이 달라
+// 프로필/설정에서 고른 값을 companion 호출에 실어 worker 프롬프트에 주입. 자유서술 아님(허들·악용 회피).
+// key 는 worker PRESET_TONE 과 1:1 일치해야 함(둘 다 바꿀 것). label=칩 표시.
+window.RG_COMPANION_PRESETS = [
+  { key: 'balanced', emoji: '🐦', label: '균형' },
+  { key: 'deep', emoji: '🔍', label: '깊이 파고들기' },
+  { key: 'light', emoji: '🍃', label: '가볍게' },
+  { key: 'emotional', emoji: '💗', label: '감정 중심' },
+  { key: 'critical', emoji: '⚖️', label: '비판적' },
+  { key: 'context', emoji: '📚', label: '작가·맥락' },
+];
+// 디바이스 선호(테마류) — 사용자 콘텐츠 아니라 localStorage 직접. 기본값=balanced(균형).
+window.RG_companionPreset = {
+  get() { try { return localStorage.getItem('rg_companion_preset') || 'balanced'; } catch (e) { return 'balanced'; } },
+  set(v) { try { localStorage.setItem('rg_companion_preset', v || 'balanced'); } catch (e) {} },
+};
 
 // 입력 검증 — 클라 1차 방어 + "값 생성 규칙" 안내. 서버(DB CHECK, supabase/04_constraints.sql)와 동일 규칙 공유.
 window.RG_VALIDATE = (function () {

@@ -77,6 +77,16 @@
 - **클라**(`library.js` BookDetailModal): `loadRecap()`이 `/api/companion` 호출 → 회고 단락 인라인 표시. 분석 이벤트 `companion_recap`.
 - **영속화 (#352, 구현 완료)**: 받은 회고를 `user_books.companion_recap`에 캐시(`books.saveRecap`, 19_companion_recap.sql) — 재진입 시 저장본 즉시 표시(LLM 재호출 없음) + "🔄 다시 받기"로 갱신. 게스트(localStorage)도 동일 표면.
 
+### 4.4 질문 방향성 프리셋 (#375, 구현 완료)
+
+사람마다 선호하는 질문의 난이도·관점이 다름. **자유 프롬프트가 아니라 정해진 프리셋(취향 칩)** 채택 — 허들·악용·일관성 리스크 회피(자유서술은 후속 고급옵션, Ref #287).
+
+- **프리셋(6종)**: `balanced`(균형, 기본) · `deep`(깊이 파고들기) · `light`(가볍게) · `emotional`(감정 중심) · `critical`(비판적) · `context`(작가·맥락). 정의 = `config.js` `RG_COMPANION_PRESETS`.
+- **저장**: 디바이스 선호(테마류) → `RG_companionPreset`(localStorage `rg_companion_preset`). 사용자 콘텐츠 아니므로 Supabase 미동기(로컬). 기본값 `balanced`.
+- **UI**: 설정(`SettingsModal`)에 칩 토글. 고른 결은 **다음 질문부터** 반영.
+- **전달**: `genCompanionQuestion`·`genCompanionFollowup`이 호출 시 현재 프리셋을 읽어 `/api/companion` body `preset`으로 전송(호출부 시그니처 불변).
+- **주입**: worker `PRESET_TONE[preset]`(키는 `RG_COMPANION_PRESETS`와 1:1)을 질문 지시문에 한 줄 덧붙임. `balanced`는 키 없음(기본 톤 유지). 시스템 프롬프트 본문은 불변.
+
 ---
 
 ## 5. 시간차 되감기 (Resurface) — Phase 1 후속 (#289)
