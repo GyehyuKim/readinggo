@@ -1,6 +1,7 @@
 # 읽기 종료 시 참새 등장 (Companion at Session End) 스펙
 
 > **신규 (v7.4, 2026-06-10)**: companion.md §2 코어 루프 UX 변경안.
+> **구현 완료 (#347, 2026-06-12)**: `nest.js` ReadingMode — 저장 직후 트리거 제거(토스트만 + '💬 지금 대화' 부수 옵션), 읽기 종료(✕/독서 종료/완독) 시 세션 문장 1개로 참새 1질문(오늘 요약 동반). companion.md §2/§3 반영.
 > 근거: whytree-team-synthesis.md — 읽기(몰입)와 성찰(대화)을 분리해야 한다.
 > **편집 정책**: 이 파일 PR로. companion.md §2와 함께 검토.
 
