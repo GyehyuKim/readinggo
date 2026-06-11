@@ -58,3 +58,7 @@ loop/*/BLOCKED.md
 
 # 로컬 전용 파일 (미팅 메모, 다운로드 등 — 커밋 금지)
 _local/
+
+# Cloudflare Worker local secrets — never commit
+.dev.vars
+.wrangler/

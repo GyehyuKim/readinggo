@@ -362,6 +362,8 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   const [page, setPage] = _useState(String(book.cur || 0)); // 문자열 — 빈칸 허용(페이지 미상)
   const [text, setText] = _useState('');
   const [kind, setKind] = _useState('quote'); // 'quote'=책 속 인용 | 'thought'=내 의견 (#360)
+  const [ocrBusy, setOcrBusy] = _useState(false); // 책 사진 OCR 추출 중 (#382)
+  const _ocrInputRef = _useRef(null);
   const [saved, setSaved] = _useState([]);
   const [closing, setClosing] = _useState(false);            // 종료 확인 단계
   const [finalPage, setFinalPage] = _useState(String(book.cur || 0));
@@ -414,6 +416,31 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   };
   const pageNum = (s) => { const n = parseInt(s, 10); return isNaN(n) ? null : Math.max(0, total ? Math.min(total, n) : n); };
   const bump = (d) => setPage((s) => String(Math.max(0, (parseInt(s, 10) || 0) + d)));
+  // 책 사진 OCR (#382) — Upstage OCR + solar-pro3 보정 → 입력칸 프리필(원하는 부분만 남기고 저장).
+  const runOcr = (file) => {
+    if (!file || ocrBusy) return;
+    if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
+    setOcrBusy(true);
+    showToast('📷 사진에서 글자를 읽는 중…');
+    const fd = new FormData();
+    fd.append('document', file, file.name || 'page.jpg');
+    fetch('/api/ocr', { method: 'POST', body: fd })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.text) {
+          // 기존 입력에 이어 붙임(있으면 줄바꿈) — 여러 장도 누적 가능.
+          setText((cur) => (cur && cur.trim() ? cur.trim() + '\n' + d.text : d.text).slice(0, 1000));
+          showToast('✨ 추출했어요 — 원하는 부분만 남기고 저장하세요');
+          rgTrack('ocr_extracted', { book_id: book.id, chars: d.text.length });
+        } else if (d && d.empty) {
+          showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
+        } else {
+          showToast('추출 실패 — 잠시 후 다시 시도해요');
+        }
+      })
+      .catch(() => showToast('추출 실패 — 네트워크를 확인해요'))
+      .finally(() => { setOcrBusy(false); });
+  };
   const save = () => {
     const t = text.trim();
     if (!t) { showToast(kind === 'thought' ? '내 생각을 적어주세요' : '한 문장을 적어주세요'); return; }
@@ -537,6 +564,17 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
         <textarea value={text} onChange={(e) => { if (e.target.value.length <= 1000) setText(e.target.value); }}
           placeholder={kind === 'thought' ? '지금 드는 내 생각·의견을 가볍게 적어요…' : '떠오른 한 문장을 바로 옮겨 적어요…'} rows={3}
           style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
+        {/* 책 사진 OCR 추출 (#382) — 인용 모드에서만(내 생각은 직접 적는 것). */}
+        {kind === 'quote' && (
+          <>
+            <input ref={_ocrInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) runOcr(f); e.target.value = ''; }} />
+            <button onClick={() => { if (!ocrBusy && _ocrInputRef.current) _ocrInputRef.current.click(); }} disabled={ocrBusy}
+              style={{ width: '100%', marginTop: 8, padding: 11, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: 'rgba(244,242,236,0.85)', fontWeight: 800, fontSize: 13.5, cursor: ocrBusy ? 'default' : 'pointer', opacity: ocrBusy ? 0.6 : 1 }}>
+              {ocrBusy ? '읽는 중…' : '📷 책 사진에서 글귀 가져오기'}
+            </button>
+          </>
+        )}
         <button onClick={save} style={{ width: '100%', marginTop: 8, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>{kind === 'thought' ? '💭 내 생각 저장' : '✨ 한 문장 저장'}{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
       </div>
       {/* 이번 세션 아카이브 — 각 문장 하단에 혼자만의 독서모임 대화 (#327) */}
