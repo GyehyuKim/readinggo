@@ -229,11 +229,13 @@ function App() {
     return () => window.removeEventListener('rg:xp', onXp);
   }, []);
 
-  // 한 문장 삭제(#1) — CompanionModal 등에서 삭제 시 appState.myQuotes 즉시 반영(서재·컬렉션 정합).
+  // 한 문장 삭제(#1)·종류변경(#381) — CompanionModal 등에서 변경 시 appState.myQuotes 즉시 반영.
   useEffect(() => {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).filter(q => q.id !== id) })); };
+    const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).map(q => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
     window.addEventListener('rg:sentence-removed', onRm);
-    return () => window.removeEventListener('rg:sentence-removed', onRm);
+    window.addEventListener('rg:sentence-kind', onKind);
+    return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); };
   }, []);
 
   // 단순 방문 보상 — 하루 첫 열람(데모: 세션 1회). 3단계 위계 중 가장 낮은 티어.

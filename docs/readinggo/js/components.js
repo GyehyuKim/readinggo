@@ -732,7 +732,7 @@ function SentenceCollectionModal({ onClose }) {
   const byBook = {};
   if (filter === 'book') filtered.forEach(s => { const k = s.bookTitle || '기타'; (byBook[k] = byBook[k] || []).push(s); });
   const renderLine = (s) => (
-    <div key={s.id} onClick={() => { if (window.RG_openCompanion) window.RG_openCompanion({ id: s.id, text: s.text, bookId: s.bookId, bookTitle: s.bookTitle, page: s.page, note: s.note || s.my_note || '' }); }}
+    <div key={s.id} onClick={() => { if (window.RG_openCompanion) window.RG_openCompanion({ id: s.id, text: s.text, bookId: s.bookId, bookTitle: s.bookTitle, page: s.page, note: s.note || s.my_note || '', kind: s.kind }); }}
       style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8, cursor: 'pointer' }}>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>
         {s.bookTitle ? s.bookTitle + ' · ' : ''}{s.page}p{s.isPrivate ? ' · 🔒' : ''}{favIds.has(s.id) ? ' · ❤️' : ''}
