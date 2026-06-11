@@ -49,32 +49,67 @@ async function buildStateFromSupabase() {
   return out;
 }
 
-// 게스트(로그아웃) 상태에서 localStorage 에 담아둔 pending 책·문장을 로그인 직후
-// Supabase 로 흡수 (backend.md §7.7). 데모 시드는 동기화하지 않고 pending 만 올린다.
+// 게스트(로그아웃) 상태에서 남긴 책·문장·대화(my_note)를 로그인 직후 Supabase 로 흡수
+// (backend.md §7.7). 데모 시드(_seed)는 제외 — 게스트가 직접 남긴 문장(_guest 태그, #370)을
+// 가진 책만 백필한다. 해자("축적되는 대화 데이터")가 가입 시 유실되던 구조 수정.
 async function syncPendingToSupabase() {
   const la = window.localStorageAdapter;
   const DS = window.SupabaseDataStore;
   if (!la || !DS) return;
-  let pend = {};
-  try { pend = (la.read() && la.read().pending) || {}; } catch (e) { return; }
-  const pb = pend.book, ps = pend.sentence;
-  if (!pb || !pb.title) return;
+  let local = {};
+  try { local = la.read() || {}; } catch (e) { return; }
+  const ubs = Array.isArray(local.user_books) ? local.user_books : [];
+  const pend = local.pending || {};
+  // 게스트가 직접 남긴 문장(_guest)을 가진 책 = 백필 대상(시드 제외).
+  const guestBooks = ubs.filter(ub => (ub.sentences || []).some(se => se && se._guest));
+  // pending.book: 문장 없이 등록만 한 활성 책(체크인 전 등록) — guestBooks 에 없으면 책만 이전.
+  const pb = (pend.book && pend.book.title) ? pend.book : null;
+  if (!guestBooks.length && !pb) return;
   try {
-    const ub = await DS.myBooks.add({
-      book: {
-        isbn13: pb.isbn13 || '', title: pb.title, author: pb.author || '',
-        publisher: pb.publisher || '', total_pages: pb.total_pages || 0, cover_url: pb.cover_url || '',
-      },
-      current_page: pb.current_page || 0,
-    });
-    if (ub && ub.id) {
-      await DS.activeBook.set(ub.id);
-      try { await DS.sessions.addToday({ userBookId: ub.id, page: pb.current_page || 0 }); } catch (e) {}
-      if (ps && ps.text) { try { await DS.sentences.add({ userBookId: ub.id, page: ps.page, text: ps.text }); } catch (e) {} }
+    let lastUbId = null, activeNewId = null;
+    for (const ub of guestBooks) {
+      const bk = ub.book || {};
+      const newUb = await DS.myBooks.add({
+        book: {
+          isbn13: bk.isbn13 || '', title: bk.title || '', author: bk.author || '',
+          publisher: bk.publisher || '', total_pages: bk.total_pages || bk.total || 0, cover_url: bk.cover_url || bk.cover || '',
+        },
+        current_page: ub.current_page || 0,
+      });
+      if (!newUb || !newUb.id) continue;
+      lastUbId = newUb.id;
+      if (ub.id && ub.id === local.active_user_book_id) activeNewId = newUb.id;
+      try { await DS.sessions.addToday({ userBookId: newUb.id, page: ub.current_page || 0 }); } catch (e) {}
+      // _guest 문장만 — my_note(대화)·kind 보존(모트 핵심). add 가 my_note 직접 수용.
+      const gsents = (ub.sentences || []).filter(se => se && se._guest)
+        .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+      for (const se of gsents) {
+        try { await DS.sentences.add({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind }); } catch (e) {}
+      }
     }
-    la.mutate(s => { s.pending = {}; return s; });
-    console.log('[ReadingGo] ✅ 게스트 pending → Supabase 동기화 완료');
-  } catch (e) { console.warn('[ReadingGo] pending 동기화 실패:', e); }
+    // 문장 없이 등록만 한 활성 책(레거시 pending) — 중복 아니면 책만 이전.
+    if (pb && !guestBooks.some(ub => ub.book && ub.book.title === pb.title)) {
+      try {
+        const newUb = await DS.myBooks.add({
+          book: { isbn13: pb.isbn13 || '', title: pb.title, author: pb.author || '', publisher: pb.publisher || '', total_pages: pb.total_pages || 0, cover_url: pb.cover_url || '' },
+          current_page: pb.current_page || 0,
+        });
+        if (newUb && newUb.id) {
+          lastUbId = activeNewId = newUb.id;
+          try { await DS.sessions.addToday({ userBookId: newUb.id, page: pb.current_page || 0 }); } catch (e) {}
+          if (pend.sentence && pend.sentence.text) { try { await DS.sentences.add({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text }); } catch (e) {} }
+        }
+      } catch (e) {}
+    }
+    if (activeNewId || lastUbId) { try { await DS.activeBook.set(activeNewId || lastUbId); } catch (e) {} }
+    // 재동기화 방지 — pending 비우고 _guest 플래그 제거(이전 끝난 문장 표식 해제).
+    la.mutate(s => {
+      s.pending = {};
+      (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se => { if (se && se._guest) delete se._guest; }));
+      return s;
+    });
+    console.log('[ReadingGo] ✅ 게스트 책·문장·대화(my_note) → Supabase 백필 완료 (#370)');
+  } catch (e) { console.warn('[ReadingGo] 게스트 백필 실패:', e); }
 }
 
 function BootSplash({ text }) {
