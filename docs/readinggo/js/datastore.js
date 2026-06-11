@@ -354,6 +354,14 @@ const DataStore = {
         return se;
       });
     },
+    // 종류 변경 인용↔내 의견 (#381) — Supabase 어댑터와 표면 일치
+    setKind(sentenceId, kind) {
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (se) se.kind = kind === 'thought' ? 'thought' : 'quote';
+        return se;
+      });
+    },
     // 한 문장 삭제 — 소속 책의 sentences 배열에서 제거 (Supabase 어댑터와 표면 일치 §7.2)
     remove(sentenceId) {
       return localStorageAdapter.mutate(s => {

@@ -630,11 +630,13 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
   });
   // 직전 진척률 가지 수 — 새 가지 stack 애니메이션 기준.
   const prevTwigsRef = _useRef(twigsForProgress(nestXpProgress(state.xp)));
-  // 한 문장 삭제(#1) 이벤트 → 둥지 '내 한 문장' 목록 즉시 반영.
+  // 한 문장 삭제(#1)·종류변경(#381) 이벤트 → 둥지 '내 한 문장' 목록 즉시 반영.
   _useEffect(() => {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
+    const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
     window.addEventListener('rg:sentence-removed', onRm);
-    return () => window.removeEventListener('rg:sentence-removed', onRm);
+    window.addEventListener('rg:sentence-kind', onKind);
+    return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); };
   }, []);
 
   // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드. 둥지(XP 기반)는 유지 — 책과 무관(#313).
@@ -926,7 +928,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
           return (
             <div key={i} className="my-q-card" style={{ cursor: 'pointer' }}
-              onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note })}>
+              onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>
               <div className="meta">
                 <span className="bk">{bkTitle}</span>
                 <span className="dot">·</span>
@@ -934,7 +936,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
                 <span className="dot">·</span>
                 <span>{q.when}</span>
               </div>
-              <div className="quote">"{q.text}"</div>
+              <div className="quote" style={q.kind === 'thought' ? { fontStyle: 'normal' } : null}>{q.kind === 'thought' ? `💭 ${q.text}` : `"${q.text}"`}</div>
             </div>
           );
         })
@@ -1008,6 +1010,7 @@ function CompanionModal({ sentence, onClose }) {
   const [rated, setRated] = _useState(null);               // 질문 평가 👍/👎 (#371)
   const [editing, setEditing] = _useState(false);          // 한 문장 본문 편집 (#325)
   const [stext, setStext] = _useState(sentence.text || '');
+  const [skind, setSkind] = _useState(sentence.kind === 'thought' ? 'thought' : 'quote'); // 인용↔내 의견 (#381)
   const MAX = 3;
   const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
   const bt = sentence.bookTitle || '', au = sentence.author || '';
@@ -1015,6 +1018,12 @@ function CompanionModal({ sentence, onClose }) {
     const v = stext.trim();
     if (!v) { setEditing(false); return; }
     if (DataStore.sentences && DataStore.sentences.updateText) Promise.resolve(DataStore.sentences.updateText(sentence.id, v)).catch(() => {});
+    // 종류 변경(#381) — 바뀐 경우에만 setKind.
+    if (skind !== (sentence.kind || 'quote') && DataStore.sentences && DataStore.sentences.setKind) {
+      Promise.resolve(DataStore.sentences.setKind(sentence.id, skind)).catch(() => {});
+      sentence.kind = skind;
+      window.dispatchEvent(new CustomEvent('rg:sentence-kind', { detail: { id: sentence.id, kind: skind } }));
+    }
     sentence.text = v; setEditing(false); showToast('✏️ 문장 수정됨');
   };
   _useEffect(() => {
@@ -1071,16 +1080,24 @@ function CompanionModal({ sentence, onClose }) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px 18px' }}>
           {editing ? (
             <div style={{ marginBottom: 12 }}>
+              {/* 인용↔내 의견 토글 (#381) — 편집 시 종류 변경 */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                {[['quote', '📖 책 속 문장'], ['thought', '💭 내 생각']].map(([k, label]) => (
+                  <button key={k} onClick={() => setSkind(k)}
+                    style={{ padding: '5px 12px', borderRadius: 12, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                      background: skind === k ? 'var(--brand)' : 'var(--paper-2)', color: skind === k ? '#fff' : 'var(--ink-3)' }}>{label}</button>
+                ))}
+              </div>
               <textarea value={stext} onChange={(e) => { if (e.target.value.length <= 1000) setStext(e.target.value); }} rows={3}
                 style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--brand)', borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <button onClick={() => { setStext(sentence.text || ''); setEditing(false); }} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 8, border: '1.5px solid var(--line)', background: 'transparent', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>취소</button>
+                <button onClick={() => { setStext(sentence.text || ''); setSkind(sentence.kind === 'thought' ? 'thought' : 'quote'); setEditing(false); }} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 8, border: '1.5px solid var(--line)', background: 'transparent', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>취소</button>
                 <button onClick={saveText} style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>저장</button>
               </div>
             </div>
           ) : (
-            <div style={{ position: 'relative', fontSize: 14, fontStyle: 'italic', color: 'var(--ink)', lineHeight: 1.5, padding: '10px 52px 10px 12px', background: 'var(--paper-2)', borderRadius: 10, marginBottom: 12 }}>
-              "{sentence.text}"
+            <div style={{ position: 'relative', fontSize: 14, fontStyle: skind === 'thought' ? 'normal' : 'italic', color: 'var(--ink)', lineHeight: 1.5, padding: '10px 52px 10px 12px', background: 'var(--paper-2)', borderRadius: 10, marginBottom: 12 }}>
+              {skind === 'thought' ? `💭 ${sentence.text}` : `"${sentence.text}"`}
               <span style={{ position: 'absolute', top: 6, right: 8, display: 'flex', gap: 6 }}>
                 <button onClick={() => { setStext(sentence.text || ''); setEditing(true); }} title="문장 수정" aria-label="문장 수정"
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: 0.6, padding: 0 }}>✏️</button>

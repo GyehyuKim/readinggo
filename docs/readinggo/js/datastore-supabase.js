@@ -207,6 +207,11 @@
       async updateText(sentenceId, text) {
         return unwrap(await sb().from('sentences').update({ text: text || '' }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
       },
+      // 종류 변경 인용↔내 의견 (#381) — 본인 행만(RLS)
+      async setKind(sentenceId, kind) {
+        const k = kind === 'thought' ? 'thought' : 'quote';
+        return unwrap(await sb().from('sentences').update({ kind: k }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
+      },
       // 한 문장 삭제 — 본인 행만(RLS). 연결된 companion_sessions 는 FK 정리 정책에 위임.
       async remove(sentenceId) {
         unwrap(await sb().from('sentences').delete().eq('id', sentenceId).eq('user_id', await uid()));
