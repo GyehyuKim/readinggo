@@ -35,7 +35,8 @@ Other agents (Cursor, Continue, Aider) should enter via [`AGENTS.md`](./AGENTS.m
 
 근거: [LF: Lock Stack in CLAUDE.md](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-lock-stack).
 
-- **플랫폼**: Phase 0/1 **순수 웹 (반응형)**. **Capacitor·네이티브 앱 보류** — OCR·STT·앱스토어가 필요한 Phase 3에서 재도입 검토 (v7 결정, 2026-06-01). 새 네이티브 프레임워크 도입 금지.
+- **플랫폼**: Phase 0/1 **순수 웹 (반응형)**. **Capacitor·네이티브 앱 보류** — STT·앱스토어가 필요한 Phase 3에서 재도입 검토 (v7 결정, 2026-06-01). 새 네이티브 프레임워크 도입 금지.
+- **OCR (해제, v8 결정 2026-06-11)**: 읽기모드 책 사진 글귀 추출 = **웹 기반 OCR 허용**. 서버리스(Cloudflare Worker `/api/ocr`)에서 **Upstage Document OCR + solar-pro3 보정**, 키는 서버 보관(클라 노출 금지). 네이티브 불필요 → 위 보류 대상 아님. STT(음성)는 여전히 OS 키보드 마이크로 대체(Phase 3).
 - **빌드**: 현행 React 18 CDN + Babel 유지. Vite 전환은 **PWA 전환 시 재검토** (현재 보류).
 - **백엔드**: Phase 0 `localStorage` / Phase 1+ **Supabase** (Google OAuth). **DataStore 계약**으로 추상화 — 피처 코드는 저장소를 직접 호출하지 않음 (`docs/readinggo/specs/backend.md` §7.2).
 - **AI**: 도서 추천은 **Gemini Flash 무료 티어 + 서버리스 프록시** (Phase 1+). 클라이언트에 API 키 노출 금지.

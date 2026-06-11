@@ -30,6 +30,13 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return companionProxy(request, env);
     }
+    // 읽기모드 OCR — 책 사진 → 한 문장 추출(#382). Upstage Document OCR + solar-pro3 보정.
+    // 키는 서버에서만(클라 노출 금지). 동일출처만.
+    if (p === '/api/ocr') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      return ocrProxy(request, env);
+    }
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.
     return env.ASSETS.fetch(request);
   },
@@ -50,14 +57,14 @@ function companionMock(sentence) {
   return qs[(sentence ? sentence.length : 0) % qs.length];
 }
 
-async function callLLM({ messages, env, maxTokens }) {
+async function callLLM({ messages, env, maxTokens, temperature }) {
   const base = (env.LLM_BASE_URL || '').replace(/\/$/, '');
   const model = env.LLM_MODEL, key = env.UPSTAGE_API_KEY;
   if (!base || !model || !key) throw new Error('LLM env 미설정');
   const payload = {
     model,
     messages,
-    temperature: 0.8,
+    temperature: (typeof temperature === 'number') ? temperature : 0.8,
     max_tokens: maxTokens || 220,
   };
   // reasoning 토글 — LLM_REASONING_EFFORT 미설정/빈 값이면 필드 생략(추론 최소). low|medium|high면 전달.
@@ -117,6 +124,52 @@ async function companionProxy(request, env) {
     // 호출 실패 → 목 질문 폴백 (무중단)
     return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
   }
+}
+
+/* ── 읽기모드 OCR — 책 사진 → 한 문장 (#382) ──────────────
+   Upstage Document OCR(저렴·한글 우수) → solar-pro3 보정(컬럼 끊김·띄어쓰기만).
+   키는 서버 보관(클라 노출 금지). 보정은 원문 변형 금지(인용 충실도). */
+const OCR_URL = 'https://api.upstage.ai/v1/document-digitization';
+const OCR_MAX_BYTES = 8 * 1024 * 1024;   // 8MB
+const OCR_CORRECT_SYSTEM = '너는 책 사진 OCR 결과를 다듬는 교정기다. 책의 좌우 단·줄바꿈 때문에 생긴 불필요한 줄바꿈과 띄어쓰기 오류만 자연스럽게 이어 붙여라. 절대 원문 단어를 바꾸거나 추가·삭제·요약·번역하지 마라. 맞춤법 교정도 하지 마라. 오직 줄바꿈·띄어쓰기 정리만. 결과 텍스트만 출력(설명·따옴표 금지).';
+
+async function ocrProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  if (!env.UPSTAGE_API_KEY) return json({ error: 'OCR 미설정', demo: true }, 503);
+  let form;
+  try { form = await request.formData(); } catch { return json({ error: 'invalid form' }, 400); }
+  const file = form.get('document');
+  if (!file || typeof file === 'string') return json({ error: 'document(이미지) 필요' }, 422);
+  if (file.size && file.size > OCR_MAX_BYTES) return json({ error: '이미지가 너무 큽니다(최대 8MB)' }, 413);
+  const doCorrect = String(form.get('correct') || 'true') !== 'false';   // 기본 LLM 보정 on
+  // 1) Upstage Document OCR (model=ocr) — { text, confidence, pages }.
+  let raw = '';
+  try {
+    const up = new FormData();
+    up.append('document', file, (file.name || 'page.jpg'));
+    up.append('model', 'ocr');
+    const r = await fetch(OCR_URL, { method: 'POST', headers: { Authorization: `Bearer ${env.UPSTAGE_API_KEY}` }, body: up });
+    if (!r.ok) return json({ error: 'OCR HTTP ' + r.status }, 502);
+    const d = await r.json();
+    raw = String((d && d.text) || '').trim();
+  } catch (e) {
+    return json({ error: 'OCR 호출 실패: ' + String((e && e.message) || e) }, 502);
+  }
+  if (!raw) return json({ text: '', raw: '', empty: true }, 200);
+  // 2) solar-pro3 보정 — 컬럼 끊김·띄어쓰기만(temperature 0.1, 원문 충실). 실패 시 raw 폴백(무중단).
+  let text = raw;
+  if (doCorrect && env.LLM_BASE_URL && env.LLM_MODEL) {
+    try {
+      const corrected = await callLLM({
+        messages: [
+          { role: 'system', content: OCR_CORRECT_SYSTEM },
+          { role: 'user', content: '다음 OCR 텍스트의 줄바꿈·띄어쓰기만 정리:\n' + raw.slice(0, 2000) },
+        ], env, maxTokens: 600, temperature: 0.1,
+      });
+      if (corrected) text = corrected.trim();
+    } catch (e) { /* raw 폴백 */ }
+  }
+  return json({ text, raw }, 200);
 }
 
 // 책 맥락 한 조각 (#373) — 참새 질문에 작품 소개를 녹이기 위한 서버측 조회.

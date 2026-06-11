@@ -99,3 +99,15 @@
 - **읽기 모드가 오늘의 한 문장을 대체**: 읽기 모드에서 기록하면 둥지의 별도 "오늘의 한 문장"은 불필요(동일 체크인 경로)
 - **종료**: "독서 종료" → 마지막 읽은 페이지 확인 입력 → `current_page` 갱신. 미입력 시 최근 페이지 유지
 - 데이터: `DataStore.sessions.addToday`·`sentences.add`·`activeBook.get`. 누적 독서시간 저장은 Phase 2(`reading_sessions.seconds`)
+
+### 5.6 책 사진 OCR 추출 (#382, 구현) — Stack Lock 해제(v8, 2026-06-11)
+
+타이핑 마찰을 줄여 "한 문장 남기기"를 더 쉽게. **웹 기반 OCR**(네이티브 불필요 → Stack Lock 보류 대상 아님, [CLAUDE.md Stack Lock](../../CLAUDE.md)).
+
+- **진입**: 읽기모드 인용(📖 책 속 문장) 모드의 입력칸 아래 **"📷 책 사진에서 글귀 가져오기"**. `<input type=file accept=image/* capture=environment>` → 모바일은 카메라/갤러리.
+- **파이프라인**: 사진 → `POST /api/ocr`(Cloudflare Worker) → **① Upstage Document OCR**(`document-digitization`, `model=ocr`, 저렴·한글 우수) → **② solar-pro3 보정**(`temperature 0.1`): 책 좌우 단·줄바꿈으로 생긴 **불필요한 줄바꿈·띄어쓰기만** 이어붙임. **원문 단어 변형·요약·번역·맞춤법 교정 금지**(인용 충실도). 보정 실패 시 raw OCR 폴백(무중단).
+- **결과**: 추출 텍스트를 입력칸에 **프리필(이어붙임)** → 사용자가 **원하는 부분만 남기고** 저장. 여러 장 누적 가능. ('드래그 영역 선택'은 v2 — 현재는 텍스트 편집으로 트림.)
+- **키 보호**: `UPSTAGE_API_KEY`(companion과 동일 secret) **서버에서만**. 클라 노출 금지. 동일출처(Origin)만 허용. 이미지 ≤8MB.
+- **내 생각(thought) 모드엔 미표시**: 내 생각은 직접 적는 것이라 OCR 불필요.
+- 분석 이벤트: `ocr_extracted`(book_id, chars).
+- **후속**: 정확도 벤치마크(실제 한글 책 페이지 샘플로 후보 비교)는 별도. `pages[]` 바운딩박스 활용한 드래그 영역 선택 = v2.

@@ -11,7 +11,7 @@ window.RG_CONFIG = {
 
 // 앱 버전 — 베타 0.XXX. **publish(배포) 1회마다 +0.001 수동 증가** (≈머지 PR 수).
 // 설정 표시 + 문의 작성 시 첨부 → 운영자가 "어느 버전 문제/해결인지" 추적.
-window.RG_VERSION = '0.192';
+window.RG_VERSION = '0.193';
 
 // 입력 검증 — 클라 1차 방어 + "값 생성 규칙" 안내. 서버(DB CHECK, supabase/04_constraints.sql)와 동일 규칙 공유.
 window.RG_VALIDATE = (function () {
