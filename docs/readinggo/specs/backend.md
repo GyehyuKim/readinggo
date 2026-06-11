@@ -371,6 +371,14 @@ OAuth 콜백 직후 동기화 → localStorage 비움:
 5. `sentences` insert
 6. `streak` 초기화 (current=1, last_check_in_date=today)
 
+**전체 게스트 활동 백필 (#370, 구현)**: 위 `pending_*`(단건)만으로는 게스트가 읽기모드에서 남긴 **여러 문장·참새 대화(my_note)** 가 가입 시 유실됐다(피치 해자 "축적되는 대화"가 비는 구조적 원인). 수정:
+
+- 로컬 어댑터 `sentences.add`는 게스트가 직접 남긴 문장에 **`_guest: true`** 태그(시드 `_seed()` 문장은 태그 없음 → 백필 제외).
+- `syncPendingToSupabase`(app.js)는 `_guest` 문장을 가진 **모든 user_book**을 이전: 책 upsert → 문장 `add({text, page, my_note, kind})`로 **대화(my_note)·종류까지 보존**. 활성 책은 로컬 `active_user_book_id` 매핑 유지.
+- 이전 후 `pending` 비우고 `_guest` 플래그 제거(재동기화 방지). 시드 완독 책(성 컬렉션)은 `_guest` 문장이 없어 미이전(폴루션 방지).
+- 참여 가시화: `answer_saved`(PostHog)는 동의와 무관하게 발화(`rgTrack`→`posthog.capture`) — 미동의 게스트의 engagement도 집계됨.
+- (후속) 동의 유저 한정 my_note Q/A의 `companion_sessions` 백필은 별도(선택).
+
 ### 7.8 다중 책 / 활성 책 전환
 
 - `user_books` 다수 행 보유 가능 (status='reading' 여러 권)

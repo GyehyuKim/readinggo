@@ -327,7 +327,7 @@ async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid) {
   try {
     const r = await fetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote', avoid: avoid || '' }),
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote', avoid: avoid || '', preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : '') }),
     });
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }
@@ -338,7 +338,7 @@ async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind
   try {
     const r = await fetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote', avoid: avoid || '' }),
+      body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote', avoid: avoid || '', preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : '') }),
     });
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }

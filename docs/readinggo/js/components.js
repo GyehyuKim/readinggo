@@ -383,6 +383,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [hbusy, setHbusy] = useState(false);
   const [hmsg, setHmsg] = useState('');
   const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes'); // 데이터 활용 동의 (#294)
+  const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'); // 참새 질문 결 (#375)
   const [bio, setBio] = useState(me.bio || '');
   const [bmsg, setBmsg] = useState('');
   const saveBio = async () => {
@@ -540,6 +541,24 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer', background: consentOn ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s' }}>
               <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
+          </div>
+
+          {/* 참새 질문 결 프리셋 (#375, companion.md §4.4) — 고른 결이 다음 질문부터 반영. */}
+          <div style={{ marginTop: 14, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>🐦 참새 질문 결</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, marginBottom: 10, lineHeight: 1.4 }}>참새가 던지는 질문의 방향을 골라요. 다음 질문부터 반영돼요.</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(window.RG_COMPANION_PRESETS || []).map((p) => {
+                const on = qPreset === p.key;
+                return (
+                  <button key={p.key} onClick={() => { setQPreset(p.key); if (window.RG_companionPreset) window.RG_companionPreset.set(p.key); }}
+                    aria-pressed={on}
+                    style={{ padding: '6px 12px', borderRadius: 16, border: on ? 'none' : '1px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--ink-2)', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>
+                    {p.emoji} {p.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* 앱 버전 (베타) */}

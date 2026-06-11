@@ -73,6 +73,16 @@ async function callLLM({ messages, env, maxTokens }) {
   return ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
 }
 
+// 질문 방향성 프리셋 → 결 지시문 (#375). key 는 config.js RG_COMPANION_PRESETS 와 1:1 일치.
+// balanced 는 키 없음(기본 톤 유지). 자유서술 아님 — 정해진 결만.
+const PRESET_TONE = {
+  deep: '한 가지를 끝까지 파고드는, 본질을 캐묻는 깊은 질문으로.',
+  light: '부담 없이 가볍게 답할 수 있는, 편안하고 일상적인 질문으로.',
+  emotional: '그때의 감정·기분·마음의 움직임에 초점을 둔 질문으로.',
+  critical: '문장에 동의하거나 반박해 보게 하는, 다른 관점에서 따져보는 비판적 질문으로.',
+  context: '작가의 삶·시대·작품 맥락과 연결 짓는 질문으로.',
+};
+
 async function companionProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   let body;
@@ -87,6 +97,9 @@ async function companionProxy(request, env) {
   const kind = (body && body.kind === 'thought') ? 'thought' : 'quote';
   // 재생성(#372) — 피할 직전 질문. 반복방지(#373)와 합류.
   const avoid = String((body && body.avoid) || '').slice(0, 500).trim();
+  // 질문 방향성 프리셋 (#375) — 사용자가 고른 질문 결. key 는 config.js RG_COMPANION_PRESETS 와 1:1.
+  const preset = String((body && body.preset) || '').slice(0, 20).trim();
+  const presetTone = PRESET_TONE[preset] || '';
   // 멀티턴 — 이전 대화(질문/답변). 후속 질문 생성용 (#327).
   const exchanges = Array.isArray(body && body.exchanges) ? body.exchanges.slice(0, 6) : [];
   if (!sentence) return json({ error: 'sentence 필요' }, 422);
@@ -109,6 +122,7 @@ async function companionProxy(request, env) {
     ? '이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로. 작품 소개·작가·시대 맥락을 한 조각 녹여 구체화하세요.'
     : '방금 답을 받아 한 걸음 더 깊이 들어가는 질문 하나를 한국어로. 위에서 이미 한 질문들과 확연히 다른 각도로 — 같거나 거의 비슷한 질문 절대 금지. 질문만.';
   if (avoid) instr += ` 다음 질문은 이미 했으니 반드시 피하고 다르게 물으세요: "${avoid}"`;
+  if (presetTone) instr += ` 질문의 결(사용자 선호): ${presetTone}`;
   messages.push({ role: 'user', content: instr });
   try {
     const q = await callLLM({ messages, env });

@@ -317,6 +317,7 @@ const DataStore = {
           text: text || '',
           my_note: my_note || null,
           kind: kind === 'thought' ? 'thought' : 'quote',   // 인용 vs 내 의견 (#360)
+          _guest: true,   // 게스트가 직접 남긴 문장(시드 아님) — 로그인 시 backfill 대상 (#370)
           created_at: Date.now(),
         };
         ub.sentences.push(row);
