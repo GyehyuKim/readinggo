@@ -249,6 +249,17 @@ const DataStore = {
         return ub;
       });
     },
+    // 책 메타 수정 (출판사·페이지수, #410) — user_book.book 갱신. Supabase 어댑터와 표면 일치.
+    updateBook(userBookId, fields) {
+      fields = fields || {};
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub || !ub.book) return null;
+        if (fields.publisher !== undefined) ub.book.publisher = fields.publisher;
+        if (fields.total_pages !== undefined) ub.book.total_pages = Number(fields.total_pages) || 0;
+        return ub;
+      });
+    },
   },
 
   /* 일일 기록 (세션) ──────────────────────────────

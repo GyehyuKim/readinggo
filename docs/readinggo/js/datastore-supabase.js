@@ -126,6 +126,16 @@
           user_id: id, book_id: bk.id, status: 'reading', current_page: current_page || 0,
         }).select('*, book:books(*)').single());
       },
+      // 책 메타 수정 (출판사·페이지수, #410) — books 테이블 update(공유 카탈로그, 쪽수 보정 전체 반영).
+      async updateBook(userBookId, fields) {
+        fields = fields || {};
+        const ub = unwrap(await sb().from('user_books').select('book_id').eq('id', userBookId).maybeSingle());
+        if (!ub || !ub.book_id) return null;
+        const patch = {};
+        if (fields.publisher !== undefined) patch.publisher = fields.publisher;
+        if (fields.total_pages !== undefined) patch.total_pages = Number(fields.total_pages) || 0;
+        return unwrap(await sb().from('books').update(patch).eq('id', ub.book_id).select().maybeSingle());
+      },
     },
     activeBook: {
       async get() {
