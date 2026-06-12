@@ -834,7 +834,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
               <button onClick={closeCreateTown} style={{background:'transparent', border:'none', fontSize:20, cursor:'pointer', padding:4}}>×</button>
             </div>
 
-            <div style={{padding:16, overflowY:'auto', maxHeight:'calc(90vh - 58px)'}}>
+            <div style={{padding:16, overflowY:'auto', overflowX:'hidden', WebkitOverflowScrolling:'touch', maxHeight:'calc(90vh - 58px)'}}>
               <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:10}}>책 선택</div>
               <input
                 value={createBookQuery}
@@ -970,7 +970,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
                       return d.toISOString().split('T')[0];
                     }));
                   };
-                  const dateInputStyle = { flex:1, padding:'6px 10px', borderRadius:8, border:'1.5px solid var(--line)', background:'var(--paper)', fontSize:13, fontWeight:700, boxSizing:'border-box' };
+                  const dateInputStyle = { flex:1, minWidth:0, padding:'6px 10px', borderRadius:8, border:'1.5px solid var(--line)', background:'var(--paper)', fontSize:13, fontWeight:700, boxSizing:'border-box' };
 
                   if (toc.length > 0) {
                     return (
@@ -1002,7 +1002,7 @@ function VillageView({ state, onSelectTown, onTownsChange }) {
                     <div>
                       <div style={{fontSize:12, fontWeight:800, color:'var(--ink-2)', marginBottom:6}}>마일스톤</div>
                       <div style={{display:'flex', gap:8, marginBottom:8}}>
-                        <input value={createPartCount} onChange={(e) => { const v=e.target.value.replace(/[^0-9]/g,''); setCreatePartCount(v); const c=Math.max(1,parseInt(v,10)||1); setCreatePartDueDates(prev=>Array.from({length:c}).map((_,i)=>prev[i]||'')); }} placeholder="파트 수" inputMode="numeric" style={{flex:1,padding:'12px 14px',borderRadius:12,border:'1.5px solid var(--line)',background:'var(--paper)',fontSize:14,fontWeight:700,boxSizing:'border-box'}} />
+                        <input value={createPartCount} onChange={(e) => { const v=e.target.value.replace(/[^0-9]/g,''); setCreatePartCount(v); const c=Math.max(1,parseInt(v,10)||1); setCreatePartDueDates(prev=>Array.from({length:c}).map((_,i)=>prev[i]||'')); }} placeholder="파트 수" inputMode="numeric" style={{flex:1,minWidth:0,padding:'12px 14px',borderRadius:12,border:'1.5px solid var(--line)',background:'var(--paper)',fontSize:14,fontWeight:700,boxSizing:'border-box'}} />
                         <button type="button" onClick={autoSplit} style={{padding:'10px 12px',border:'1.5px solid var(--line)',borderRadius:12,background:'var(--card)',fontWeight:800,fontSize:12,color:'var(--ink-2)',cursor:'pointer',whiteSpace:'nowrap'}}>균등 자동 분할</button>
                       </div>
                       <div style={{display:'flex', flexDirection:'column', gap:8}}>
