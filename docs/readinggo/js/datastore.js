@@ -554,7 +554,11 @@ const DataStore = {
       });
     },
     list() {
-      return localStorageAdapter.mutate(s => s.wish_books.slice());
+      // Supabase 어댑터와 표면 일치 — {book_id, book} 객체 배열 반환(getBook으로 해소, #403).
+      return localStorageAdapter.mutate(s => s.wish_books.map(id => {
+        const bk = (typeof window.getBook === 'function') ? window.getBook(id) : null;
+        return { book_id: id, book: bk ? { id: bk.id, title: bk.title, author: bk.author, publisher: bk.pub || bk.publisher, total_pages: bk.total, cover_url: bk.cover, isbn13: bk.isbn } : { id } };
+      }));
     },
     remove(bookId) {
       return localStorageAdapter.mutate(s => {

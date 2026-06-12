@@ -432,12 +432,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
 }
 
 /* ── ProfileView ─────────────────────────────────────– */
-// 위시 행 → 표시용 책 (#403). 로컬(게스트)은 bookId 문자열, Supabase는 {book} join 객체 — 둘 다 처리.
+// 위시 행 → 표시용 책 (#403). 양 어댑터 모두 {book_id, book} 객체 반환(로컬은 datastore에서 getBook 해소).
 function _mapWish(w) {
-  if (typeof w === 'string') {
-    const b = (window.getBook && window.getBook(w)) || {};
-    return { id: w, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover || b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total || 0, isbn: b.isbn13 || b.isbn || '', cur: 0, status: 'wish' };
-  }
   const b = (w && w.book) || w || {};
   return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish' };
 }
