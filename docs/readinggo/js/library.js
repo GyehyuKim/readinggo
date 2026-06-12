@@ -616,7 +616,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             )}
           </div>
           {state.myQuotes.slice(0, 10).map((q) => (
-            <div key={q.id || q.text} style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:12, marginBottom:8}}>
+            <div key={q.id || q.text}
+              onClick={() => { if (q.id && window.RG_openCompanion) window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: q.bookTitle, author: q.author, page: q.page, note: q.note, kind: q.kind }); }}
+              style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:12, marginBottom:8, cursor: q.id ? 'pointer' : 'default'}}>
               <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:4}}>{q.bookTitle ? q.bookTitle + ' · ' : ''}{q.page != null ? q.page + 'p' : '페이지 미상'}{q.kind === 'thought' ? ' · 💭 내 생각' : ''}</div>
               {q.kind === 'thought'
                 ? <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.5}}>💭 {q.text}</div>
