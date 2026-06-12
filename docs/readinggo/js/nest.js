@@ -483,6 +483,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   // 대화 전체(Q/A)를 해당 문장 감상(my_note)으로 영속 (양 어댑터 setNote)
   const persistCompanionNote = (sid, exchanges) => {
     if (!sid || !(DataStore.sentences && DataStore.sentences.setNote)) return;
+    if (!exchanges || !exchanges.length) return;   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
     const note = (exchanges || []).map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
     Promise.resolve(DataStore.sentences.setNote(sid, note)).catch(() => {});
     // 같은 세션 정합 — appState/nestState myQuotes의 note 갱신 → 재오픈 시 대화 이어보기(처음부터 X).
@@ -1137,6 +1138,7 @@ function CompanionModal({ sentence, onClose }) {
   }, []);
   const persist = (ex) => {
     if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return;
+    if (!ex || !ex.length) return;   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
     const note = ex.map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
     Promise.resolve(DataStore.sentences.setNote(sentence.id, note)).catch(() => {});
     sentence.note = note; // 모달 내 즉시 정합

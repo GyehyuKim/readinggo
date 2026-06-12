@@ -57,6 +57,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           if (book.ubId && DataStore.books && DataStore.books.saveRecap) {
             Promise.resolve(DataStore.books.saveRecap(book.ubId, d.recap)).catch(() => {});
           }
+          // 같은 세션 정합 (#404) — 부모 myBooks 의 book.recap 갱신 → 모달 재오픈 시 빈 화면 방지.
+          window.dispatchEvent(new CustomEvent('rg:recap-saved', { detail: { ubId: book.ubId, bookId: book.id, recap: d.recap } }));
         }
         else showToast('회고를 불러오지 못했어요 — 잠시 후 다시');
       } else showToast('회고를 불러오지 못했어요 — 잠시 후 다시');
@@ -379,39 +381,32 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                             "{q.text}"
                           </div>
                         )}
-                        {(() => {
-                          const note = noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '');
-                          if (editingId === q.id) {
-                            return (
-                              <div style={{marginTop:8}}>
-                                <textarea value={draft} maxLength={1000} onChange={e => setDraft(e.target.value)} placeholder="이 문장에 대한 감상… (최대 1000자)" rows={3}
-                                  style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:8, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
-                                <div style={{display:'flex', gap:6, marginTop:6}}>
-                                  <button onClick={() => saveNote(q)} style={{padding:'6px 12px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
-                                  <button onClick={() => setEditingId(null)} style={{padding:'6px 12px', borderRadius:8, border:'1px solid var(--line)', background:'transparent', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
-                                </div>
-                              </div>
-                            );
-                          }
+                        {/* 참새 대화로 통일 (#404) — 둥지와 동일 진입(CompanionModal). 자유 감상 편집은
+                            폐지: 참새 Q/A 와 같은 my_note 칸을 공유해 서로 덮어쓰던 충돌 제거. */}
+                        {q.id && (() => {
+                          const note = q.note || '';
+                          const turns = note ? note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
+                          const openChat = () => window.RG_openCompanion && window.RG_openCompanion({
+                            id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author,
+                            page: q.page, note: q.note, kind: q.kind,
+                          });
                           return note ? (
                             <div style={{marginTop:8}}>
-                              <div onClick={() => { if (q.id) { setEditingId(q.id); setDraft(note); } }}
-                                style={{padding:'8px 10px', background:'var(--paper-2)', borderRadius:8, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer'}}>
+                              <div onClick={openChat}
+                                style={{padding:'8px 10px', background:'var(--paper-2)', borderRadius:8, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer', whiteSpace:'pre-wrap', maxHeight:96, overflow:'hidden'}}>
                                 💬 {note}
                               </div>
-                              {q.id && (
-                                <button onClick={() => togglePrivNote(q)}
-                                  style={{marginTop:4, background:'none', border:'none', color:'var(--ink-3)', fontSize:11, fontWeight:700, cursor:'pointer', padding:'2px 0'}}>
-                                  {isPrivNote(q) ? '🔒 감상 비공개' : '🌐 감상 공개'}
-                                </button>
-                              )}
+                              <button onClick={openChat}
+                                style={{marginTop:4, background:'none', border:'none', color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:'pointer', padding:'2px 0'}}>
+                                🐦 참새와 대화 이어가기{turns ? ' (' + turns + ')' : ''}
+                              </button>
                             </div>
-                          ) : (q.id ? (
-                            <button onClick={() => { setEditingId(q.id); setDraft(''); }}
-                              style={{marginTop:6, padding:'4px 10px', borderRadius:8, border:'1px dashed var(--line)', background:'transparent', fontSize:11, fontWeight:700, color:'var(--ink-3)', cursor:'pointer'}}>
-                              ✏️ 감상 추가
+                          ) : (
+                            <button onClick={openChat}
+                              style={{marginTop:6, padding:'5px 12px', borderRadius:8, border:'1px dashed var(--line)', background:'transparent', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer'}}>
+                              🐦 참새와 대화하기
                             </button>
-                          ) : null);
+                          );
                         })()}
                       </>
                     )}
@@ -480,6 +475,16 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
     // 무작위 한 문장 회상 (§5.8.7)
     Promise.resolve(DataStore.sentences.random()).then(s => { if (alive) setRecall(s || null); }).catch(() => {});
     return () => { alive = false; };
+  }, []);
+
+  // 회고 저장 시 myBooks 의 해당 book.recap 즉시 갱신 (#404) — 모달 재오픈 시 stale 빈 화면 방지.
+  _useEffect(() => {
+    const onRecap = (e) => {
+      const d = e && e.detail; if (!d) return;
+      setMyBooks((prev) => (prev || []).map((b) => (b.ubId === d.ubId || b.id === d.bookId) ? { ...b, recap: d.recap } : b));
+    };
+    window.addEventListener('rg:recap-saved', onRecap);
+    return () => window.removeEventListener('rg:recap-saved', onRecap);
   }, []);
 
   const books = myBooks || [];
