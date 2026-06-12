@@ -353,6 +353,63 @@ function archiveCompanion(bookId, sentenceText, q, a) {
   } catch (e) {}
 }
 
+// 책 사진 OCR — 드래그 영역 선택 v2 (#396). 사진에서 원하는 구절만 사각형으로 골라
+// 그 영역만 잘라 OCR → 배경 잡음·두 페이지 인터리빙(벤치마크 #395) 근본 회피.
+function OcrCropOverlay({ file, onCancel, onCrop }) {
+  const { useState: uS, useRef: uR, useEffect: uE } = React;
+  const [url] = uS(() => URL.createObjectURL(file));
+  const [imgGeo, setImgGeo] = uS(null);   // 박스 기준 이미지 렌더 위치 {left,top,width,height}
+  const [sel, setSel] = uS(null);          // 선택 사각형(이미지 좌표 기준) {x,y,w,h}
+  const imgRef = uR(null), boxRef = uR(null), dragRef = uR(null);
+  uE(() => () => { try { URL.revokeObjectURL(url); } catch (e) {} }, [url]);
+  const measure = () => {
+    if (!imgRef.current || !boxRef.current) return;
+    const ir = imgRef.current.getBoundingClientRect(), br = boxRef.current.getBoundingClientRect();
+    setImgGeo({ left: ir.left - br.left, top: ir.top - br.top, width: ir.width, height: ir.height });
+  };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const ptXY = (e) => {
+    const ir = imgRef.current.getBoundingClientRect();
+    return { x: clamp(e.clientX - ir.left, 0, ir.width), y: clamp(e.clientY - ir.top, 0, ir.height) };
+  };
+  const onDown = (e) => { if (!imgRef.current) return; const p = ptXY(e); dragRef.current = p; setSel({ x: p.x, y: p.y, w: 0, h: 0 }); };
+  const onMove = (e) => { if (!dragRef.current) return; e.preventDefault(); const p = ptXY(e), s = dragRef.current; setSel({ x: Math.min(s.x, p.x), y: Math.min(s.y, p.y), w: Math.abs(p.x - s.x), h: Math.abs(p.y - s.y) }); };
+  const onUp = () => { dragRef.current = null; };
+  const doCrop = (whole) => {
+    const img = imgRef.current; if (!img) return;
+    const r = img.getBoundingClientRect();
+    const sX = img.naturalWidth / r.width, sY = img.naturalHeight / r.height;
+    let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+    if (!whole && sel && sel.w >= 8 && sel.h >= 8) { sx = sel.x * sX; sy = sel.y * sY; sw = sel.w * sX; sh = sel.h * sY; }
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(sw)); cv.height = Math.max(1, Math.round(sh));
+    cv.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    cv.toBlob((blob) => { if (blob) onCrop(blob); }, 'image/jpeg', 0.92);
+  };
+  const hasSel = sel && sel.w >= 8 && sel.h >= 8;
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.94)', zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '16px 18px 6px', color: '#fff', textAlign: 'center' }}>
+        <div style={{ fontWeight: 900, fontSize: 15 }}>가져올 글귀를 드래그로 선택</div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>한 구절만 감싸면 배경·옆 페이지 없이 깔끔해요</div>
+      </div>
+      <div ref={boxRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', touchAction: 'none', margin: '8px 12px' }}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
+        <img ref={imgRef} src={url} alt="" onLoad={measure} draggable={false}
+          style={{ position: 'absolute', inset: 0, margin: 'auto', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', userSelect: 'none', pointerEvents: 'none' }} />
+        {hasSel && imgGeo && (
+          <div style={{ position: 'absolute', left: imgGeo.left + sel.x, top: imgGeo.top + sel.y, width: sel.w, height: sel.h, border: '2px solid var(--brand)', background: 'rgba(63,209,127,0.18)', borderRadius: 4, pointerEvents: 'none' }} />
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8, padding: '8px 16px 18px' }}>
+        <button onClick={onCancel} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
+        <button onClick={() => doCrop(true)} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>전체</button>
+        <button onClick={() => doCrop(false)} disabled={!hasSel} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', background: hasSel ? 'var(--brand)' : 'rgba(255,255,255,0.15)', color: hasSel ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: 900, fontSize: 14, cursor: hasSel ? 'pointer' : 'default' }}>{hasSel ? '✨ 선택 영역 추출' : '영역을 드래그하세요'}</button>
+      </div>
+    </div>
+  );
+}
+
 function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   // book 스냅샷 — 세션 중 부모가 appState.book 을 빈 값으로 갱신(탭 복귀 시 transient 새로고침,
   // 만료 세션 등)해도 읽기 세션이 비워지거나 깨지지 않도록 진입 시점 book 을 고정한다.
@@ -363,6 +420,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   const [text, setText] = _useState('');
   const [kind, setKind] = _useState('quote'); // 'quote'=책 속 인용 | 'thought'=내 의견 (#360)
   const [ocrBusy, setOcrBusy] = _useState(false); // 책 사진 OCR 추출 중 (#382)
+  const [ocrFile, setOcrFile] = _useState(null);  // 크롭 오버레이로 넘길 원본 사진 (#396)
   const _ocrInputRef = _useRef(null);
   const [saved, setSaved] = _useState([]);
   const [closing, setClosing] = _useState(false);            // 종료 확인 단계
@@ -640,12 +698,15 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
         {/* 책 사진 OCR 추출 (#382) — 인용 모드에서만(내 생각은 직접 적는 것). */}
         {kind === 'quote' && (
           <>
+            {/* 사진 선택 → 크롭 오버레이에서 영역 선택 → 그 영역만 OCR (#396) */}
             <input ref={_ocrInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) runOcr(f); e.target.value = ''; }} />
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setOcrFile(f); e.target.value = ''; }} />
             <button onClick={() => { if (!ocrBusy && _ocrInputRef.current) _ocrInputRef.current.click(); }} disabled={ocrBusy}
               style={{ width: '100%', marginTop: 8, padding: 11, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: 'rgba(244,242,236,0.85)', fontWeight: 800, fontSize: 13.5, cursor: ocrBusy ? 'default' : 'pointer', opacity: ocrBusy ? 0.6 : 1 }}>
               {ocrBusy ? '읽는 중…' : '📷 책 사진에서 글귀 가져오기'}
             </button>
+            {/* 촬영 가이드 (#395 벤치마크 결론) */}
+            <div style={{ fontSize: 11, opacity: 0.5, marginTop: 5, textAlign: 'center', lineHeight: 1.4 }}>한 페이지·한 구절만, 배경 없이 찍고 → 원하는 영역을 골라요</div>
           </>
         )}
         {/* 저장(기본) + 지금 대화(부수 옵션) — 읽는 중엔 저장만, 참새는 읽기 종료 시(#347). */}
@@ -707,6 +768,10 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
             {companion.done ? '🪹 둥지로' : '건너뛰고 둥지로'}
           </button>
         </div>
+      )}
+      {/* 책 사진 크롭 선택 (#396) — 사진에서 원하는 영역만 잘라 OCR */}
+      {ocrFile && (
+        <OcrCropOverlay file={ocrFile} onCancel={() => setOcrFile(null)} onCrop={(blob) => { setOcrFile(null); runOcr(blob); }} />
       )}
     </div>
   );

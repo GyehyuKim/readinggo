@@ -92,7 +92,7 @@ function SocialView({ state }) {
     <section className="view active">
       <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3>📚 한 문장 피드</h3>
-        <button onClick={() => setFindOpen(v => !v)} title="친구 찾기" style={{ background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer', padding: '2px 6px' }}>🔍</button>
+        <button onClick={() => setFindOpen(v => !v)} title="친구 찾기" aria-label="친구 찾기" style={{ background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer', padding: '2px 6px' }}>👥</button>
       </div>
       {findOpen && (
         <div style={{ padding: '0 16px 12px' }}>
