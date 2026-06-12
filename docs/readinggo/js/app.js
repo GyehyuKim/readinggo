@@ -112,6 +112,39 @@ async function syncPendingToSupabase() {
   } catch (e) { console.warn('[ReadingGo] 게스트 백필 실패:', e); }
 }
 
+// my_note("Q. ...\nA. ...\n\n…") → [{q,a}] 파싱. companion_sessions backfill용 (#394). 관대하게.
+function parseQAPairs(note) {
+  const out = [];
+  String(note || '').split(/\n\s*\n/).forEach((b) => {
+    const m = b.match(/Q\.\s*([\s\S]*?)(?:\n+A\.\s*([\s\S]*))?$/);
+    if (m && m[1] && m[1].trim()) out.push({ q: m[1].trim(), a: (m[2] || '').trim() });
+  });
+  return out;
+}
+
+// 동의 유저의 과거 대화(my_note)를 companion_sessions 로 1회 backfill (#394) — 해자 집계 채움.
+// 가드: 동의(yes)만(PIPA) + 기존 세션 0건일 때만(라이브 답변 이력 있으면 스킵 = 중복 방지).
+async function backfillCompanionSessions() {
+  const DS = window.SupabaseDataStore;
+  if (!DS || !(DS.companionSessions && DS.companionSessions.add)) return;
+  if (!(window.RG_consent && window.RG_consent.get() === 'yes')) return;
+  try {
+    const existing = (DS.companionSessions.countMine) ? await DS.companionSessions.countMine() : 1;
+    if (existing > 0) return; // 이미 세션 있음 → backfill 안 함
+    const mine = await DS.sentences.listMine().catch(() => []);
+    let n = 0;
+    for (const s of (mine || [])) {
+      if (!s || !s.my_note) continue;
+      const bookId = (s.user_book && s.user_book.book_id) || s.book_id || null;
+      for (const qa of parseQAPairs(s.my_note)) {
+        if (!qa.a) continue; // 답 없는 질문만 있는 노트는 세션 아님
+        try { await DS.companionSessions.add({ bookId, sentence: s.text, question: qa.q, answer: qa.a, lens: 'why' }); n++; } catch (e) {}
+      }
+    }
+    if (n) console.log('[ReadingGo] ✅ my_note → companion_sessions backfill: ' + n + '턴 (#394)');
+  } catch (e) { console.warn('[ReadingGo] companion_sessions backfill 실패:', e); }
+}
+
 function BootSplash({ text }) {
   return (
     <div className="stage"><div className="app">
@@ -328,6 +361,7 @@ function App() {
     (async () => {
       try {
         await syncPendingToSupabase();   // 게스트 → 로그인: pending 책·문장 흡수(§7.7)
+        backfillCompanionSessions();     // 과거 my_note → companion_sessions 1회 채움(#394, 비차단)
         const next = await buildStateFromSupabase();
         // PostHog 유저 식별 (analytics.md §3.2) — 로그인 유저에 person profile 연결
         try {

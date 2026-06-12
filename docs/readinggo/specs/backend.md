@@ -377,7 +377,7 @@ OAuth 콜백 직후 동기화 → localStorage 비움:
 - `syncPendingToSupabase`(app.js)는 `_guest` 문장을 가진 **모든 user_book**을 이전: 책 upsert → 문장 `add({text, page, my_note, kind})`로 **대화(my_note)·종류까지 보존**. 활성 책은 로컬 `active_user_book_id` 매핑 유지.
 - 이전 후 `pending` 비우고 `_guest` 플래그 제거(재동기화 방지). 시드 완독 책(성 컬렉션)은 `_guest` 문장이 없어 미이전(폴루션 방지).
 - 참여 가시화: `answer_saved`(PostHog)는 동의와 무관하게 발화(`rgTrack`→`posthog.capture`) — 미동의 게스트의 engagement도 집계됨.
-- (후속) 동의 유저 한정 my_note Q/A의 `companion_sessions` 백필은 별도(선택).
+- **동의 유저 my_note → `companion_sessions` 백필 (#394, 구현)**: 로그인 시 `backfillCompanionSessions()`(app.js) — 동의(`yes`)·기존 세션 0건일 때만(중복 방지) sentence `my_note`의 `Q./A.` 쌍을 파싱(`parseQAPairs`)해 `companionSessions.add`. 가드용 `companionSessions.countMine()` 양 어댑터 추가(로컬=0). 미동의 유저 제외(PIPA). 해자 집계(`companion_sessions`)를 과거 대화로 채움.
 
 ### 7.8 다중 책 / 활성 책 전환
 

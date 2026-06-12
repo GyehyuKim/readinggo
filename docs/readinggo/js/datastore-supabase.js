@@ -805,6 +805,12 @@
           is_resurface: !!isResurface, consented: true,
         }).select().single());
       },
+      // 내 대화 세션 수 (#394 backfill 가드) — 0이면 my_note backfill 1회 실행.
+      async countMine() {
+        const id = await uid();
+        const { count } = await sb().from('companion_sessions').select('id', { count: 'exact', head: true }).eq('user_id', id);
+        return count || 0;
+      },
     },
   };
 

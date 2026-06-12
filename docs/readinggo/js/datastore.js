@@ -616,6 +616,7 @@ const DataStore = {
   /* 독서 파트너 대화 아카이브 (#295) — 로컬/게스트는 서버 아카이브 안 함(no-op). Supabase 모드만 실저장. */
   companionSessions: {
     add() { return null; },
+    countMine() { return 0; },   // 로컬/게스트는 서버 세션 없음 (#394 backfill 가드)
   },
 };
 
