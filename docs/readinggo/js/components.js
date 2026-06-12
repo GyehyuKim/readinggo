@@ -739,7 +739,10 @@ function SentenceCollectionModal({ onClose }) {
       setMine((sents || []).map(s => ({
         id: s.id, text: s.text, page: s.page,
         bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '',
-        bookId: (s.user_book && s.user_book.book_id) || '',
+        bookId: (s.user_book && s.user_book.book_id) || s.book_id || '',
+        author: (s.user_book && s.user_book.book && s.user_book.book.author) || '',
+        note: s.my_note || '',   // 저장된 참새 대화 — 재오픈 시 이어보기(#418)
+        kind: s.kind || 'quote',
         isPrivate: !!s.is_private,
       })));
       setFavIds(new Set((bms || []).map(b => b.sentence_id)));
@@ -752,7 +755,7 @@ function SentenceCollectionModal({ onClose }) {
   const byBook = {};
   if (filter === 'book') filtered.forEach(s => { const k = s.bookTitle || '기타'; (byBook[k] = byBook[k] || []).push(s); });
   const renderLine = (s) => (
-    <div key={s.id} onClick={() => { if (window.RG_openCompanion) window.RG_openCompanion({ id: s.id, text: s.text, bookId: s.bookId, bookTitle: s.bookTitle, page: s.page, note: s.note || s.my_note || '', kind: s.kind }); }}
+    <div key={s.id} onClick={() => { if (window.RG_openCompanion) window.RG_openCompanion({ id: s.id, text: s.text, bookId: s.bookId, bookTitle: s.bookTitle, author: s.author, page: s.page, note: s.note || s.my_note || '', kind: s.kind }); }}
       style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8, cursor: 'pointer' }}>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>
         {s.bookTitle ? s.bookTitle + ' · ' : ''}{s.page}p{s.isPrivate ? ' · 🔒' : ''}{favIds.has(s.id) ? ' · ❤️' : ''}
