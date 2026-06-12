@@ -777,11 +777,48 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
   );
 }
 
+// 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 둥지 진척 즉시 반영.
+function BookEditModal({ book, onClose, onSaved }) {
+  const [pub, setPub] = _useState((book.pub || book.publisher || '').trim());
+  const [total, setTotal] = _useState(String(book.total || 0));
+  const save = () => {
+    const tp = Math.max(0, parseInt(total, 10) || 0);
+    const finish = (ubId) => {
+      if (ubId && DataStore.myBooks && DataStore.myBooks.updateBook) {
+        Promise.resolve(DataStore.myBooks.updateBook(ubId, { publisher: pub.trim(), total_pages: tp })).catch(() => {});
+      }
+      onSaved && onSaved({ pub: pub.trim(), total: tp });
+      showToast('✏️ 책 정보 수정됨');
+      onClose();
+    };
+    // 활성 책의 user_book id 확보 후 저장.
+    Promise.resolve(DataStore.activeBook.get()).then((ub) => finish(ub && ub.id)).catch(() => finish(null));
+  };
+  return ReactDOM.createPortal(
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px 24px' }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', marginBottom: 4 }}>책 정보 수정</div>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</div>
+        <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)' }}>출판사</label>
+        <input value={pub} onChange={(e) => setPub(e.target.value)} placeholder="출판사"
+          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 12px', margin: '6px 0 14px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 700 }} />
+        <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)' }}>총 페이지수</label>
+        <input value={total} onChange={(e) => setTotal(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="예: 341"
+          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 12px', margin: '6px 0 16px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 700 }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} style={{ flex: '0 0 auto', padding: '12px 18px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
+          <button onClick={save} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 14, cursor: 'pointer' }}>저장</button>
+        </div>
+      </div>
+    </div>, document.body);
+}
+
 function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpenSearch, onArchive }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [readingOpen, setReadingOpen] = _useState(false); // 읽기 모드 (#184)
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
+  const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
   const [ceremony, setCeremony] = _useState(null);
   const [showConfetti, setShowConfetti] = _useState(false);
   const [sameBookFeed, setSameBookFeed] = _useState([]); // 같은 책 다른 사용자 한 문장 (#1)
@@ -974,7 +1011,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     return (
       <section className="view active">
         <div className="card book-card-wrap">
-          <button className="book-jump" onClick={onGoLibrary}><span>📚</span><span>내 서재</span></button>
+          {/* '내 서재' 버튼 제거 (#410) — 하단 탭바로 충분. 책 없으면 ⚙️도 없음. */}
           <div style={{ padding: '38px 22px', textAlign: 'center' }}>
             <div style={{ fontSize: 46, marginBottom: 12 }}>🐦</div>
             <div style={{ fontWeight: 900, fontSize: 18, color: 'var(--ink)', marginBottom: 6 }}>아직 읽는 책이 없어요</div>
@@ -992,8 +1029,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     <section className="view active">
       {/* 활성 책 카드 — 좌우 리볼빙으로 활성 책 전환 (#185) */}
       <div className="card book-card-wrap" style={{ position: 'relative' }}>
-        <button className="book-jump" onClick={onGoLibrary}>
-          <span>📚</span><span>내 서재</span>
+        {/* 책 정보 수정 (#410) — '내 서재' 버튼 제거(하단 탭바로 충분), ⚙️ 로 교체. */}
+        <button className="book-jump" onClick={() => setBookEditOpen(true)} title="책 정보 수정" aria-label="책 정보 수정" style={{ gap: 0 }}>
+          <span>⚙️</span>
         </button>
         {readingBooks.length > 1 && (
           <>
@@ -1151,6 +1189,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
       {showConfetti && ReactDOM.createPortal(
         <Confetti active={showConfetti} nestUp={ceremony ? ceremony.nestUp : false} />,
         document.body
+      )}
+      {/* 책 정보 수정 (#410) — ⚙️ 진입. 저장 시 둥지 진척(total) 즉시 반영 */}
+      {bookEditOpen && nestState.book && nestState.book.id && (
+        <BookEditModal book={nestState.book} onClose={() => setBookEditOpen(false)}
+          onSaved={({ pub, total }) => setNestState((ns) => ({ ...ns, book: { ...ns.book, pub: pub, total: total || ns.book.total } }))} />
       )}
     </section>
   );
