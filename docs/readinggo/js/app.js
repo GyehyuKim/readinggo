@@ -268,6 +268,8 @@ function App() {
   // 책 정보 모달(#11) — 한 문장의 책 제목 탭으로 열림.
   const [bookDetailId, setBookDetailId] = useState(null);
   useEffect(() => { window.RG_openBook = (id) => setBookDetailId(id); return () => { window.RG_openBook = null; }; }, []);
+  // 검색 모달 전역 오픈 (#403) — 서재 위시리스트 '+찜하기' 등에서 호출.
+  useEffect(() => { window.RG_openSearch = () => setIsSearchOpen(true); return () => { window.RG_openSearch = null; }; }, []);
   // 한 문장 대화 모달 (#326) — 내 한 문장 탭으로 열림.
   const [companionSentence, setCompanionSentence] = useState(null);
   useEffect(() => { window.RG_openCompanion = (s) => setCompanionSentence(s); return () => { window.RG_openCompanion = null; }; }, []);
@@ -557,10 +559,10 @@ function App() {
     }
   }, [switchTab]);
 
-  const handleSearchSelectBook = useCallback((book) => {
+  // 검색 책 선택 → 책장 분기 (#409): 'wish'(찜) | 'reading'(읽는중, 기본) | 'completed'(완독).
+  const handleSearchSelectBook = useCallback((book, shelf) => {
+    shelf = shelf || 'reading';
     setIsSearchOpen(false);
-    switchTab('nest');
-    // 검색 결과(데모 or 알라딘 = 전체 책 정보) → Supabase 등록 + 활성화. 데모 getBook 비의존.
     if (!(DataStore.myBooks && DataStore.myBooks.add)) return;
     const isbn13 = book.isbn13 || book.isbn || '';
     (async () => {
@@ -576,28 +578,50 @@ function App() {
             } catch (e) { /* 프록시 실패 시 쪽수 미상으로 진행(#204 수동 폴백) */ }
           }
         }
+        // 찜(읽고 싶어요, #409) — user_book 없이 wish_books 에만. 책 id 확보 후 add.
+        if (shelf === 'wish') {
+          let bookId = book.book_id || book.id || '';
+          if (!bookId && DataStore.books && DataStore.books.upsert) {
+            const up = await Promise.resolve(DataStore.books.upsert({ isbn13, title: book.title, author: book.author, publisher: book.publisher, total_pages: totalPages, cover_url: book.cover_url }));
+            bookId = up && up.id;
+          }
+          if (bookId && DataStore.wishBooks && DataStore.wishBooks.add) {
+            await Promise.resolve(DataStore.wishBooks.add(bookId));
+            window.dispatchEvent(new CustomEvent('rg:wish-changed'));
+            showToast(`❤️ '${book.title}' 읽고 싶은 책에 담았어요`);
+          } else { showToast('이 책은 찜할 수 없어요 — 잠시 후 다시'); }
+          return;
+        }
+        // 읽는중 / 완독 — user_book 확보(중복 시 재사용).
         const mine = await Promise.resolve(DataStore.myBooks.list());
         let ub = (mine || []).find(u => u.book && ((isbn13 && u.book.isbn13 === isbn13) || u.book.title === book.title));
         if (!ub) {
           ub = await Promise.resolve(DataStore.myBooks.add({
             book: { isbn13: isbn13, title: book.title, author: book.author, publisher: book.publisher, total_pages: totalPages, cover_url: book.cover_url },
-            current_page: 0,
+            current_page: shelf === 'completed' ? totalPages : 0,
           }));
         }
-        if (ub && ub.id) {
-          await Promise.resolve(DataStore.activeBook.set(ub.id));
-          setAppState(s => ({
-            ...s,
-            book: {
-              id: ub.book_id, title: book.title,
-              author: (book.author || '') + (book.publisher ? ' · ' + book.publisher : ''),
-              cur: ub.current_page || 0, total: totalPages, days: 1,
-              cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
-            },
-            // 둥지는 책과 무관 — 유지 (#313)
-          }));
-          showToast(`📖 ${book.title} 등록 완료`);
+        if (!ub || !ub.id) return;
+        // 완독(다 읽었어요, #409) — status=completed. 별점·소감은 서재 책상세에서.
+        if (shelf === 'completed') {
+          if (DataStore.books && DataStore.books.complete) await Promise.resolve(DataStore.books.complete(ub.id, {}));
+          window.dispatchEvent(new CustomEvent('rg:wish-changed')); // 서재 목록 갱신 신호 재사용
+          showToast(`🏰 '${book.title}' 완독 책장에 — 서재에서 별점·소감을 남겨보세요`);
+          return;
         }
+        // 읽는중(기존) — 활성 책 + 둥지 반영.
+        switchTab('nest');
+        await Promise.resolve(DataStore.activeBook.set(ub.id));
+        setAppState(s => ({
+          ...s,
+          book: {
+            id: ub.book_id, title: book.title,
+            author: (book.author || '') + (book.publisher ? ' · ' + book.publisher : ''),
+            cur: ub.current_page || 0, total: totalPages, days: 1,
+            cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
+          },
+        }));
+        showToast(`📖 ${book.title} 등록 완료`);
       } catch (e) { console.warn('[ReadingGo] 검색 책 등록 실패:', e); }
     })();
   }, [switchTab]);

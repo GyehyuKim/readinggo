@@ -17,6 +17,7 @@ const SearchModal = ({
   const [dbResults, setDbResults] = React.useState([]); // 우리 DB(books) 결과 — 즉시 표시 (#148)
   const [dbLoading, setDbLoading] = React.useState(false);     // 검색 진행중 구분 (#202)
   const [remoteLoading, setRemoteLoading] = React.useState(false);
+  const [pendingBook, setPendingBook] = React.useState(null); // 책장 선택 대기 (#409)
 
   // Fuse.js 인덱싱 (최초 1회)
   React.useEffect(() => {
@@ -91,10 +92,16 @@ const SearchModal = ({
 
   if (!isOpen) return null;
 
+  // 책 탭 → 즉시 등록(읽는중) 대신 책장 선택 시트(#409). 찜/읽는중/완독 분기.
   const handleSelectResult = (item) => {
-    onSelectBook(item);
+    setPendingBook(item);
+  };
+  const chooseShelf = (shelf) => {
+    const item = pendingBook;
+    setPendingBook(null);
     setQuery('');
     onClose();
+    if (item) onSelectBook(item, shelf);
   };
 
   // 병합 우선순위: 우리 DB(즉시) → 로컬(데모) → 알라딘(외부). isbn/제목 기준 중복 제거.
@@ -281,6 +288,25 @@ const SearchModal = ({
           )}
         </div>
       </div>
+      {/* 책장 선택 시트 (#409) — 책 탭 후 읽고싶어요/읽는중/다읽었어요 분기 */}
+      {pendingBook && (
+        <div onClick={() => setPendingBook(null)}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 10000 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px 24px' }}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', marginBottom: 4 }}>어떤 책장에 놓을까요?</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingBook.title}</div>
+            {[['wish', '❤️ 읽고 싶어요'], ['reading', '📖 지금 읽는 중'], ['completed', '🏰 다 읽었어요']].map(([k, label]) => (
+              <button key={k} onClick={() => chooseShelf(k)}
+                style={{ width: '100%', padding: '14px', marginBottom: 8, borderRadius: 12, border: '1.5px solid var(--line)', background: k === 'reading' ? 'var(--brand-tint)' : 'var(--card)', color: 'var(--ink)', fontWeight: 800, fontSize: 15, cursor: 'pointer', textAlign: 'left' }}>
+                {label}
+              </button>
+            ))}
+            <button onClick={() => setPendingBook(null)}
+              style={{ width: '100%', padding: '10px', marginTop: 4, borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

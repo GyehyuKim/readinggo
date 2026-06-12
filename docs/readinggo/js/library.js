@@ -432,6 +432,16 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
 }
 
 /* ── ProfileView ─────────────────────────────────────– */
+// 위시 행 → 표시용 책 (#403). 로컬(게스트)은 bookId 문자열, Supabase는 {book} join 객체 — 둘 다 처리.
+function _mapWish(w) {
+  if (typeof w === 'string') {
+    const b = (window.getBook && window.getBook(w)) || {};
+    return { id: w, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover || b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total || 0, isbn: b.isbn13 || b.isbn || '', cur: 0, status: 'wish' };
+  }
+  const b = (w && w.book) || w || {};
+  return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish' };
+}
+
 function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const [selectedBookId, setSelectedBookId] = _useState(null);
   const [archiveOpen, setArchiveOpen] = _useState(false); // 성 컬렉션 책장 상세 (#312)
@@ -463,14 +473,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
     }).catch(() => { if (alive) setMyBooks([]); });
     Promise.resolve((DataStore.wishBooks && DataStore.wishBooks.list) ? DataStore.wishBooks.list() : []).then(rows => {
       if (!alive) return;
-      setWishlistBooks((rows || []).map(w => {
-        const b = w.book || w || {};
-        return {
-          id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '',
-          cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0,
-          isbn: b.isbn13 || '', cur: 0, status: 'wish',
-        };
-      }));
+      setWishlistBooks((rows || []).map(_mapWish));
     }).catch(() => { if (alive) setWishlistBooks([]); });
     // 무작위 한 문장 회상 (§5.8.7)
     Promise.resolve(DataStore.sentences.random()).then(s => { if (alive) setRecall(s || null); }).catch(() => {});
@@ -486,6 +489,28 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
     window.addEventListener('rg:recap-saved', onRecap);
     return () => window.removeEventListener('rg:recap-saved', onRecap);
   }, []);
+
+  // 위시리스트/완독 변경(검색 책장 선택·찜 삭제·완독 추가, #403/#409) → 목록 즉시 갱신.
+  _useEffect(() => {
+    const reload = () => {
+      Promise.resolve((DataStore.wishBooks && DataStore.wishBooks.list) ? DataStore.wishBooks.list() : []).then(rows => {
+        setWishlistBooks((rows || []).map(_mapWish));
+      }).catch(() => {});
+      Promise.resolve(DataStore.myBooks.list()).then(rows => {
+        setMyBooks((rows || []).map(ub => { const b = ub.book || {}; return { ubId: ub.id, id: ub.book_id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, recap: ub.companion_recap || '' }; }));
+      }).catch(() => {});
+    };
+    window.addEventListener('rg:wish-changed', reload);
+    return () => window.removeEventListener('rg:wish-changed', reload);
+  }, []);
+
+  // 찜 삭제 (#403) — 위시리스트 카드 ✕. 낙관적 제거 + 토스트.
+  const removeWish = (e, bookId) => {
+    if (e) e.stopPropagation();
+    setWishlistBooks((prev) => prev.filter((w) => w.id !== bookId));
+    if (DataStore.wishBooks && DataStore.wishBooks.remove) Promise.resolve(DataStore.wishBooks.remove(bookId)).catch(() => {});
+    showToast('찜 목록에서 제거했어요');
+  };
 
   const books = myBooks || [];
   const readingBooks = books.filter(b => b.status === 'reading')
@@ -636,6 +661,14 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           ))}
         </div>
 
+        {/* 찜하기 — 위시리스트 탭에서 검색 모달로 책 추가 (#403) */}
+        {activeSubtab === 'wishlist' && (
+          <button onClick={() => window.RG_openSearch && window.RG_openSearch()}
+            style={{ width:'100%', margin:'4px 0 12px', padding:'11px', borderRadius:12, border:'1px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13.5, cursor:'pointer' }}>
+            ＋ 읽고 싶은 책 찾아 담기
+          </button>
+        )}
+
         {/* 책 목록 */}
         {myBooks === null ? (
           <div style={{textAlign:'center', padding:'40px 20px', color:'var(--ink-3)', fontSize:13, fontWeight:700}}>불러오는 중…</div>
@@ -656,9 +689,13 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
                   <BookCover className="shelf-cover" title={b.title} author={b.author} cover={b.cover} fb={b.fb} />
                   <div className="shelf-meta">
                     <div className="shelf-title">{b.title}</div>
-                    <div className="shelf-prog">{progText}</div>
+                    <div className="shelf-prog">{b.status === 'wish' ? (b.author || '읽고 싶은 책') : progText}</div>
                   </div>
                   {b.id === state.book.id && <span className="shelf-active-pill">읽는 중</span>}
+                  {b.status === 'wish' && (
+                    <button onClick={(e) => removeWish(e, b.id)} title="찜 삭제" aria-label="찜 삭제"
+                      style={{ background:'none', border:'none', cursor:'pointer', fontSize:14, color:'var(--ink-3)', padding:'4px 6px', flexShrink:0 }}>✕</button>
+                  )}
                 </div>
               );
             })}
