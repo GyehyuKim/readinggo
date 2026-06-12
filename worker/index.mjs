@@ -50,7 +50,20 @@ export default {
 /* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
    provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
    키 없거나 실패 시 목 질문으로 graceful fallback (데모/피치 무중단). */
-const COMPANION_SYSTEM = '당신은 사용자와 친한 독서모임 진행자입니다. 사용자가 방금 남긴 한 문장을 보고, 그 사람이 자기 생각을 더 깊이 펼치도록 대화하듯 이끄는 질문을 한국어로 하나 던지세요. 입력의 역할을 혼동하지 마세요(#359): "책에서 옮겨 적은 한 문장(인용)"은 작품 속 문장이고, "내 메모(감상)"는 사용자 자신의 생각입니다. 인용을 사용자의 감상으로 단정하지 마세요. 만약 한 문장이 책 속 인용으로 보기 어렵거나(예: "즐거웠다"처럼 짧은 감상형) 작품 속 맥락을 알 수 없다면, 함부로 해석하지 말고 — 그 문장이 책의 어떤 장면·맥락에서 나온 것인지, 혹은 본인의 생각을 적은 것인지를 먼저 물어보세요. 그 책과 작가에 대해 아는 바(작품 맥락·작가의 삶·시대)가 있으면 자연스럽게 한 조각 곁들여 질문을 풍부하게 하되, 핵심은 그 사람의 경험·감정·기억과 잇는 것입니다. 따뜻하고 호기심 어린 톤. 예/아니오로 닫히지 않는 열린 질문. 길이는 자연스럽게(억지로 짧게 하지 말 것), 단 질문은 하나만. 칭찬·요약·해설 나열은 금지하고 질문으로 끝맺으세요.';
+const COMPANION_SYSTEM = '당신은 사용자와 친한 독서모임 진행자입니다. 사용자가 방금 남긴 한 문장을 보고, 그 사람이 자기 생각을 더 깊이 펼치도록 대화하듯 이끄는 질문을 한국어로 하나 던지세요. 입력의 역할을 혼동하지 마세요(#359): "책에서 옮겨 적은 한 문장(인용)"은 작품 속 문장이고, "내 메모(감상)"는 사용자 자신의 생각입니다. 인용을 사용자의 감상으로 단정하지 마세요. 만약 한 문장이 책 속 인용으로 보기 어렵거나(예: "즐거웠다"처럼 짧은 감상형) 작품 속 맥락을 알 수 없다면, 함부로 해석하지 말고 — 그 문장이 책의 어떤 장면·맥락에서 나온 것인지, 혹은 본인의 생각을 적은 것인지를 먼저 물어보세요. 그 책과 작가에 대해 아는 바(작품 맥락·작가의 삶·시대)가 있으면 자연스럽게 한 조각 곁들여 질문을 풍부하게 하되, 핵심은 그 사람의 경험·감정·기억과 잇는 것입니다. 따뜻하고 호기심 어린 톤. 예/아니오로 닫히지 않는 열린 질문 하나만. 2~3문장 이내로 짧고 간결하게 — 작품 분석을 길게 늘어놓지 말 것. 마크다운 서식(별표 **, #, 목록 기호 등)을 절대 쓰지 말고 일반 문장으로만 쓰세요. 칭찬·요약·해설 나열은 금지하고 질문으로 끝맺으세요.';
+
+// 마크다운 서식 제거 (#406) — UI가 md 렌더 안 해 별표(**)가 날것으로 보이는 문제 방지.
+// 굵게/기울임/제목/목록/코드 기호만 제거(텍스트 보존).
+function stripMd(s) {
+  return String(s || '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .trim();
+}
 
 function companionMock(sentence) {
   const qs = ['왜 이 문장이 마음에 걸렸어요?', '이 문장, 지금 내 상황이랑 연결되는 게 있어요?', '이 문장에서 어떤 장면이나 기억이 떠올랐어요?', '이 문장을 누군가에게 들려준다면 누구일까요?'];
@@ -126,14 +139,14 @@ async function companionProxy(request, env) {
     if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
   }
   let instr = exchanges.length === 0
-    ? '이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로. 작품 소개·작가·시대 맥락을 한 조각 녹여 구체화하세요.'
-    : '방금 답을 받아 한 걸음 더 깊이 들어가는 질문 하나를 한국어로. 위에서 이미 한 질문들과 확연히 다른 각도로 — 같거나 거의 비슷한 질문 절대 금지. 질문만.';
+    ? '이 문장을 두고 그 사람의 생각을 끌어내는 질문 하나를 한국어로. 작품 맥락을 한 조각만 가볍게 곁들이되 짧게(2~3문장).'
+    : '사용자가 방금 한 답변에 먼저 한 문장으로 짧게 공감·반응한 뒤, 그 답을 실마리로 한 걸음 더 들어가는 질문 하나만 한국어로. 사용자의 답이 짧거나 가벼워도(예: 농담) 그 답을 무시하지 말고 거기서 자연스럽게 이어가세요. 새 작품 분석을 길게 늘어놓지 말 것. 전체 2~3문장, 질문 하나.';
   if (avoid) instr += ` 다음 질문은 이미 했으니 반드시 피하고 다르게 물으세요: "${avoid}"`;
   if (presetTone) instr += ` 질문의 결(사용자 선호): ${presetTone}`;
   messages.push({ role: 'user', content: instr });
   try {
     const q = await callLLM({ messages, env });
-    return json({ question: q || companionMock(sentence) }, 200);
+    return json({ question: stripMd(q) || companionMock(sentence) }, 200);
   } catch (e) {
     // 호출 실패 → 목 질문 폴백 (무중단)
     return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
@@ -233,7 +246,7 @@ async function companionRecap(body, env) {
   ];
   try {
     const recap = await callLLM({ messages, env, maxTokens: 450 });
-    return json({ recap: recap || recapMock(bookTitle, sentences) }, 200);
+    return json({ recap: stripMd(recap) || recapMock(bookTitle, sentences) }, 200);
   } catch (e) {
     return json({ recap: recapMock(bookTitle, sentences), demo: true, error: String((e && e.message) || e) }, 200);
   }

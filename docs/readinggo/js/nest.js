@@ -1179,6 +1179,7 @@ function CompanionModal({ sentence, onClose }) {
   const [editing, setEditing] = _useState(false);          // 한 문장 본문 편집 (#325)
   const [stext, setStext] = _useState(sentence.text || '');
   const [skind, setSkind] = _useState(sentence.kind === 'thought' ? 'thought' : 'quote'); // 인용↔내 의견 (#381)
+  const _compTailRef = _useRef(null);                      // 대화 말단 anchor (#407 화면 점프 방지)
   const MAX = 3;
   const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
   const bt = sentence.bookTitle || '', au = sentence.author || '';
@@ -1201,6 +1202,10 @@ function CompanionModal({ sentence, onClose }) {
       : (past.length ? genCompanionFollowup(sentence.text, past, bt, au, sentence.kind) : genCompanionQuestion(sentence.text, bt, au, sentence.kind));
     gen.then((q) => { setQuestion(q); setLoading(false); });
   }, []);
+  // 새 질문·답변·로딩 변화 시 대화 말단을 view로 — 답변 생성에 의한 화면 점프·오탭 방지 (#407)
+  _useEffect(() => {
+    try { _compTailRef.current && _compTailRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch (e) {}
+  }, [question, loading, done, exchanges.length]);
   const persist = (ex) => {
     if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return;
     if (!ex || !ex.length) return;   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
@@ -1306,6 +1311,8 @@ function CompanionModal({ sentence, onClose }) {
               </div>
             </>
           )}
+          {/* 말단 anchor (#407) — 새 질문/답변 추가 시 활성 영역을 view로 고정해 화면 점프·오탭 방지 */}
+          <div ref={_compTailRef} />
         </div>
       </div>
     </div>, document.body);
