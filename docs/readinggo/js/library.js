@@ -533,6 +533,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
 
   return (
     <section className="view active">
+      {/* 둥지 캐릭터(NestTheatre) — 홈에서 프로필 최상단으로 이동 (#428) */}
+      {window.NestTheatre && <NestTheatre xp={state.xp} />}
+
       {/* 프로필 상단 */}
       <div style={{background:'linear-gradient(135deg, var(--brand), var(--brand-3))', color:'white', padding:'20px 16px', marginBottom:20, position:'relative'}}>
         <button onClick={() => window.RG_openSettings && window.RG_openSettings()} title="설정"
@@ -546,11 +549,10 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           <div style={{fontSize:13, opacity:0.9, marginTop:4, minHeight:18}}>
             {(window.RG_ME && window.RG_ME.bio) || '한 줄 소개를 설정에서 적어보세요'}
           </div>
-          {/* 통계 뱃지 한 줄 — 🏰 ×N · 🔥 N · ⚡ N (§5.8 v7.2) */}
+          {/* 통계 뱃지 — ⚡ XP · Lv.N (🏰 성·🔥 스트릭 제거 #428·#425. 성 컬렉션은 서재로 #429) */}
           <div style={{display:'flex', justifyContent:'center', gap:16, marginTop:10, fontSize:14, fontWeight:800, opacity:0.95}}>
-            <span>🏰 ×{castles.length}</span>
-            <span>🔥 {state.streak || 0}</span>
-            <span>⚡ {(state.xp || 0).toLocaleString()}</span>
+            <span>⚡ {(state.xp || 0).toLocaleString()} XP</span>
+            <span>Lv.{calcLevel(state.xp || 0)}</span>
           </div>
         </div>
       </div>

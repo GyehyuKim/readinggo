@@ -333,8 +333,8 @@ input,textarea{font-family:inherit;}
 .nest-theatre{
   --health: 80;
   --decay: 0.20;
-  margin-top: 14px;
-  padding: 0 0 16px;
+  margin: 0 0 4px;
+  padding: 0 0 12px;
   background:
     radial-gradient(80% 60% at 50% 88%, #C9E8D2 0%, #DFF3E5 30%, transparent 65%),
     linear-gradient(180deg, #EAF4FF 0%, #F8F1DD 70%, #F0E4C7 100%);
@@ -406,11 +406,11 @@ input,textarea{font-family:inherit;}
   background: var(--paper);
 }
 .nest-svg-wrap.nest-img-stack{
-  height: 210px;
+  height: 140px;
 }
 .nest-svg-wrap.nest-img-stack .nest-img{
   position: absolute; inset: 0; margin: auto;
-  width: 210px; height: 210px; object-fit: contain;
+  width: 140px; height: 140px; object-fit: contain;
   opacity: 0; transition: opacity .55s ease;
   filter: saturate(calc(1 - var(--decay) * 0.7)) brightness(calc(1 - var(--decay) * 0.06));
   -webkit-user-drag: none; user-select: none;
@@ -433,7 +433,7 @@ input,textarea{font-family:inherit;}
   50%   { transform: translateY(-3px) rotate(-.5deg); }
 }
 /* crack-overlay 를 이미지 둥지 본체(아래쪽)에 맞춤 */
-.nest-img-stack .crack-overlay{ width: 200px; height: 200px; top: 57%; }
+.nest-img-stack .crack-overlay{ width: 130px; height: 130px; top: 57%; }
 .nest-img-stack .crack-overlay svg{ width: 100%; height: 100%; display:block; }
 
 .nest-svg-wrap svg.nest-art .twig{

@@ -242,11 +242,14 @@ const NEST_CRACK_SVG = (
   </svg>
 );
 
-function NestTheatre({ xp, streak, prevTwigs, health = 100 }) {
+function NestTheatre({ xp, health = 100 }) {
   // 둥지 = 누적 활동(XP). 책 진척률 아님 (#313). pct = 현재 레벨 내 진행도.
   const pct = _xpProg(xp);
   const stage = getNestStageByXp(xp);
   const { cur, next } = nestInfo(stage.lv);
+  // XP 라벨 — 레벨 배지(#425)·스트릭은 헤더로 일원화, 둥지는 누적 XP 진척만 보여준다 (#428).
+  const lv = calcLevel(xp);
+  const nextXp = xpForLevel(lv + 1);
   // 둥지 일러스트는 진척률(stage.lv)로 그린다. health 는 §6.2 시각 상태(흔들림/균열)용.
   const hp = Math.max(0, Math.min(100, Math.round(health)));
   const hstate = nestVisualState(hp);
@@ -256,13 +259,7 @@ function NestTheatre({ xp, streak, prevTwigs, health = 100 }) {
       className={`nest-theatre nest-img-mode ${hstate.cls}`}
       style={{'--health': pct, '--decay': hstate.decay, '--stage-color': stage.color}}
     >
-      <div className="nest-stagebar">
-        <span className="nest-stage-pill">
-          <span className="lv">LV.{cur.lv}</span>
-          <span>{cur.short} {cur.name}</span>
-        </span>
-        <span className="nest-day-chip">🔥 {streak}일</span>
-      </div>
+      {/* LV·🔥 배지 제거 (#428·#425) — 레벨/스트릭은 상단바·프로필 헤더로 일원화 */}
 
       <div className="nest-svg-wrap nest-img-stack">
         {[1, 2, 3, 4, 5].map(lv => (
@@ -293,7 +290,7 @@ function NestTheatre({ xp, streak, prevTwigs, health = 100 }) {
               <span className="next-arrow">→ {next.short} {next.name}</span>
             )}
           </div>
-          <div className="nest-health-num">진척 <b>{pct}</b>%</div>
+          <div className="nest-health-num"><b>{(xp || 0).toLocaleString()}</b> / {nextXp.toLocaleString()} XP</div>
         </div>
         <div className="nest-health-bar">
           <div className="nest-health-fill" />
@@ -1080,12 +1077,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         </div>
       </div>
 
-      {/* 둥지 시어터 — 누적 활동(XP) 5단계, 책과 무관 (#313) */}
-      <NestTheatre
-        xp={nestState.xp}
-        streak={nestState.streak}
-        prevTwigs={prevTwigsRef.current}
-      />
+      {/* 둥지 시어터(NestTheatre)는 프로필 상단으로 이동 (#428) — 홈은 책읽기 중심 */}
 
       {/* 데모 거르기 */}
       <div className="demo-decay">
@@ -1223,6 +1215,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
 }
 
 window.NestView = NestView;
+window.NestTheatre = NestTheatre;
 
 /* ── CompanionModal (#326): 한 문장 대화 — 읽기 모드 밖에서 열람·이어가기 ──
    저장된 대화(my_note의 Q/A)를 보여주고, 동의 시 한 걸음 더 이어감(멀티턴). */
