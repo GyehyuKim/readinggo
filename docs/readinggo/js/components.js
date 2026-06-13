@@ -450,8 +450,11 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
       showToast('데이터를 내보냈어요 (JSON)');
     } catch (e) { showToast('내보내기 실패'); }
   };
+  // 책별 한 문장 Markdown 일괄 내보내기 (#423) — 책 선택 모달
+  const [bxOpen, setBxOpen] = useState(false);
   return (
     <div className="modal-backdrop show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      {bxOpen && <BookExportModal onClose={() => setBxOpen(false)} />}
       <div className="sheet" role="dialog" aria-label="설정">
         <div className="sheet-grip" />
         <div style={{ padding: '8px 20px 24px' }}>
@@ -493,7 +496,8 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             {bmsg && <div style={{ fontSize: 12, color: bmsg.indexOf('✓') === 0 ? 'var(--brand)' : '#d33', marginTop: 6 }}>{bmsg}</div>}
           </div>
           {/* 데이터 내보내기 (#172) — 데이터 주권: 내 기록은 내 것 */}
-          <button onClick={exportData} style={{ marginTop: 18, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📦 내 데이터 내보내기 (JSON)</button>
+          <button onClick={() => setBxOpen(true)} style={{ marginTop: 18, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📖 책별 한 문장 내보내기 (Markdown)</button>
+          <button onClick={exportData} style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📦 내 데이터 전체 내보내기 (JSON)</button>
 
           {/* 운영자 문의 — DB 저장 → admin 대시보드 */}
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
@@ -563,6 +567,110 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
 
           {/* 앱 버전 (베타) */}
           <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo v{(window.RG_VERSION || '0.000')} · beta</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 책별 한 문장 Markdown 일괄 내보내기 (#423) — 책 체크 선택 → buildBookMarkdown(library.js) 묶음 .md.
+// 전체 JSON 덤프(#172)는 raw·통째라 읽기 어려움 → 책 단위로 정돈된 사람이 읽는 포맷 보완.
+function BookExportModal({ onClose }) {
+  const [books, setBooks] = useState(null);   // null=로딩, []=책 없음
+  const [sel, setSel] = useState({});
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      Promise.resolve((DataStore.myBooks && DataStore.myBooks.list) ? DataStore.myBooks.list() : []).catch(() => []),
+      Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : []).catch(() => []),
+    ]).then(([rows, sents]) => {
+      if (!alive) return;
+      const byBook = {};   // book_id → [{page,text,note,when}]
+      (sents || []).forEach(s => {
+        const bid = (s.user_book && s.user_book.book_id) || s.book_id || '';
+        (byBook[bid] || (byBook[bid] = [])).push({ page: s.page, text: s.text, note: s.my_note || '', when: s.created_at || s.createdAt });
+      });
+      const mapped = (rows || []).map(ub => {
+        const b = ub.book || {};
+        return {
+          id: ub.book_id, title: b.title || '제목 없음', author: b.author || '',
+          pub: b.publisher || '', cover: b.cover_url || '', total: b.total_pages || 0, isbn: b.isbn13 || '',
+          status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at,
+          quotes: byBook[ub.book_id] || [],
+        };
+      }).sort((a, b) => (b.quotes.length - a.quotes.length));   // 한 문장 많은 책 위로
+      setBooks(mapped);
+      const init = {}; mapped.forEach(m => { if (m.quotes.length) init[m.id] = true; });   // 기본: 한 문장 있는 책 선택
+      setSel(init);
+    });
+    return () => { alive = false; };
+  }, []);
+  const toggle = (id) => setSel(s => ({ ...s, [id]: !s[id] }));
+  const selCount = books ? books.filter(b => sel[b.id]).length : 0;
+  const allOn = !!(books && books.length && books.every(b => sel[b.id]));
+  const toggleAll = () => { const v = !allOn; const n = {}; (books || []).forEach(b => { n[b.id] = v; }); setSel(n); };
+  const doExport = () => {
+    const build = window.buildBookMarkdown;
+    if (!build) { showToast('내보내기 모듈 로드 실패'); return; }
+    const chosen = (books || []).filter(b => sel[b.id]);
+    if (!chosen.length) { showToast('내보낼 책을 선택해주세요'); return; }
+    setBusy(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const handle = (window.RG_ME && window.RG_ME.handle) || 'me';
+      const parts = [`# 📚 @${handle}의 ReadingGo 기록`, '', `${chosen.length}권 · 내보낸 날짜 ${today}`];
+      chosen.forEach(b => { parts.push('', '---', '', build(b, b.quotes, {})); });
+      const blob = new Blob([parts.join('\n')], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `readinggo-books-${handle}-${today}.md`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast(`📄 ${chosen.length}권 내보냈어요`);
+      onClose();
+    } catch (e) { showToast('내보내기 실패'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="modal-backdrop show" style={{ zIndex: 1200 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" role="dialog" aria-label="책별 내보내기">
+        <div className="sheet-grip" />
+        <div style={{ padding: '8px 20px 24px' }}>
+          <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>📖 책별 한 문장 내보내기</span>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ink-3)' }} title="닫기">✕</button>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>고른 책을 책별로 정돈된 Markdown 한 파일로 저장해요.</div>
+          {books === null ? (
+            <div style={{ padding: 30, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>불러오는 중…</div>
+          ) : books.length === 0 ? (
+            <div style={{ padding: 30, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>아직 서재에 책이 없어요.</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+                <button onClick={toggleAll} style={{ background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer', padding: 0 }}>{allOn ? '전체 해제' : '전체 선택'}</button>
+                <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>{selCount}권 선택</span>
+              </div>
+              <div style={{ maxHeight: '46vh', overflowY: 'auto', margin: '4px 0 14px' }}>
+                {books.map(b => {
+                  const on = !!sel[b.id]; const n = b.quotes.length;
+                  return (
+                    <button key={b.id} onClick={() => toggle(b.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 4px', background: 'none', border: 'none', borderBottom: '1px solid var(--line)', cursor: 'pointer', textAlign: 'left', opacity: n ? 1 : 0.55 }}>
+                      <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 5, border: on ? 'none' : '1.5px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                      <BookCover title={b.title} author={b.author} cover={b.cover} fb={['#9AA7B2', '#C7D0D8']} style={{ width: 30, height: 42, borderRadius: 4, flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontWeight: 800, fontSize: 14, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</span>
+                        <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>한 문장 {n}개{b.status === 'completed' ? ' · 완독' : ''}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={doExport} disabled={busy || !selCount} style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: selCount ? 'var(--brand)' : 'var(--line)', color: selCount ? '#fff' : 'var(--ink-3)', fontWeight: 900, fontSize: 15, cursor: (busy || !selCount) ? 'default' : 'pointer' }}>{busy ? '내보내는 중…' : `📄 ${selCount}권 Markdown 내보내기`}</button>
+            </>
+          )}
         </div>
       </div>
     </div>

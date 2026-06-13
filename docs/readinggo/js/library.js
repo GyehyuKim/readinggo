@@ -141,46 +141,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   };
 
   // Markdown Export (§5.8.4, #315/#316) — 책 메타·소개 + 완독정보 + 한 문장(페이지·날짜·감상). 북모리 양식 벤치마킹.
+  // 변환 핵심은 buildBookMarkdown(파일 레벨)에 추출해 #423 다중 일괄 내보내기와 공유.
   const exportMarkdown = async () => {
-    // 날짜 정규화: ISO/타임스탬프 → YYYY-MM-DD. 파싱 실패 시 빈 문자열(‘날짜 미상’ 대신 생략).
-    const fmtDate = (v) => {
-      if (!v) return '';
-      if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
-      const t = (typeof v === 'number') ? v : Date.parse(v);
-      if (!t || isNaN(t)) return '';
-      const d = new Date(t);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
-    const lines = [`# ${book.title}`, ''];
-    // 책 메타
-    if (book.author) lines.push(`**${book.author}**`);
-    const meta = [book.pub, (book.total > 0 ? `${book.total}쪽` : ''), (book.isbn ? `ISBN ${book.isbn}` : '')].filter(Boolean);
-    if (meta.length) lines.push(meta.join(' · '));
-    if (book.cover) { lines.push(''); lines.push(`![표지](${book.cover})`); }
-    // 책 소개 (#316) — 알라딘 description. 없으면 섹션 생략.
-    const desc = await fetchBookDesc();
-    if (desc) { lines.push('', '---', '', '## 📚 책 소개', '', desc); }
-    // 완독 정보
-    if (book.status === 'completed') {
-      lines.push('', '---', '', '## 📖 완독 정보');
-      const r = (typeof book.rating === 'number') ? `⭐ ${book.rating.toFixed(1)} / 5` : '';
-      const cd = fmtDate(book.completedAt);
-      const head = [r, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · ');
-      if (head) lines.push(head);
-      if (book.comment) lines.push(`> ${book.comment}`);
-    }
-    // 한 문장
-    const sorted = (bookQuotes || []).slice().sort((a, b) => (a.page || 0) - (b.page || 0));
-    lines.push('', '---', '', `## ✍️ 내 한 문장 (${sorted.length})`, '');
-    sorted.forEach(q => {
-      const date = fmtDate(q.createdAt || q.when);
-      lines.push(`### p.${q.page ?? '?'}${date ? ` · ${date}` : ''}`);
-      lines.push(`> ${q.text || ''}`);
-      const note = noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '');
-      if (note) { lines.push(''); lines.push(note); }
-      lines.push('');
-    });
-    const content = lines.join('\n');
+    const desc = await fetchBookDesc();   // 알라딘 책 소개 (#316) — 단일 export만 포함
+    const quotes = (bookQuotes || []).map(q => ({
+      page: q.page, text: q.text, when: q.createdAt || q.when,
+      note: (noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '')),
+    }));
+    const content = buildBookMarkdown(book, quotes, { desc });
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -430,6 +398,47 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     </div>
   );
 }
+
+// 날짜 정규화: ISO/타임스탬프 → YYYY-MM-DD. 파싱 실패 시 빈 문자열.
+function rgFmtExportDate(v) {
+  if (!v) return '';
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  const t = (typeof v === 'number') ? v : Date.parse(v);
+  if (!t || isNaN(t)) return '';
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+// 책 1권 → Markdown 문자열 (#315 → #423 공용). 단일 책 상세·다중 일괄 내보내기에서 공유해 포맷 일관성 유지.
+//   book: {title,author,pub,total,isbn,cover,status,rating,completedAt,comment}
+//   quotes: [{page,text,note,when}]   opts: {desc} (알라딘 책 소개, 단일 export만 — 다중은 속도상 생략)
+function buildBookMarkdown(book, quotes, opts) {
+  opts = opts || {};
+  const lines = [`# ${book.title || '제목 없음'}`, ''];
+  if (book.author) lines.push(`**${book.author}**`);
+  const meta = [book.pub, (book.total > 0 ? `${book.total}쪽` : ''), (book.isbn ? `ISBN ${book.isbn}` : '')].filter(Boolean);
+  if (meta.length) lines.push(meta.join(' · '));
+  if (book.cover) { lines.push(''); lines.push(`![표지](${book.cover})`); }
+  if (opts.desc) { lines.push('', '---', '', '## 📚 책 소개', '', opts.desc); }
+  if (book.status === 'completed') {
+    lines.push('', '---', '', '## 📖 완독 정보');
+    const r = (typeof book.rating === 'number') ? `⭐ ${book.rating.toFixed(1)} / 5` : '';
+    const cd = rgFmtExportDate(book.completedAt);
+    const head = [r, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · ');
+    if (head) lines.push(head);
+    if (book.comment) lines.push(`> ${book.comment}`);
+  }
+  const sorted = (quotes || []).slice().sort((a, b) => (a.page || 0) - (b.page || 0));
+  lines.push('', '---', '', `## ✍️ 내 한 문장 (${sorted.length})`, '');
+  sorted.forEach(q => {
+    const date = rgFmtExportDate(q.when);
+    lines.push(`### p.${q.page ?? '?'}${date ? ` · ${date}` : ''}`);
+    lines.push(`> ${q.text || ''}`);
+    if (q.note) { lines.push(''); lines.push(q.note); }
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+window.buildBookMarkdown = buildBookMarkdown;
 
 /* ── ProfileView ─────────────────────────────────────– */
 // 위시 행 → 표시용 책 (#403). 양 어댑터 모두 {book_id, book} 객체 반환(로컬은 datastore에서 getBook 해소).
