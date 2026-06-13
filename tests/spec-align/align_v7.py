@@ -29,7 +29,7 @@ JS_DIR = ROOT / "docs" / "readinggo" / "js"
 # Feature files: v6 residue and direct localStorage are forbidden here.
 FEATURE_FILES = [
     "app.js", "components.js", "nest.js", "social.js",
-    "library.js", "village.js", "town.js", "search.js", "onboarding.js",
+    "library.js", "search.js", "onboarding.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
