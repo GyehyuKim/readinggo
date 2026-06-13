@@ -357,11 +357,32 @@ function archiveCompanion(bookId, sentenceText, q, a) {
 // 그 영역만 잘라 OCR → 배경 잡음·두 페이지 인터리빙(벤치마크 #395) 근본 회피.
 function OcrCropOverlay({ file, onCancel, onCrop }) {
   const { useState: uS, useRef: uR, useEffect: uE } = React;
-  const [url] = uS(() => URL.createObjectURL(file));
+  const [url, setUrl] = uS(null);          // EXIF 정규화한 정방향 이미지 URL
   const [imgGeo, setImgGeo] = uS(null);   // 박스 기준 이미지 렌더 위치 {left,top,width,height}
   const [sel, setSel] = uS(null);          // 선택 사각형(이미지 좌표 기준) {x,y,w,h}
   const imgRef = uR(null), boxRef = uR(null), dragRef = uR(null);
-  uE(() => () => { try { URL.revokeObjectURL(url); } catch (e) {} }, [url]);
+  // EXIF orientation 정규화(#421): <img>는 EXIF로 회전 표시되지만 naturalWidth/Height·canvas drawImage는
+  // 원시 픽셀(미회전)이라 crop 좌표가 90도 어긋나 누운 이미지가 OCR로 전송됨 → 글자 순서 붕괴.
+  // 진입 시 정방향 비트맵을 캔버스로 재인코딩해, 보이는 것=자르는 것=보내는 것을 일치시킨다.
+  uE(() => {
+    let u = null, alive = true;
+    (async () => {
+      try {
+        const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        const cv = document.createElement('canvas');
+        cv.width = bmp.width; cv.height = bmp.height;
+        cv.getContext('2d').drawImage(bmp, 0, 0);
+        if (bmp.close) bmp.close();
+        const blob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.95));
+        u = URL.createObjectURL(blob || file);
+      } catch (e) {
+        u = URL.createObjectURL(file);   // createImageBitmap 미지원/실패 — 원본 폴백(무중단)
+      }
+      if (alive) setUrl(u);
+      else { try { URL.revokeObjectURL(u); } catch (e) {} }
+    })();
+    return () => { alive = false; try { if (u) URL.revokeObjectURL(u); } catch (e) {} };
+  }, [file]);
   const measure = () => {
     if (!imgRef.current || !boxRef.current) return;
     const ir = imgRef.current.getBoundingClientRect(), br = boxRef.current.getBoundingClientRect();
@@ -395,8 +416,10 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
       </div>
       <div ref={boxRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', touchAction: 'none', margin: '8px 12px' }}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
-        <img ref={imgRef} src={url} alt="" onLoad={measure} draggable={false}
-          style={{ position: 'absolute', inset: 0, margin: 'auto', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', userSelect: 'none', pointerEvents: 'none' }} />
+        {url
+          ? <img ref={imgRef} src={url} alt="" onLoad={measure} draggable={false}
+              style={{ position: 'absolute', inset: 0, margin: 'auto', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', userSelect: 'none', pointerEvents: 'none' }} />
+          : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>이미지 준비 중…</div>}
         {hasSel && imgGeo && (
           <div style={{ position: 'absolute', left: imgGeo.left + sel.x, top: imgGeo.top + sel.y, width: sel.w, height: sel.h, border: '2px solid var(--brand)', background: 'rgba(63,209,127,0.18)', borderRadius: 4, pointerEvents: 'none' }} />
         )}
