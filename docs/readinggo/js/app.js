@@ -247,13 +247,6 @@ function App() {
   const [guestBannerOff, setGuestBannerOff] = useState(false); // 게스트 안내 배너 세션 닫기
   const [showConsent, setShowConsent] = useState(() => !!(window.RG_consent && window.RG_consent.get() === null)); // 진입 동의 배너 (#331)
   const [activeTab, setActiveTab] = useState('nest');
-  const [selectedTownId, setSelectedTownId] = useState(null);
-
-  // 마을 패치 — DataStore 어댑터 경유 (localStorage 직접 호출 금지)
-  const _loadPatches = () => DataStore.villages.patches.load();
-  const _savePatches = (p) => DataStore.villages.patches.save(p);
-
-  const [villageTowns, setVillageTowns] = useState([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   // 스포일러 전역 토글 (§5.7.1): true 면 모든 페이지 블라인드 해제.
   const [spoilerReveal, setSpoilerReveal] = useState(false);
@@ -278,11 +271,7 @@ function App() {
   // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
   const [collectionOpen, setCollectionOpen] = useState(false);
   useEffect(() => { window.RG_openCollection = () => setCollectionOpen(true); return () => { window.RG_openCollection = null; }; }, []);
-  const [appState, setAppState] = useState(() => ({
-    ...INITIAL_STATE,
-    // village sent 상태는 로컬 복사
-    village: INITIAL_STATE.village.map(v => ({ ...v })),
-  }));
+  const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE }));
 
   // 성(🏰) 개수 — 로컬: 동기 파생 / Supabase: 데이터 로드 시 주입 (§5.2.1).
   const [castleCount, setCastleCount] = useState(() => {
@@ -409,35 +398,9 @@ function App() {
 
   const switchTab = useCallback((tab) => {
     setActiveTab(tab);
-    setSelectedTownId(null);
     // 스크롤 맨위로
     const main = document.querySelector('.main');
     if (main) main.scrollTop = 0;
-  }, []);
-
-  const handleSelectTown = useCallback((townId) => {
-    setSelectedTownId(townId);
-  }, []);
-
-  const handleBackToVillage = useCallback(() => {
-    setSelectedTownId(null);
-  }, []);
-
-  const handleTownUpdate = useCallback((updatedFields) => {
-    const { id, ...rest } = updatedFields;
-    setVillageTowns(prev => prev.map(t => t.id === id ? { ...t, ...rest } : t));
-    // 멤버·게시판·마일스톤 변경 → localStorage 패치에 저장
-    const PERSIST = ['members', '_topics', 'milestones', 'name', 'description', 'visibility'];
-    const patches = _loadPatches();
-    if (!patches[id]) patches[id] = {};
-    PERSIST.forEach(k => { if (rest[k] !== undefined) patches[id][k] = rest[k]; });
-    _savePatches(patches);
-  }, []);
-
-  // VillageView가 towns 목록을 넘길 때 localStorage 패치를 merge하여 변경사항 복원
-  const handleTownsChange = useCallback((towns) => {
-    const patches = _loadPatches();
-    setVillageTowns(towns.map(t => patches[t.id] ? { ...t, ...patches[t.id] } : t));
   }, []);
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
@@ -505,19 +468,6 @@ function App() {
       ...s,
       streak: ns.streak,
     }));
-  }, []);
-
-  const handleSendSeed = useCallback((idx) => {
-    setAppState(s => {
-      const village = s.village.map((v, i) => i === idx ? { ...v } : v);
-      if (village[idx].sent) {
-        showToast('오늘은 이미 보냈어요 🌱');
-        return s;
-      }
-      village[idx].sent = true;
-      showToast(`@${village[idx].name}에게 🪱 콕찌르기를 보냈어요!`);
-      return { ...s, village };
-    });
   }, []);
 
   const handleSetActiveBook = useCallback((bookId) => {
@@ -758,23 +708,6 @@ function App() {
               onArchive={handleArchive}
             />
           )}
-          {activeTab === 'village' && !selectedTownId && (
-            <VillageView
-              key="village"
-              state={appState}
-              onSelectTown={handleSelectTown}
-              onTownsChange={handleTownsChange}
-            />
-          )}
-          {activeTab === 'village' && selectedTownId && (
-            <TownDetailView
-              key={`town_${selectedTownId}`}
-              state={villageTowns.length > 0 ? { ...appState, towns: villageTowns } : appState}
-              townId={selectedTownId}
-              onBack={handleBackToVillage}
-              onTownUpdate={handleTownUpdate}
-            />
-          )}
           {activeTab === 'social' && (
             <SocialView
               key="social"
@@ -797,7 +730,6 @@ function App() {
         <nav className="tabbar">
           {[
             { id: 'nest',    ico: '🏠', label: '둥지'   },
-            { id: 'village', ico: '🌳', label: '마을'   },
             { id: 'social',  ico: '🏆', label: '소셜'   },
             { id: 'profile', ico: '👤', label: '프로필' },
           ].map(t => (

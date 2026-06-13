@@ -50,7 +50,6 @@ docs/readinggo/
 │   ├── components.js   # 공용 UI (AppHeader, BookCover, StreakCalendar 등)
 │   ├── onboarding.js   # 가입 여정 A→C1→C2→D1→D2→D3→E
 │   ├── nest.js         # 홈 탭 (독서 기록, 스트릭)
-│   ├── village.js      # 마을 탭 (친구 둥지)
 │   ├── social.js       # 소셜 탭 (리그, 피드)
 │   ├── library.js      # 서재 탭 (책 목록, 상세, 설정)
 │   └── app.js          # 최상위 App + ReactDOM.createRoot
