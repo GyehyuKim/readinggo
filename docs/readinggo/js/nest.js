@@ -787,23 +787,12 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
           <button onClick={() => bump(1)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>+</button>
           {total > 0 && <span style={{ fontSize: 11, opacity: 0.5 }}>/ {total}p</span>}
         </div>
-        {/* 인용 ↔ 내 생각 토글 (#360) — 의견도 한 문장처럼 가볍게 남긴다 */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, justifyContent: 'center' }}>
-          {[['quote', '📖 책 속 문장'], ['thought', '💭 내 생각']].map(([k, label]) => (
-            <button key={k} onClick={() => { kindTouchedRef.current = true; setKind(k); }}
-              style={{ padding: '6px 14px', borderRadius: 14, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                background: kind === k ? 'var(--brand)' : 'rgba(255,255,255,0.1)', color: kind === k ? '#fff' : 'rgba(244,242,236,0.7)' }}>
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* '내 생각' 토글 폐기 — 인용만 (#482, 추후 재시도 아카이브: #360/#420) */}
         <textarea value={text} onChange={(e) => {
           if (e.target.value.length > 1000) return;
           setText(e.target.value);
-          // 직접 타이핑은 추정 대상 — OCR로 채운 텍스트(원문)는 quote 유지, 사용자가 토글을 직접 만진 뒤로는 추정이 덮어쓰지 않음 (#420)
-          if (!kindTouchedRef.current && !ocrUsedRef.current) setKind(estimateSentenceKind(e.target.value));
         }}
-          placeholder={kind === 'thought' ? '지금 드는 내 생각·의견을 가볍게 적어요…' : '떠오른 한 문장을 바로 옮겨 적어요…'} rows={3}
+          placeholder="떠오른 한 문장을 바로 옮겨 적어요…" rows={3}
           style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
         {/* 책 사진 OCR 추출 (#382) — 인용 모드에서만(내 생각은 직접 적는 것). */}
         {kind === 'quote' && (
@@ -922,8 +911,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
   const [quickText, setQuickText] = _useState('');
-  const [quickKind, setQuickKind] = _useState('quote'); // 'quote'=책 속 인용 | 'thought'=내 생각 (#360)
-  const quickKindTouchedRef = _useRef(false);
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
   const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
@@ -1067,26 +1054,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     const raw = quickPage === '' ? cur : (parseInt(quickPage, 10) || 0);
     const p = Math.max(cur, total ? Math.min(total, raw) : raw); // 진도는 현재 이상으로만
     if (!t && p <= cur) { showToast('쪽수를 넘기거나 한 문장을 남겨보세요'); return; }
-    handleCheckin({ page: p, sentence: t || null, kind: quickKind });
-    setQuickText(''); setQuickPage(''); quickKindTouchedRef.current = false; setQuickKind('quote');
+    handleCheckin({ page: p, sentence: t || null, kind: 'quote' });
+    setQuickText(''); setQuickPage('');
   };
 
-  // 데모: 하루 거르기 — 둥지·XP·성은 존속, 스트릭만 위기 (§5.4)
-  const handleSimSkip = () => {
-    const ns = { ...nestState };
-    if (!ns.skipStreakRisk && ns.streak > 0) {
-      ns.skipStreakRisk = true;
-      showToast(`🛡️ 방패가 막았어요. 오늘 짹하면 ${ns.streak}일 유지!`);
-    } else if (ns.streak > 0) {
-      ns.streak = 0;
-      ns.skipStreakRisk = false;
-      showToast('💔 연속 출석이 끊겼어요. 다시 1일부터…');
-    } else {
-      showToast('🐦 오늘 한 쪽이면 다시 시작이에요.');
-    }
-    setNestState(ns);
-    onSimSkip(ns);
-  };
+  // 데모 '하루 거르기' 핸들러 폐기 (#481) — onSimSkip prop은 하위호환 위해 시그니처에 유지(미사용).
 
   // 완독 세리머니에서 받은 별점/소감을 영속 (§5.8.3).
   // 활성 책의 user_book 을 status='completed' + rating/review_text 로 마감.
@@ -1103,9 +1075,10 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     showToast('🏰 성 컬렉션에 기록이 남았어요!');
   };
 
-  // 오늘의 한 문장 (#436) — myQuotes 중 오늘 작성분만 최신순. 고양감: '오늘 내가 남긴 것'.
+  // 오늘의 한 문장 (#436·#480) — 현재 선택한 책 + 오늘 작성분만 최신순. 고양감: '이 책에 오늘 내가 남긴 것'.
   const _todayStr = new Date().toDateString();
   const todayQuotes = (nestState.myQuotes || []).filter((q) => {
+    if (q.bookId !== nestState.book.id) return false;   // 현재 선택한 책만 (#480)
     if (q.when === '방금') return true;            // 이번 세션 방금 저장분
     if (!q.createdAt) return false;
     try { return new Date(q.createdAt).toDateString() === _todayStr; } catch (e) { return false; }
@@ -1166,12 +1139,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
       {/* 둥지 시어터(NestTheatre)는 프로필 상단으로 이동 (#428) — 홈은 책읽기 중심 */}
 
-      {/* 데모 거르기 — 읽기 세션 중엔 숨김 (#432) */}
-      {!readingOpen && (
-        <div className="demo-decay">
-          <button onClick={handleSimSkip}>⏩ 데모: 하루 거르기 (스트릭 위기)</button>
-        </div>
-      )}
+      {/* 데모 '하루 거르기' 제거 (#481) */}
 
       {/* 빠른 입력 (#462) — '읽기 시작' 버튼 없이 페이지·한 문장 상시 입력. 타이머 몰입은 [⏱ 집중 읽기] 선택. */}
       {readingOpen ? (
@@ -1200,24 +1168,14 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           {/* 한 문장 */}
           <div className="quick-sec">
             <div className="quick-sec-head"><span>✏️ 한 문장 남기기 <small>(선택)</small></span></div>
-            <div className="quick-toggle">
-              {[['quote', '📖 책 속 문장'], ['thought', '💭 내 생각']].map(([k, label]) => (
-                <button key={k} className={quickKind === k ? 'on' : ''} onClick={() => { quickKindTouchedRef.current = true; setQuickKind(k); }}>{label}</button>
-              ))}
-            </div>
-            <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); if (!quickKindTouchedRef.current) setQuickKind(estimateSentenceKind(e.target.value)); }}
-              placeholder={quickKind === 'thought' ? '지금 드는 생각을 가볍게 적어요…' : '떠오른 한 문장을 옮겨 적어요…'} rows={2} />
+            <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); }}
+              placeholder="떠오른 한 문장을 옮겨 적어요…" rows={2} />
           </div>
           <button className="checkin-cta quick-submit" onClick={submitQuick}>✨ 오늘 기록하기</button>
         </div>
       )}
 
-      {/* 체크인 = 읽기 모드 종료로 자동 처리 (#1) — 세션 중엔 숨김 (#432) */}
-      {!readingOpen && checkedToday && (
-        <div className="nudge" style={{ textAlign: 'center', fontWeight: 800 }}>
-          🐦 오늘 기록 완료! <span className="em">🔥 {nestState.streak}일</span> 연속
-        </div>
-      )}
+      {/* '오늘 기록 완료 · N일 연속' nudge 제거 (#481) */}
 
       {/* 시간차 되감기 카드 (#346) — 세션 중엔 숨김 (#432) */}
       {!readingOpen && resurfaceCard && (
@@ -1251,10 +1209,10 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       {/* 오늘의 한 문장 (#436) — 세션 중엔 숨김(세션 아카이브가 대체). 오늘 작성분만 최신순 → 고양감. */}
       {!readingOpen && (
       <div className="section-head">
-        <h3>🔖 오늘의 한 문장 <span className="my-q-count">{todayQuotes.length}</span></h3>
+        <h3>🔖 이 책, 오늘의 한 문장 <span className="my-q-count">{todayQuotes.length}</span></h3>
         {nestState.myQuotes.length > 0 && (
           <button className="more" onClick={() => window.RG_openCollection && window.RG_openCollection()}>
-            전체 {nestState.myQuotes.length}개 보기 →
+            전체 문장 보기 →
           </button>
         )}
       </div>
