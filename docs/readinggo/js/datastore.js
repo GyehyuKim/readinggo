@@ -282,7 +282,7 @@ const DataStore = {
      sessions.addToday: 그날 세션 1행 생성(같은 날 재호출 중복 방지)
      + streak.bumpOnCheckIn 연동. */
   sessions: {
-    addToday({ userBookId, page }) {
+    addToday({ userBookId, page, duration_sec }) {
       const today = _today();
       const session = localStorageAdapter.mutate(s => {
         const ub = _ubById(s, userBookId) || _activeUB(s);
@@ -296,11 +296,14 @@ const DataStore = {
             user_book_id: ub.id,
             session_date: today,
             current_page: ub.current_page,
+            duration_sec: (typeof duration_sec === 'number' && duration_sec > 0) ? duration_sec : 0,
             created_at: Date.now(),
           };
           ub.sessions.push(row);
-        } else if (typeof page === 'number') {
-          row.current_page = page;
+        } else {
+          if (typeof page === 'number') row.current_page = page;
+          // 같은 날 재호출(여러 읽기 세션) → 독서 시간 누적 (#430)
+          if (typeof duration_sec === 'number' && duration_sec > 0) row.duration_sec = (row.duration_sec || 0) + duration_sec;
         }
         return row;
       });

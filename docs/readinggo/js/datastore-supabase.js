@@ -166,22 +166,24 @@
 
     /* 일일 기록 (세션) — 그날 1행 upsert + 스트릭 bump */
     sessions: {
-      async addToday({ userBookId, page }) {
+      async addToday({ userBookId, page, duration_sec }) {
         const id = await uid();
         const today = _today();
         // 활동 히트맵(#195)용 일별 읽은 쪽수: 직전 current_page 대비 증분을 그날 누적.
         let pagesToday = 0;
+        let durationToday = (typeof duration_sec === 'number' && duration_sec > 0) ? duration_sec : 0;
         if (typeof page === 'number') {
           try {
             const ub = unwrap(await sb().from('user_books').select('current_page').eq('id', userBookId).maybeSingle());
             const delta = Math.max(0, page - ((ub && ub.current_page) || 0));
-            const prev = unwrap(await sb().from('reading_sessions').select('pages_read_today').eq('user_book_id', userBookId).eq('session_date', today).maybeSingle());
+            const prev = unwrap(await sb().from('reading_sessions').select('pages_read_today, duration_sec').eq('user_book_id', userBookId).eq('session_date', today).maybeSingle());
             pagesToday = ((prev && prev.pages_read_today) || 0) + delta;
+            durationToday += (prev && prev.duration_sec) || 0;
           } catch (e) {}
           await sb().from('user_books').update({ current_page: page }).eq('id', userBookId);
         }
         const row = unwrap(await sb().from('reading_sessions').upsert({
-          user_book_id: userBookId, user_id: id, session_date: today, current_page: page, pages_read_today: pagesToday,
+          user_book_id: userBookId, user_id: id, session_date: today, current_page: page, pages_read_today: pagesToday, duration_sec: durationToday,
         }, { onConflict: 'user_book_id,session_date' }).select().single());
         await A.streak.bumpOnCheckIn();
         return row;

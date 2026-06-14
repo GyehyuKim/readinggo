@@ -66,7 +66,7 @@ activeBook.get()                           → UserBook | null
 activeBook.set(userBookId)                                  // = users.active_user_book_id UPDATE
 
 // 일일 기록 (세션 + 한 문장)
-sessions.addToday({userBookId, page})      → Session         // 하루 첫 기록: 세션 생성 + 스트릭/XP
+sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 세션 생성 + 스트릭/XP. duration_sec(#430): 읽기 세션 시간(초) 누적
 sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): quote(기본)|thought(내 의견) — 20_sentence_kind.sql
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
@@ -195,6 +195,7 @@ reading_sessions
   session_date     date
   current_page     int
   pages_read_today int                  -- v7.2: addToday가 전일 대비 증분 누적 기록 → 활동 히트맵(#195, sessions.heatmap)
+  duration_sec     int  DEFAULT 0       -- #430: 그날 읽기 세션 누적 시간(초) — 프로필 독서 시간 통계
   xp_earned        int
   created_at       timestamptz
   UNIQUE(user_book_id, session_date)

@@ -693,7 +693,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
     const { exit, finalP } = endCtxRef.current;
     if (!exit) {
       rgTrack('reading_session_end', { book_id: book.id, duration_sec: secs, pages_logged: Math.max(0, (finalP || 0) - (book.cur || 0)) });
-      if (onCheckin) onCheckin({ page: finalP, sentence: null });
+      if (onCheckin) onCheckin({ page: finalP, sentence: null, duration_sec: secs });
     }
     onClose();
   };
@@ -1006,7 +1006,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
-  const handleCheckin = ({ page, sentence }) => {
+  const handleCheckin = ({ page, sentence, duration_sec }) => {
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
     const ns = { ...nestState };
@@ -1039,7 +1039,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
     prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
     setNestState(ns);
-    onCheckin(ns, newLv, xpGain, sentence);
+    onCheckin(ns, newLv, xpGain, sentence, duration_sec);
 
     // 단계 상승 시 진화 마이크로카피 toast (§5.2)
     if (nestUp) {
