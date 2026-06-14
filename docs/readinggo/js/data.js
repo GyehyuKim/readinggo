@@ -348,6 +348,56 @@ const ALL_BOOKS = RG_BOOKS.map(b => ({
   cover_url: b.cover,
 }));
 
+// ── 관련 도서 추천 (#496) ─────────────────────────────
+// worker /api/related(LLM)가 "제목 — 저자" 후보를 주면, 실존 books DB와 매칭해
+// 지어낸 책(환각)을 걸러내고 실제 책 객체만 돌려준다. 결과는 책 단위 메모리 캐시.
+// Phase 0은 LLM 추천 기반. Supabase '함께 읽은 사람들' 집계는 Phase 1 (#496 결정).
+const _relatedCache = {};
+function _normTitle(t) {
+  return String(t || '').toLowerCase().replace(/[\s·,.:;!?'"“”‘’()\[\]<>「」『』、~\-_]/g, '').trim();
+}
+// 환각 필터용 제목 매칭 — fuzzySearch(부분 포함)보다 보수적. 완전일치 또는
+// 한쪽이 다른쪽으로 시작(세계문학전집 권번호·부제: "토지" ↔ "토지 1")만 인정.
+function _titleMatches(dbTitle, sugTitle) {
+  const x = _normTitle(dbTitle), y = _normTitle(sugTitle);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (y.length >= 2 && x.startsWith(y)) return true;
+  if (x.length >= 2 && y.startsWith(x)) return true;
+  return false;
+}
+async function recommendRelated(book, limit = 6) {
+  if (!book || !book.title) return [];
+  const ck = book.id || book.isbn || book.title;
+  if (_relatedCache[ck]) return _relatedCache[ck];
+  let suggestions = [];
+  try {
+    const res = await fetch('/api/related', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: book.title, author: book.author || '' }),
+    });
+    if (res.ok) { const d = await res.json(); suggestions = (d && d.books) || []; }
+  } catch (e) { suggestions = []; }
+  if (!suggestions.length) { _relatedCache[ck] = []; return []; }
+  // 환각 필터 — LLM 제목을 실존 books DB와 매칭. 매칭 실패(=지어낸 책)는 버린다.
+  const all = await loadBooks();
+  const selfId = book.id || book.isbn;
+  const out = [];
+  const used = new Set();
+  for (const sug of suggestions) {
+    const hit = all.find(h => _titleMatches(h.title, sug.title));
+    if (!hit) continue;
+    const hid = hit.id || hit.isbn;
+    if (!hid || hid === selfId || used.has(hid)) continue;
+    used.add(hid);
+    out.push(hit);
+    if (out.length >= limit) break;
+  }
+  _relatedCache[ck] = out;
+  return out;
+}
+
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
 window.INITIAL_PROGRESS=INITIAL_PROGRESS;
 window.NEST_STAGES=NEST_STAGES; window.getNestStage=getNestStage;
@@ -360,4 +410,4 @@ window.INITIAL_BOOKSHELF=INITIAL_BOOKSHELF; window.WISHLIST=WISHLIST;
 window.ALL_BOOKS=ALL_BOOKS;
 window.NEST_TWIGS=NEST_TWIGS; window.NEST_GEO=NEST_GEO;
 window.twigsForProgress=twigsForProgress; window.nestInfo=nestInfo; window.drawNest=drawNest;
-window.loadBooks=loadBooks; window.fuzzySearch=fuzzySearch;
+window.loadBooks=loadBooks; window.fuzzySearch=fuzzySearch; window.recommendRelated=recommendRelated;

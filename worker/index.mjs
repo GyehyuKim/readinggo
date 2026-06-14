@@ -37,6 +37,13 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return ocrProxy(request, env);
     }
+    // 관련 도서 추천 — 이 책과 함께 읽을 책 (#496). LLM은 제목·저자만 제시하고,
+    // 환각 필터(실존 도서 매칭)는 클라에서 books DB로 수행. 키는 서버에서만(클라 노출 금지). 동일출처만.
+    if (p === '/api/related') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      return relatedProxy(request, env);
+    }
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.
     return env.ASSETS.fetch(request);
   },
@@ -150,6 +157,61 @@ async function companionProxy(request, env) {
   } catch (e) {
     // 호출 실패 → 목 질문 폴백 (무중단)
     return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
+  }
+}
+
+/* ── 관련 도서 추천 — 이 책과 함께 읽을 책 (#496) ──────────────
+   LLM은 "제목 — 저자"만 제시한다(설명·ISBN 생성 금지 — 환각 최소화).
+   실존 여부 판정(환각 필터)은 클라가 books DB와 fuzzy 매칭으로 수행하므로
+   여기서는 후보 목록만 돌려준다. 키/설정 없으면 빈 목록(데모 무중단).
+   Phase 0은 LLM 추천 기반. Supabase 함께읽기(공동독서) 집계는 Phase 1 (#496 결정). */
+const RELATED_SYSTEM = '당신은 한국 독자에게 책을 추천하는 사서입니다. 사용자가 좋아한 책 한 권을 주면, 그 책을 좋아한 독자가 함께 읽으면 좋을 다른 책을 추천하세요. 반드시 실존하는, 한국에서 정식 출간된 책만 고르세요(존재하지 않는 책·지어낸 제목 절대 금지). 입력한 책 자신은 제외하세요. 형식은 오직 JSON 배열 하나로만 답하세요: [{"title":"책 제목","author":"저자"}]. 설명·머리말·코드펜스·그 외 텍스트를 일절 붙이지 말고 JSON 배열만 출력하세요. 최대 8권.';
+
+function parseRelated(raw) {
+  // LLM 응답에서 JSON 배열만 추출 (코드펜스·잡텍스트 방어).
+  const s = String(raw || '');
+  const m = s.match(/\[[\s\S]*\]/);
+  if (!m) return [];
+  let arr;
+  try { arr = JSON.parse(m[0]); } catch { return []; }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const it of arr) {
+    if (!it || typeof it !== 'object') continue;
+    const title = String(it.title || '').trim().slice(0, 200);
+    const author = String(it.author || '').trim().slice(0, 120);
+    if (!title) continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title, author });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+async function relatedProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  const title = String((body && body.title) || '').slice(0, 200).trim();
+  const author = String((body && body.author) || '').slice(0, 120).trim();
+  if (!title) return json({ error: 'title 필요' }, 422);
+  // 키/설정 없으면 빈 목록 (데모 안전 — 클라는 빈 결과를 조용히 숨김)
+  if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
+    return json({ books: [], demo: true }, 200);
+  }
+  const messages = [
+    { role: 'system', content: RELATED_SYSTEM },
+    { role: 'user', content: `좋아한 책: ${title}${author ? ` — ${author}` : ''}\n이 책을 좋아한 독자가 함께 읽으면 좋을 책을 JSON 배열로 추천해줘.` },
+  ];
+  try {
+    const raw = await callLLM({ messages, env, maxTokens: 600 });
+    return json({ books: parseRelated(raw) }, 200);
+  } catch (e) {
+    // 호출 실패 → 빈 목록 폴백 (무중단)
+    return json({ books: [], demo: true, error: String((e && e.message) || e) }, 200);
   }
 }
 

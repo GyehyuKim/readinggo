@@ -433,4 +433,12 @@ Phase 0 (localStorage, `rg_v41`):
 - **Phase 0**: 카테고리별 하드코딩 추천 3권 시뮬 (실 호출 없음).
 - **프라이버시**: 무료 티어는 입력이 학습에 쓰일 수 있음 — 데모 범위 무방. 유료 전환 시 해제.
 
+#### 7.9.1 관련 도서 — `POST /api/related` (#496)
+
+책 상세 "함께 읽으면 좋은 책"([profile.md §5.8.4](./profile.md)) 의 호출 경로. companion/ocr 과 동일한 동일출처 가드 + `callLLM(env)` 프록시 패턴(키 서버 보관).
+
+- **라우트**: `POST /api/related` (`worker/index.mjs` `relatedProxy`). 입력 `{title, author}` → 출력 `{books:[{title, author}]}` (최대 8). system = 사서(실존 한국 출간서만, JSON 배열만 출력). 키/설정 없거나 호출 실패 시 `{books:[]}` 폴백(무중단).
+- **환각 필터(클라)**: LLM 은 **제목·저자만** 제시(ISBN·설명 생성 금지). `data.js recommendRelated` 가 후보 제목을 **실존 books DB 와 매칭**(정규화 후 완전일치 또는 권번호/부제 prefix) 해 지어낸 책을 버리고 실제 책 객체만 반환. 책 단위 메모리 캐시. #489 외서 보강의 LLM 환각 필터와 동일 원칙.
+- **DataStore 계약**: `books.related(book)` — 두 어댑터 표면 일치(§7.2). Phase 0 은 양쪽 모두 LLM 폴백. **Phase 1**: Supabase 어댑터를 `user_books` 공동독서 집계 RPC(예: `books_also_read`)로 교체 → '이 책 읽은 사람들이 읽은 책'(실데이터). 그 전까지 허위 카피 금지.
+
 ---

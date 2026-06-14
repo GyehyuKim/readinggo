@@ -79,6 +79,9 @@
 - 한 문장 타임라인 (날짜 desc, 페이지/문장 + `my_note` 있으면 함께). 스포일러 블라인드 적용
 - **한 문장 사후 감상**: 각 한 문장에 긴 감상(`my_note`)을 **작성 시점 이후 언제든 추가·편집**. 한 문장은 짧게(인용 ≤200자), 감상은 넉넉하게(권장 500자). 타임라인 항목 탭 → 감상 입력 (`DataStore.sentences.setNote`). 본인만 작성, 본인 프로필·책 상세에서만 표시. UX 참고: [북모리 캡쳐 분석](../bookmory-capture-analysis.md) (인용 위 감상 입력·페이지 메타·사후편집)
 - **교보문고 링크**: `https://search.kyobobook.co.kr/search?keyword={isbn}` — "교보문고에서 보기 →" (Phase 1+ 어필리에이트 파라미터)
+- **함께 읽으면 좋은 책 (#496)**: 책 상세 하단에 관련 도서 가로 캐러셀(표지·제목·저자). 표지 탭 → 찜(`DataStore.wishBooks.add`). 데이터: `DataStore.books.related(book)` → `data.js recommendRelated`.
+  - **Phase 0 소스**: worker `POST /api/related`(LLM, `{title, author}` → `{books:[{title,author}]}`)가 후보 제목만 제시 → 클라가 **실존 books DB와 매칭(환각 필터)** 해 지어낸 책을 버리고 실제 책만 노출. 매칭 0이면 섹션 자체를 숨김(빈 캐러셀·허위 없음).
+  - **신뢰 카피 차등 (§5.8.6 정직성)**: Phase 0은 실제 '함께 읽은 사람들' 집계가 없으므로 **"N명이 함께 읽었어요" 류 허위 카피 금지** — "함께 읽으면 좋은 책"으로만 표기. 실제 공동독서 집계('이 책 읽은 사람들이 읽은 책')는 **Phase 1**에 Supabase `user_books` 기반 RPC로 강화(backend.md §7.9). 관련: [backend.md #489 환각 필터](./backend.md)
 - **Export (v7.4, #315 — 북모리 양식 벤치마킹)**: Markdown 다운로드. **책 메타**(제목·저자/역자·출판사·쪽수·ISBN·표지) + **완독 정보**(별점·소감·완독일, 완독 시) + **한 문장**(`### p.N · YYYY-MM-DD` + `> 문장` + 감상). 날짜는 `created_at` 복원(미파싱 시 생략). 단일 책·책별 일괄 Markdown은 **UTF-8 BOM**을 포함해 Windows 자동 인코딩 감지에서도 한글이 깨지지 않아야 한다. **책 소개(description)는 후속**(알라딘 ItemLookUp OptResult 확장, #302 합류). Phase 2 이미지 카드
 - 책 삭제: 길게 누름 → 확인 모달. 누적 기록 soft delete
 

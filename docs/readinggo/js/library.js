@@ -35,6 +35,26 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // #352: 저장본(user_books.companion_recap) 우선 표시, 새로 받으면 캐시 갱신.
   const [recap, setRecap] = _useState(book.recap || '');
   const [recapLoading, setRecapLoading] = _useState(false);
+  // 관련 도서 추천 (#496) — 이 책과 함께 읽으면 좋은 책. worker /api/related(LLM) + 실존 books 매칭.
+  const [related, setRelated] = _useState([]);
+  const [wished, setWished] = _useState({});
+  _useEffect(() => {
+    let alive = true;
+    Promise.resolve((DataStore.books && DataStore.books.related) ? DataStore.books.related(book) : [])
+      .then(list => { if (alive) setRelated(list || []); })
+      .catch(() => { if (alive) setRelated([]); });
+    return () => { alive = false; };
+  }, [book.id]);
+  const addWish = (rb) => {
+    if (!rb || !rb.id || wished[rb.id]) return;
+    Promise.resolve(DataStore.wishBooks.add(rb.id))
+      .then(() => {
+        setWished(w => ({ ...w, [rb.id]: true }));
+        showToast('🔖 찜한 책에 담았어요');
+        if (window.rgTrack) window.rgTrack('related_book_wished', { from: book.id, to: rb.id });
+      })
+      .catch(() => showToast('담기 실패 — 잠시 후 다시'));
+  };
   const loadRecap = async () => {
     if (recapLoading) return;
     setRecapLoading(true);
@@ -329,6 +349,31 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
              style={{display:'block', textAlign:'center', padding:'12px 14px', background:'var(--brand-tint)', border:'1.5px solid var(--brand)', borderRadius:'8px', color:'var(--brand-3)', fontSize:13, fontWeight:800, textDecoration:'none', marginBottom:14, cursor:'pointer'}}>
             교보문고에서 보기 →
           </a>
+
+          {/* 함께 읽으면 좋은 책 (#496) — LLM 추천 + 실존 books 매칭(환각 필터). 표지 탭 → 찜.
+              실제 '함께 읽은 사람들' 집계는 Phase 1이므로 허위 카피("N명이 읽었어요") 금지. */}
+          {related.length > 0 && (
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:3}}>📚 함께 읽으면 좋은 책</div>
+              <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:10}}>이 책을 좋아한다면 — 표지를 누르면 찜에 담겨요</div>
+              <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:4, WebkitOverflowScrolling:'touch'}}>
+                {related.map(rb => (
+                  <button key={rb.id} type="button" onClick={() => addWish(rb)} title={`${rb.title} — 찜에 담기`}
+                    style={{flex:'0 0 auto', width:92, background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left'}}>
+                    <div style={{position:'relative'}}>
+                      <img src={rb.cover} alt={rb.title} loading="lazy"
+                        style={{width:92, height:134, objectFit:'cover', borderRadius:6, boxShadow:'0 1px 4px rgba(0,0,0,0.12)', background:'var(--paper-2)', display:'block'}} />
+                      {wished[rb.id] && (
+                        <div style={{position:'absolute', top:4, right:4, background:'var(--brand)', color:'#fff', fontSize:10, fontWeight:800, borderRadius:10, padding:'2px 6px'}}>찜 ✓</div>
+                      )}
+                    </div>
+                    <div style={{fontSize:11, fontWeight:800, color:'var(--ink)', marginTop:6, lineHeight:1.3, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical'}}>{rb.title}</div>
+                    <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{rb.author}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Markdown Export (§5.8.4) — 내 한 문장이 1개 이상 있을 때만 노출 */}
           {bookQuotes.length > 0 && (
