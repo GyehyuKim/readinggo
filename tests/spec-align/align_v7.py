@@ -124,8 +124,7 @@ INVARIANTS = [
         ["datastore.js"], r"setNote[\s\S]*random\(\)|random\(\)[\s\S]*setNote"),
 
     # ── C: post-beta 기능 (스펙↔구현 동기화 강제, decisions §8.4/§8.5) ──
-    ("C", "present", "읽기 모드 (nest.md §5.5, #184)",
-        ["nest.js"], r"ReadingMode"),
+    # 읽기 모드(ReadingMode/타이머) invariant 폐기 (#505) — 홈 빠른입력으로 일원화, 독서시간 측정 폐기
     ("C", "present", "활성 책 캐러셀 전환 (nest.md §5.3, #185)",
         ["nest.js"], r"switchBook"),
     ("C", "present", "운영 대시보드 (profile.md §5.8.9, #161)",

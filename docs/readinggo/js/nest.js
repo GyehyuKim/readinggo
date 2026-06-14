@@ -374,10 +374,8 @@ function NestTheatre({ xp, health = 100 }) {
 }
 
 /* ── NestView ─────────────────────────────────────────── */
-/* ── ReadingMode: 읽기 모드 (#184) — 독서 타이머 + 상시 한 문장 입력 ──
-   둥지에서 활성 책으로 진입. 북모리식 몰입 캡처: 타이머가 도는 동안
-   입력칸이 항상 열려 있어 떠오른 한 문장을 즉시 아카이브한다. */
-// 혼자만의 독서모임 (companion.md §4) — Worker /api/companion(solar-pro3) 호출. 실패/키없음 시 목 폴백.
+/* ── 짹(Jacky) 대화 헬퍼 (#184 읽기모드/타이머 폐기 #505 — 빠른입력·CompanionModal 공용) ── */
+// 짹(Jacky) 대화 (companion.md §4) — Worker /api/companion(solar-pro3) 호출. 실패/키없음 시 목 폴백.
 const COMPANION_QS = [
   '왜 이 문장이 마음에 걸렸어요?',
   '이 문장, 지금 내 상황이랑 연결되는 게 있어요?',
@@ -500,374 +498,6 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
   );
 }
 
-function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = false }) {
-  // book 스냅샷 — 세션 중 부모가 appState.book 을 빈 값으로 갱신(탭 복귀 시 transient 새로고침,
-  // 만료 세션 등)해도 읽기 세션이 비워지거나 깨지지 않도록 진입 시점 book 을 고정한다.
-  const [book] = _useState(() => bookProp);
-  const [secs, setSecs] = _useState(0);
-  const [running, setRunning] = _useState(true);
-  const [page, setPage] = _useState(String(book.cur || 0)); // 문자열 — 빈칸 허용(페이지 미상)
-  const [text, setText] = _useState('');
-  const [kind, setKind] = _useState('quote'); // 'quote'=책 속 인용 | 'thought'=내 의견 (#360)
-  const kindTouchedRef = _useRef(false); // 사용자가 토글을 직접 눌렀는지 — 직접 누르면 자동 추정이 덮어쓰지 않음 (#420)
-  const ocrUsedRef = _useRef(false); // OCR로 채운 텍스트 — 추정과 무관하게 quote 유지 (#420)
-  const [ocrBusy, setOcrBusy] = _useState(false); // 책 사진 OCR 추출 중 (#382)
-  const [ocrFile, setOcrFile] = _useState(null);  // 크롭 오버레이로 넘길 원본 사진 (#396)
-  const _ocrInputRef = _useRef(null);
-  const [saved, setSaved] = _useState([]);
-  const [closing, setClosing] = _useState(false);            // 종료 확인 단계
-  const [finalPage, setFinalPage] = _useState(String(book.cur || 0));
-  const [companion, setCompanion] = _useState(null);         // 혼자만의 독서모임 질문 (#305) — 체크인(읽기 종료) 직후 화면에만 노출(#347/#438)
-  const [endStage, setEndStage] = _useState(null);           // 읽기 종료 참새(#347): null | 'companion'
-  const endCtxRef = _useRef({ exit: true, finalP: 0 });       // 종료 맥락 — exit(✕,체크인X) | finish(독서 종료,체크인)
-  const ubRef = _useRef(null);
-  const total = book.total || 0;
-  // 벽시계 타이머 — setInterval 틱 누적은 백그라운드 스로틀/절전 시 시간이 손실됨.
-  // 누적초(accum) + 현재 러닝 세그먼트 시작 ts(segStart)로 실제 경과를 계산 → 스로틀돼도 값 정확.
-  const accumRef = _useRef(0);
-  const segStartRef = _useRef(Date.now());
-  const autoPausedRef = _useRef(false);
-  const computeSecs = () => accumRef.current + (segStartRef.current != null ? Math.floor((Date.now() - segStartRef.current) / 1000) : 0);
-  _useEffect(() => {
-    Promise.resolve(DataStore.activeBook.get()).then((ub) => { if (ub) ubRef.current = ub.id; }).catch(() => {});
-  }, []);
-  // 읽기 세션 중 플래그 — app.js 탭 복귀 재로드(#191)가 이걸 보고 보류. 빈 상태 덮어쓰기로
-  // NestView가 빈 둥지 UI로 바뀌며 portal(ReadingMode) 언마운트되던 세션 파괴 방지(1h QA 재현).
-  _useEffect(() => {
-    window.RG_READING_OPEN = true;
-    return () => { window.RG_READING_OPEN = false; };
-  }, []);
-  // 러닝/정지 전환 시 진행분을 누적에 반영
-  _useEffect(() => {
-    if (running && !closing) {
-      if (segStartRef.current == null) segStartRef.current = Date.now();
-    } else if (segStartRef.current != null) {
-      accumRef.current += Math.floor((Date.now() - segStartRef.current) / 1000);
-      segStartRef.current = null;
-    }
-    setSecs(computeSecs());
-  }, [running, closing]);
-  // 디스플레이 틱 — 벽시계 기반이라 스로틀돼도 표시값은 정확
-  _useEffect(() => {
-    if (!running || closing) return;
-    const t = setInterval(() => setSecs(computeSecs()), 1000);
-    return () => clearInterval(t);
-  }, [running, closing]);
-  // 가시성 — 숨기면 자동 일시정지, 복귀 시 자동 재개(수동 정지는 존중). 복귀 후 타이머가 죽던 버그 수정.
-  _useEffect(() => {
-    const onVis = () => {
-      if (document.hidden) { if (running && !closing) { autoPausedRef.current = true; setRunning(false); } }
-      else if (autoPausedRef.current) { autoPausedRef.current = false; setRunning(true); }
-    };
-    document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
-  }, [running, closing]);
-  const fmt = (s) => {
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
-    return (h > 0 ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
-  };
-  const pageNum = (s) => { const n = parseInt(s, 10); return isNaN(n) ? null : Math.max(0, total ? Math.min(total, n) : n); };
-  const bump = (d) => setPage((s) => String(Math.max(0, (parseInt(s, 10) || 0) + d)));
-  // 책 사진 OCR (#382) — Upstage OCR + solar-pro3 보정 → 입력칸 프리필(원하는 부분만 남기고 저장).
-  const runOcr = (file) => {
-    if (!file || ocrBusy) return;
-    if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
-    setOcrBusy(true);
-    showToast('📷 사진에서 글자를 읽는 중…');
-    const fd = new FormData();
-    fd.append('document', file, file.name || 'page.jpg');
-    fetch('/api/ocr', { method: 'POST', body: fd })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d && d.text) {
-          // 기존 입력에 이어 붙임(있으면 줄바꿈) — 여러 장도 누적 가능.
-          setText((cur) => (cur && cur.trim() ? cur.trim() + '\n' + d.text : d.text).slice(0, 1000));
-          // OCR로 채운 텍스트는 원문 인용으로 본다 — 휴리스틱 추정이 thought로 덮어쓰지 않음 (#420)
-          ocrUsedRef.current = true;
-          if (!kindTouchedRef.current) setKind('quote');
-          showToast('✨ 추출했어요 — 원하는 부분만 남기고 저장하세요');
-          rgTrack('ocr_extracted', { book_id: book.id, chars: d.text.length });
-        } else if (d && d.empty) {
-          showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
-        } else {
-          showToast('추출 실패 — 잠시 후 다시 시도해요');
-        }
-      })
-      .catch(() => showToast('추출 실패 — 네트워크를 확인해요'))
-      .finally(() => { setOcrBusy(false); });
-  };
-  // 한 문장 저장 — 토스트만(마찰 제로, 흐름 유지). 참새는 체크인(읽기 종료) 시 한 번만(#347/#438).
-  const save = () => {
-    const t = text.trim();
-    if (!t) { showToast(kind === 'thought' ? '내 생각을 적어주세요' : '한 문장을 적어주세요'); return; }
-    const p = pageNum(page); // 비어있으면 null(페이지 없이 저장)
-    const ubId = ubRef.current;
-    const k = kind; // 저장 시점 kind 고정 (#360)
-    Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: p, text: t, kind: k })).then((row) => {
-      const sid = row && row.id;
-      setSaved((list) => [{ id: sid, text: t, page: p, kind: k }, ...list]);
-      setText('');
-      setKind('quote');
-      kindTouchedRef.current = false;
-      ocrUsedRef.current = false;
-      showToast(k === 'thought' ? '💭 내 생각 저장됨 💬' : (p != null ? ('📍 ' + p + 'p 저장됨 💬') : '저장됨 💬'));
-      // id+bookTitle 전달 (#358·사피엔스버그) — bookTitle 누락 시 둥지 카드가 getBook 폴백(RG_BOOKS[0]=사피엔스)으로 오표시.
-      if (onArchive) onArchive({ id: sid, text: t, bookId: book.id, bookTitle: book.title || '', page: p, when: '방금', kind: k });
-      rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length, kind: k });
-    }).catch(() => showToast('저장 실패 — 다시 시도'));
-  };
-  // 동의 상태에 맞춰 질문 시작 — 'yes'면 solar-pro3, 그 외(거부)면 로컬 목 (외부 전송 없음). (#294/§4)
-  // 체크인 완료 직후 읽기 종료 화면에서 세션 1질문(#347/#438) — atEnd 항상 true.
-  const startCompanion = (sid, t, k, atEnd) => {
-    const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
-    setCompanion({ sentenceId: sid, text: t, kind: k || 'quote', question: null, loading: true, answer: '', exchanges: [], atEnd: !!atEnd });
-    const gen = (consent === 'yes') ? genCompanionQuestion(t, book.title, book.author, k) : Promise.resolve(pickCompanionQ(t));
-    gen.then((q) => setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
-  };
-  const decideConsent = (v) => {
-    if (window.RG_consent) window.RG_consent.set(v);
-    rgTrack('data_consent', { value: v });
-    if (companion) startCompanion(companion.sentenceId, companion.text, companion.kind, companion.atEnd);
-  };
-  // 대화 전체(Q/A)를 해당 문장 감상(my_note)으로 영속 (양 어댑터 setNote)
-  const persistCompanionNote = (sid, exchanges) => {
-    if (!sid || !(DataStore.sentences && DataStore.sentences.setNote)) return;
-    if (!exchanges || !exchanges.length) return;   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
-    const note = (exchanges || []).map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
-    Promise.resolve(DataStore.sentences.setNote(sid, note)).catch(() => {});
-    // 같은 세션 정합 — appState/nestState myQuotes의 note 갱신 → 재오픈 시 대화 이어보기(처음부터 X).
-    window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sid, note } }));
-  };
-  // 답 남기기 — 멀티턴(#327). 최대 3턴, 그 후/비동의 시 마무리. 매 답마다 대화 저장.
-  const MAX_TURNS = 3;
-  const answerCompanion = () => {
-    if (!companion) return;
-    const a = (companion.answer || '').trim();
-    if (!a) { setCompanion((c) => c ? { ...c, done: true } : c); return; }
-    const ex = [...(companion.exchanges || []), { q: companion.question, a }];
-    rgTrack('answer_saved', { book_id: book.id, lens: 'why', answer_length: a.length });
-    persistCompanionNote(companion.sentenceId, ex);
-    archiveCompanion(book.id, companion.text, companion.question, a); // 서버 아카이브 (#295)
-    const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
-    if (ex.length >= MAX_TURNS || consent !== 'yes') {
-      setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, exchanges: ex, question: null, answer: '', loading: false, done: true } : c);
-      showToast('🐦 좋은 대화였어요');
-      return;
-    }
-    setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, exchanges: ex, question: null, answer: '', loading: true } : c);
-    genCompanionFollowup(companion.text, ex, book.title, book.author, companion.kind).then((q) =>
-      setCompanion((c) => (c && c.sentenceId === companion.sentenceId) ? { ...c, question: q, loading: false } : c));
-  };
-  // 질문 재생성 (#372) — 현재 질문을 avoid로 넘겨 다른 질문 받기.
-  const regenCompanion = () => {
-    if (!companion || companion.loading || !companion.question) return;
-    const cur = companion.question, ex = companion.exchanges || [], sid = companion.sentenceId;
-    rgTrack('companion_q_regen', { book_id: book.id });
-    setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: null, loading: true, rated: null } : c);
-    const gen = ex.length ? genCompanionFollowup(companion.text, ex, book.title, book.author, companion.kind, cur)
-      : genCompanionQuestion(companion.text, book.title, book.author, companion.kind, cur);
-    gen.then((q) => setCompanion((c) => (c && c.sentenceId === sid) ? { ...c, question: q, loading: false } : c));
-  };
-  // 질문 평가 (#371) — 👍/👎 (사유는 후속). engagement 신호 → PostHog.
-  const rateCompanion = (val) => {
-    if (!companion) return;
-    rgTrack('companion_q_rated', { book_id: book.id, value: val });
-    setCompanion((c) => c ? { ...c, rated: val } : c);
-  };
-  // 읽기 종료 시 참새 1회(#347, companion-reading-end.md) — 읽기(몰입)와 성찰(대화) 분리.
-  // ✕ 나가기·독서 종료·완독 모두에서, 세션에 모은 문장 중 하나로 질문 1개. 0문장이면 미등장.
-  // 문장 선택: 코멘트(note) 달린 것 우선 → 없으면 마지막 저장(saved[0]=최신).
-  const beginEnd = (exit, finalP) => {
-    endCtxRef.current = { exit: exit, finalP: finalP };
-    setClosing(false);
-    const sess = saved;
-    if (!sess.length) { commitEnd(); return; }   // 모은 문장 0개 → 참새 없이 바로 종료
-    const target = sess.find((s) => s.note) || sess[0];
-    setEndStage('companion');
-    const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
-    if (consent === null) setCompanion({ sentenceId: target.id, text: target.text, kind: target.kind, needsConsent: true, answer: '', exchanges: [], atEnd: true });
-    else startCompanion(target.id, target.text, target.kind, true);
-  };
-  // 실제 종료 위임 — exit(✕): 체크인 없이 닫기 / finish(독서 종료): 부모 체크인 파이프라인(#300)
-  // → 진도/스트릭/XP 갱신 + 둥지 갱신(onCheckin) + 완독 시 세리머니까지 단일 경로. 문장은 이미 저장됨(sentence=null).
-  const commitEnd = () => {
-    const { exit, finalP } = endCtxRef.current;
-    if (!exit) {
-      rgTrack('reading_session_end', { book_id: book.id, duration_sec: secs, pages_logged: Math.max(0, (finalP || 0) - (book.cur || 0)) });
-      if (onCheckin) onCheckin({ page: finalP, sentence: null, duration_sec: secs });
-    }
-    onClose();
-  };
-  // 독서 종료 확인(완료) → 최종 쪽 확정 후 참새 종료 화면으로.
-  const finish = () => {
-    const fp = pageNum(finalPage);
-    const finalP = fp != null ? fp : (book.cur || 0);
-    beginEnd(false, finalP);
-  };
-  // 참새 대화 본문 — 읽기 종료 화면(#347/#438). 말풍선 채팅 UI(#435): 질문=좌측(참새), 답=우측(나).
-  const renderCompanionBody = () => (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
-        <span>🐦</span><span>Jacky와 대화하기</span>
-      </div>
-      {(companion.exchanges || []).map((e, ei) => (
-        <div key={ei}>
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 6 }}>
-            <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13.5, fontWeight: 700, lineHeight: 1.5 }}>{e.q}</div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-            <div style={{ maxWidth: '85%', background: 'var(--brand)', color: '#fff', borderRadius: '14px 14px 4px 14px', padding: '8px 12px', fontSize: 13, lineHeight: 1.5 }}>{e.a}</div>
-          </div>
-        </div>
-      ))}
-      {companion.needsConsent ? (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
-            <div style={{ maxWidth: '90%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '10px 12px', fontSize: 13, lineHeight: 1.55, opacity: 0.9 }}>
-              남긴 문장을 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해도 될까요? 끄면 로컬 질문만 드려요. (설정에서 언제든 변경)
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => decideConsent('no')} style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>아니요</button>
-            <button onClick={() => decideConsent('yes')} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>좋아요</button>
-          </div>
-        </>
-      ) : companion.done ? (
-        <div style={{ fontSize: 12, opacity: 0.6, fontStyle: 'italic', paddingTop: 2 }}>🐦 대화 저장됨 · 다음에 또 이어가요</div>
-      ) : companion.loading ? (
-        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-          <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13, opacity: 0.7, fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
-            <div style={{ maxWidth: '85%', display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px' }}>
-              <div style={{ flex: 1, fontSize: 14, fontWeight: 700, lineHeight: 1.55 }}>{companion.question}</div>
-              <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
-                <button onClick={() => rateCompanion('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'up' ? 1 : 0.45 }}>👍</button>
-                <button onClick={() => rateCompanion('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'down' ? 1 : 0.45 }}>👎</button>
-                <button onClick={regenCompanion} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
-              </div>
-            </div>
-          </div>
-          <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
-            placeholder="떠오르는 대로 답해보세요" rows={2}
-            style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#F4F2EC', fontSize: 14, lineHeight: 1.5, padding: 10, resize: 'none', boxSizing: 'border-box' }} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button onClick={() => { persistCompanionNote(companion.sentenceId, companion.exchanges); setCompanion((c) => c ? { ...c, done: true } : c); }} style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{companion.atEnd ? '건너뛰기' : '마치기'}</button>
-            <button onClick={answerCompanion} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{(companion.exchanges || []).length >= MAX_TURNS - 1 ? '답 남기고 마치기' : '답하고 이어가기'}</button>
-          </div>
-        </>
-      )}
-    </>
-  );
-  return (
-    <div style={inline
-      ? { position: 'relative', background: '#1A1C20', color: '#F4F2EC', borderRadius: 16, display: 'flex', flexDirection: 'column', maxHeight: '74vh', overflow: 'hidden', margin: '0 0 12px' }
-      : { position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {/* #4 나가기 — 체크인 없이 종료. 모은 문장 있으면 참새 1회 후 닫힘(#347). */}
-          <button onClick={() => beginEnd(true, book.cur || 0)} aria-label="나가기" title="나가기 (기록 없이)" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 12px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>✕</button>
-          <button onClick={() => setRunning((r) => !r)} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#F4F2EC', borderRadius: 16, padding: '6px 12px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{running ? '⏸' : '▶'}</button>
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: 1 }}>⏱ {fmt(secs)}</div>
-        <button onClick={() => { setFinalPage(page); setClosing(true); }} style={{ background: 'var(--brand)', border: 'none', color: '#fff', borderRadius: 16, padding: '6px 14px', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>독서 종료</button>
-      </div>
-      <div style={{ padding: '20px 18px 10px', textAlign: 'center' }}>
-        <div style={{ fontSize: 17, fontWeight: 900 }}>{book.title}</div>
-        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>{book.author}</div>
-      </div>
-      {/* 상시 입력칸 */}
-      <div style={{ padding: '8px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, justifyContent: 'center' }}>
-          <span style={{ fontSize: 13, opacity: 0.8 }}>📍 이 문장 페이지</span>
-          <button onClick={() => bump(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>−</button>
-          <input type="number" inputMode="numeric" value={page} placeholder="—" onChange={(e) => setPage(e.target.value)} onBlur={() => setPage((s) => s === '' ? '' : String(pageNum(s) ?? ''))} style={{ width: 60, textAlign: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#F4F2EC', fontSize: 15, fontWeight: 800, padding: '6px 0' }} />
-          <button onClick={() => bump(1)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>+</button>
-          {total > 0 && <span style={{ fontSize: 11, opacity: 0.5 }}>/ {total}p</span>}
-        </div>
-        {/* '내 생각' 토글 폐기 — 인용만 (#482, 추후 재시도 아카이브: #360/#420) */}
-        <textarea value={text} onChange={(e) => {
-          if (e.target.value.length > 1000) return;
-          setText(e.target.value);
-        }}
-          placeholder="책에서 마음에 남은 한 문장을 옮겨 적어보세요…" rows={3}
-          style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
-        {/* 책 사진 OCR 추출 (#382) — 인용 모드에서만(내 생각은 직접 적는 것). */}
-        {kind === 'quote' && (
-          <>
-            {/* 사진 선택 → 크롭 오버레이에서 영역 선택 → 그 영역만 OCR (#396) */}
-            <input ref={_ocrInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setOcrFile(f); e.target.value = ''; }} />
-            <button onClick={() => { if (!ocrBusy && _ocrInputRef.current) _ocrInputRef.current.click(); }} disabled={ocrBusy}
-              style={{ width: '100%', marginTop: 8, padding: 11, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: 'rgba(244,242,236,0.85)', fontWeight: 800, fontSize: 13.5, cursor: ocrBusy ? 'default' : 'pointer', opacity: ocrBusy ? 0.6 : 1 }}>
-              {ocrBusy ? '읽는 중…' : '📷 촬영해서 입력'}
-            </button>
-            {/* 촬영 가이드 (#395 벤치마크 결론) */}
-            <div style={{ fontSize: 11, opacity: 0.5, marginTop: 5, textAlign: 'center', lineHeight: 1.4 }}>한 페이지·한 구절만, 배경 없이 찍고 → 원하는 영역을 골라요</div>
-          </>
-        )}
-        {/* 저장만 — 읽는 중엔 흐름 유지, 참새는 체크인(읽기 종료) 직후에만(#347/#438). */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button onClick={save} style={{ flex: 1, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>{kind === 'thought' ? '💭 내 생각 저장' : '✨ 한 문장 저장'}{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
-        </div>
-      </div>
-      {/* 이번 세션 아카이브 — 저장한 문장 목록. 참새 대화는 읽기 종료 화면에서(#327/#438) */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 24px' }}>
-        {saved.length > 0 && <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 800, margin: '8px 0' }}>이번 독서에서 모은 {saved.length}문장</div>}
-        {saved.map((s, i) => (
-          <div key={s.id || i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>{s.page != null ? s.page + 'p' : '페이지 미상'}{s.kind === 'thought' ? ' · 💭 내 생각' : ''}</div>
-            {s.kind === 'thought'
-              ? <div style={{ fontSize: 14, lineHeight: 1.5 }}>💭 {s.text}</div>
-              : <div style={{ fontSize: 14, lineHeight: 1.5, fontStyle: 'italic' }}>"{s.text}"</div>}
-          </div>
-        ))}
-      </div>
-      {/* 종료 확인 — 최종 읽은 쪽 */}
-      {closing && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={(e) => { if (e.target === e.currentTarget) setClosing(false); }}>
-          <div style={{ background: '#22252B', borderRadius: 16, padding: 24, width: '100%', maxWidth: 320 }}>
-            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>📖 어디까지 읽으셨어요?</div>
-            <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 14 }}>오늘 {fmt(secs)} 읽음 · {saved.length}문장 기록</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
-              <button onClick={() => setFinalPage((s) => String(Math.max(0, (parseInt(s, 10) || 0) - 1)))} style={{ width: 36, height: 36, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>−</button>
-              <input type="number" inputMode="numeric" value={finalPage} onChange={(e) => setFinalPage(e.target.value)} style={{ width: 80, textAlign: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#F4F2EC', fontSize: 18, fontWeight: 900, padding: '8px 0' }} />
-              <button onClick={() => setFinalPage((s) => String((parseInt(s, 10) || 0) + 1))} style={{ width: 36, height: 36, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#F4F2EC', fontSize: 18, cursor: 'pointer' }}>+</button>
-              {total > 0 && <span style={{ fontSize: 12, opacity: 0.5 }}>/ {total}p</span>}
-            </div>
-            <button onClick={finish} style={{ width: '100%', padding: 13, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>완료</button>
-            <button onClick={() => setClosing(false)} style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 12, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>계속 읽기</button>
-          </div>
-        </div>
-      )}
-      {/* 읽기 종료 시 참새 — 읽기(몰입)·성찰(대화) 분리(#347). 세션 1문장 1질문 + 오늘 요약. */}
-      {endStage === 'companion' && companion && (
-        <div style={{ position: 'absolute', inset: 0, background: '#1A1C20', zIndex: 30, display: 'flex', flexDirection: 'column', padding: '24px 18px', overflowY: 'auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 18 }}>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>오늘 {Math.max(0, (endCtxRef.current.finalP || 0) - (book.cur || 0))}쪽 읽었어요 ✨</div>
-            <div style={{ fontSize: 12.5, opacity: 0.6, marginTop: 4 }}>이번 독서에서 {saved.length}문장을 모았어요</div>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: 16 }}>
-            {/* 참새가 고른 한 문장 */}
-            <div style={{ fontSize: 13.5, lineHeight: 1.55, opacity: 0.9, marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.1)', fontStyle: companion.kind === 'thought' ? 'normal' : 'italic' }}>
-              {companion.kind === 'thought' ? ('💭 ' + companion.text) : ('"' + companion.text + '"')}
-            </div>
-            {renderCompanionBody()}
-          </div>
-          <button onClick={commitEnd} style={{ marginTop: 16, width: '100%', padding: 13, borderRadius: 12, border: 'none', background: companion.done ? 'var(--brand)' : 'transparent', color: companion.done ? '#fff' : 'rgba(255,255,255,0.6)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
-            {companion.done ? '🪹 둥지로' : '건너뛰고 둥지로'}
-          </button>
-        </div>
-      )}
-      {/* 책 사진 크롭 선택 (#396) — 사진에서 원하는 영역만 잘라 OCR */}
-      {ocrFile && (
-        <OcrCropOverlay file={ocrFile} onCancel={() => setOcrFile(null)} onCrop={(blob) => { setOcrFile(null); runOcr(blob); }} />
-      )}
-    </div>
-  );
-}
 
 // 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 둥지 진척 즉시 반영.
 function BookEditModal({ book, onClose, onSaved }) {
@@ -907,7 +537,6 @@ function BookEditModal({ book, onClose, onSaved }) {
 
 function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onArchive }) {
   const [modalOpen, setModalOpen] = _useState(false);
-  const [readingOpen, setReadingOpen] = _useState(false); // 읽기 모드 (#184)
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
   const [quickText, setQuickText] = _useState('');
@@ -1003,7 +632,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
-  const handleCheckin = ({ page, sentence, kind, duration_sec }) => {
+  const handleCheckin = ({ page, sentence, kind }) => {
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
     const ns = { ...nestState };
@@ -1036,7 +665,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
     prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
     setNestState(ns);
-    onCheckin(ns, newLv, xpGain, sentence, duration_sec, kind);
+    onCheckin(ns, newLv, xpGain, sentence, kind);
 
     // 단계 상승 시 진화 마이크로카피 toast (§5.2)
     if (nestUp) {
@@ -1174,22 +803,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
       {/* 데모 '하루 거르기' 제거 (#481) */}
 
-      {/* 빠른 입력 (#462) — '읽기 시작' 버튼 없이 페이지·한 문장 상시 입력. 타이머 몰입은 [⏱ 집중 읽기] 선택. */}
-      {readingOpen ? (
-        <ReadingMode
-          inline
-          book={nestState.book}
-          onClose={() => setReadingOpen(false)}
-          onArchive={(q) => { setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] })); if (onArchive) onArchive(q); }}
-          onCheckin={handleCheckin}
-        />
-      ) : (
-        <div className="quick-log">
+      {/* 빠른 입력 (#462·#505) — 홈에서 페이지·한 문장·OCR 상시 입력. 읽기모드(타이머) 폐기. */}
+      <div className="quick-log">
           {/* 페이지 진도 */}
           <div className="quick-sec">
             <div className="quick-sec-head">
               <span>📖 오늘의 독서</span>
-              <button className="quick-timer" onClick={() => { rgTrack('book_opened', { book_id: nestState.book.id, entry_point: 'reading_mode' }); setReadingOpen(true); }}>⏱ 집중 읽기</button>
             </div>
             <div className="quick-stepper">
               <button onClick={() => setQuickPage((s) => String(Math.max(0, (parseInt(s, 10) || nestState.book.cur || 0) - 1)))} aria-label="이전 쪽">−</button>
@@ -1216,12 +835,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
             <OcrCropOverlay file={quickOcrFile} onCancel={() => setQuickOcrFile(null)} onCrop={(blob) => { setQuickOcrFile(null); runOcrQuick(blob); }} />
           )}
         </div>
-      )}
 
       {/* '오늘 기록 완료 · N일 연속' nudge 제거 (#481) */}
 
-      {/* 시간차 되감기 카드 (#346) — 세션 중엔 숨김 (#432) */}
-      {!readingOpen && resurfaceCard && (
+      {/* 시간차 되감기 카드 (#346) */}
+      {resurfaceCard && (
         <div style={{ background: 'var(--brand-tint)', border: '1px solid var(--brand)', borderRadius: 12, padding: '14px 16px', margin: '10px 0' }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand-3)', marginBottom: 6 }}>💬 참새</div>
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>
@@ -1249,8 +867,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
         </div>
       )}
 
-      {/* 오늘의 한 문장 (#436) — 세션 중엔 숨김(세션 아카이브가 대체). 오늘 작성분만 최신순 → 고양감. */}
-      {!readingOpen && (
+      {/* 오늘의 한 문장 (#436) — 현재 책·오늘 작성분 최신순 → 고양감. */}
       <div className="section-head">
         <h3>🔖 이 책, 오늘의 한 문장 <span className="my-q-count">{todayQuotes.length}</span></h3>
         {nestState.myQuotes.length > 0 && (
@@ -1259,8 +876,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           </button>
         )}
       </div>
-      )}
-      {!readingOpen && (todayQuotes.length === 0 ? (
+      {todayQuotes.length === 0 ? (
         <div className="my-q-empty">
           <span className="ico">🐦</span>
           오늘 만난 한 줄을 짹 해보세요.<br />
@@ -1288,9 +904,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
             </div>
           );
         })
-      ))}
+      )}
 
-      {/* 읽기 세션은 위 책 카드 아래 인라인으로 이동 (#432) */}
 
       {/* 세리머니 — portal */}
       {ceremony && ReactDOM.createPortal(

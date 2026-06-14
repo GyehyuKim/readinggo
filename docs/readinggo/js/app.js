@@ -396,7 +396,7 @@ function App() {
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
   // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, duration_sec, kind) => {
+  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind) => {
     setAppState(s => ({
       ...s,
       book: ns.book,
@@ -425,7 +425,7 @@ function App() {
       try {
         const ub = await Promise.resolve(DataStore.activeBook.get());
         if (!ub || !ub.id) { console.warn('[ReadingGo] 체크인: 활성 책 없음 — 등록 먼저 필요'); return; }
-        await Promise.resolve(DataStore.sessions.addToday({ userBookId: ub.id, page: ns.book.cur, duration_sec }));
+        await Promise.resolve(DataStore.sessions.addToday({ userBookId: ub.id, page: ns.book.cur }));
         if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ub.id, page: ns.book.cur, text: sentence, kind: kind || 'quote' }));
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ub.id + ')');
