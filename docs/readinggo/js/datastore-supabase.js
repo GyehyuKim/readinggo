@@ -464,10 +464,19 @@
       },
     },
     friends: {
-      async list() {
-        const id = await uid();
+      // 내가(또는 userId가) 팔로우하는 사람 목록 → [{following: {user}}]
+      async list(userId) {
+        const id = userId || await uid();
+        if (!id) return [];
         return unwrap(await sb().from('follows')
           .select('following:users!follows_following_id_fkey(*)').eq('follower_id', id));
+      },
+      // 나를(또는 userId를) 팔로우하는 사람 목록 → [{follower: {user}}] (#509)
+      async followers(userId) {
+        const id = userId || await uid();
+        if (!id) return [];
+        return unwrap(await sb().from('follows')
+          .select('follower:users!follows_follower_id_fkey(*)').eq('following_id', id));
       },
       async follow(userId) {
         const id = await uid();
