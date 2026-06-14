@@ -7,7 +7,7 @@
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
 | §5.1 상단바·진화배너·둥지자람·캐러셀 | ✅ | app.js topbar · nest.js NestTheatre/twigs/switchBook |
-| §5.2 **둥지=누적 XP 분리(v7.4)** · 5단계·성컬렉션 | ✅ | #313 getNestStageByXp/nestXpProgress · NestTheatre xp |
+| §5.2 **둥지=1,600 XP 주기(v8.1)** · 경계 성 획득·리셋 | 🚩 | #520 spec. 현재 구현은 전체 누적 XP 단계 + 완독 성 파생 — #521 구현 필요 |
 | §5.1 CTA·§5.4 일일미션 = 읽기모드 대체 | ✅ | #252 — nest.md §5.5 반영(읽기모드가 체크인 대체). CheckinModal 폐기 |
 | §5.4 별점0.5·완독세리머니(읽기모드 위임) · §5.5 읽기모드(나가기✕) | ✅ | #300 finish→handleCheckin · ReadingMode |
 
