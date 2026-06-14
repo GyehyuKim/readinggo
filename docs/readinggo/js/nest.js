@@ -110,18 +110,67 @@ function CheckinModal({ book, onClose, onSubmit }) {
 function Ceremony({ data, onClose, onComplete }) {
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
+  // nestUp(레벨업) 시 2-step: 0=일반 체크인 화면, 1=둥지 진화 축하 화면 (#426)
+  const [step, setStep] = _useState(0);
+  // 둥지 진척도 bar — 체크인 전(prevXp) → 후(newXp) 애니메이션. mount 후 다음 프레임에 목표값으로 전환.
+  const [barPct, setBarPct] = _useState(null);
   if (!data) return null;
-  const { xpGain, xpParts, streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay, wasReset, isComplete } = data;
+  const { xpGain, xpParts, sentence, nestUp, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
   let leadText;
   if (!isNewDay && !wasReset) {
     leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료 🐦`;
-  } else if (wasReset) {
-    leadText = `+${pagesAdded}쪽 · ${streak}일 — 다시 시작이에요!`;
   } else {
-    leadText = `+${pagesAdded}쪽 읽었어요 · ${streak}일 연속!`;
+    leadText = `+${pagesAdded}쪽 읽었어요`;
   }
   const prevStage = nestUp ? NEST_STAGES[prevLv - 1] : null;
   const nowStage  = nestUp ? NEST_STAGES[newLv  - 1] : null;
+
+  const startPct = _xpProg(prevXp != null ? prevXp : newXp);
+  const endPct   = _xpProg(newXp != null ? newXp : prevXp);
+  const curStage = getNestStageByXp(newXp != null ? newXp : prevXp);
+
+  _useEffect(() => {
+    setBarPct(startPct);
+    const t = setTimeout(() => setBarPct(endPct), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // nestUp 축하 화면 (step 1) — prevStage → nowStage 진화 시각화 + [계속 →]
+  if (step === 1 && nestUp && prevStage && nowStage) {
+    const evoCopy = getEvolutionCopy(prevLv, newLv);
+    return (
+      <div className="ceremony show">
+        <div className="inner">
+          <h2>✨ 둥지가 진화했어요!</h2>
+          <div className="nest-evo">
+            <div className="nest-evo-stage">
+              <span className="em">{prevStage.short}</span>
+              <div className="name">{prevStage.name}</div>
+            </div>
+            <div className="nest-evo-arrow">→</div>
+            <div className="nest-evo-stage now">
+              <span className="em">{nowStage.short}</span>
+              <div className="name">{nowStage.name}</div>
+            </div>
+          </div>
+          {evoCopy && <div className="nest-evo-copy">{evoCopy}</div>}
+          <button
+            className="next-btn"
+            onClick={() => {
+              if (isComplete && onComplete) {
+                onComplete({ rating: rating || null, review_text: reviewText.trim() || null });
+              }
+              onClose();
+            }}
+          >
+            계속 →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="ceremony show">
       <div className="inner">
@@ -132,11 +181,6 @@ function Ceremony({ data, onClose, onComplete }) {
             <span className="ico">⭐</span>
             <div className="val">+{xpGain}</div>
             <div className="lbl">XP</div>
-          </div>
-          <div className="reward-card fire">
-            <span className="ico">🔥</span>
-            <div className="val">{streak}일</div>
-            <div className="lbl">STREAK</div>
           </div>
           <div className="reward-card gold">
             <span className="ico">🔖</span>
@@ -163,15 +207,18 @@ function Ceremony({ data, onClose, onComplete }) {
           </div>
         )}
 
-        {nestUp && prevStage && nowStage && (
-          <div className="nest-up">
-            <span className="em">{nowStage.short}</span>
-            <div className="text">
-              둥지가 진화했어요!
-              <small>{prevStage.short} {prevStage.name} → {nowStage.short} {nowStage.name}</small>
-            </div>
+        <div className="nest-progress">
+          <div className="nest-progress-head">
+            <span className="em">{curStage.short}</span>
+            <span className="name">{curStage.name}</span>
           </div>
-        )}
+          <div className="nest-progress-bar">
+            <span className="nest-progress-fill" style={{ width: (barPct != null ? barPct : startPct) + '%' }} />
+          </div>
+          <div className="nest-progress-sub">
+            {endPct >= 100 ? '다음 단계 진화 준비 완료!' : `다음 단계까지 ${100 - endPct}% 남았어요`}
+          </div>
+        </div>
 
         {isComplete && (
           <div className="complete-review">
@@ -206,6 +253,10 @@ function Ceremony({ data, onClose, onComplete }) {
         <button
           className="next-btn"
           onClick={() => {
+            if (nestUp && prevStage && nowStage) {
+              setStep(1);
+              return;
+            }
             if (isComplete && onComplete) {
               onComplete({ rating: rating || null, review_text: reviewText.trim() || null });
             }
@@ -1017,7 +1068,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
       if (copy) showToast(`${getNestStageByXp(ns.xp).short} ${copy}`);
     }
 
-    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, prevLv, newLv, pagesAdded, isNewDay: true, wasReset, isComplete });
+    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
   };

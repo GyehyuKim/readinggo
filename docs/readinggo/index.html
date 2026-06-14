@@ -1016,7 +1016,7 @@ input,textarea{font-family:inherit;}
 }
 .ceremony .em{ color: var(--brand-3); font-weight: 900; }
 .reward-grid{
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
   margin-bottom: 22px;
 }
 .reward-card{
@@ -1063,18 +1063,58 @@ input,textarea{font-family:inherit;}
   font-weight: 400; color: var(--brand-3); letter-spacing: 1.2px;
   margin-bottom: 6px; text-transform: uppercase;
 }
-.nest-up{
-  background: linear-gradient(145deg, #FFF8E8, #FFE2A8);
-  border: 1.5px solid #F5C875;
-  padding: 12px 14px; border-radius: var(--r-md);
-  margin-bottom: 16px;
-  display:flex; align-items:center; gap: 10px;
+/* 둥지 진척도 bar (#426) — 체크인 전→후 진행률 애니메이션 */
+.nest-progress{
+  background: var(--paper-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px; margin-bottom: 16px;
   text-align: left;
-  animation: rcPop .4s ease .65s both;
+  animation: rcPop .4s ease .55s both;
 }
-.nest-up .em{ font-size: 28px; }
-.nest-up .text{ font-size: 13px; font-weight: 800; color: var(--ink); }
-.nest-up .text small{ display:block; font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+.nest-progress-head{
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 900; color: var(--ink);
+  margin-bottom: 10px;
+}
+.nest-progress-head .em{ font-size: 22px; }
+.nest-progress-bar{
+  height: 12px; border-radius: 999px;
+  background: rgba(0,0,0,.10);
+  position: relative; overflow: hidden;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,.10);
+}
+.nest-progress-fill{
+  position:absolute; left:0; top:0; bottom:0;
+  width: 0%;
+  background: linear-gradient(90deg, var(--brand) 0%, #6FE3A1 100%);
+  border-radius: 999px;
+  transition: width .8s cubic-bezier(.2,.8,.2,1);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.10);
+}
+.nest-progress-sub{
+  margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--ink-3);
+}
+
+/* 둥지 진화 축하 화면 (#426) — nestUp 시 별도 step */
+.nest-evo{
+  display: flex; align-items: center; justify-content: center; gap: 18px;
+  margin: 28px 0 16px;
+}
+.nest-evo-stage{
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  animation: rcPop .4s ease .15s both;
+}
+.nest-evo-stage.now{ animation: rcPop .5s cubic-bezier(.2,.8,.2,1.2) .45s both; }
+.nest-evo-stage .em{ font-size: 48px; }
+.nest-evo-stage .name{ font-size: 13px; font-weight: 800; color: var(--ink-2); }
+.nest-evo-stage.now .name{ color: var(--ink); font-weight: 900; }
+.nest-evo-arrow{ font-size: 24px; font-weight: 900; color: var(--ink-3); }
+.nest-evo-copy{
+  font-size: 14px; font-weight: 800; color: var(--brand-3);
+  margin-bottom: 22px;
+  animation: rcPop .4s ease .6s both;
+}
 
 .complete-review{
   background: var(--paper-2);
