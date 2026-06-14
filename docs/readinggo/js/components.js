@@ -169,7 +169,7 @@ function SentenceCard({ item, bookId }) {
       )}
       <div className="react">
         <span className={'chip' + (liked ? ' active' : '')} style={mineStyle} onClick={toggleLike}>
-          짹 {likeCount}
+          좋아요 {likeCount}
         </span>
         <span className={'chip' + (bookmarked ? ' active' : '')} style={mineStyle} onClick={toggleBookmark}>
           🔖
