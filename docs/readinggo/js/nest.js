@@ -145,11 +145,13 @@ function Ceremony({ data, onClose, onComplete }) {
           <h2>✨ 둥지가 진화했어요!</h2>
           <div className="nest-evo">
             <div className="nest-evo-stage">
+              <img className="nest-evo-img" src={`assets/nest/lv${prevStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
               <span className="em">{prevStage.short}</span>
               <div className="name">{prevStage.name}</div>
             </div>
             <div className="nest-evo-arrow">→</div>
             <div className="nest-evo-stage now">
+              <img className="nest-evo-img" src={`assets/nest/lv${nowStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
               <span className="em">{nowStage.short}</span>
               <div className="name">{nowStage.name}</div>
             </div>
@@ -208,6 +210,7 @@ function Ceremony({ data, onClose, onComplete }) {
         )}
 
         <div className="nest-progress">
+          <img className="nest-progress-img" src={`assets/nest/lv${curStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
           <div className="nest-progress-head">
             <span className="em">{curStage.short}</span>
             <span className="name">{curStage.name}</span>

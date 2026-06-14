@@ -1078,6 +1078,11 @@ input,textarea{font-family:inherit;}
   margin-bottom: 10px;
 }
 .nest-progress-head .em{ font-size: 22px; }
+/* 둥지 현재 단계 이미지 (#427) — NestTheatre와 동일 에셋, bar 위에 표시 */
+.nest-progress-img{
+  display: block; width: 120px; height: 120px;
+  margin: 0 auto 10px; object-fit: contain;
+}
 .nest-progress-bar{
   height: 12px; border-radius: 999px;
   background: rgba(0,0,0,.10);
@@ -1106,6 +1111,8 @@ input,textarea{font-family:inherit;}
   animation: rcPop .4s ease .15s both;
 }
 .nest-evo-stage.now{ animation: rcPop .5s cubic-bezier(.2,.8,.2,1.2) .45s both; }
+/* 진화 전/후 둥지 이미지 (#427) — NestTheatre와 동일 에셋 */
+.nest-evo-img{ width: 80px; height: 80px; object-fit: contain; }
 .nest-evo-stage .em{ font-size: 48px; }
 .nest-evo-stage .name{ font-size: 13px; font-weight: 800; color: var(--ink-2); }
 .nest-evo-stage.now .name{ color: var(--ink); font-weight: 900; }
