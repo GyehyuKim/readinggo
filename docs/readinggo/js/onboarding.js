@@ -7,8 +7,8 @@ const ScreenA = ({ onStart }) => (
     background: 'linear-gradient(160deg,#F0FDF4 0%,#fff 60%)' }}>
     {/* 상단 로고 */}
     <div style={{ padding: '48px 0 0', textAlign: 'center' }}>
-      <div className="sparrow-bounce" style={{ display: 'inline-block' }}>
-        <Sparrow size={96}/>
+      <div className="sparrow-bounce" style={{ display: 'inline-block', fontSize: 96, lineHeight: 1 }}>
+        🐦
       </div>
       <h1 style={{ fontWeight: 900, fontSize: 28, color: '#1F1F1F', margin: '16px 0 8px',
         letterSpacing: '-0.5px', lineHeight: 1.2 }}>
@@ -305,8 +305,8 @@ const ScreenD3 = ({ sessionNum, xpGained, onContinue, isLoggedIn }) => {
       ))}
 
       {/* 참새 bounce */}
-      <div className="sparrow-bounce" style={{ marginBottom: 12 }}>
-        <Sparrow size={88}/>
+      <div className="sparrow-bounce" style={{ marginBottom: 12, fontSize: 88, lineHeight: 1 }}>
+        🐦
       </div>
 
       <h2 className="pop-in" style={{ fontWeight: 900, fontSize: 26, color: '#1F1F1F', margin: '0 0 6px', textAlign: 'center' }}>

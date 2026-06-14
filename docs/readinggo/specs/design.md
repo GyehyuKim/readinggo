@@ -120,7 +120,7 @@ Pixel 폰트 적용 대상 (선택자 단위):
 | `fall` | Confetti | 2.4s cubic-bezier(.25,.5,.5,1), translateY -20px → 110vh + rotate 720deg |
 | `ping` | 마을 불빛 ON | 1.2s ease-out infinite, box-shadow ripple |
 
-참새 SVG: `Sparrow` 컴포넌트 (색상 #C49A4A 본체 + #8B6234 날개 + #E8D5A3 배). 윤지 PR #86 자산 재사용.
+참새 마스코트: 온보딩·소개 화면은 **🐦 이모지**(`sparrow-bounce` 애니메이션)로 표현한다. (#527 — 코드에 머지된 적 없는 `Sparrow` SVG 컴포넌트 참조를 제거하고 ScreenJacky(#502)와 통일. SVG 자산 재도입은 별도 디자인 결정.) 둥지 단계 시각화는 NEST_STAGES 이모지(🪵🪹🏠🏡🏰) 사용.
 
 ### 11.5 반응형 내비게이션 (v8.1, #466)
 
