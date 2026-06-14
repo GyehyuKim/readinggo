@@ -445,7 +445,7 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
   );
 }
 
-function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
+function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = false }) {
   // book 스냅샷 — 세션 중 부모가 appState.book 을 빈 값으로 갱신(탭 복귀 시 transient 새로고침,
   // 만료 세션 등)해도 읽기 세션이 비워지거나 깨지지 않도록 진입 시점 book 을 고정한다.
   const [book] = _useState(() => bookProp);
@@ -702,7 +702,9 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin }) {
     </>
   );
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
+    <div style={inline
+      ? { position: 'relative', background: '#1A1C20', color: '#F4F2EC', borderRadius: 16, display: 'flex', flexDirection: 'column', maxHeight: '74vh', overflow: 'hidden', margin: '0 0 12px' }
+      : { position: 'fixed', inset: 0, background: '#1A1C20', color: '#F4F2EC', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', gap: 8 }}>
           {/* #4 나가기 — 체크인 없이 종료. 모은 문장 있으면 참새 1회 후 닫힘(#347). */}
@@ -1054,6 +1056,14 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
 
   // sameBookFeed 는 위 effect 에서 실 byBook 으로 로드됨 (#1). 데모 NPC_QUOTES 미사용.
 
+  // 오늘의 한 문장 (#436) — myQuotes 중 오늘 작성분만 최신순. 고양감: '오늘 내가 남긴 것'.
+  const _todayStr = new Date().toDateString();
+  const todayQuotes = (nestState.myQuotes || []).filter((q) => {
+    if (q.when === '방금') return true;            // 이번 세션 방금 저장분
+    if (!q.createdAt) return false;
+    try { return new Date(q.createdAt).toDateString() === _todayStr; } catch (e) { return false; }
+  });
+
   // 활성 책 없음(신규/미등록): 데모책 대신 '책 등록' 온보딩 — 유령 책 체크인(영속 실패) 방지.
   if (!nestState.book || !nestState.book.id) {
     return (
@@ -1107,27 +1117,39 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
 
       {/* 둥지 시어터(NestTheatre)는 프로필 상단으로 이동 (#428) — 홈은 책읽기 중심 */}
 
-      {/* 데모 거르기 */}
-      <div className="demo-decay">
-        <button onClick={handleSimSkip}>⏩ 데모: 하루 거르기 (스트릭 위기)</button>
-      </div>
+      {/* 데모 거르기 — 읽기 세션 중엔 숨김 (#432) */}
+      {!readingOpen && (
+        <div className="demo-decay">
+          <button onClick={handleSimSkip}>⏩ 데모: 하루 거르기 (스트릭 위기)</button>
+        </div>
+      )}
 
-      {/* 읽기 모드 진입 (#184·#203) — 2줄 가운데 정렬, 주 CTA */}
-      <button className="checkin-cta" onClick={() => { rgTrack('book_opened', { book_id: nestState.book.id, entry_point: 'reading_mode' }); setReadingOpen(true); }}
-        style={{ background: 'var(--brand)', marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, lineHeight: 1.3 }}>
-        <span style={{ fontSize: 16, fontWeight: 900 }}>📖 읽기 모드</span>
-        <span style={{ fontSize: 12, opacity: 0.72, fontWeight: 700 }}>타이머 + 한 문장 모으기</span>
-      </button>
+      {/* 읽기 세션 (#432·#436) — '읽기 시작' = 타이머 ON, 같은 홈에서 인라인 펼침(별도 진입 화면 없음) */}
+      {readingOpen ? (
+        <ReadingMode
+          inline
+          book={nestState.book}
+          onClose={() => setReadingOpen(false)}
+          onArchive={(q) => { setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] })); if (onArchive) onArchive(q); }}
+          onCheckin={handleCheckin}
+        />
+      ) : (
+        <button className="checkin-cta" onClick={() => { rgTrack('book_opened', { book_id: nestState.book.id, entry_point: 'reading_mode' }); setReadingOpen(true); }}
+          style={{ background: 'var(--brand)', marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, lineHeight: 1.3 }}>
+          <span style={{ fontSize: 16, fontWeight: 900 }}>📖 읽기 시작</span>
+          <span style={{ fontSize: 12, opacity: 0.72, fontWeight: 700 }}>타이머 + 한 문장 모으기</span>
+        </button>
+      )}
 
-      {/* 체크인 = 읽기 모드 종료로 자동 처리 (#1) */}
-      {checkedToday && (
+      {/* 체크인 = 읽기 모드 종료로 자동 처리 (#1) — 세션 중엔 숨김 (#432) */}
+      {!readingOpen && checkedToday && (
         <div className="nudge" style={{ textAlign: 'center', fontWeight: 800 }}>
           🐦 오늘 기록 완료! <span className="em">🔥 {nestState.streak}일</span> 연속
         </div>
       )}
 
-      {/* 시간차 되감기 카드 (#346, resurface.md §3.1) — 비침습, 스크롤로 지나칠 수 있음 */}
-      {resurfaceCard && (
+      {/* 시간차 되감기 카드 (#346) — 세션 중엔 숨김 (#432) */}
+      {!readingOpen && resurfaceCard && (
         <div style={{ background: 'var(--brand-tint)', border: '1px solid var(--brand)', borderRadius: 12, padding: '14px 16px', margin: '10px 0' }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand-3)', marginBottom: 6 }}>💬 참새</div>
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>
@@ -1155,23 +1177,25 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
         </div>
       )}
 
-      {/* 내 한 문장 */}
+      {/* 오늘의 한 문장 (#436) — 세션 중엔 숨김(세션 아카이브가 대체). 오늘 작성분만 최신순 → 고양감. */}
+      {!readingOpen && (
       <div className="section-head">
-        <h3>🔖 내 한 문장 <span className="my-q-count">{nestState.myQuotes.length}</span></h3>
+        <h3>🔖 오늘의 한 문장 <span className="my-q-count">{todayQuotes.length}</span></h3>
         {nestState.myQuotes.length > 0 && (
           <button className="more" onClick={() => window.RG_openCollection && window.RG_openCollection()}>
             전체 {nestState.myQuotes.length}개 보기 →
           </button>
         )}
       </div>
-      {nestState.myQuotes.length === 0 ? (
+      )}
+      {!readingOpen && (todayQuotes.length === 0 ? (
         <div className="my-q-empty">
           <span className="ico">🐦</span>
           오늘 만난 한 줄을 짹 해보세요.<br />
-          등록한 문장이 여기 차곡차곡 쌓여요.
+          오늘 남긴 문장이 여기 쌓여요.
         </div>
       ) : (
-        nestState.myQuotes.slice(0, 10).map((q, i) => {
+        todayQuotes.slice(0, 10).map((q, i) => {
           // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백하므로, id가 실제 일치할 때만 그 제목을 씀(사피엔스버그).
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
@@ -1189,9 +1213,10 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
             </div>
           );
         })
-      )}
+      ))}
 
-      {/* 같은 책 피드 */}
+      {/* 같은 책 피드 — 세션 중엔 숨김 (#432). 소셜 통합 제거는 #434. */}
+      {!readingOpen && (<>
       <div className="section-head">
         <h3>📖 같은 책을 읽는 사람들</h3>
         <button className="more" onClick={onGoSocial}>더보기 →</button>
@@ -1206,17 +1231,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           <SentenceCard key={i} item={it} bookId={nestState.book.id} />
         ))
       )}
+      </>)}
 
-      {/* 읽기 모드 — portal (#184) */}
-      {readingOpen && ReactDOM.createPortal(
-        <ReadingMode
-          book={nestState.book}
-          onClose={() => setReadingOpen(false)}
-          onArchive={(q) => { setNestState((ns) => ({ ...ns, myQuotes: [q, ...ns.myQuotes] })); if (onArchive) onArchive(q); }}
-          onCheckin={handleCheckin}
-        />,
-        document.body
-      )}
+      {/* 읽기 세션은 위 책 카드 아래 인라인으로 이동 (#432) */}
 
       {/* 세리머니 — portal */}
       {ceremony && ReactDOM.createPortal(
