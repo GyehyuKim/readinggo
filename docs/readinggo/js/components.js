@@ -621,7 +621,7 @@ function BookExportModal({ onClose }) {
       const handle = (window.RG_ME && window.RG_ME.handle) || 'me';
       const parts = [`# 📚 @${handle}의 ReadingGo 기록`, '', `${chosen.length}권 · 내보낸 날짜 ${today}`];
       chosen.forEach(b => { parts.push('', '---', '', build(b, b.quotes, {})); });
-      const blob = new Blob([parts.join('\n')], { type: 'text/markdown;charset=utf-8' });
+      const blob = new Blob(['\uFEFF', parts.join('\n')], { type: 'text/markdown;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `readinggo-books-${handle}-${today}.md`;
