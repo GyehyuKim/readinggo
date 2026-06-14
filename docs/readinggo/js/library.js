@@ -549,12 +549,11 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
       {/* 프로필 정보 (#471) — 그라디언트 배너 제거, NestTheatre 아래 깔끔한 행 + stats */}
       <div style={{padding:'4px 16px 16px', position:'relative'}}>
         <div style={{position:'absolute', top:0, right:12, display:'flex', gap:8}}>
+          {/* 설정 ⚙️는 하단 '설정' 탭으로 이전 (#488). 운영 대시보드(📊)만 헤더 유지. */}
           {isAdmin && (
             <button onClick={() => setAdminOpen(true)} title="운영 대시보드"
               style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:'50%', width:34, height:34, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1}}>📊</button>
           )}
-          <button onClick={() => window.RG_openSettings && window.RG_openSettings()} title="설정"
-            style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:'50%', width:34, height:34, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1}}>⚙️</button>
         </div>
         <div style={{fontSize:22, fontWeight:900, color:'var(--ink)'}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
         <div style={{fontSize:13, color:'var(--ink-3)', marginTop:4, minHeight:18}}>
