@@ -618,10 +618,6 @@ function App() {
               <span>reading<span className="go">GO</span></span>
             </div>
             <div className="topbar-stats">
-              <span className="stat gold" title="누적 XP">
-                <span className="ico">⚡</span>
-                <span>{appState.xp}</span>
-              </span>
               <span className="stat lv" title="레벨 (systems.md §6.3)">
                 <span>Lv.{calcLevel(appState.xp)}</span>
               </span>
