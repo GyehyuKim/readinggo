@@ -56,7 +56,9 @@ settings.get() / settings.update({reminder_hour, ...})
 books.search(query)                        → Book[]          // DB ilike(즉시) — 클라에서 데모 Fuse + 알라딘 결과와 병합·중복제거(isbn13). 외국 작가 표기변이는 알라딘 위임 (QA3 #148)
 // 도서 프록시(Cloudflare Worker `worker/index.mjs` `/aladin`, 별칭 `/.netlify/functions/aladin`): **ItemSearch(검색)는 packing을 줘도 itemPage 미제공** — 쪽수는 **ItemLookUp(?isbn=)만** 반환. 등록 시 쪽수 없으면 isbn 개별 조회로 1회 보강 (QA7 #233). 그래도 없으면 total_pages=null → 수동 입력 폴백(#204)
 // 외서 균형 보강(#302): 검색이면 **국내(알라딘) 최대 5 + 외서(Google Books) 최대 5 = 총 ≤10**, isbn13/title 중복제거. Google 키는 `GOOGLE_BOOKS_API_KEY`(무키 시 레이트리밋). ISBN 단건 조회엔 미적용.
-// 책 소개(#316): ISBN 조회 응답에 알라딘 `description` 첨부(export 상세화용). archive normalize→upsert 경로엔 미반영(books 테이블 description 컬럼 없음).
+// 책 소개·풀 메타(#316→#489): 검색·ISBN 조회 응답에 알라딘 풀 메타(`description` 등) 첨부. **#489: `normalize()` 가 books 풀 메타 컬럼(위 테이블)을 채워 upsert** → archive·검색 양 경로 공통 반영(이전엔 description 컬럼 부재로 미반영).
+// 검색 도서 자동 저장(#489): `aladinProxy` 가 알라딘 결과를 `ctx.waitUntil` 백그라운드로 books upsert(`on_conflict=isbn13`). 검색(ItemSearch)은 itemPage 누락 잦아 **저장 직전 ISBN 보강**(위 QA7). Google 외서는 우리 컬럼 매핑분만 + `source='google'`. 응답 지연 0(upsert는 응답과 분리).
+// 외서·빈필드 폴백 체인(#489): 등록 시 **알라딘 → Google Books → OpenLibrary** 순으로 빈 필드만 non-destructive merge(표지: Google thumbnail → OpenLibrary covers). 끝내 빈 `description`은 **LLM 보강 허용**(solar-pro3/Gemini, **결과를 books DB ISBN 매칭해 환각 필터**, 사실성 부담 큰 쪽수·가격엔 미적용). `source`·`enriched_at` 로 출처·재보강 추적. 신뢰 카피 차등은 [nest.md/library 추천 #496] 참조.
 // 인기도서 사전 아카이브(#239): `worker/index.mjs` `scheduled()`(cron 0 18 * * *) — 알라딘 베스트셀러→ItemLookUp→books upsert(service_role). 등록 지연 0·API 의존 감소. env: SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY·ARCHIVE_DAILY_CAP(기본3000)
 books.get(bookId)                          → Book
 myBooks.list()                             → UserBook[]      // 읽는 중 + 완독 + 보관. publisher/total_pages는 override 병합값(#431)
@@ -162,6 +164,25 @@ books
   publisher     text
   total_pages   int
   cover_url     text
+  -- 알라딘/외서 무료 메타 (#489) — normalize() 가 채움. 외서·LLM은 가용 필드만, 나머지 NULL.
+  -- ⚠️ 최종 컬럼셋은 구현 1단계 raw 실측(프록시 임시 &debug=raw)으로 무료 TTBKey 실제 채움 필드를 확인 후 확정.
+  description          text     NULL  -- 책 소개(알라딘 description / Google·OpenLibrary 폴백)
+  full_description     text     NULL  -- 출판사 제공 긴 소개(알라딘 OptResult=fulldescription)
+  subtitle             text     NULL  -- 부제(subInfo.subTitle)
+  original_title       text     NULL  -- 원제(외서, subInfo.originalTitle)
+  pub_date             date     NULL  -- 출간일(pubDate)
+  category_id          int      NULL  -- 알라딘 분야 ID — 추천(#496) 같은 분야 폴백에 사용
+  category_name        text     NULL  -- 분야명(categoryName)
+  toc                  text     NULL  -- 목차(OptResult=Toc)
+  story                text     NULL  -- 줄거리(OptResult=Story)
+  price_standard       int      NULL  -- 정가
+  price_sales          int      NULL  -- 판매가
+  customer_review_rank smallint NULL  -- 알라딘 별점 0~10
+  sales_point          int      NULL  -- 알라딘 판매지수
+  aladin_link          text     NULL  -- 알라딘 상세 링크
+  adult                bool     NULL  -- 성인 여부
+  source               text     NULL  -- 메타 출처: 'aladin'|'google'|'openlibrary'|'llm' (폴백 추적·신뢰 카피 차등)
+  enriched_at          timestamptz NULL  -- 메타 보강 시각 — 빈 필드 재보강 cron 추적(#489)
   rank_recent   int  NULL
   rank_steady   int  NULL
   created_at    timestamptz
