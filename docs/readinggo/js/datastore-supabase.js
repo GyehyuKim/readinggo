@@ -471,13 +471,26 @@
       },
       async follow(userId) {
         const id = await uid();
-        await sb().from('follows').upsert({ follower_id: id, following_id: userId }, { onConflict: 'follower_id,following_id' });
+        // error 체크 — RLS·FK 실패를 삼키지 않음(#516). upsert는 throw 대신 {error} 반환.
+        const { error } = await sb().from('follows').upsert({ follower_id: id, following_id: userId }, { onConflict: 'follower_id,following_id' });
+        if (error) throw error;
         return true;
       },
       async unfollow(userId) {
         const id = await uid();
-        await sb().from('follows').delete().eq('follower_id', id).eq('following_id', userId);
+        const { error } = await sb().from('follows').delete().eq('follower_id', id).eq('following_id', userId);
+        if (error) throw error;
         return false;
+      },
+      // 팔로잉/팔로워 수 — userId 생략 시 본인(#516). count head 질의(행 미전송).
+      async counts(userId) {
+        const id = userId || await uid();
+        if (!id) return { following: 0, followers: 0 };
+        const [fg, fr] = await Promise.all([
+          sb().from('follows').select('following_id', { count: 'exact', head: true }).eq('follower_id', id),
+          sb().from('follows').select('follower_id', { count: 'exact', head: true }).eq('following_id', id),
+        ]);
+        return { following: fg.count || 0, followers: fr.count || 0 };
       },
       async isFollowing(userId) {
         const id = await uid();
