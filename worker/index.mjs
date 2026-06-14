@@ -14,7 +14,7 @@ const ALADIN = 'http://www.aladin.co.kr/ttb/api/';
 
 export default {
   // ── HTTP: 정적 + 알라딘 프록시 ──────────────────────────
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
     if (p === '/aladin' || p === '/.netlify/functions/aladin') {
@@ -22,7 +22,7 @@ export default {
       // 동일출처 GET은 Origin 헤더 미전송 → 통과. 다른 출처면 Origin이 우리 도메인과 달라 403.
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
-      return aladinProxy(url.searchParams, env);
+      return aladinProxy(url.searchParams, env, ctx);
     }
     // LLM 독서 파트너 — 참새 질문 생성 (#287). 키는 서버에서만 사용(클라 노출 금지).
     if (p === '/api/companion') {
@@ -253,7 +253,7 @@ async function companionRecap(body, env) {
 }
 
 /* ── 알라딘 프록시 (aladin.js 포팅) ─────────────────────── */
-async function aladinProxy(q, env) {
+async function aladinProxy(q, env, ctx) {
   const key = env.ALADIN_TTB_KEY;
   if (!key) return json({ error: 'ALADIN_TTB_KEY 미설정' }, 500);
   const isbn = (q.get('isbn') || '').trim();
@@ -264,24 +264,24 @@ async function aladinProxy(q, env) {
   if (isbn) {
     if (!/^\d{10,13}$/.test(isbn)) return json({ error: 'isbn 형식 오류' }, 400);
     apiUrl = `${ALADIN}ItemLookUp.aspx?ttbkey=${key}&itemIdType=ISBN13&ItemId=${encodeURIComponent(isbn)}`
-      + `&output=js&Version=20131101&Cover=Big&OptResult=packing`;
+      + `&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`;
   } else if (query) {
     apiUrl = `${ALADIN}ItemSearch.aspx?ttbkey=${key}&Query=${encodeURIComponent(query)}`
       + `&QueryType=Keyword&SearchTarget=Book&MaxResults=${max}&start=1`
-      + `&output=js&Version=20131101&Cover=Big&OptResult=packing`;
+      + `&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`;
   } else {
     return json({ error: 'query 또는 isbn 필요' }, 400);
   }
 
   try {
-    // 책 소개(description) 첨부 (#316) — export 상세화용. 알라딘 raw.description를 응답에만 실음.
-    // ⚠️ archive의 normalize→upsertBook 경로는 건드리지 않음(books 테이블에 description 컬럼 없음).
-    let items = (await aladinFetch(apiUrl)).map((it) => {
-      const n = normalize(it);
-      const desc = String(it.description || '').trim();
-      if (desc) n.description = desc;
-      return n;
-    });
+    // normalize()가 풀 메타(description 등) 매핑 (#489).
+    let items = (await aladinFetch(apiUrl)).map(normalize);
+    // 검색 도서 자동 저장 (#489) — 알라딘 결과를 백그라운드 비파괴 upsert.
+    // normalize가 빈 필드 키를 생략하므로 검색(쪽수 등 누락)이 기존 풍부한 행을 덮지 않음.
+    if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
+      const SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
+      ctx.waitUntil(Promise.all(items.filter((b) => b.isbn13).map((b) => upsertBook(SB, SRK, b).catch(() => {}))));
+    }
     // 외서 균형 보강 (#302) — 검색이면 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
     // 결과 홍수 방지: 알라딘 5칸으로 자르고, 외서 5칸을 항상 채워 균형. ISBN 단건 조회엔 미적용.
     // 빈자리 이월(#350): 알라딘이 5칸을 못 채우면(외서 등) 남은 자리를 Google로 채워 총 10건 보장.
@@ -363,7 +363,7 @@ async function archive(env) {
     while (idx < todo.length && Date.now() - start < TIME_BUDGET_MS) {
       const isbn = todo[idx++];
       try {
-        const lk = await aladinFetch(`${ALADIN}ItemLookUp.aspx?ttbkey=${KEY}&itemIdType=ISBN13&ItemId=${isbn}&output=js&Version=20131101&Cover=Big&OptResult=packing`);
+        const lk = await aladinFetch(`${ALADIN}ItemLookUp.aspx?ttbkey=${KEY}&itemIdType=ISBN13&ItemId=${isbn}&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`);
         if (lk[0]) await upsertBook(SB, SRK, normalize(lk[0]));
       } catch (e) { /* skip */ }
     }
@@ -383,14 +383,35 @@ async function aladinFetch(url) {
 
 function normalize(it) {
   const sub = it.subInfo || {};
-  return {
+  const n = {
     isbn13: it.isbn13 || it.isbn || '',
     title: it.title || '',
     author: it.author || '',
     publisher: it.publisher || '',
     total_pages: sub.itemPage ? Number(sub.itemPage) : null,
     cover_url: (it.cover || '').replace(/^http:/, 'https:'),
+    source: 'aladin',
   };
+  // 알라딘 풀 메타 (#489) — 있으면 채움(graceful). 빈 값은 키 생략 → upsert 비파괴(기존값 보존).
+  const s = (v) => { const t = String(v == null ? '' : v).trim(); return t || undefined; };
+  const num = (v) => { if (v == null || v === '') return undefined; const x = Number(v); return Number.isFinite(x) ? x : undefined; };
+  const set = (k, v) => { if (v !== undefined) n[k] = v; };
+  set('description', s(it.description));
+  set('full_description', s(sub.fullDescription || sub.fullDescription2));
+  set('subtitle', s(sub.subTitle));
+  set('original_title', s(sub.originalTitle));
+  set('pub_date', s(it.pubDate));
+  set('category_id', num(it.categoryId));
+  set('category_name', s(it.categoryName));
+  set('toc', s(sub.toc));
+  set('story', s(sub.story));
+  set('price_standard', num(it.priceStandard));
+  set('price_sales', num(it.priceSales));
+  set('customer_review_rank', num(it.customerReviewRank));
+  set('sales_point', num(it.salesPoint));
+  set('aladin_link', s(it.link));
+  if (typeof it.adult === 'boolean') n.adult = it.adult;
+  return n;
 }
 
 async function existingIsbns(SB, SRK, list) {
@@ -410,6 +431,7 @@ async function existingIsbns(SB, SRK, list) {
 
 async function upsertBook(SB, SRK, book) {
   if (!book.isbn13) return;
+  const row = { ...book, enriched_at: new Date().toISOString() };  // #489: 메타 보강 시각
   await fetch(`${SB}/rest/v1/books?on_conflict=isbn13`, {
     method: 'POST',
     headers: {
@@ -417,7 +439,7 @@ async function upsertBook(SB, SRK, book) {
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal',
     },
-    body: JSON.stringify(book),
+    body: JSON.stringify(row),
   });
 }
 
