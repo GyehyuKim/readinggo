@@ -87,7 +87,7 @@ function CheckinModal({ book, onClose, onSubmit }) {
           <div className="label">✏️ 오늘의 한 문장 <small style={{color:'var(--ink-3)', fontWeight:700}}>(선택)</small></div>
           <textarea
             className="sentence-area"
-            placeholder="오늘 마음에 들어온 한 문장을 그대로 옮겨 적어보세요."
+            placeholder="책에서 마음에 남은 한 문장을 옮겨 적어보세요."
             value={sentence}
             onChange={handleSentence}
           />
@@ -792,7 +792,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
           if (e.target.value.length > 1000) return;
           setText(e.target.value);
         }}
-          placeholder="떠오른 한 문장을 바로 옮겨 적어요…" rows={3}
+          placeholder="책에서 마음에 남은 한 문장을 옮겨 적어보세요…" rows={3}
           style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#F4F2EC', fontSize: 15, lineHeight: 1.6, padding: 12, resize: 'none', boxSizing: 'border-box' }} />
         {/* 책 사진 OCR 추출 (#382) — 인용 모드에서만(내 생각은 직접 적는 것). */}
         {kind === 'quote' && (
