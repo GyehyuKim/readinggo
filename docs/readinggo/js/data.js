@@ -154,8 +154,7 @@ const _ab = getBook("b008");
 const _ap = INITIAL_PROGRESS["b008"];
 const INITIAL_STATE = {
   book: {
-    id: _ab.id, title: _ab.title,
-    author: _ab.author + " · " + _ab.pub,
+    id: _ab.id, title: _ab.title, author: _ab.author, pub: _ab.pub,
     cur: _ap.cur, total: _ab.total, days: _ap.days,
     cover: _ab.cover, fb: _ab.fb, toc: _ab.toc,
   },

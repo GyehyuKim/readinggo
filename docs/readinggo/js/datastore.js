@@ -190,6 +190,21 @@ function _activeUB(s) {
 function _ubById(s, userBookId) {
   return s.user_books.find(ub => ub.id === userBookId) || null;
 }
+// 책 정보 수정(#410/#431) — ub.publisher_override/total_pages_override를
+// ub.book.publisher/total_pages에 병합(읽기 시 override 우선). Supabase 어댑터와 표면 일치.
+// 원본 state는 변형하지 않고 ub.book만 얕은 복사한 뷰를 반환.
+function _applyBookOverrides(ub) {
+  if (!ub || !ub.book) return ub;
+  if (ub.publisher_override == null && ub.total_pages_override == null) return ub;
+  return {
+    ...ub,
+    book: {
+      ...ub.book,
+      publisher: ub.publisher_override != null ? ub.publisher_override : ub.book.publisher,
+      total_pages: ub.total_pages_override != null ? ub.total_pages_override : ub.book.total_pages,
+    },
+  };
+}
 function _allSentences(s) {
   const out = [];
   s.user_books.forEach(ub => {
@@ -208,7 +223,7 @@ const DataStore = {
   /* 책 / 활성 책 ──────────────────────────────── */
   activeBook: {
     get() {
-      return localStorageAdapter.mutate(s => _activeUB(s));
+      return localStorageAdapter.mutate(s => _applyBookOverrides(_activeUB(s)));
     },
     set(userBookId) {
       return localStorageAdapter.mutate(s => {
@@ -223,7 +238,7 @@ const DataStore = {
      누락 시 DataStore.myBooks.list() 가 throw → 서재 탭 전체 크래시(무가드). */
   myBooks: {
     list() {
-      return localStorageAdapter.mutate(s => (s.user_books || []).slice());
+      return localStorageAdapter.mutate(s => (s.user_books || []).map(_applyBookOverrides));
     },
     add({ book, current_page }) {
       book = book || {};
@@ -249,15 +264,16 @@ const DataStore = {
         return ub;
       });
     },
-    // 책 메타 수정 (출판사·페이지수, #410) — user_book.book 갱신. Supabase 어댑터와 표면 일치.
+    // 책 정보 수정 (출판사·페이지수, #410/#431) — user_book override 컬럼에 저장
+    // (공유 books 카탈로그가 아닌 사용자별 user_books override). Supabase 어댑터와 표면 일치.
     updateBook(userBookId, fields) {
       fields = fields || {};
       return localStorageAdapter.mutate(s => {
         const ub = _ubById(s, userBookId);
         if (!ub || !ub.book) return null;
-        if (fields.publisher !== undefined) ub.book.publisher = fields.publisher;
-        if (fields.total_pages !== undefined) ub.book.total_pages = Number(fields.total_pages) || 0;
-        return ub;
+        if (fields.publisher !== undefined) ub.publisher_override = fields.publisher;
+        if (fields.total_pages !== undefined) ub.total_pages_override = Number(fields.total_pages) || 0;
+        return _applyBookOverrides(ub);
       });
     },
   },

@@ -22,15 +22,14 @@ async function buildStateFromSupabase() {
   if (ub && ub.book) {
     const total = ub.book.total_pages || 0; // 0 = 쪽수 미상 (#204) — 진척률 계산 시 가드
     out.book = {
-      id: ub.book_id, title: ub.book.title,
-      author: (ub.book.author || '') + (ub.book.publisher ? ' · ' + ub.book.publisher : ''),
+      id: ub.book_id, title: ub.book.title, author: ub.book.author || '', pub: ub.book.publisher || '',
       cur: ub.current_page || 0, total, days: 1,
       cover: ub.book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
     };
     out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지 = 누적 XP (#313), 책 무관
   } else {
     // 활성 책 없음(Supabase 모드): 데모책(b008) 환영 방지 — 빈 sentinel 로 '책 등록' 유도.
-    out.book = { id: '', title: '', author: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
+    out.book = { id: '', title: '', author: '', pub: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
     out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지는 책 없어도 XP로 유지 (#313)
   }
   // 항상 설정(없으면 []) — 로그인 시 데모 시드(INITIAL_STATE.myQuotes)가 '내 것'으로 남는 문제 방지 (#332).
@@ -473,8 +472,7 @@ function App() {
       return {
         ...s,
         book: {
-          id: bk.id, title: bk.title,
-          author: bk.author + ' · ' + bk.pub,
+          id: bk.id, title: bk.title, author: bk.author, pub: bk.pub,
           cur: prog.cur, total: bk.total, days: prog.days,
           cover: bk.cover, fb: bk.fb, toc: bk.toc,
         },
@@ -557,8 +555,7 @@ function App() {
         setAppState(s => ({
           ...s,
           book: {
-            id: ub.book_id, title: book.title,
-            author: (book.author || '') + (book.publisher ? ' · ' + book.publisher : ''),
+            id: ub.book_id, title: book.title, author: book.author || '', pub: book.publisher || '',
             cur: ub.current_page || 0, total: totalPages, days: 1,
             cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
           },
@@ -580,8 +577,7 @@ function App() {
     setAppState(s => ({
       ...s,
       book: {
-        id: item.id, title: item.title,
-        author: (item.author || '') + (item.pub ? ' · ' + item.pub : ''),
+        id: item.id, title: item.title, author: item.author || '', pub: item.pub || '',
         cur: item.cur || 0, total: item.total || 0, days: 1,
         cover: item.cover, fb: item.fb || ['#9AA7B2', '#C7D0D8'], toc: [],
       },

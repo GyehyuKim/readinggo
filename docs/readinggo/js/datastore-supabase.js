@@ -37,6 +37,20 @@
   function _dayDiff(from, to) {
     return Math.round((new Date(to + 'T00:00:00') - new Date(from + 'T00:00:00')) / 86400000);
   }
+  // 책 정보 수정(#410/#431) — user_books.publisher_override/total_pages_override를
+  // ub.book.publisher/total_pages에 병합. books(공유 카탈로그)는 그대로 유지.
+  function _applyBookOverrides(ub) {
+    if (!ub || !ub.book) return ub;
+    if (ub.publisher_override == null && ub.total_pages_override == null) return ub;
+    return {
+      ...ub,
+      book: {
+        ...ub.book,
+        publisher: ub.publisher_override != null ? ub.publisher_override : ub.book.publisher,
+        total_pages: ub.total_pages_override != null ? ub.total_pages_override : ub.book.total_pages,
+      },
+    };
+  }
 
   const A = {
     /* 인증 — supabase-client.js(RG_SB) 위임 */
@@ -116,32 +130,36 @@
     myBooks: {
       async list() {
         const id = await uid();
-        return unwrap(await sb().from('user_books').select('*, book:books(*)')
+        const rows = unwrap(await sb().from('user_books').select('*, book:books(*)')
           .eq('user_id', id).order('started_at', { ascending: false }));
+        return (rows || []).map(_applyBookOverrides);
       },
       async add({ book, current_page }) {
         const id = await uid();
         const bk = book && book.id ? book : await A.books.upsert(book);
-        return unwrap(await sb().from('user_books').insert({
+        const row = unwrap(await sb().from('user_books').insert({
           user_id: id, book_id: bk.id, status: 'reading', current_page: current_page || 0,
         }).select('*, book:books(*)').single());
+        return _applyBookOverrides(row);
       },
-      // 책 메타 수정 (출판사·페이지수, #410) — books 테이블 update(공유 카탈로그, 쪽수 보정 전체 반영).
+      // 책 메타 수정 (출판사·페이지수, #410/#431) — user_books override 컬럼에 저장.
+      // books(공유 카탈로그)는 수정하지 않음 — 다른 유저에게 전파되면 안 됨.
       async updateBook(userBookId, fields) {
         fields = fields || {};
-        const ub = unwrap(await sb().from('user_books').select('book_id').eq('id', userBookId).maybeSingle());
-        if (!ub || !ub.book_id) return null;
         const patch = {};
-        if (fields.publisher !== undefined) patch.publisher = fields.publisher;
-        if (fields.total_pages !== undefined) patch.total_pages = Number(fields.total_pages) || 0;
-        return unwrap(await sb().from('books').update(patch).eq('id', ub.book_id).select().maybeSingle());
+        if (fields.publisher !== undefined) patch.publisher_override = fields.publisher;
+        if (fields.total_pages !== undefined) patch.total_pages_override = Number(fields.total_pages) || 0;
+        const row = unwrap(await sb().from('user_books').update(patch).eq('id', userBookId)
+          .select('*, book:books(*)').maybeSingle());
+        return row ? _applyBookOverrides(row) : null;
       },
     },
     activeBook: {
       async get() {
         const u = await A.profile.get();
         if (!u || !u.active_user_book_id) return null;
-        return unwrap(await sb().from('user_books').select('*, book:books(*)').eq('id', u.active_user_book_id).maybeSingle());
+        const row = unwrap(await sb().from('user_books').select('*, book:books(*)').eq('id', u.active_user_book_id).maybeSingle());
+        return row ? _applyBookOverrides(row) : null;
       },
       async set(userBookId) { await A.profile.update({ active_user_book_id: userBookId }); return userBookId; },
     },
