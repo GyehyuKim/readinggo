@@ -689,14 +689,15 @@ function App() {
         {/* 하단 탭바 */}
         <nav className="tabbar">
           {[
-            { id: 'nest',    ico: '🏠', label: '홈'   },
-            { id: 'social',  ico: '🏆', label: '소셜'   },
-            { id: 'profile', ico: '👤', label: '프로필' },
+            { id: 'nest',     ico: '🏠', label: '홈'   },
+            { id: 'social',   ico: '📰', label: '피드' },   // '소셜' → '피드' (#488)
+            { id: 'profile',  ico: '📚', label: '책장' },   // '프로필' → '책장' (#487)
+            { id: 'settings', ico: '⚙️', label: '설정' },   // 설정 별도 탭 (#488)
           ].map(t => (
             <button
               key={t.id}
-              className={'tab' + (activeTab === t.id ? ' active' : '')}
-              onClick={() => switchTab(t.id)}
+              className={'tab' + ((t.id === 'settings' ? settingsOpen : activeTab === t.id) ? ' active' : '')}
+              onClick={() => { if (t.id === 'settings') setSettingsOpen(true); else switchTab(t.id); }}
             >
               <span className="ico">{t.ico}</span>
               <span>{t.label}</span>
