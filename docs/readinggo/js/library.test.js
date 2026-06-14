@@ -3,7 +3,7 @@
  * 사용법: 브라우저 콘솔에서 `runLibraryTests()` 호출
  *
  * 테스트 대상:
- *   T1 — Markdown Export 포맷 (§5.8.4)
+ *   T1 — Markdown Export 포맷·UTF-8 BOM (§5.8.4)
  *   T2 — 별점 유효숫자 toFixed(1) (§5.8.3 v7.2)
  *   T3 — 쪽수 미상 graceful — total=0/null 시 progressPct 안전 (§5.8.4 v7.2 #204)
  *   T4 — 상단 통계 뱃지 데이터 파생 (§5.8 v7.2)
@@ -26,7 +26,7 @@ function runLibraryTests() {
   console.group('📚 library.js — 프로필 탭 테스트');
 
   // ── T1: Markdown Export 포맷 ────────────────────────────────
-  console.group('T1: Markdown Export 포맷');
+  console.group('T1: Markdown Export 포맷·UTF-8 BOM');
   {
     const book = { title: '사피엔스', author: '유발 하라리' };
     const quotes = [
@@ -45,8 +45,11 @@ function runLibraryTests() {
       lines.push('');
     });
     const md = lines.join('\n');
+    const encoded = '\uFEFF' + md;
 
     assert('헤더가 "# 사피엔스 — 유발 하라리" 로 시작', md.startsWith('# 사피엔스 — 유발 하라리'));
+    assert('UTF-8 BOM(U+FEFF)으로 시작', encoded.charCodeAt(0) === 0xFEFF);
+    assert('BOM 뒤 한글 Markdown 본문이 유지', encoded.slice(1) === md);
     assert('날짜 형식이 YYYY-MM-DD (p.N) 포함', md.includes('## 2026-05-10 (p.42)'));
     assert('문장이 blockquote(>) 로 래핑', md.includes('> 인류는 이야기를'));
     assert('my_note가 있으면 빈 줄 후 포함', md.includes('자본주의의 핵심'));

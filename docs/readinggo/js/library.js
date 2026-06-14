@@ -181,7 +181,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       lines.push('');
     });
     const content = lines.join('\n');
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const blob = new Blob(['\uFEFF', content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
