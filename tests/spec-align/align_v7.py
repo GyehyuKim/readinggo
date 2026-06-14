@@ -139,6 +139,9 @@ INVARIANTS = [
         ["components.js"], r"TinderCards"),
     ("C", "present", "운영자 문의 (profile.md 설정, #문의)",
         ["datastore-supabase.js"], r"inquiries"),
+    # 온보딩 — 정의 없는 Sparrow 컴포넌트 참조 금지 (#527). 🐦 이모지로 통일, 재도입 시 렌더 크래시.
+    ("C", "absent", "미정의 Sparrow 컴포넌트 참조 (#527)",
+        ["onboarding.js"], r"<Sparrow"),
 ]
 
 
