@@ -1115,10 +1115,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     <section className="view active">
       {/* 활성 책 카드 — 좌우 리볼빙으로 활성 책 전환 (#185) */}
       <div className="card book-card-wrap" style={{ position: 'relative' }}>
-        {/* 책 정보 수정 (#410) — '내 서재' 버튼 제거(하단 탭바로 충분), ⚙️ 로 교체. */}
-        <button className="book-jump" onClick={() => setBookEditOpen(true)} title="책 정보 수정" aria-label="책 정보 수정" style={{ gap: 0 }}>
-          <span>⚙️</span>
-        </button>
         {readingBooks.length > 1 && (
           <>
             <button onClick={() => switchBook(-1)} aria-label="이전 책" style={{ position: 'absolute', left: 2, top: '50%', transform: 'translateY(-50%)', zIndex: 3, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.06)', color: 'var(--ink-2)', fontSize: 16, cursor: 'pointer' }}>‹</button>
@@ -1131,7 +1127,13 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
         <div className="book-card">
           <BookCover className="book-cover" title={nestState.book.title} author={nestState.book.author} cover={nestState.book.cover} fb={nestState.book.fb} />
           <div className="book-meta">
-            <p className="book-title">{nestState.book.title}</p>
+            <div className="book-title-row">
+              <p className="book-title">{nestState.book.title}</p>
+              {/* 책 정보 수정 (#410) — 제목과 같은 행에서 현재 책 편집 맥락을 명확히 표시. */}
+              <button className="book-jump" onClick={() => setBookEditOpen(true)} title="책 정보 수정" aria-label="책 정보 수정">
+                <span>⚙️</span>
+              </button>
+            </div>
             <p className="book-author">{[nestState.book.author, nestState.book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
             <div className="book-progress-row">
               <div className="book-progress">
