@@ -557,38 +557,6 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         </div>
       </div>
 
-      {/* 성(🏰) 컬렉션 선반 — 최상단 (§5.8.1, #205). 완독 파생. 둥지 상단 🏰×N 배지가 여기로 연결. */}
-      {castles.length > 0 && (
-        <div style={{padding:'0 12px', marginTop:16, marginBottom:20}}>
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, paddingLeft:4}}>
-            <div style={{fontSize:18, fontWeight:900}}>
-              🏰 성 컬렉션 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>(완독 {castles.length}권)</span>
-            </div>
-            <button onClick={() => setArchiveOpen(true)}
-              style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer'}}>책장 상세 →</button>
-          </div>
-          {/* 최근 10권만 미리보기 (#312). 전체는 책장 상세 모달. */}
-          <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:8, paddingLeft:4, scrollBehavior:'smooth'}}>
-            {castles.slice(0, 10).map(c => (
-              <div
-                key={c.bookId}
-                onClick={() => setSelectedBookId(c.bookId)}
-                style={{flex:'0 0 auto', width:96, cursor:'pointer'}}
-              >
-                <BookCover className="book-cover" title={c.title} author={c.author} cover={c.cover} fb={c.fb} radius={8}
-                  style={{width:96, height:134, marginBottom:6, boxShadow:'0 2px 6px rgba(0,0,0,0.12)'}} />
-                {typeof c.rating === 'number' && (
-                  <div style={{fontSize:11, fontWeight:800, color:'var(--ink)'}}>⭐ {c.rating.toFixed(1)}</div>
-                )}
-                {c.completedAt && (
-                  <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2}}>{String(c.completedAt).slice(0, 10)}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* 무작위 한 문장 회상 (§5.8.7) — 과거 내 문장 1개 */}
       {recall && (
         <div
@@ -631,8 +599,6 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         </div>
       )}
 
-      {/* 성 컬렉션은 프로필 최상단(헤더 직후)으로 이동 (#205) */}
-
       {/* 내 서재 섹션 */}
       <div style={{padding:'0 12px', marginBottom:20}}>
         <div style={{fontSize:18, fontWeight:900, marginBottom:12, paddingLeft:4}}>📚 내 서재</div>
@@ -667,6 +633,39 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             style={{ width:'100%', margin:'4px 0 12px', padding:'11px', borderRadius:12, border:'1px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13.5, cursor:'pointer' }}>
             ＋ 읽고 싶은 책 찾아 담기
           </button>
+        )}
+
+        {/* 성(🏰) 컬렉션 선반 — 읽은 책 탭 상단 (§5.8.1, #429). 완독 파생. */}
+        {activeSubtab === 'completed' && castles.length > 0 && (
+          <div style={{marginBottom:20}}>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, paddingLeft:4}}>
+              <div style={{fontSize:18, fontWeight:900}}>
+                🏰 성 컬렉션 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>(완독 {castles.length}권)</span>
+              </div>
+              <button onClick={() => setArchiveOpen(true)}
+                style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer'}}>책장 상세 →</button>
+            </div>
+            {/* 최근 10권만 미리보기 (#312). 전체는 책장 상세 모달. */}
+            <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:8, paddingLeft:4, scrollBehavior:'smooth'}}>
+              {castles.slice(0, 10).map(c => (
+                <div
+                  key={c.bookId}
+                  onClick={() => setSelectedBookId(c.bookId)}
+                  style={{flex:'0 0 auto', width:96, cursor:'pointer'}}
+                >
+                  <BookCover className="book-cover" title={c.title} author={c.author} cover={c.cover} fb={c.fb} radius={8}
+                    style={{width:96, height:134, marginBottom:6, boxShadow:'0 2px 6px rgba(0,0,0,0.12)'}} />
+                  {typeof c.rating === 'number' && (
+                    <div style={{fontSize:11, fontWeight:800, color:'var(--ink)'}}>⭐ {c.rating.toFixed(1)}</div>
+                  )}
+                  {c.completedAt && (
+                    <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2}}>{String(c.completedAt).slice(0, 10)}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{borderBottom:'1px solid var(--line)', marginTop:16}} />
+          </div>
         )}
 
         {/* 책 목록 */}
