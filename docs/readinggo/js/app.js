@@ -614,6 +614,10 @@ function App() {
               <span>reading<span className="go">GO</span></span>
             </div>
             <div className="topbar-stats">
+              {/* 상단바 XP 수치 표시 (#493) — Lv 왼쪽에 현재 보유 XP. appState.xp 라 변경 시 즉시 반영. */}
+              <span className="stat xp" title="현재 XP (systems.md §6.3)">
+                <span>Xp {(appState.xp || 0).toLocaleString()}</span>
+              </span>
               <span className="stat lv" title="레벨 (systems.md §6.3)">
                 <span>Lv.{calcLevel(appState.xp)}</span>
               </span>
