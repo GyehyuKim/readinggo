@@ -445,6 +445,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const [myBooks, setMyBooks] = _useState(null);   // null=로딩
   const [wishlistBooks, setWishlistBooks] = _useState([]);
   const [savedCount, setSavedCount] = _useState(0); // ❤️ 저장(북마크) 문장 수 — stats행 (#471/#472)
+  const [followCounts, setFollowCounts] = _useState({ following: 0, followers: 0 }); // 팔로잉/팔로워 수 (#516)
   // 좋아요한 문장은 내 한 문장 "전체 보기" 컬렉션 모달 내 필터로 이동 (#12)
   const [adminOpen, setAdminOpen] = _useState(false); // 운영 대시보드 (#161)
   const isAdmin = !!(window.RG_ME && window.RG_ME.isAdmin);
@@ -473,6 +474,8 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
     }).catch(() => { if (alive) setWishlistBooks([]); });
     // ❤️ 저장(북마크) 문장 수 — stats행 저장 카운트 (#471/#472)
     Promise.resolve((DataStore.bookmarks && DataStore.bookmarks.list) ? DataStore.bookmarks.list() : []).then(rows => { if (alive) setSavedCount((rows || []).length); }).catch(() => {});
+    // 팔로잉/팔로워 수 — Supabase friends.counts (게스트/localStorage는 메서드 부재 → 0 유지) (#516)
+    Promise.resolve((DataStore.friends && DataStore.friends.counts) ? DataStore.friends.counts() : { following: 0, followers: 0 }).then(c => { if (alive) setFollowCounts(c || { following: 0, followers: 0 }); }).catch(() => {});
     return () => { alive = false; };
   }, []);
 
@@ -559,14 +562,14 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         <div style={{fontSize:13, color:'var(--ink-3)', marginTop:4, minHeight:18}}>
           {(window.RG_ME && window.RG_ME.bio) || '한 줄 소개를 설정에서 적어보세요'}
         </div>
-        {/* 팔로잉/팔로워/저장 (#471/#472) — Phase 0: 저장만 실데이터, 팔로우는 Phase 1 Supabase 연동 */}
+        {/* 팔로잉/팔로워/저장 (#471/#472) — 팔로우 수는 Supabase friends.counts 실데이터 (#516) */}
         <div style={{display:'flex', gap:24, marginTop:14}}>
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>0</div>
+            <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{followCounts.following}</div>
             <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>팔로잉</div>
           </div>
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>0</div>
+            <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{followCounts.followers}</div>
             <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>팔로워</div>
           </div>
           <button onClick={() => window.RG_openCollection && window.RG_openCollection()}
