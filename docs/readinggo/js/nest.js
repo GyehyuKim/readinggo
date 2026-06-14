@@ -516,7 +516,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
   const [saved, setSaved] = _useState([]);
   const [closing, setClosing] = _useState(false);            // 종료 확인 단계
   const [finalPage, setFinalPage] = _useState(String(book.cur || 0));
-  const [companion, setCompanion] = _useState(null);         // 혼자만의 독서모임 질문 (#305) — 인라인('지금 대화') 또는 종료 화면(atEnd, #347)
+  const [companion, setCompanion] = _useState(null);         // 혼자만의 독서모임 질문 (#305) — 체크인(읽기 종료) 직후 화면에만 노출(#347/#438)
   const [endStage, setEndStage] = _useState(null);           // 읽기 종료 참새(#347): null | 'companion'
   const endCtxRef = _useRef({ exit: true, finalP: 0 });       // 종료 맥락 — exit(✕,체크인X) | finish(독서 종료,체크인)
   const ubRef = _useRef(null);
@@ -595,9 +595,8 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
       .catch(() => showToast('추출 실패 — 네트워크를 확인해요'))
       .finally(() => { setOcrBusy(false); });
   };
-  // 한 문장 저장. chat=true('지금 대화')면 저장 후 즉시 참새(인라인). 기본은 저장만 —
-  // 읽는 중엔 흐름 유지, 참새는 읽기 종료 시 한 번(#347, companion-reading-end.md).
-  const save = (chat) => {
+  // 한 문장 저장 — 토스트만(마찰 제로, 흐름 유지). 참새는 체크인(읽기 종료) 시 한 번만(#347/#438).
+  const save = () => {
     const t = text.trim();
     if (!t) { showToast(kind === 'thought' ? '내 생각을 적어주세요' : '한 문장을 적어주세요'); return; }
     const p = pageNum(page); // 비어있으면 null(페이지 없이 저장)
@@ -610,20 +609,14 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
       setKind('quote');
       kindTouchedRef.current = false;
       ocrUsedRef.current = false;
-      showToast(chat ? '🐦 참새와 대화해요' : (k === 'thought' ? '💭 내 생각 저장됨 💬' : (p != null ? ('📍 ' + p + 'p 저장됨 💬') : '저장됨 💬')));
+      showToast(k === 'thought' ? '💭 내 생각 저장됨 💬' : (p != null ? ('📍 ' + p + 'p 저장됨 💬') : '저장됨 💬'));
       // id+bookTitle 전달 (#358·사피엔스버그) — bookTitle 누락 시 둥지 카드가 getBook 폴백(RG_BOOKS[0]=사피엔스)으로 오표시.
       if (onArchive) onArchive({ id: sid, text: t, bookId: book.id, bookTitle: book.title || '', page: p, when: '방금', kind: k });
       rgTrack('highlight_selected', { book_id: book.id, page: p, sentence_length: t.length, kind: k });
-      // '지금 대화'(부수 옵션, #347)에서만 즉시 참새. 첫 사용 시 데이터 활용 동의 먼저(#294).
-      if (chat) {
-        const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
-        if (consent === null) setCompanion({ sentenceId: sid, text: t, kind: k, needsConsent: true, answer: '', exchanges: [], atEnd: false });
-        else startCompanion(sid, t, k, false);
-      }
     }).catch(() => showToast('저장 실패 — 다시 시도'));
   };
   // 동의 상태에 맞춰 질문 시작 — 'yes'면 solar-pro3, 그 외(거부)면 로컬 목 (외부 전송 없음). (#294/§4)
-  // atEnd(#347): true면 읽기 종료 화면(세션 1질문), false면 '지금 대화'(읽는 중 인라인).
+  // 체크인 완료 직후 읽기 종료 화면에서 세션 1질문(#347/#438) — atEnd 항상 true.
   const startCompanion = (sid, t, k, atEnd) => {
     const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
     setCompanion({ sentenceId: sid, text: t, kind: k || 'quote', question: null, loading: true, answer: '', exchanges: [], atEnd: !!atEnd });
@@ -710,21 +703,29 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
     const finalP = fp != null ? fp : (book.cur || 0);
     beginEnd(false, finalP);
   };
-  // 참새 대화 본문 — 인라인('지금 대화')·읽기 종료 화면 공용(#347). companion 상태에서 렌더.
+  // 참새 대화 본문 — 읽기 종료 화면(#347/#438). 말풍선 채팅 UI(#435): 질문=좌측(참새), 답=우측(나).
   const renderCompanionBody = () => (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#7BE0A8', marginBottom: 8 }}>
         <span>🐦</span><span>혼자만의 독서모임</span>
       </div>
       {(companion.exchanges || []).map((e, ei) => (
-        <div key={ei} style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.5 }}>{e.q}</div>
-          <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4, paddingLeft: 8, borderLeft: '2px solid rgba(255,255,255,0.18)', lineHeight: 1.5 }}>{e.a}</div>
+        <div key={ei}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 6 }}>
+            <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13.5, fontWeight: 700, lineHeight: 1.5 }}>{e.q}</div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            <div style={{ maxWidth: '85%', background: 'var(--brand)', color: '#fff', borderRadius: '14px 14px 4px 14px', padding: '8px 12px', fontSize: 13, lineHeight: 1.5 }}>{e.a}</div>
+          </div>
         </div>
       ))}
       {companion.needsConsent ? (
         <>
-          <div style={{ fontSize: 13, lineHeight: 1.55, marginBottom: 10, opacity: 0.9 }}>남긴 문장을 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해도 될까요? 끄면 로컬 질문만 드려요. (설정에서 언제든 변경)</div>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
+            <div style={{ maxWidth: '90%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '10px 12px', fontSize: 13, lineHeight: 1.55, opacity: 0.9 }}>
+              남긴 문장을 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해도 될까요? 끄면 로컬 질문만 드려요. (설정에서 언제든 변경)
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => decideConsent('no')} style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>아니요</button>
             <button onClick={() => decideConsent('yes')} style={{ flex: 1, padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>좋아요</button>
@@ -733,15 +734,19 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
       ) : companion.done ? (
         <div style={{ fontSize: 12, opacity: 0.6, fontStyle: 'italic', paddingTop: 2 }}>🐦 대화 저장됨 · 다음에 또 이어가요</div>
       ) : companion.loading ? (
-        <div style={{ fontSize: 13, opacity: 0.7, fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13, opacity: 0.7, fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+        </div>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
-            <div style={{ flex: 1, fontSize: 14, fontWeight: 700, lineHeight: 1.55 }}>{companion.question}</div>
-            <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
-              <button onClick={() => rateCompanion('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'up' ? 1 : 0.45 }}>👍</button>
-              <button onClick={() => rateCompanion('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'down' ? 1 : 0.45 }}>👎</button>
-              <button onClick={regenCompanion} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
+            <div style={{ maxWidth: '85%', display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px' }}>
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 700, lineHeight: 1.55 }}>{companion.question}</div>
+              <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
+                <button onClick={() => rateCompanion('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'up' ? 1 : 0.45 }}>👍</button>
+                <button onClick={() => rateCompanion('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: companion.rated === 'down' ? 1 : 0.45 }}>👎</button>
+                <button onClick={regenCompanion} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
+              </div>
             </div>
           </div>
           <textarea value={companion.answer} onChange={(e) => setCompanion((c) => ({ ...c, answer: e.target.value }))}
@@ -813,13 +818,12 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
             <div style={{ fontSize: 11, opacity: 0.5, marginTop: 5, textAlign: 'center', lineHeight: 1.4 }}>한 페이지·한 구절만, 배경 없이 찍고 → 원하는 영역을 골라요</div>
           </>
         )}
-        {/* 저장(기본) + 지금 대화(부수 옵션) — 읽는 중엔 저장만, 참새는 읽기 종료 시(#347). */}
+        {/* 저장만 — 읽는 중엔 흐름 유지, 참새는 체크인(읽기 종료) 직후에만(#347/#438). */}
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button onClick={() => save(false)} style={{ flex: 1, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>{kind === 'thought' ? '💭 내 생각 저장' : '✨ 한 문장 저장'}{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
-          <button onClick={() => save(true)} title="지금 이 문장으로 참새와 대화" style={{ flex: '0 0 auto', padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: 'rgba(244,242,236,0.9)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>💬 지금 대화</button>
+          <button onClick={save} style={{ flex: 1, padding: 14, borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>{kind === 'thought' ? '💭 내 생각 저장' : '✨ 한 문장 저장'}{text.length > 800 ? ' (' + text.length + '/1000)' : ''}</button>
         </div>
       </div>
-      {/* 이번 세션 아카이브 — 각 문장 하단에 혼자만의 독서모임 대화 (#327) */}
+      {/* 이번 세션 아카이브 — 저장한 문장 목록. 참새 대화는 읽기 종료 화면에서(#327/#438) */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 24px' }}>
         {saved.length > 0 && <div style={{ fontSize: 12, opacity: 0.6, fontWeight: 800, margin: '8px 0' }}>이번 독서에서 모은 {saved.length}문장</div>}
         {saved.map((s, i) => (
@@ -828,12 +832,6 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
             {s.kind === 'thought'
               ? <div style={{ fontSize: 14, lineHeight: 1.5 }}>💭 {s.text}</div>
               : <div style={{ fontSize: 14, lineHeight: 1.5, fontStyle: 'italic' }}>"{s.text}"</div>}
-            {/* '지금 대화'(부수 옵션)로 시작한 인라인 대화 — 읽기 종료 대화(atEnd)는 종료 화면에서 (#347) */}
-            {companion && !companion.atEnd && companion.sentenceId === s.id && (
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                {renderCompanionBody()}
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -1229,9 +1227,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백하므로, id가 실제 일치할 때만 그 제목을 씀(사피엔스버그).
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
+          // 참새 대화는 홈에 두지 않음(#438) — 대화는 체크인 직후 또는 프로필 > 내서재 > 책 상세에서.
           return (
-            <div key={i} className="my-q-card" style={{ cursor: 'pointer' }}
-              onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>
+            <div key={i} className="my-q-card">
               <div className="meta">
                 <span className="bk">{bkTitle}</span>
                 <span className="dot">·</span>
@@ -1399,24 +1397,35 @@ function CompanionModal({ sentence, onClose }) {
               </span>
             </div>
           )}
+          {/* 말풍선 채팅 UI (#435) — 좌=참새 질문, 우=내 답 */}
           {exchanges.map((e, ei) => (
-            <div key={ei} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.5 }}>{e.q}</div>
-              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4, paddingLeft: 8, borderLeft: '2px solid var(--line)', lineHeight: 1.5 }}>{e.a}</div>
+            <div key={ei}>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 6 }}>
+                <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13.5, fontWeight: 700, lineHeight: 1.5 }}>{e.q}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                <div style={{ maxWidth: '85%', background: 'var(--brand)', color: '#fff', borderRadius: '14px 14px 4px 14px', padding: '8px 12px', fontSize: 13, lineHeight: 1.5 }}>{e.a}</div>
+              </div>
             </div>
           ))}
           {done ? (
             <div style={{ fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>🐦 대화 저장됨</div>
           ) : loading ? (
-            <div style={{ fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
+              <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+            </div>
           ) : (
             <>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
-                <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>{question}</div>
-                <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
-                  <button onClick={() => rate('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'up' ? 1 : 0.45 }}>👍</button>
-                  <button onClick={() => rate('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'down' ? 1 : 0.45 }}>👎</button>
-                  <button onClick={regen} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
+                <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>{question}</div>
+                    <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
+                      <button onClick={() => rate('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'up' ? 1 : 0.45 }}>👍</button>
+                      <button onClick={() => rate('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'down' ? 1 : 0.45 }}>👎</button>
+                      <button onClick={regen} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="떠오르는 대로 답해보세요" rows={2}

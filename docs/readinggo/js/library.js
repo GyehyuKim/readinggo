@@ -576,28 +576,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         <ActivityHeatmap days={182} />
       </div>
 
-      {/* 내 한 문장 — 최대 10개 + 더 보기(컬렉션 모달, 좋아요 필터 포함) */}
-      {state.myQuotes && state.myQuotes.length > 0 && (
-        <div style={{padding:'0 12px', marginBottom:20}}>
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, paddingLeft:4}}>
-            <div style={{fontSize:18, fontWeight:900}}>🔖 내 한 문장 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>({state.myQuotes.length})</span></div>
-            {state.myQuotes.length > 10 && (
-              <button onClick={() => window.RG_openCollection && window.RG_openCollection()} style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer'}}>더 보기 →</button>
-            )}
-          </div>
-          {state.myQuotes.slice(0, 10).map((q) => (
-            <div key={q.id || q.text}
-              onClick={() => { if (q.id && window.RG_openCompanion) window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: q.bookTitle, author: q.author, page: q.page, note: q.note, kind: q.kind }); }}
-              style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:12, marginBottom:8, cursor: q.id ? 'pointer' : 'default'}}>
-              <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:4}}>{q.bookTitle ? q.bookTitle + ' · ' : ''}{q.page != null ? q.page + 'p' : '페이지 미상'}{q.kind === 'thought' ? ' · 💭 내 생각' : ''}</div>
-              {q.kind === 'thought'
-                ? <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.5}}>💭 {q.text}</div>
-                : <div style={{fontSize:13, color:'var(--ink)', fontStyle:'italic', lineHeight:1.5}}>"{q.text}"</div>}
-            </div>
-          ))}
-          <button onClick={() => window.RG_openCollection && window.RG_openCollection()} style={{display:'block', width:'100%', marginTop:4, padding:'10px', background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, color:'var(--ink-3)', fontWeight:800, fontSize:13, cursor:'pointer', textAlign:'center'}}>전체 보기 · 좋아요 필터 →</button>
-        </div>
-      )}
+      {/* 내 한 문장 섹션 제거(#439) — 프로필 → 내서재 → 읽고 있는 책 클릭 → 책 상세에서 그 책의 한 문장 + 참새 대화 확인 */}
 
       {/* 내 서재 섹션 */}
       <div style={{padding:'0 12px', marginBottom:20}}>
