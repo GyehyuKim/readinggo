@@ -668,7 +668,6 @@ function App() {
               onCheckin={handleCheckin}
               onSimSkip={handleSimSkip}
               onGoLibrary={() => switchTab('profile')}
-              onGoSocial={() => switchTab('social')}
               onOpenSearch={() => setIsSearchOpen(true)}
               onArchive={handleArchive}
             />

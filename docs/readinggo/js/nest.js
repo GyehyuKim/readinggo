@@ -914,7 +914,7 @@ function BookEditModal({ book, onClose, onSaved }) {
     </div>, document.body);
 }
 
-function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpenSearch, onArchive }) {
+function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onArchive }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [readingOpen, setReadingOpen] = _useState(false); // 읽기 모드 (#184)
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
@@ -922,7 +922,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
   const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
   const [ceremony, setCeremony] = _useState(null);
   const [showConfetti, setShowConfetti] = _useState(false);
-  const [sameBookFeed, setSameBookFeed] = _useState([]); // 같은 책 다른 사용자 한 문장 (#1)
   // 둥지 단계 = 활성 책 진척률(book.cur/book.total). 체력/days 추적 없음.
   const _pctOf = (bk) => bk && bk.total ? Math.round(bk.cur / bk.total * 100) : 0;
   const [nestState, setNestState] = _useState({
@@ -1006,27 +1005,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
-  // 같은 책 읽는 사람들 — 실 sentences(타 사용자, NPC 포함). 활성 책 변경 시 재로드. (#1)
-  _useEffect(() => {
-    let alive = true;
-    const bid = nestState.book.id;
-    const _isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bid || '');
-    Promise.resolve((_isUuid && DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(bid, { limit: 5 }) : [])
-      .then(rows => {
-        if (!alive) return;
-        setSameBookFeed((rows || []).map(s => {
-          const u = s.user || {};
-          const bk = (s.user_book && s.user_book.book) || {};
-          const days = s.created_at ? Math.floor((Date.now() - new Date(s.created_at).getTime()) / 86400000) : 0;
-          return { id: s.id, page: s.page, q: s.text, nick: u.handle ? ('@' + u.handle) : '@익명',
-            avatar: (u.display_name && u.display_name[0]) || '🐦', claps: 0,
-            time: days < 1 ? '오늘' : (days + '일 전'),
-            bookTitle: bk.title || '', bookId: bk.id || bid, isMine: false };
-        }));
-      }).catch(() => { if (alive) setSameBookFeed([]); });
-    return () => { alive = false; };
-  }, [nestState.book.id]);
-
   const handleCheckin = ({ page, sentence }) => {
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
@@ -1104,8 +1082,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
     })();
     showToast('🏰 성 컬렉션에 기록이 남았어요!');
   };
-
-  // sameBookFeed 는 위 effect 에서 실 byBook 으로 로드됨 (#1). 데모 NPC_QUOTES 미사용.
 
   // 오늘의 한 문장 (#436) — myQuotes 중 오늘 작성분만 최신순. 고양감: '오늘 내가 남긴 것'.
   const _todayStr = new Date().toDateString();
@@ -1265,24 +1241,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onGoSocial, onOpen
           );
         })
       ))}
-
-      {/* 같은 책 피드 — 세션 중엔 숨김 (#432). 소셜 통합 제거는 #434. */}
-      {!readingOpen && (<>
-      <div className="section-head">
-        <h3>📖 같은 책을 읽는 사람들</h3>
-        <button className="more" onClick={onGoSocial}>더보기 →</button>
-      </div>
-      {sameBookFeed.length === 0 ? (
-        <div className="empty">
-          <span className="ico">🐦</span>
-          이 책은 아직 첫 독자예요. 첫 한 문장의 주인공이 되어보세요.
-        </div>
-      ) : (
-        sameBookFeed.map((it, i) => (
-          <SentenceCard key={i} item={it} bookId={nestState.book.id} />
-        ))
-      )}
-      </>)}
 
       {/* 읽기 세션은 위 책 카드 아래 인라인으로 이동 (#432) */}
 
