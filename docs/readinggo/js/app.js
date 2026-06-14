@@ -7,17 +7,16 @@
 async function buildStateFromSupabase() {
   const DS = window.SupabaseDataStore;
   if (!DS) return null;
-  const [ub, st, xpv, mine, castles] = await Promise.all([
+  const [ub, st, xpv, mine] = await Promise.all([
     DS.activeBook.get().catch(() => null),
     DS.streak.get().catch(() => null),
     DS.xp.get().catch(() => 0),
     DS.sentences.listMine().catch(() => []),
-    DS.castles.list().catch(() => []),
   ]);
   const out = {
     streak: st ? (st.current || 0) : 0,
     xp: xpv || 0,
-    castleCount: (castles || []).length,
+    castleCount: 0, // 완독 권수(posthog books_count) — 아래 myBooks 파생으로 채움 (#513: castles.list 호출 제거)
   };
   if (ub && ub.book) {
     const total = ub.book.total_pages || 0; // 0 = 쪽수 미상 (#204) — 진척률 계산 시 가드
@@ -42,8 +41,10 @@ async function buildStateFromSupabase() {
   try {
     const myb = await DS.myBooks.list();
     const pages = {};
-    (myb || []).forEach(u => { if (u.book_id) pages[u.book_id] = u.current_page || 0; });
+    let completed = 0;
+    (myb || []).forEach(u => { if (u.book_id) pages[u.book_id] = u.current_page || 0; if (u.status === 'completed') completed++; });
     window.RG_MY_PAGES = pages;
+    out.castleCount = completed; // 완독 권수 — castles.list 대신 myBooks 파생 (#513)
   } catch (e) {}
   return out;
 }

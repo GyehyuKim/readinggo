@@ -440,8 +440,9 @@ function _mapWish(w) {
 
 function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const [selectedBookId, setSelectedBookId] = _useState(null);
-  const [archiveOpen, setArchiveOpen] = _useState(false); // 성 컬렉션 책장 상세 (#312)
   const [activeSubtab, setActiveSubtab] = _useState('reading'); // 'wishlist' | 'reading' | 'completed'
+  const [completedSort, setCompletedSort] = _useState('recent'); // 'recent' | 'rating' | 'title' — 읽은 책 정렬 (#513)
+  const [onlyHighRating, setOnlyHighRating] = _useState(false); // 4점 이상만 필터 (#513)
   const [myBooks, setMyBooks] = _useState(null);   // null=로딩
   const [wishlistBooks, setWishlistBooks] = _useState([]);
   const [savedCount, setSavedCount] = _useState(0); // ❤️ 저장(북마크) 문장 수 — stats행 (#471/#472)
@@ -516,12 +517,6 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const readingBooks = books.filter(b => b.status === 'reading')
     .sort((a, b) => (a.id === state.book.id ? -1 : b.id === state.book.id ? 1 : (b.cur || 0) - (a.cur || 0)));
   const completedBooks = books.filter(b => b.status === 'completed');
-  // 성(🏰) 컬렉션 = 완독 집합 파생 (§5.2.1/§5.8.1)
-  const castles = completedBooks.map(b => ({
-    bookId: b.id, title: b.title, author: b.author, cover: b.cover, fb: b.fb,
-    rating: b.rating, reviewText: b.comment, completedAt: b.completedAt,
-  }))
-    .sort((a, b) => String(b.completedAt || '').localeCompare(String(a.completedAt || ''))); // 최근 완독순
 
   const allItems = books.concat(wishlistBooks);
   const selectedBook = selectedBookId ? (allItems.find(x => x.id === selectedBookId) || null) : null;
@@ -535,7 +530,19 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const currentTab = tabsData.find(t => t.id === activeSubtab);
   const currentBooks = currentTab?.books || [];
 
-  // 탭에 속한 책들의 ID 목록 추출 및 문장 필터링
+  // 읽은 책 탭: 정렬/필터 적용 (#513). 무평점은 0점 취급(최하). 다른 탭은 원본 순서 유지.
+  const displayBooks = activeSubtab === 'completed'
+    ? completedBooks
+        .filter(b => !onlyHighRating || (b.rating || 0) >= 4)
+        .slice()
+        .sort((a, b) => {
+          if (completedSort === 'rating') return (b.rating || 0) - (a.rating || 0);
+          if (completedSort === 'title') return (a.title || '').localeCompare(b.title || '');
+          return String(b.completedAt || '').localeCompare(String(a.completedAt || '')); // 최근순
+        })
+    : currentBooks;
+
+  // 탭에 속한 책들의 ID 목록 추출 및 문장 필터링(필터 무관 — 탭 전체 문장)
   const currentBookIds = currentBooks.map(b => b.id);
   const tabQuotes = (state.myQuotes || [])
     .filter(q => currentBookIds.includes(q.bookId))
@@ -630,45 +637,24 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           </button>
         )}
 
-        {/* 성(🏰) 컬렉션 선반 — 읽은 책 탭 상단 (§5.8.1, #429). 완독 파생. */}
-        {activeSubtab === 'completed' && castles.length > 0 && (
-          <div style={{marginBottom:20}}>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, paddingLeft:4}}>
-              <div style={{fontSize:18, fontWeight:900}}>
-                🏰 성 컬렉션 <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>(완독 {castles.length}권)</span>
-              </div>
-              <button onClick={() => setArchiveOpen(true)}
-                style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer'}}>책장 상세 →</button>
-            </div>
-            {/* 최근 10권만 미리보기 (#312). 전체는 책장 상세 모달. */}
-            <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:8, paddingLeft:4, scrollBehavior:'smooth'}}>
-              {castles.slice(0, 10).map(c => (
-                <div
-                  key={c.bookId}
-                  onClick={() => setSelectedBookId(c.bookId)}
-                  style={{flex:'0 0 auto', width:96, cursor:'pointer'}}
-                >
-                  <BookCover className="book-cover" title={c.title} author={c.author} cover={c.cover} fb={c.fb} radius={8}
-                    style={{width:96, height:134, marginBottom:6, boxShadow:'0 2px 6px rgba(0,0,0,0.12)'}} />
-                  {typeof c.rating === 'number' && (
-                    <div style={{fontSize:11, fontWeight:800, color:'var(--ink)'}}>⭐ {c.rating.toFixed(1)}</div>
-                  )}
-                  {c.completedAt && (
-                    <div style={{fontSize:10, color:'var(--ink-3)', fontWeight:700, marginTop:2}}>{String(c.completedAt).slice(0, 10)}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div style={{borderBottom:'1px solid var(--line)', marginTop:16}} />
+        {/* 읽은 책 탭 정렬/필터 컨트롤 (#513) — 성 컬렉션 선반 대체. 완독 책이 있을 때만 노출. */}
+        {activeSubtab === 'completed' && completedBooks.length > 0 && (
+          <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:16, paddingLeft:4}}>
+            {[['recent', '최근순'], ['rating', '별점순'], ['title', '제목순']].map(([id, label]) => (
+              <button key={id} onClick={() => setCompletedSort(id)}
+                style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: completedSort === id ? 'var(--brand)' : 'var(--card)', color: completedSort === id ? '#fff' : 'var(--ink-2)', boxShadow: completedSort === id ? 'none' : 'inset 0 0 0 1px var(--line)'}}>{label}</button>
+            ))}
+            <button onClick={() => setOnlyHighRating(v => !v)}
+              style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: onlyHighRating ? 'var(--gold)' : 'var(--card)', color: onlyHighRating ? '#fff' : 'var(--ink-2)', boxShadow: onlyHighRating ? 'none' : 'inset 0 0 0 1px var(--line)'}}>⭐ 4점 이상</button>
           </div>
         )}
 
         {/* 책 목록 */}
         {myBooks === null ? (
           <div style={{textAlign:'center', padding:'40px 20px', color:'var(--ink-3)', fontSize:13, fontWeight:700}}>불러오는 중…</div>
-        ) : currentBooks.length > 0 ? (
+        ) : displayBooks.length > 0 ? (
           <div className="shelf-grid">
-            {currentBooks.map(b => {
+            {displayBooks.map(b => {
               const isCompleted = b.status === 'completed';
               const progText = isCompleted
                 ? (typeof b.rating === 'number' ? `⭐ ${b.rating.toFixed(1)}` : '완독')
@@ -697,7 +683,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             <div style={{fontSize:13, fontWeight:700}}>
               {activeSubtab === 'wishlist' && '찜한 책이 없어요'}
               {activeSubtab === 'reading' && '읽는 책이 없어요'}
-              {activeSubtab === 'completed' && '완독한 책이 없어요'}
+              {activeSubtab === 'completed' && (onlyHighRating ? '4점 이상 완독한 책이 없어요' : '완독한 책이 없어요')}
             </div>
           </div>
         )}
@@ -766,74 +752,11 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         <AdminDashboardModal onClose={() => setAdminOpen(false)} />,
         document.body
       )}
-      {archiveOpen && ReactDOM.createPortal(
-        <ArchiveShelfModal
-          castles={castles}
-          onClose={() => setArchiveOpen(false)}
-          onSelect={(id) => { setArchiveOpen(false); setSelectedBookId(id); }}
-        />,
-        document.body
-      )}
       {followModal && ReactDOM.createPortal(
         <FollowListModal mode={followModal} onClose={() => setFollowModal(null)} />,
         document.body
       )}
     </section>
-  );
-}
-
-/* ── ArchiveShelfModal: 성 컬렉션 책장 상세 (#312) — 5열 그리드 + 검색/정렬/필터 ── */
-function ArchiveShelfModal({ castles, onClose, onSelect }) {
-  const [q, setQ] = _useState('');
-  const [sort, setSort] = _useState('recent'); // recent | rating | title
-  const [minRating, setMinRating] = _useState(0);
-  const t = (q || '').trim().toLowerCase();
-  let list = (castles || []).filter(c => {
-    if (t && !((c.title || '').toLowerCase().includes(t) || (c.author || '').toLowerCase().includes(t))) return false;
-    if (minRating > 0 && !(typeof c.rating === 'number' && c.rating >= minRating)) return false;
-    return true;
-  });
-  list = list.slice().sort((a, b) => {
-    if (sort === 'rating') return (b.rating || 0) - (a.rating || 0);
-    if (sort === 'title') return (a.title || '').localeCompare(b.title || '');
-    return String(b.completedAt || '').localeCompare(String(a.completedAt || ''));
-  });
-  const sorts = [['recent', '최근순'], ['rating', '별점순'], ['title', '제목순']];
-  return (
-    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
-      <div style={{ background: 'var(--paper)', width: '100%', maxWidth: 430, height: '92vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 10px' }}>
-          <div style={{ fontSize: 17, fontWeight: 900 }}>🏰 성 컬렉션 <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 800 }}>(완독 {(castles || []).length}권)</span></div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-3)', cursor: 'pointer', padding: 4 }}>×</button>
-        </div>
-        <div style={{ padding: '0 18px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="제목·저자 검색"
-            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, fontFamily: 'inherit', outline: 'none' }} />
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {sorts.map(([id, label]) => (
-              <button key={id} onClick={() => setSort(id)} style={{ padding: '6px 12px', borderRadius: 999, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: sort === id ? 'var(--brand)' : 'var(--card)', color: sort === id ? '#fff' : 'var(--ink-2)', boxShadow: sort === id ? 'none' : 'inset 0 0 0 1px var(--line)' }}>{label}</button>
-            ))}
-            <button onClick={() => setMinRating(minRating >= 4 ? 0 : 4)} style={{ padding: '6px 12px', borderRadius: 999, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: minRating >= 4 ? 'var(--gold)' : 'var(--card)', color: minRating >= 4 ? '#fff' : 'var(--ink-2)', boxShadow: minRating >= 4 ? 'none' : 'inset 0 0 0 1px var(--line)' }}>⭐ 4+</button>
-          </div>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px 24px' }}>
-          {list.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontWeight: 700, padding: '40px 0', fontSize: 13 }}>조건에 맞는 책이 없어요</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-              {list.map(c => (
-                <div key={c.bookId} onClick={() => onSelect(c.bookId)} style={{ cursor: 'pointer' }}>
-                  <BookCover title={c.title} author={c.author} cover={c.cover} fb={c.fb} radius={6}
-                    style={{ width: '100%', aspectRatio: '2 / 3', boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }} />
-                  {typeof c.rating === 'number' && <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink)', marginTop: 3, textAlign: 'center' }}>⭐{c.rating.toFixed(1)}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -894,5 +817,4 @@ function FollowListModal({ mode, onClose }) {
 
 window.LibraryView = LibraryView;
 window.BookDetailModal = BookDetailModal;
-window.ArchiveShelfModal = ArchiveShelfModal;
 window.FollowListModal = FollowListModal;
