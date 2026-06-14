@@ -27,6 +27,9 @@ jobs:
       - name: DataStore 계약 (UI 호출 ↔ supabase 어댑터)
         run: node tests/contract/datastore-contract.mjs
 
+      - name: 관련 도서 ISBN 환각 필터 (#496)
+        run: node tests/related-filter.test.mjs
+
       - name: Worker syntax
         run: node --check worker/index.mjs
 
