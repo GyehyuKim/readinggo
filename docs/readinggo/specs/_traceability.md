@@ -46,11 +46,12 @@
 | 한 문장 삭제 (책상세·둥지 상세) | ✅ | #358 sentences.remove(양 어댑터)·책상세 🗑 · CompanionModal 🗑(rg:sentence-removed 이벤트) |
 | 한 문장 책 제목 오표시(getBook 폴백) 수정 | ✅ | PR #374 — onArchive bookTitle 전달 + 둥지 카드 폴백 가드 |
 
-## village.md (마을) — owner 윤지
+## village.md (마을) — owner 윤지 — ⚠️ 폐기 (#440, 2026-06)
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
-| §5.5.4 3탭·프로필연결·짹·게시판 실작성자/권한 | ✅ | QA6 (#219~225) town.js |
-| 마을 Supabase 연동 | ✅ | villages.* (게시판은 Phase0 in-memory `_topics`) |
+| 마을 탭 자체 | ⚠️폐기 | #440 — village.js/town.js 제거, 소셜로 일원화. 이하 항목은 이력 |
+| §5.5.4 3탭·프로필연결·짹·게시판 실작성자/권한 | ⚠️폐기 | QA6 (#219~225) town.js (제거됨) |
+| 마을 Supabase 연동 | ⚠️폐기 | villages.* (게시판은 Phase0 in-memory `_topics`, 코드 제거됨) |
 
 ## systems.md (스트릭·XP·휴식) — owner 승원
 | 조항 | 상태 | 근거/갭 |
