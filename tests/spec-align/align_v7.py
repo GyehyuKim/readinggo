@@ -125,6 +125,9 @@ INVARIANTS = [
 
     # ── C: post-beta 기능 (스펙↔구현 동기화 강제, decisions §8.4/§8.5) ──
     # 읽기 모드(ReadingMode/타이머) invariant 폐기 (#505) — 홈 빠른입력으로 일원화, 독서시간 측정 폐기
+    # 책정보 수정(BookEditModal) → 서재 갱신 신호 (#512). 신호 누락 시 LibraryView stale → 미반영 회귀.
+    ("C", "present", "책정보 수정 후 서재 갱신 신호 (#512)",
+        ["nest.js"], r"rg:wish-changed"),
     ("C", "present", "활성 책 캐러셀 전환 (nest.md §5.3, #185)",
         ["nest.js"], r"switchBook"),
     ("C", "present", "운영 대시보드 (profile.md §5.8.9, #161)",

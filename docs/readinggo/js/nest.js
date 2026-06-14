@@ -506,8 +506,15 @@ function BookEditModal({ book, onClose, onSaved }) {
   const save = () => {
     const tp = Math.max(0, parseInt(total, 10) || 0);
     const finish = (ubId) => {
+      // 저장 완료 후 서재 목록 갱신 신호(#512) — 데이터층(override 병합)은 정상이나,
+      // 다른 책장 변경(app.js)과 달리 이 모달만 'rg:wish-changed'를 안 쏴서 LibraryView 가
+      // stale 상태로 남아 출판사·총 페이지 수정이 내 서재에 미반영되던 버그. 신호로 reload 트리거.
       if (ubId && DataStore.myBooks && DataStore.myBooks.updateBook) {
-        Promise.resolve(DataStore.myBooks.updateBook(ubId, { publisher: pub.trim(), total_pages: tp })).catch(() => {});
+        Promise.resolve(DataStore.myBooks.updateBook(ubId, { publisher: pub.trim(), total_pages: tp }))
+          .then(() => { window.dispatchEvent(new CustomEvent('rg:wish-changed')); })
+          .catch(() => {});
+      } else {
+        window.dispatchEvent(new CustomEvent('rg:wish-changed'));
       }
       onSaved && onSaved({ pub: pub.trim(), total: tp });
       showToast('✏️ 책 정보 수정됨');
