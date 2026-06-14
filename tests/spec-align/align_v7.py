@@ -122,6 +122,12 @@ INVARIANTS = [
         ["datastore-supabase.js"], r"user_book:user_books\(book_id"),
     ("B", "present", "어댑터 대칭 — localStorage sentences.setNote/random",
         ["datastore.js"], r"setNote[\s\S]*random\(\)|random\(\)[\s\S]*setNote"),
+    ("B", "present", "관련 도서 추천 — recommendRelated + books.related (#496)",
+        ["data.js", "datastore.js"], r"recommendRelated"),
+    ("B", "present", "관련 도서 ISBN 환각 필터 — filterRelatedCandidates (#496)",
+        ["data.js"], r"filterRelatedCandidates"),
+    ("B", "present", "책 상세 관련 도서 캐러셀 (#496)",
+        ["library.js"], r"함께 읽으면 좋은 책"),
 
     # ── C: post-beta 기능 (스펙↔구현 동기화 강제, decisions §8.4/§8.5) ──
     # 읽기 모드(ReadingMode/타이머) invariant 폐기 (#505) — 홈 빠른입력으로 일원화, 독서시간 측정 폐기

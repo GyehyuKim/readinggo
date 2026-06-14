@@ -348,6 +348,73 @@ const ALL_BOOKS = RG_BOOKS.map(b => ({
   cover_url: b.cover,
 }));
 
+// ── 관련 도서 추천 (#496) ─────────────────────────────
+// worker /api/related(LLM)가 {isbn, title, author} 후보를 주면, LLM이 준 ISBN을 신뢰하지 않고
+// 실존 books DB의 ISBN과 정확 일치(+ 정규화 제목 일치)일 때만 실제 책 객체를 돌려준다(ISBN 환각 필터).
+// 결과는 책 단위 메모리 캐시. Phase 0은 LLM 추천 기반. Supabase '함께 읽은 사람들' 집계는 Phase 1 (#496 결정).
+const _relatedCache = {};
+// ISBN-13 정규화 — 숫자만 남겨 정확히 13자리일 때만 반환, 아니면 '' (누락·형식 오류는 빈 문자열).
+function normalizeIsbn13(s) {
+  const d = String(s == null ? '' : s).replace(/[^0-9]/g, '');
+  return d.length === 13 ? d : '';
+}
+function _normTitle(t) {
+  return String(t || '').toLowerCase().replace(/[\s·,.:;!?'"“”‘’()\[\]<>「」『』、~\-_]/g, '').trim();
+}
+// 정규화 제목 완전 일치(부분/prefix 아님). ISBN이 정확히 일치한 DB 책의 제목이 후보 제목과 같은지 확인.
+function _titleEq(a, b) {
+  const x = _normTitle(a), y = _normTitle(b);
+  return !!x && x === y;
+}
+// ISBN 환각 필터 (순수 함수 — 테스트 가능). LLM 후보 {isbn,title,author} 중 다음만 통과:
+//  · ISBN-13 형식이 유효하고  · 현재 책 ISBN이 아니며  · 중복 ISBN이 아니고
+//  · DB에 그 ISBN이 실재하며  · DB 책의 정규화 제목이 후보 제목과 일치.
+// 반환은 매칭된 실제 DB 책 객체 배열. 제목 prefix/부분 매칭은 환각 필터로 쓰지 않는다.
+function filterRelatedCandidates(candidates, dbBooks, selfIsbn, limit = 6) {
+  const self = normalizeIsbn13(selfIsbn);
+  const byIsbn = new Map();
+  for (const b of (dbBooks || [])) {
+    const bi = normalizeIsbn13(b && b.isbn);
+    if (bi && !byIsbn.has(bi)) byIsbn.set(bi, b);
+  }
+  const out = [];
+  const used = new Set();
+  for (const c of (candidates || [])) {
+    if (!c || typeof c !== 'object') continue;
+    const ci = normalizeIsbn13(c.isbn);
+    if (!ci) continue;                            // ISBN 누락/형식 오류
+    if (self && ci === self) continue;            // 현재 책과 동일 ISBN
+    if (used.has(ci)) continue;                   // 중복 ISBN
+    const db = byIsbn.get(ci);
+    if (!db) continue;                            // DB 미존재(지어낸 ISBN)
+    if (!_titleEq(db.title, c.title)) continue;   // ISBN-제목 불일치
+    used.add(ci);
+    out.push(db);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+async function recommendRelated(book, limit = 6) {
+  if (!book || !book.title) return [];
+  const ck = book.id || book.isbn || book.title;
+  if (_relatedCache[ck]) return _relatedCache[ck];
+  let suggestions = [];
+  try {
+    const res = await fetch('/api/related', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: book.title, author: book.author || '', isbn: book.isbn || '' }),
+    });
+    if (res.ok) { const d = await res.json(); suggestions = (d && d.books) || []; }
+  } catch (e) { suggestions = []; }
+  if (!suggestions.length) { _relatedCache[ck] = []; return []; }
+  // ISBN 환각 필터 — 실존 books DB의 ISBN과 정확 일치(+제목 일치) 시만 통과.
+  const all = await loadBooks();
+  const out = filterRelatedCandidates(suggestions, all, book.isbn, limit);
+  _relatedCache[ck] = out;
+  return out;
+}
+
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
 window.INITIAL_PROGRESS=INITIAL_PROGRESS;
 window.NEST_STAGES=NEST_STAGES; window.getNestStage=getNestStage;
@@ -360,4 +427,5 @@ window.INITIAL_BOOKSHELF=INITIAL_BOOKSHELF; window.WISHLIST=WISHLIST;
 window.ALL_BOOKS=ALL_BOOKS;
 window.NEST_TWIGS=NEST_TWIGS; window.NEST_GEO=NEST_GEO;
 window.twigsForProgress=twigsForProgress; window.nestInfo=nestInfo; window.drawNest=drawNest;
-window.loadBooks=loadBooks; window.fuzzySearch=fuzzySearch;
+window.loadBooks=loadBooks; window.fuzzySearch=fuzzySearch; window.recommendRelated=recommendRelated;
+window.normalizeIsbn13=normalizeIsbn13; window.filterRelatedCandidates=filterRelatedCandidates;

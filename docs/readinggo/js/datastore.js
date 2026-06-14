@@ -534,6 +534,12 @@ const DataStore = {
         return Object.values(by).sort((a, b) => b.starters - a.starters).slice(0, lim);
       });
     },
+    // 관련 도서 추천 (#496) — "이 책과 함께 읽으면 좋은 책".
+    // Phase 0: worker /api/related(LLM) + 실존 books 매칭(환각 필터). 저장소 무관 로직이라
+    // data.js recommendRelated 에 위임. Phase 1에 Supabase '함께 읽은 사람들' 집계로 강화 예정.
+    related(book, limit) {
+      return window.recommendRelated ? window.recommendRelated(book, limit) : Promise.resolve([]);
+    },
   },
   castles: {
     list() {

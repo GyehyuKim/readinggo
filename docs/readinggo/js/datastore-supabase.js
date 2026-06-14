@@ -124,6 +124,12 @@
         const rows = unwrap(await sb().rpc('social_newcomers_weekly', { lim }));
         return (rows || []).map((x) => ({ bookId: x.book_id, title: x.title, author: x.author, cover_url: x.cover_url, starters: Number(x.starters) || 0 }));
       },
+      // 관련 도서 추천 (#496) — localStorage 어댑터와 표면 일치(§7.2).
+      // Phase 0: LLM 추천(worker /api/related) + 실존 매칭. data.js recommendRelated 위임.
+      // TODO(Phase 1): user_books 공동독서 집계 RPC(예: books_also_read)로 '함께 읽은 사람들' 강화.
+      related(book, limit) {
+        return window.recommendRelated ? window.recommendRelated(book, limit) : Promise.resolve([]);
+      },
     },
 
     /* 내 책 / 활성 책 */
