@@ -40,7 +40,7 @@ Other agents (Cursor, Continue, Aider) should enter via [`AGENTS.md`](./AGENTS.m
 - **빌드**: 현행 React 18 CDN + Babel 유지. Vite 전환은 **PWA 전환 시 재검토** (현재 보류).
 - **백엔드**: Phase 0 `localStorage` / Phase 1+ **Supabase** (Google OAuth). **DataStore 계약**으로 추상화 — 피처 코드는 저장소를 직접 호출하지 않음 (`docs/readinggo/specs/backend.md` §7.2).
 - **AI**: 도서 추천은 **Gemini Flash 무료 티어 + 서버리스 프록시** (Phase 1+). 클라이언트에 API 키 노출 금지.
-- **데이터**: 책 데이터셋 TSV 포맷 유지 (#90 결정).
+- **데이터 (canonical 갱신, #490 결정 2026-06-15)**: 책 데이터의 canonical source는 **Phase 1 Supabase `books`**. `getBook(id)` 동기 API는 부팅 시 Supabase 전체 책을 메모리 캐시에 적재해 보존하고, 게스트 검색도 publishable key + RLS read 로 같은 카탈로그를 쓴다. `books.tsv`·인라인 `RG_BOOKS`는 **더 이상 주 데이터 소스가 아니다** — 시드 및 네트워크/부팅 실패용 최소 폴백으로만 남긴다(근거·범위는 PR에 명시). 단 **Phase 0 현재 구현은 여전히 `localStorage` + 정적 TSV** 이며, 위 전환(차집합 시드·코드·데이터 적용)은 #490 후속 코드 PR에서 한다. (이전 "TSV 포맷 유지 #90"을 본 결정으로 갱신.)
 - 변경 제안 시 해당 피처의 `docs/readinggo/specs/<feature>.md` spec PR 먼저, 코드 PR 나중 ([LF: Spec only PR](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)).
 
 새 프레임워크/라이브러리/언어 도입 제안이 들어오면 위 룰을 먼저 안내하고 사용자에게 확인.
