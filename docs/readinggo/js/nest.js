@@ -1116,13 +1116,17 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
             </div>
           </>
         )}
-        <div className="book-card">
+        {/* 책 정보 탭 → 책 상세 모달(BookInfoModal) 진입 (#495). ⚙️ 수정 버튼은 stopPropagation으로 격리. */}
+        <div className="book-card" role="button" tabIndex={0} aria-label="책 상세 정보 보기"
+          style={{ cursor: (nestState.book.id && window.RG_openBook) ? 'pointer' : 'default' }}
+          onClick={() => { if (nestState.book.id && window.RG_openBook) window.RG_openBook(nestState.book.id); }}
+          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && nestState.book.id && window.RG_openBook) { e.preventDefault(); window.RG_openBook(nestState.book.id); } }}>
           <BookCover className="book-cover" title={nestState.book.title} author={nestState.book.author} cover={nestState.book.cover} fb={nestState.book.fb} />
           <div className="book-meta">
             <div className="book-title-row">
               <p className="book-title">{nestState.book.title}</p>
               {/* 책 정보 수정 (#410) — 제목과 같은 행에서 현재 책 편집 맥락을 명확히 표시. */}
-              <button className="book-jump" onClick={() => setBookEditOpen(true)} title="책 정보 수정" aria-label="책 정보 수정">
+              <button className="book-jump" onClick={(e) => { e.stopPropagation(); setBookEditOpen(true); }} title="책 정보 수정" aria-label="책 정보 수정">
                 <span>⚙️</span>
               </button>
             </div>
