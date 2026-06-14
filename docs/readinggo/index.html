@@ -712,6 +712,26 @@ input,textarea{font-family:inherit;}
   100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
 }
 
+/* 빠른 입력 (#462) — 홈 상시 페이지·한 문장 입력 폼 */
+.quick-log{ display:flex; flex-direction:column; gap:12px; margin-bottom:14px; }
+.quick-sec{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+.quick-sec-head{ display:flex; align-items:center; justify-content:space-between; font-weight:900; font-size:14px; color:var(--ink); margin-bottom:10px; }
+.quick-sec-head small{ font-weight:700; color:var(--ink-3); font-size:12px; }
+.quick-timer{ background:var(--brand-tint); border:1.5px solid var(--brand-soft); color:var(--brand-3); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:800; cursor:pointer; }
+.quick-stepper{ display:flex; align-items:center; justify-content:center; gap:10px; }
+.quick-stepper button{ width:38px; height:38px; border-radius:10px; border:none; background:var(--brand-tint); color:var(--brand-3); font-size:20px; font-weight:800; cursor:pointer; }
+.quick-stepper input{ width:72px; text-align:center; background:var(--paper); border:1.5px solid var(--line); border-radius:10px; padding:8px 0; font-size:17px; font-weight:900; color:var(--ink); }
+.quick-total{ font-size:12px; color:var(--ink-3); font-weight:700; }
+.quick-toggle{ display:flex; gap:6px; margin-bottom:8px; }
+.quick-toggle button{ padding:6px 12px; border-radius:14px; border:1px solid var(--line); background:transparent; color:var(--ink-3); font-size:12px; font-weight:800; cursor:pointer; }
+.quick-toggle button.on{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.quick-sec textarea{ width:100%; box-sizing:border-box; background:var(--paper); border:1.5px solid var(--line); border-radius:10px; padding:10px; font-size:15px; line-height:1.6; color:var(--ink); resize:none; }
+.quick-submit{ margin-top:2px; }
+
+/* 오늘의 한 문장 카드 AI 진입 (#469) */
+.my-q-card .q-ai{ margin-top:8px; display:inline-flex; align-items:center; gap:4px; background:var(--brand-tint); border:1px solid var(--brand-soft); color:var(--brand-3); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:800; cursor:pointer; }
+.my-q-card .q-ai:active{ transform:translateY(1px); }
+
 .nudge{
   margin-top: 10px; text-align:center;
   font-size: 13px; color: var(--ink-2); font-weight: 700;

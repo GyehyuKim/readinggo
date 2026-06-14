@@ -330,6 +330,25 @@ function NestTheatre({ xp, health = 100 }) {
     >
       {/* LV·🔥 배지 제거 (#428·#425) — 레벨/스트릭은 상단바·프로필 헤더로 일원화 */}
 
+      {/* #471: XP 진척 정보·bar를 캐릭터 이미지 위로 */}
+      <div className="nest-meta">
+        <div className="nest-name-row">
+          <div className="nest-name">
+            <span>Lv.{lv}</span>
+            {next && (
+              <span className="next-arrow">→ Lv.{lv + 1}</span>
+            )}
+          </div>
+          <div className="nest-health-num"><b>{(xp || 0).toLocaleString()}</b> / {nextXp.toLocaleString()} XP</div>
+        </div>
+        <div className="nest-health-bar">
+          <div className="nest-health-fill" />
+        </div>
+        <div className="nest-microcopy">
+          {cur.short} {cur.name}{next ? ` · ${stageMicrocopy(pct, stage)}` : ''}
+        </div>
+      </div>
+
       <div className="nest-svg-wrap nest-img-stack">
         {[1, 2, 3, 4, 5].map(lv => (
           <img
@@ -348,24 +367,6 @@ function NestTheatre({ xp, health = 100 }) {
           <span className="fall-twig">🍂</span>
           <span className="fall-twig">🌿</span>
           <span className="fall-twig">🍂</span>
-        </div>
-      </div>
-
-      <div className="nest-meta">
-        <div className="nest-name-row">
-          <div className="nest-name">
-            <span>{cur.short} {cur.name}</span>
-            {next && (
-              <span className="next-arrow">→ {next.short} {next.name}</span>
-            )}
-          </div>
-          <div className="nest-health-num"><b>{(xp || 0).toLocaleString()}</b> / {nextXp.toLocaleString()} XP</div>
-        </div>
-        <div className="nest-health-bar">
-          <div className="nest-health-fill" />
-        </div>
-        <div className="nest-microcopy">
-          {stageMicrocopy(pct, stage)}
         </div>
       </div>
     </div>
@@ -918,6 +919,11 @@ function BookEditModal({ book, onClose, onSaved }) {
 function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onArchive }) {
   const [modalOpen, setModalOpen] = _useState(false);
   const [readingOpen, setReadingOpen] = _useState(false); // 읽기 모드 (#184)
+  // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
+  const [quickPage, setQuickPage] = _useState('');
+  const [quickText, setQuickText] = _useState('');
+  const [quickKind, setQuickKind] = _useState('quote'); // 'quote'=책 속 인용 | 'thought'=내 생각 (#360)
+  const quickKindTouchedRef = _useRef(false);
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
   const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
@@ -1006,7 +1012,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
-  const handleCheckin = ({ page, sentence, duration_sec }) => {
+  const handleCheckin = ({ page, sentence, kind, duration_sec }) => {
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
     const ns = { ...nestState };
@@ -1034,12 +1040,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     const nestUp = newLv > prevLv;
 
     if (sentence) {
-      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금' }, ...ns.myQuotes];
+      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금', kind: kind || 'quote' }, ...ns.myQuotes];
     }
 
     prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
     setNestState(ns);
-    onCheckin(ns, newLv, xpGain, sentence, duration_sec);
+    onCheckin(ns, newLv, xpGain, sentence, duration_sec, kind);
 
     // 단계 상승 시 진화 마이크로카피 toast (§5.2)
     if (nestUp) {
@@ -1050,6 +1056,19 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
+  };
+
+  // 빠른 기록 (#462) — 홈 상시 입력 폼에서 페이지/한 문장을 한 번에 체크인.
+  // handleCheckin 단일 경로 재사용 → 스트릭·XP·세리머니·문장 영속(app onCheckin)·companion(#438) 보존.
+  const submitQuick = () => {
+    const t = quickText.trim();
+    const total = nestState.book.total || 0;
+    const cur = nestState.book.cur || 0;
+    const raw = quickPage === '' ? cur : (parseInt(quickPage, 10) || 0);
+    const p = Math.max(cur, total ? Math.min(total, raw) : raw); // 진도는 현재 이상으로만
+    if (!t && p <= cur) { showToast('쪽수를 넘기거나 한 문장을 남겨보세요'); return; }
+    handleCheckin({ page: p, sentence: t || null, kind: quickKind });
+    setQuickText(''); setQuickPage(''); quickKindTouchedRef.current = false; setQuickKind('quote');
   };
 
   // 데모: 하루 거르기 — 둥지·XP·성은 존속, 스트릭만 위기 (§5.4)
@@ -1154,7 +1173,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
         </div>
       )}
 
-      {/* 읽기 세션 (#432·#436) — '읽기 시작' = 타이머 ON, 같은 홈에서 인라인 펼침(별도 진입 화면 없음) */}
+      {/* 빠른 입력 (#462) — '읽기 시작' 버튼 없이 페이지·한 문장 상시 입력. 타이머 몰입은 [⏱ 집중 읽기] 선택. */}
       {readingOpen ? (
         <ReadingMode
           inline
@@ -1164,11 +1183,33 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           onCheckin={handleCheckin}
         />
       ) : (
-        <button className="checkin-cta" onClick={() => { rgTrack('book_opened', { book_id: nestState.book.id, entry_point: 'reading_mode' }); setReadingOpen(true); }}
-          style={{ background: 'var(--brand)', marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, lineHeight: 1.3 }}>
-          <span style={{ fontSize: 16, fontWeight: 900 }}>📖 읽기 시작</span>
-          <span style={{ fontSize: 12, opacity: 0.72, fontWeight: 700 }}>타이머 + 한 문장 모으기</span>
-        </button>
+        <div className="quick-log">
+          {/* 페이지 진도 */}
+          <div className="quick-sec">
+            <div className="quick-sec-head">
+              <span>📖 오늘의 독서</span>
+              <button className="quick-timer" onClick={() => { rgTrack('book_opened', { book_id: nestState.book.id, entry_point: 'reading_mode' }); setReadingOpen(true); }}>⏱ 집중 읽기</button>
+            </div>
+            <div className="quick-stepper">
+              <button onClick={() => setQuickPage((s) => String(Math.max(0, (parseInt(s, 10) || nestState.book.cur || 0) - 1)))} aria-label="이전 쪽">−</button>
+              <input type="number" inputMode="numeric" value={quickPage} placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickPage(e.target.value)} />
+              <button onClick={() => setQuickPage((s) => String((parseInt(s, 10) || nestState.book.cur || 0) + 1))} aria-label="다음 쪽">+</button>
+              {nestState.book.total > 0 && <span className="quick-total">/ {nestState.book.total}p</span>}
+            </div>
+          </div>
+          {/* 한 문장 */}
+          <div className="quick-sec">
+            <div className="quick-sec-head"><span>✏️ 한 문장 남기기 <small>(선택)</small></span></div>
+            <div className="quick-toggle">
+              {[['quote', '📖 책 속 문장'], ['thought', '💭 내 생각']].map(([k, label]) => (
+                <button key={k} className={quickKind === k ? 'on' : ''} onClick={() => { quickKindTouchedRef.current = true; setQuickKind(k); }}>{label}</button>
+              ))}
+            </div>
+            <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); if (!quickKindTouchedRef.current) setQuickKind(estimateSentenceKind(e.target.value)); }}
+              placeholder={quickKind === 'thought' ? '지금 드는 생각을 가볍게 적어요…' : '떠오른 한 문장을 옮겨 적어요…'} rows={2} />
+          </div>
+          <button className="checkin-cta quick-submit" onClick={submitQuick}>✨ 오늘 기록하기</button>
+        </div>
       )}
 
       {/* 체크인 = 읽기 모드 종료로 자동 처리 (#1) — 세션 중엔 숨김 (#432) */}
@@ -1229,7 +1270,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백하므로, id가 실제 일치할 때만 그 제목을 씀(사피엔스버그).
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
-          // 참새 대화는 홈에 두지 않음(#438) — 대화는 체크인 직후 또는 프로필 > 내서재 > 책 상세에서.
+          // 홈 문장 카드에서 AI 대화 진입 허용 (#469) — 체크인 직후·책 상세 경로(#438)에 더해 발견성 보강.
           return (
             <div key={i} className="my-q-card">
               <div className="meta">
@@ -1240,6 +1281,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
                 {q.when ? <span>{q.when}</span> : null}
               </div>
               <div className="quote" style={q.kind === 'thought' ? { fontStyle: 'normal' } : null}>{q.kind === 'thought' ? `💭 ${q.text}` : `"${q.text}"`}</div>
+              {q.id && (
+                <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>🤖 AI와 이야기</button>
+              )}
             </div>
           );
         })
