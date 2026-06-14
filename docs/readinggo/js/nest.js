@@ -802,7 +802,7 @@ function ReadingMode({ book: bookProp, onClose, onArchive, onCheckin, inline = f
               onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setOcrFile(f); e.target.value = ''; }} />
             <button onClick={() => { if (!ocrBusy && _ocrInputRef.current) _ocrInputRef.current.click(); }} disabled={ocrBusy}
               style={{ width: '100%', marginTop: 8, padding: 11, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: 'rgba(244,242,236,0.85)', fontWeight: 800, fontSize: 13.5, cursor: ocrBusy ? 'default' : 'pointer', opacity: ocrBusy ? 0.6 : 1 }}>
-              {ocrBusy ? '읽는 중…' : '📷 책 사진에서 글귀 가져오기'}
+              {ocrBusy ? '읽는 중…' : '📷 촬영해서 입력'}
             </button>
             {/* 촬영 가이드 (#395 벤치마크 결론) */}
             <div style={{ fontSize: 11, opacity: 0.5, marginTop: 5, textAlign: 'center', lineHeight: 1.4 }}>한 페이지·한 구절만, 배경 없이 찍고 → 원하는 영역을 골라요</div>
@@ -911,6 +911,10 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
   const [quickText, setQuickText] = _useState('');
+  // 빠른입력 OCR (#498) — 책 사진 → quickText 프리필
+  const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
+  const [quickOcrFile, setQuickOcrFile] = _useState(null);
+  const _quickOcrInputRef = _useRef(null);
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
   const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
@@ -1047,6 +1051,31 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
   // 빠른 기록 (#462) — 홈 상시 입력 폼에서 페이지/한 문장을 한 번에 체크인.
   // handleCheckin 단일 경로 재사용 → 스트릭·XP·세리머니·문장 영속(app onCheckin)·companion(#438) 보존.
+  // 빠른입력 OCR (#498) — Upstage OCR + solar-pro3 → quickText 프리필(원하는 부분만 남기고 저장).
+  const runOcrQuick = (file) => {
+    if (!file || quickOcrBusy) return;
+    if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
+    setQuickOcrBusy(true);
+    showToast('📷 사진에서 글자를 읽는 중…');
+    const fd = new FormData();
+    fd.append('document', file, file.name || 'page.jpg');
+    fetch('/api/ocr', { method: 'POST', body: fd })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.text) {
+          setQuickText((cur) => (cur && cur.trim() ? cur.trim() + '\n' + d.text : d.text).slice(0, 1000));
+          showToast('✨ 추출했어요 — 원하는 부분만 남기고 저장하세요');
+          rgTrack('ocr_extracted', { book_id: nestState.book.id, chars: d.text.length });
+        } else if (d && d.empty) {
+          showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
+        } else {
+          showToast('추출 실패 — 잠시 후 다시 시도해요');
+        }
+      })
+      .catch(() => showToast('추출 실패 — 네트워크를 확인해요'))
+      .finally(() => setQuickOcrBusy(false));
+  };
+
   const submitQuick = () => {
     const t = quickText.trim();
     const total = nestState.book.total || 0;
@@ -1174,8 +1203,18 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
             <div className="quick-sec-head"><span>✏️ 한 문장 남기기 <small>(선택)</small></span></div>
             <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); }}
               placeholder="떠오른 한 문장을 옮겨 적어요…" rows={2} />
+            {/* 책 사진 OCR (#498) — 사진 선택 → 크롭 영역만 OCR → quickText 프리필 */}
+            <input ref={_quickOcrInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setQuickOcrFile(f); e.target.value = ''; }} />
+            <button className="quick-ocr" onClick={() => { if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }} disabled={quickOcrBusy}>
+              {quickOcrBusy ? '읽는 중…' : '📷 촬영해서 입력'}
+            </button>
           </div>
           <button className="checkin-cta quick-submit" onClick={submitQuick}>✨ 오늘 기록하기</button>
+          {/* 크롭 오버레이 — 사진에서 원하는 영역만 잘라 OCR (#396·#498) */}
+          {quickOcrFile && (
+            <OcrCropOverlay file={quickOcrFile} onCancel={() => setQuickOcrFile(null)} onCrop={(blob) => { setQuickOcrFile(null); runOcrQuick(blob); }} />
+          )}
         </div>
       )}
 
