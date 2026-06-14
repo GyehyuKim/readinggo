@@ -698,7 +698,7 @@ function App() {
         {/* 하단 탭바 */}
         <nav className="tabbar">
           {[
-            { id: 'nest',    ico: '🏠', label: '둥지'   },
+            { id: 'nest',    ico: '🏠', label: '홈'   },
             { id: 'social',  ico: '🏆', label: '소셜'   },
             { id: 'profile', ico: '👤', label: '프로필' },
           ].map(t => (
