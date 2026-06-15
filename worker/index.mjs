@@ -345,6 +345,16 @@ async function aladinProxy(q, env, ctx) {
   try {
     // normalize()가 풀 메타(description 등) 매핑 (#489).
     let items = (await aladinFetch(apiUrl)).map(normalize);
+    // #529: ISBN 단건 등록 경로 — 알라딘 빈필드를 Google→OpenLibrary→LLM 으로 비파괴 보강(외서 대응).
+    if (isbn) {
+      if (items.length) {
+        items[0] = await enrichForeignMeta(items[0], env);
+      } else {
+        // 알라딘 미보유 외서 — Google→OpenLibrary 로 신규 생성
+        const made = await enrichForeignMeta({ isbn13: isbn, title: '', author: '', publisher: '', total_pages: null, cover_url: '', description: '', source: '' }, env);
+        if (made.title) items = [made];
+      }
+    }
     // 검색 도서 자동 저장 (#489) — 알라딘 결과를 백그라운드 비파괴 upsert.
     // normalize가 빈 필드 키를 생략하므로 검색(쪽수 등 누락)이 기존 풍부한 행을 덮지 않음.
     if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -365,6 +375,11 @@ async function aladinProxy(q, env, ctx) {
           if (k && !seen.has(k)) { seen.add(k); items.push(g); }
         }
       } catch (e) { /* 폴백 실패 무시 */ }
+      // #529: 검색 보강 Google 결과도 저장(이전엔 응답만 — source='google' 행 upsert)
+      if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
+        const gItems = items.filter((b) => b.isbn13 && b.source === 'google');
+        if (gItems.length) ctx.waitUntil(Promise.all(gItems.map((b) => upsertBook(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, b).catch(() => {}))));
+      }
     }
     return json({ items }, 200, 86400);
   } catch (e) {
@@ -399,6 +414,78 @@ async function googleBooksSearch(query, max, env) {
       source: 'google',
     };
   }).filter((b) => b.title);
+}
+
+// OpenLibrary ISBN 조회 (#529) — 무키. 외서 빈필드·표지 폴백.
+async function openLibraryByIsbn(isbn) {
+  if (!/^\d{10,13}$/.test(isbn)) return null;
+  try {
+    const r = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&jscmd=data&format=json`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const v = d[`ISBN:${isbn}`];
+    if (!v) return null;
+    const cover = (v.cover && (v.cover.large || v.cover.medium || v.cover.small)) || '';
+    const desc = typeof v.description === 'string' ? v.description : (v.description && v.description.value) || '';
+    return {
+      title: v.title || '',
+      author: (v.authors && v.authors.map((a) => a.name).filter(Boolean).join(', ')) || '',
+      publisher: (v.publishers && v.publishers.map((p) => p.name).filter(Boolean).join(', ')) || '',
+      total_pages: v.number_of_pages ? Number(v.number_of_pages) : null,
+      cover_url: cover.replace(/^http:/, 'https:'),
+      description: String(desc || '').trim(),
+      source: 'openlibrary',
+    };
+  } catch (e) { return null; }
+}
+
+// 빈 필드만 비파괴 merge (#529) — 기존(알라딘) 값 보존, 빈 칸만 외서 메타로 채움.
+function mergeBookMeta(base, extra) {
+  if (!extra) return base;
+  const out = { ...base };
+  let filledCore = false;
+  for (const k of ['title', 'author', 'publisher', 'total_pages', 'cover_url', 'description']) {
+    const cur = out[k];
+    const empty = cur == null || cur === '';
+    if (empty && extra[k] != null && extra[k] !== '') { out[k] = extra[k]; if (k === 'title') filledCore = true; }
+  }
+  // 알라딘이 못 잡은 외서(제목까지 외부가 채움)면 출처 승계 — 폴백 추적(#489 source)
+  if (filledCore && (!base.source || base.source === 'aladin')) out.source = extra.source || out.source;
+  return out;
+}
+
+// 빈 description LLM 보강 (#529) — 제목·저자 기반 사실 소개. 키 있을 때만 best-effort.
+async function llmDescribe(book, env) {
+  const messages = [
+    { role: 'system', content: '책 제목과 저자를 보고 그 책의 소개를 한국어 3~4문장으로 사실에 근거해 작성하세요. 확실히 모르는 책이면 빈 문자열만 출력하세요. 줄거리 스포일러·과장·허구·추측 금지. 마크다운 없이 일반 문장.' },
+    { role: 'user', content: `제목: ${book.title}${book.author ? ` / 저자: ${book.author}` : ''}${book.isbn13 ? ` / ISBN ${book.isbn13}` : ''}` },
+  ];
+  const raw = await callLLM({ messages, env, maxTokens: 400 });
+  const d = stripMd(raw).trim();
+  // 약한 환각 가드 — 너무 짧거나 "모름" 류 거부 응답이면 버림
+  if (!d || d.length < 20 || /^(모르|알 수 없|정보가 없|해당 책)/.test(d)) return '';
+  return d.slice(0, 800);
+}
+
+// 외서·빈필드 보강 체인 (#529) — 알라딘 → Google → OpenLibrary 빈필드 비파괴 merge,
+// 끝내 빈 description 은 LLM best-effort. 단건(ISBN) 등록 경로에서만 호출(검색 결과 일괄엔 미적용 — 비용).
+async function enrichForeignMeta(book, env) {
+  let b = { ...book };
+  const isbn = b.isbn13 || '';
+  const needs = () => !b.title || !b.author || !b.publisher || !b.total_pages || !b.cover_url || !b.description;
+  if (isbn && needs()) {
+    try { const gb = await googleBooksSearch(`isbn:${isbn}`, 1, env); if (gb && gb[0]) b = mergeBookMeta(b, gb[0]); } catch (e) { /* skip */ }
+  }
+  if (isbn && needs()) {
+    try { const ol = await openLibraryByIsbn(isbn); if (ol) b = mergeBookMeta(b, ol); } catch (e) { /* skip */ }
+  }
+  // 표지 최종 폴백 — OpenLibrary covers URL (#529)
+  if (isbn && !b.cover_url) b.cover_url = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+  // 끝내 빈 description → LLM 보강(키 있을 때만, source='llm' 추적)
+  if (!b.description && b.title && env && env.UPSTAGE_API_KEY && env.LLM_BASE_URL && env.LLM_MODEL) {
+    try { const d = await llmDescribe(b, env); if (d) { b.description = d; if (!b.source || b.source === 'aladin') b.source = 'llm'; } } catch (e) { /* skip */ }
+  }
+  return b;
 }
 
 /* ── 인기도서 아카이브 (archive-books.mjs 포팅) ─────────── */
@@ -478,7 +565,7 @@ function normalize(it) {
   set('price_sales', num(it.priceSales));
   set('customer_review_rank', num(it.customerReviewRank));
   set('sales_point', num(it.salesPoint));
-  set('aladin_link', s(it.link));
+  set('aladin_link', s(it.link != null ? String(it.link).replace(/&amp;/g, '&') : it.link)); // #529: HTML 엔티티 디코드(링크 깨짐 방지)
   if (typeof it.adult === 'boolean') n.adult = it.adult;
   return n;
 }
