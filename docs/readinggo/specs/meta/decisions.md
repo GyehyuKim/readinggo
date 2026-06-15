@@ -134,7 +134,7 @@
 | 항목 | 결정 | 담당 | 비고 |
 |---|---|---|---|
 | **#3·4·5 타인 프로필 페이지** | 모달→**전체 페이지**. 책장 6권+더보기(읽은/읽는중 필터) + 책 탭 시 그 사람 평점·후기·한 문장 드릴다운. `users.publicShelf`·`bookContrib` 추가. '보고싶은'은 wish RLS 비공개라 본인만 | profile/backend | profile.md §5.8.2 반영 |
-| **#186 틴더 한 문장 카드** | 소셜 피드 '카드로 넘겨보기' → 스와이프 우=좋아요(짹+책갈피)/좌=넘김/아래=유예. Pointer Events 직접(Stack Lock) | social | social.md 반영 |
+| **#186 틴더 한 문장 카드** | ~~소셜 피드 '카드로 넘겨보기' → 스와이프 우=좋아요(짹+책갈피)/좌=넘김/아래=유예. Pointer Events 직접(Stack Lock)~~ → **2026-06-15 보류(§8.10/#540)** | social | social.md 반영 · 보류(§8.10) |
 | **운영자 문의** | 설정 폼 → `inquiries` 테이블(09_inquiries.sql, RLS: 본인 insert/select+admin) → admin 대시보드 목록. LLM 자동처리는 Phase 2(Gemini) | profile/backend | DB 방식 채택 |
 | **한 문장 1000자** | 인용 200→**1000자**(감상과 동일). 클라(config)+DB(07_sentence_1000.sql) | nest/backend | ⚠️ **nest.md §5.4 '200자' → 1000자 갱신 필요(승원)** |
 | **한 문장=페이지 명시** | 입력 시 그 문장이 속한 페이지를 기록(진행률과 별개 개념). 읽기모드/체크인에 명시 | nest | ⚠️ **nest.md 반영 필요(승원)** |
@@ -157,7 +157,7 @@
 | **#148 책 검색 재설계** | **우리 DB(books) 즉시 검색**(`books.search` ilike) + 데모 + **알라딘 병합·중복제거**(isbn13 기준, DB→데모→알라딘 우선). **외국 작가 표기 변이(도스토옙스키/Dostoevsky)는 알라딘에 위임**(재발명 X). 알라딘 책 선택 시 `books` upsert(lazy-cache). Netlify `ALADIN_TTB_KEY` 설정 | backend/social | 키 없어 미동작이던 것 정상화 |
 | **#170 마을 추천/검색 필터** | 추천·검색 둘 다 `myVillageIds` 제외(렌더 단계 이중 방어) | village(윤지) | 버그 수정 |
 | **공개 범위 토글 라벨** | 아이콘(🌐/👥/🔒) → **텍스트 칩 "전체공개/친구공개/비공개"**(아이콘만은 헷갈림) | social/profile | UX |
-| **틴더 카드 책표지** | 카드 중앙 상단에 표지·제목·저자(카드 본문 불변). 피드 임베드 author 추가 | social | #186 후속 |
+| **틴더 카드 책표지** | ~~카드 중앙 상단에 표지·제목·저자(카드 본문 불변)~~ → **2026-06-15 보류(§8.10/#540)**. 피드 임베드 author 추가는 유지 | social | #186 후속 · 보류(§8.10) |
 | **앱 버전 체계** | `RG_VERSION`(config.js) = 베타 **0.XXX**. **publish 1회마다 +0.001 수동**(≈머지 PR 수). 설정 표시 + 문의에 `app_version` 첨부(10_inquiry_version.sql) → "어느 버전 문제/해결" 추적 | backend/profile | 시작 0.192 |
 | **문의 답변 메일** | 문의 작성 시 **auth 이메일 캡처**(닉 변경 무관) → admin 대시보드 mailto 답장 + 상태 토글(open/answered/closed) | backend/profile | #189 |
 | **세션 관리** | 멀티 디바이스 유지 + 설정 "다른 기기 로그아웃"(`signOut scope:others`). 기기별 목록은 Phase 2(#191) | profile/backend | #189 |
@@ -237,6 +237,19 @@
 | 성 획득 | `castleCount = floor(totalXp / 1600)`. 완독 권수와 분리하고 `users.xp`에서 파생 | [nest.md §5.2.1](../nest.md) |
 | 주기 완료 | 성 획득 후 `cycleXp = totalXp % 1600`으로 다음 주기 Lv1부터 재시작. 전체 XP·상단바 레벨은 리셋하지 않음 | [systems.md §6.3](../systems.md) |
 | 완독 | 책 상태·별점·소감·XP +200은 유지하되 성을 직접 지급하지 않음 | [nest.md §5.4](../nest.md) |
+
+---
+
+### 8.10 결정 (2026-06-15, #540 카드 리뷰 보류 + 좋아요/저장 분리. 충돌 시 §8.9 위에 **우선**)
+
+> §8.4 `#186 틴더 한 문장 카드`·§8.5 `틴더 카드 책표지` 결정을 **대체**한다(보류).
+
+| 항목 | 결정 | SSOT |
+|---|---|---|
+| 카드 리뷰(#186) | **현재 제품 범위 제외(보류).** 스와이프 우=좋아요(짹+책갈피 동시)가 짹·책갈피 의미를 섞음. 피드 `🃏 카드로 넘겨보기` CTA·`TinderCards` 호출 연결은 후속 코드 PR에서 해제, **컴포넌트 코드·데이터는 삭제하지 않고 보존** | [social.md §5.7](../social.md) |
+| 좋아요 = 짹 | 타인 문장에 대한 **공개 반응**(개수 공개, XP +1 적용). 저장과 별개 동작 | [social.md §5.7](../social.md) |
+| 저장 = 책갈피 | 내·타인 문장의 **비공개 개인 보관**(공개 개수·XP 없음, `sentence_bookmarks`). 짹과 별개 동작 | [social.md §5.7](../social.md) · [profile.md §5.8.5](../profile.md) |
+| 절차 | spec-only PR(이 결정) 먼저 → 별도 코드 PR로 CTA·호출 연결만 해제 | — |
 
 ---
 
