@@ -534,11 +534,13 @@ input,textarea{font-family:inherit;}
 }
 .nest-name .next-arrow{
   font-size: 12px; color: var(--ink-3); font-weight: 700; margin-left: 6px;
+  white-space: nowrap;  /* #621: '참새의 성'이 '성'만 다음 줄로 떨어지는 고아 방지 */
 }
 .nest-health-num{
   font-family: 'Moneygraphy Pixel', monospace;
   font-size: 13px; letter-spacing: 1.5px;
   color: var(--ink-2); font-weight: 400;
+  white-space: nowrap;  /* #621: '1,600 XP'가 'XP'만 떨어지는 고아 방지 */
 }
 .nest-health-num b{ color: var(--brand-3); font-weight: 400; }
 .nest-theatre.h-shaky   .nest-health-num b{ color: #E08A1A; }
