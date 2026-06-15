@@ -4,6 +4,25 @@
    ========================================================= */
 const { useState: _useState, useEffect: _useEffect } = React;
 
+// HTML 엔티티 디코드 (#562) — 외부 API description 의 `&lt; &gt; &amp; &#39;` 등이 raw 노출되던 버그.
+// 표시·markdown export 시점에 안전하게 텍스트로 디코드(스크립트 실행 없음, dangerouslySetInnerHTML 미사용).
+// 브라우저: textarea.value 트릭(모든 엔티티). 비DOM(테스트): 핵심 엔티티 정규식 폴백.
+function decodeEntities(s) {
+  const str = String(s == null ? '' : s);
+  if (!str || str.indexOf('&') < 0) return str;
+  if (typeof document !== 'undefined' && document.createElement) {
+    try { const t = document.createElement('textarea'); t.innerHTML = str; return t.value; } catch (e) { /* fall through */ }
+  }
+  const named = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: ' ' };
+  return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (m, ent) => {
+    if (ent[0] === '#') {
+      const code = (ent[1] === 'x' || ent[1] === 'X') ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+    }
+    return named[ent.toLowerCase()] || m;
+  });
+}
+
 /* ── BookDetailModal ─────────────────────────────────────── */
 function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 실 book item: { id, title, author, pub, cover, fb, total, isbn, cur, status, rating, comment }
@@ -191,7 +210,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (meta.length) lines.push(meta.join(' · '));
     if (book.cover) { lines.push(''); lines.push(`![표지](${book.cover})`); }
     // 책 소개 (#316) — 알라딘 description. 없으면 섹션 생략.
-    const desc = await fetchBookDesc();
+    const desc = decodeEntities(await fetchBookDesc());
     if (desc) { lines.push('', '---', '', '## 📚 책 소개', '', desc); }
     // 완독 정보
     if (book.status === 'completed') {
@@ -370,7 +389,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               {descLoading && !bookDesc ? (
                 <div style={{fontSize:13, color:'var(--ink-3)', fontWeight:700}}>책 소개를 불러오는 중…</div>
               ) : (
-                <div style={{fontSize:13, color:'var(--ink-2)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{bookDesc}</div>
+                <div style={{fontSize:13, color:'var(--ink-2)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{decodeEntities(bookDesc)}</div>
               )}
             </div>
           )}
