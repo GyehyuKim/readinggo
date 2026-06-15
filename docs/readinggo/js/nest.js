@@ -793,14 +793,44 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     showToast('🏰 성 컬렉션에 기록이 남았어요!');
   };
 
-  // 오늘의 한 문장 (#436·#480) — 현재 선택한 책 + 오늘 작성분만 최신순. 고양감: '이 책에 오늘 내가 남긴 것'.
+  // 이 책 한 문장 (#499) — 현재 책의 전체 기간 최신순(오늘만 아님). 오늘 작성분은 '오늘' 라벨.
   const _todayStr = new Date().toDateString();
-  const todayQuotes = (nestState.myQuotes || []).filter((q) => {
-    if (q.bookId !== nestState.book.id) return false;   // 현재 선택한 책만 (#480)
-    if (q.when === '방금') return true;            // 이번 세션 방금 저장분
+  const _isTodayQuote = (q) => {
+    if (q.when === '방금') return true;
     if (!q.createdAt) return false;
     try { return new Date(q.createdAt).toDateString() === _todayStr; } catch (e) { return false; }
-  });
+  };
+  const bookQuotes = (nestState.myQuotes || [])
+    .filter((q) => q.bookId === nestState.book.id)   // 현재 선택한 책만
+    .slice()
+    .sort((a, b) => {
+      const rank = (q) => (q.when === '방금' ? 'ZZZZ-99' : String(q.createdAt || q.when || ''));
+      return rank(b).localeCompare(rank(a));  // 최신순
+    });
+  // 좋아요(❤️ = 책갈피) 상태 — bookmarks.list 로 favIds 로드 (#499)
+  const [favIds, setFavIds] = _useState(() => new Set());
+  _useEffect(() => {
+    let alive = true;
+    Promise.resolve((DataStore.bookmarks && DataStore.bookmarks.list) ? DataStore.bookmarks.list() : [])
+      .then((rows) => { if (alive) setFavIds(new Set((rows || []).map((b) => b.sentence_id))); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [nestState.book.id, (nestState.myQuotes || []).length]);
+  const toggleFav = (id) => {
+    if (!id || !(DataStore.bookmarks && DataStore.bookmarks.toggle)) return;
+    Promise.resolve(DataStore.bookmarks.toggle(id)).then((on) => {
+      setFavIds((prev) => { const n = new Set(prev); if (on) n.add(id); else n.delete(id); return n; });
+    }).catch(() => showToast('잠시 후 다시'));
+  };
+  const delHomeQuote = (id, bookId) => {
+    if (!id || !(DataStore.sentences && DataStore.sentences.remove)) return;
+    if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return;
+    Promise.resolve(DataStore.sentences.remove(id)).then(() => {
+      window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); // onRm → myQuotes 갱신
+      if (window.rgTrack) window.rgTrack('sentence_deleted', { book_id: bookId || '' });
+      showToast('🗑 한 문장을 삭제했어요');
+    }).catch(() => showToast('삭제 실패 — 잠시 후 다시'));
+  };
 
   // 활성 책 없음(신규/미등록): 데모책 대신 '책 등록' 온보딩 — 유령 책 체크인(영속 실패) 방지.
   if (!nestState.book || !nestState.book.id) {
@@ -930,35 +960,45 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
         </div>
       )}
 
-      {/* 오늘의 한 문장 (#436) — 현재 책·오늘 작성분 최신순 → 고양감. */}
+      {/* 이 책, 한 문장 (#499) — 현재 책 전체 기간 최신순 + 날짜·좋아요·삭제. */}
       <div className="section-head">
-        <h3>🔖 이 책, 오늘의 한 문장 <span className="my-q-count">{todayQuotes.length}</span></h3>
+        <h3>🔖 이 책, 한 문장 <span className="my-q-count">{bookQuotes.length}</span></h3>
         {nestState.myQuotes.length > 0 && (
           <button className="more" onClick={() => window.RG_openCollection && window.RG_openCollection()}>
             전체 문장 보기 →
           </button>
         )}
       </div>
-      {todayQuotes.length === 0 ? (
+      {bookQuotes.length === 0 ? (
         <div className="my-q-empty">
           <span className="ico">🐦</span>
-          오늘 만난 한 줄을 짹 해보세요.<br />
-          오늘 남긴 문장이 여기 쌓여요.
+          이 책에서 만난 한 줄을 짹 해보세요.<br />
+          남긴 문장이 여기 쌓여요.
         </div>
       ) : (
-        todayQuotes.slice(0, 10).map((q, i) => {
+        bookQuotes.slice(0, 10).map((q, i) => {
           // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백하므로, id가 실제 일치할 때만 그 제목을 씀(사피엔스버그).
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
-          // 홈 문장 카드에서 AI 대화 진입 허용 (#469) — 체크인 직후·책 상세 경로(#438)에 더해 발견성 보강.
+          const dateText = _isTodayQuote(q) ? '오늘' : (q.createdAt ? String(q.createdAt).slice(0, 10) : (q.when || ''));
           return (
-            <div key={i} className="my-q-card">
+            <div key={q.id || i} className="my-q-card">
               <div className="meta">
                 <span className="bk">{bkTitle}</span>
                 <span className="dot">·</span>
                 <span>{q.page}p</span>
-                {q.when ? <span className="dot">·</span> : null}
-                {q.when ? <span>{q.when}</span> : null}
+                {dateText ? <span className="dot">·</span> : null}
+                {dateText ? <span>{dateText}</span> : null}
+                {q.id && (
+                  <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 10, alignItems: 'center' }}>
+                    <button onClick={() => toggleFav(q.id)} title="좋아요(즐겨찾기)" aria-label="좋아요"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}>
+                      {favIds.has(q.id) ? '❤️' : '🤍'}
+                    </button>
+                    <button onClick={() => delHomeQuote(q.id, q.bookId)} title="이 한 문장 삭제" aria-label="삭제"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0, opacity: 0.6, lineHeight: 1 }}>🗑</button>
+                  </span>
+                )}
               </div>
               <div className="quote" style={q.kind === 'thought' ? { fontStyle: 'normal' } : null}>{q.kind === 'thought' ? `💭 ${q.text}` : `"${q.text}"`}</div>
               {q.id && (
