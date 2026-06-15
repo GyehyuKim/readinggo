@@ -634,10 +634,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
 
   return (
     <section className="view active">
-      {/* 둥지 캐릭터(NestTheatre) — 홈에서 프로필 최상단으로 이동 (#428) */}
-      {window.NestTheatre && <NestTheatre xp={state.xp} />}
-
-      {/* 프로필 정보 (#471) — 그라디언트 배너 제거, NestTheatre 아래 깔끔한 행 + stats */}
+      {/* 프로필 정보 (#508) — 닉네임·한 줄 소개·팔로잉/팔로워/저장을 최상단으로(#428 '둥지 최상단' → 재배치, SNS 표준 UX) */}
       <div style={{padding:'4px 16px 16px', position:'relative'}}>
         <div style={{position:'absolute', top:0, right:12, display:'flex', gap:8}}>
           {/* 설정 ⚙️는 하단 '설정' 탭으로 이전 (#488). 운영 대시보드(📊)만 헤더 유지. */}
@@ -685,6 +682,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           </button>
         </div>
       </div>
+
+      {/* 둥지 캐릭터(NestTheatre) — 프로필 헤더 아래로 이동 (#508, #428 갱신) */}
+      {window.NestTheatre && <NestTheatre xp={state.xp} />}
 
       {/* 💭 과거 문장 회상 카드 제거 (#471) */}
 
