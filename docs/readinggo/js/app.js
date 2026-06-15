@@ -287,10 +287,13 @@ function App() {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).filter(q => q.id !== id) })); };
     const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).map(q => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
     const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).map(q => q.id === d.id ? { ...q, note: d.note } : q) })); };
+    // 책 상세에서 한 문장 추가 (#584) — 새 문장을 myQuotes 최상단에 반영(중복 가드).
+    const onAdd = (e) => { const q = e && e.detail && e.detail.quote; if (!q || !q.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).some(x => x.id === q.id) ? s.myQuotes : [q, ...(s.myQuotes || [])] })); };
     window.addEventListener('rg:sentence-removed', onRm);
     window.addEventListener('rg:sentence-kind', onKind);
     window.addEventListener('rg:sentence-note', onNote);
-    return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); window.removeEventListener('rg:sentence-note', onNote); };
+    window.addEventListener('rg:sentence-added', onAdd);
+    return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); window.removeEventListener('rg:sentence-note', onNote); window.removeEventListener('rg:sentence-added', onAdd); };
   }, []);
 
   // 단순 방문 보상 — 하루 첫 열람(데모: 세션 1회). 3단계 위계 중 가장 낮은 티어.

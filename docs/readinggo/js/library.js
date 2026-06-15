@@ -31,6 +31,33 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 삭제(#325 후속): 낙관적 제거 — bookQuotes 는 prop 파생이라 삭제분을 로컬에서 즉시 거름.
   const [removedIds, setRemovedIds] = _useState({});
   const bookQuotes = (allQuotes || []).filter(q => q.bookId === book.id && !removedIds[q.id]);
+  // 한 문장 추가 (#584) — 책 상세에서 직접(완독 책 포함). app.js 가 rg:sentence-added 로 myQuotes 갱신 → 목록 자동 반영.
+  const [addOpen, setAddOpen] = _useState(false);
+  const [addText, setAddText] = _useState('');
+  const [addPage, setAddPage] = _useState('');
+  const [addKind, setAddKind] = _useState('quote');
+  const [addBusy, setAddBusy] = _useState(false);
+  const saveNewQuote = async () => {
+    const t = (addText || '').trim();
+    if (!t) { showToast('한 문장을 입력해주세요'); return; }
+    if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return; }
+    if (addBusy) return;
+    setAddBusy(true);
+    try {
+      const pg = addPage === '' ? null : (parseInt(addPage, 10) || null);
+      const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: pg, text: t, kind: addKind }));
+      const id = (row && row.id) || ('se_' + Date.now());
+      window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
+        id, text: t, bookId: book.id, bookTitle: book.title, author: book.author,
+        page: (typeof pg === 'number' ? pg : 0), when: '방금', createdAt: (row && row.created_at) || '',
+        note: '', kind: addKind, visibility: 'public',
+      } } }));
+      setAddText(''); setAddPage(''); setAddKind('quote'); setAddOpen(false);
+      showToast('✍️ 한 문장을 남겼어요');
+      if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: addKind });
+    } catch (e) { showToast('저장 실패 — 잠시 후 다시'); }
+    finally { setAddBusy(false); }
+  };
   const delQuote = (q) => {
     if (!q.id) return;
     if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return;
@@ -425,6 +452,38 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               style={{display:'block', width:'100%', textAlign:'center', padding:'12px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14, boxSizing:'border-box'}}>
               ⬇️ 내 한 문장 Markdown 내보내기
             </button>
+          )}
+
+          {/* 한 문장 추가 (#584) — 완독 책 포함, book.ubId 있을 때. 목록 0개여도 항상 노출 */}
+          {book.ubId && (
+            <div style={{marginBottom:14}}>
+              {!addOpen ? (
+                <button onClick={() => setAddOpen(true)}
+                  style={{display:'block', width:'100%', padding:'12px', borderRadius:8, border:'1.5px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer'}}>✍️ 한 문장 추가</button>
+              ) : (
+                <div style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:8, padding:12}}>
+                  <textarea value={addText} onChange={e => { if (e.target.value.length <= 1000) setAddText(e.target.value); }}
+                    placeholder="이 책에서 남기고 싶은 한 문장 (인용 또는 내 생각)" rows={3} autoFocus
+                    style={{width:'100%', boxSizing:'border-box', border:'1.5px solid var(--line)', borderRadius:8, padding:10, fontSize:14, lineHeight:1.5, resize:'none'}} />
+                  <div style={{display:'flex', gap:8, alignItems:'center', marginTop:8}}>
+                    <div style={{display:'flex', gap:6}}>
+                      {[['quote','" 인용'],['thought','💭 내 생각']].map(([k,label]) => (
+                        <button key={k} onClick={() => setAddKind(k)} aria-pressed={addKind===k}
+                          style={{padding:'6px 10px', borderRadius:14, border:addKind===k?'none':'1px solid var(--line)', background:addKind===k?'var(--brand)':'transparent', color:addKind===k?'#fff':'var(--ink-2)', fontSize:12, fontWeight:800, cursor:'pointer'}}>{label}</button>
+                      ))}
+                    </div>
+                    <input type="number" inputMode="numeric" min="0" max="99999" value={addPage} onChange={e => setAddPage(e.target.value)} placeholder="페이지"
+                      style={{width:72, textAlign:'center', padding:'7px 4px', border:'1.5px solid var(--line)', borderRadius:8, fontSize:13, fontWeight:700}} />
+                  </div>
+                  <div style={{display:'flex', gap:8, marginTop:10}}>
+                    <button onClick={() => { setAddOpen(false); setAddText(''); setAddPage(''); }}
+                      style={{flex:'0 0 auto', padding:'10px 14px', borderRadius:8, border:'1.5px solid var(--line)', background:'transparent', color:'var(--ink-3)', fontWeight:700, fontSize:13, cursor:'pointer'}}>취소</button>
+                    <button onClick={saveNewQuote} disabled={addBusy}
+                      style={{flex:1, padding:'10px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:addBusy?'default':'pointer', opacity:addBusy?0.6:1}}>{addBusy?'저장 중…':'저장'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {bookQuotes.length > 0 && (
