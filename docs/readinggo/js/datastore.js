@@ -471,7 +471,8 @@ const DataStore = {
       });
     },
     // 같은 책 피드 (Supabase 어댑터와 표면 일치) — 로컬(Phase 0)엔 타 사용자 없음 → 빈 배열.
-    byBook() { return []; },
+    // (bookId, {limit?, sort?}) 시그니처는 supabase 표면 일치용 — 게스트는 sort='likes'(#594)도 빈 폴백.
+    byBook(bookId, opts) { return []; },
   },
 
   /* 시간차 되감기 노출 게이트 (#346, resurface.md §2.1·§4.2) — 1일 1회.
