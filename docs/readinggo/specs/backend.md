@@ -74,7 +74,8 @@ sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 
 sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): quote(기본)|thought(내 의견) — 20_sentence_kind.sql
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
-sentences.listByBook(userBookId)           → Sentence[]
+sentences.listByBook(userBookId)           → Sentence[]      // 내 책(user_book) 한 문장
+sentences.byBook(bookId, {limit?, sort?})  → Sentence[]      // 그 책(books.id)의 *타인* 공개 한 문장(#11). 본인 제외(neq user_id), 비-UUID id → []. sort='likes'(#594): 짹 많은 순 Top N(clap_count embed), 기본 'recent'(최신순). 각 행에 clapCount 부착
 sentences.feed({cursor})                   → Sentence[]      // 최근(전체 공개) 피드 (§social)
 sentences.feedFollowing({limit})           → Sentence[]      // v7.1: 팔로우 피드
 sentences.feedRecommended({limit})         → Sentence[]      // v7.1: 추천(공유 책 유사도, 비면 최근 폴백)
