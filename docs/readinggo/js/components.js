@@ -684,6 +684,7 @@ function BookInfoModal({ bookId, onClose }) {
   const [manualPages, setManualPages] = useState(''); // 쪽수 메타 누락 시 수동 입력 (#204)
   const [desc, setDesc] = useState(''); // 책 소개 (#578) — DB description 우선, 없으면 알라딘 폴백
   const [popular, setPopular] = useState([]); // 인기 한 문장 Top5 (#594) — 짹 많은 순, 게스트/빈 → []
+  const [mySents, setMySents] = useState([]); // 내 한 문장 (#610) — 이 책에 내가 남긴 것 (읽은 책)
   useEffect(() => {
     let alive = true;
     const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
@@ -698,6 +699,19 @@ function BookInfoModal({ bookId, onClose }) {
     Promise.resolve((DS.sentences && DS.sentences.byBook) ? DS.sentences.byBook(bookId, { limit: 5, sort: 'likes' }) : [])
       .then(rows => { if (alive) setPopular(Array.isArray(rows) ? rows : []); })
       .catch(() => { if (alive) setPopular([]); });
+    return () => { alive = false; };
+  }, [bookId]);
+  // 내 한 문장 (#610) — 이 책에 내가 남긴 문장(byBook은 타인 전용이라 listMine 필터). 읽은 책이면 노출.
+  useEffect(() => {
+    let alive = true;
+    const DS = window.DataStore || {};
+    Promise.resolve((DS.sentences && DS.sentences.listMine) ? DS.sentences.listMine() : [])
+      .then(rows => {
+        if (!alive) return;
+        const mine = (Array.isArray(rows) ? rows : []).filter(r => ((r.user_book && r.user_book.book_id) || r.book_id) === bookId);
+        setMySents(mine.map(r => ({ id: r.id, text: r.text || '', page: r.page, bookId, bookTitle: (r.user_book && r.user_book.book && r.user_book.book.title) || '', visibility: r.visibility, isPrivate: r.is_private, note: r.my_note || '', kind: r.kind })));
+      })
+      .catch(() => { if (alive) setMySents([]); });
     return () => { alive = false; };
   }, [bookId]);
   // 책 소개 — DB books.description 우선, 비면 알라딘 프록시 폴백 (#578, library.js BookDetailModal §5.8 패턴)
@@ -740,6 +754,19 @@ function BookInfoModal({ bookId, onClose }) {
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>📚 책 소개</div>
                 <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
+              </div>
+            )}
+            {/* 내 한 문장 (#610) — 읽은 책: 내가 남긴 문장 + 공용 SentenceActions(공개범위·책갈피·수정·삭제) */}
+            {mySents.length > 0 && (
+              <div style={{ textAlign: 'left', marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 8 }}>✍️ 내 한 문장</div>
+                {mySents.map(s => (
+                  <div key={s.id} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                    <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6 }}>"{decodeEntities(s.text)}"</div>
+                    {typeof s.page === 'number' && s.page > 0 ? <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>{s.page}p</div> : null}
+                    <SentenceActions sentence={s} mine onRemoved={(rid) => setMySents(m => (m || []).filter(x => x.id !== rid))} />
+                  </div>
+                ))}
               </div>
             )}
             {/* 이 책의 인기 한 문장 Top5 (#594) — 짹 많은 순, 타인 공개 문장. 읽기 전용(짹 토글·대화 없음).

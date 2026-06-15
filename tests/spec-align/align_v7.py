@@ -196,6 +196,8 @@ INVARIANTS = [
         ["components.js"], r"function SentenceActions"),
     ("C", "present", "SentenceCollectionModal 한 문장이 SentenceActions 경유 (#610 계약)",
         ["components.js"], r"<SentenceActions sentence=\{s\}"),
+    ("C", "present", "책 상세에 내 한 문장 섹션 — 읽은 책=내 문장(+SentenceActions) / 안읽음=타인 (#610)",
+        ["components.js"], r"mySents\.map"),
 ]
 
 
