@@ -17,7 +17,6 @@ function SocialView({ state }) {
   const { useState, useEffect } = React;
   const [tab, setTab] = useState('recent');  // 'following' | 'recent' | 'recommend' (#8)
   const [items, setItems] = useState(null);  // null=로딩, []=빈
-  const [cardMode, setCardMode] = useState(false); // 틴더 카드 리뷰 (#186)
   const [findOpen, setFindOpen] = useState(false); // 친구 찾기 패널 (#250)
   const [fq, setFq] = useState('');
   const [fres, setFres] = useState([]);
@@ -143,18 +142,9 @@ function SocialView({ state }) {
           </button>
         ))}
       </div>
-      {items && items.length > 0 && (
-        <div style={{ padding: '0 16px 10px' }}>
-          <button onClick={() => setCardMode(true)}
-            style={{ width: '100%', padding: '10px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
-            🃏 카드로 넘겨보기 — 좋아요/넘기기로 한 문장 리뷰
-          </button>
-        </div>
-      )}
-      {cardMode && items && ReactDOM.createPortal(
-        <TinderCards items={items} title={tab === 'recommend' ? '추천 한 문장' : tab === 'following' ? '팔로우 한 문장' : '최근 한 문장'} onClose={() => setCardMode(false)} />,
-        document.body
-      )}
+      {/* 카드 리뷰(#186) 보류 — '🃏 카드로 넘겨보기' CTA·TinderCards 진입 연결 제거 (#540, decisions §8.10).
+          우=좋아요(짹+책갈피 동시)가 짹(공개 반응)·책갈피(비공개 저장) 의미를 섞어 현재 범위 제외.
+          TinderCards 컴포넌트(components.js)는 보존 — 재도입 시 두 행동 분리 전제. */}
       {items === null ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>불러오는 중…</div>
       ) : items.length === 0 ? (
