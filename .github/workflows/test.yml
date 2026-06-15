@@ -72,4 +72,27 @@ jobs:
             exit 1
           fi
 
+  migrations:
+    name: migrations (Supabase 마이그레이션 적용 검증)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # docs/readinggo/supabase/*.sql 의 add column/create table 가 라이브 DB에
+      # 실제 적용됐는지 information_schema 와 대조 (read-only, DDL 미실행).
+      # 코드/.sql은 머지됐는데 DB 미적용이면 런타임 400(column does not exist)으로
+      # 조용히 실패 → 머지 전 감지 (#633, 2026-06-16 QA: 11/22/23/24 누락 사례).
+      # SUPABASE_ACCESS_TOKEN secret 미설정 시 skip(점진 도입).
+      - name: Check migrations applied to live DB
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::warning::SUPABASE_ACCESS_TOKEN secret 미설정 — 마이그레이션 검사 skip. repo Settings→Secrets and variables→Actions 에 등록하면 활성화됩니다 (#633)."
+            exit 0
+          fi
+          python tests/spec-align/migrations_applied.py
+
 # (deploy/detect 제거됨 — 배포는 Cloudflare Workers Build가 main 푸시 시 자동 처리)
