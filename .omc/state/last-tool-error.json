@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"find .git -name \\\"desktop.ini\\\" -type f -delete 2>/dev/null; git fetch origin readinggo-demo 2>&1 | tail -3 && git checkout readinggo-demo 2>&1\",\"description\":\"Fetch and checkout readinggo...",
-  "error": "Exit code 1\nfatal: couldn't find remote ref readinggo-demo\nerror: pathspec 'readinggo-demo' did not match any file(s) known to git",
-  "timestamp": "2026-05-28T13:41:15.944Z",
+  "tool_input_preview": "{\"command\":\"find .git -name \\\"desktop.ini\\\" -type f -delete && git fetch origin && git pull origin main\",\"description\":\"Clean desktop.ini and pull latest main\"}",
+  "error": "Exit code 1\nFrom https://github.com/GyehyuKim/glocalx\n   9b45ad9..f41413d  main                    -> origin/main\n * [new branch]      chore/spec-xp-v7.1      -> origin/chore/spec-xp-v7.1\n * [new branch]      claude/readinggo-core-values-YX4UT -> origin/claude/readinggo-core-values-YX4UT\n * [new branch]      feat/nest-clay-illustration -> origin/feat/nest-clay-illustration\n * [new branch]      feat/nest-xp-v7.1       -> origin/feat/nest-xp-v7.1\n * [new branch]      gyehyu/abort-book       -> ori...",
+  "timestamp": "2026-06-15T13:33:43.604Z",
   "retry_count": 1
 }

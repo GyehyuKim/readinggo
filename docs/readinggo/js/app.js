@@ -648,17 +648,12 @@ function App() {
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               <button
                 onClick={() => setIsSearchOpen(true)}
-                style={{
-                  background:'transparent',
-                  border:'none',
-                  fontSize:20,
-                  cursor:'pointer',
-                  padding:'4px 8px',
-                  marginLeft:8,
-                }}
+                style={{ background:'transparent', border:'none', cursor:'pointer', padding:'6px 8px', marginLeft:4, color:'var(--ink-2)', display:'inline-flex', alignItems:'center' }}
                 title="도서 검색"
               >
-                🔍
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
               </button>
             </div>
           </div>
@@ -675,7 +670,7 @@ function App() {
               저장하기
             </button>
             <button onClick={() => setGuestBannerOff(true)} aria-label="배너 닫기"
-              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 16, padding: '0 2px' }}>
+              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 16, padding: '13px 14px', margin: '-13px -14px' }}>
               ×
             </button>
           </div>
@@ -717,10 +712,32 @@ function App() {
         {/* 하단 탭바 */}
         <nav className="tabbar">
           {[
-            { id: 'nest',     ico: '🏠', label: '홈'   },
-            { id: 'social',   ico: '📰', label: '피드' },   // '소셜' → '피드' (#488)
-            { id: 'profile',  ico: '📚', label: '책장' },   // '프로필' → '책장' (#487)
-            { id: 'settings', ico: '⚙️', label: '설정' },   // 설정은 목적지 탭이 아닌 액션 (#488 #567)
+            { id: 'nest', label: '홈', svg: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/>
+                <path d="M9 21V12h6v9"/>
+              </svg>
+            )},
+            { id: 'social', label: '피드', svg: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            )},
+            { id: 'profile', label: '책장', svg: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+            )},
+            { id: 'settings', label: '설정', svg: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            )},
           ].map(t => (
             <button
               key={t.id}
@@ -728,7 +745,7 @@ function App() {
               style={t.id === 'settings' && settingsOpen ? { opacity: 0.7 } : undefined}
               onClick={() => { if (t.id === 'settings') setSettingsOpen(true); else switchTab(t.id); }}
             >
-              <span className="ico">{t.ico}</span>
+              <span className="ico">{t.svg}</span>
               <span>{t.label}</span>
             </button>
           ))}
