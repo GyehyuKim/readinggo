@@ -185,6 +185,11 @@ INVARIANTS = [
     # 온보딩 — 정의 없는 Sparrow 컴포넌트 참조 금지 (#527). 🐦 이모지로 통일, 재도입 시 렌더 크래시.
     ("C", "absent", "미정의 Sparrow 컴포넌트 참조 (#527)",
         ["onboarding.js"], r"<Sparrow"),
+    # ── 한 문장 액션 계약 (#610) — 표면별 버튼 드리프트 자동 락 ──
+    ("C", "present", "공용 SentenceCard 에 책갈피 토글 (한 문장 액션 계약 #610)",
+        ["components.js"], r"const toggleBookmark"),
+    ("C", "present", "BookInfoModal 인기 한 문장이 SentenceCard 경유 — 좋아요+책갈피 보장 (#610)",
+        ["components.js"], r"SentenceCard key=\{s\.id\} bookId=\{bk\.id\} noBlind"),
 ]
 
 

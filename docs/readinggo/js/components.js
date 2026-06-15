@@ -106,7 +106,7 @@ function Confetti({ active, nestUp }) {
 }
 
 /* ── SentenceCard ─────────────────────────────────────── */
-function SentenceCard({ item, bookId }) {
+function SentenceCard({ item, bookId, noBlind }) {
   // 실 피드(Supabase)면 item.id(UUID)·item.isMine·item.bookTitle 사용, 데모면 합성값 폴백.
   const sentenceId = item.id || `${bookId}:${item.page}:${item.nick}`;
   const isMine = (typeof item.isMine !== 'undefined') ? item.isMine : (item.nick === '@jerome' || item.nick === 'jerome');
@@ -145,7 +145,7 @@ function SentenceCard({ item, bookId }) {
   // 스포일러 블라인드: 전역 토글(revealAll) 또는 카드별 탭 공개 시 해제 (§5.7.1).
   const revealAll = React.useContext(SpoilerContext);
   const [revealed, setRevealed] = useState(false);
-  const blinded = !revealAll && !revealed && isSentenceBlinded(bookId, item.page);
+  const blinded = !noBlind && !revealAll && !revealed && isSentenceBlinded(bookId, item.page);
   return (
     <div className="sentence-card">
       <div className="who">
@@ -698,21 +698,15 @@ function BookInfoModal({ bookId, onClose }) {
             {popular.length > 0 && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 8 }}>🔖 이 책의 한 문장</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {popular.map(s => {
-                    const u = s.user || {};
-                    const who = u.display_name || (u.handle ? '@' + u.handle : '익명');
-                    return (
-                      <div key={s.id} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12 }}>
-                        <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6, marginBottom: 8 }}>"{decodeEntities(s.text || '')}"</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>
-                          <span>{who}{typeof s.page === 'number' && s.page > 0 ? ` · p.${s.page}` : ''}</span>
-                          <span aria-label={`짹 ${s.clapCount || 0}`}>🐦 {s.clapCount || 0}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                {/* 한 문장 액션 계약 (#610) — 타인 문장은 공용 SentenceCard 로 통일(좋아요+책갈피 보장). 발견 맥락이라 noBlind. */}
+                {popular.map(s => {
+                  const u = s.user || {};
+                  return (
+                    <SentenceCard key={s.id} bookId={bk.id} noBlind
+                      item={{ id: s.id, q: decodeEntities(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: '🐦',
+                              page: s.page, time: '', claps: s.clapCount || 0, bookId: bk.id, bookTitle: '', isMine: false }} />
+                  );
+                })}
               </div>
             )}
             {/* 쪽수 메타 누락 시 수동 입력 — 진척률·읽기모드용 (#204) */}
