@@ -33,6 +33,7 @@
 | 집계 | **최근 7일** 신규 `user_books`(`started_at >= now() - interval '7 days'`) 책별 distinct 시작자 상위 5권. RPC `social_newcomers_weekly(lim)` (SECURITY DEFINER, anon/authenticated grant) |
 | 표시 | 순위 + 표지 + 책 제목·저자 + "N명 시작"(내 책장에 있으면 상태 강조). **starters ≥ 2명일 때만 "N명 시작" 표시; 1명이면 카운트 미노출** |
 | 탭 동작 | **책 상세(`BookInfoModal`) 진입** — `window.RG_openBook(b.bookId)` 호출. 피드 카드 책 제목 탭과 동일 경로. (구 책장 선택 바텀시트 폐기) |
+| 책 상세 내용 (#578) | `BookInfoModal` 에 **📚 책 소개**(DB `books.description` 우선·알라딘 폴백·`decodeEntities`) + **찜 동선 복구**: `❤️ 읽고 싶어요`(`RG_addBookToShelf(bk,'wish')`) / `📖 이 책 읽기`(`RG_registerBook`) 2버튼. "왜 읽는지"를 보여 찜·읽기 전환 유도. 책 상세는 공용(피드·홈·인기책 공통) |
 | 렌더 순서 | **소셜 뷰 최상단**에 위치. 그 아래 한 문장 피드(헤더+탭+카드 목록) |
 | 윈도우 근거 (#576) | ~~주간(월요일 00:00 UTC 리셋)~~ 폐기 — 월요일 직후 0건 → 섹션 소멸 버그. **롤링 7일**로 변경(절벽 제거, 시드 덤프 제외). 마이그레이션 `26_social_newcomers_rolling.sql` |
 | Phase 0 | 하드코딩 시드 / Phase 1+ 롤링 집계 RPC |

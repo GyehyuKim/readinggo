@@ -613,9 +613,27 @@ window.UserProfileModal = UserProfileModal;
 window.SettingsModal = SettingsModal;
 
 /* ── BookInfoModal: 한 문장의 책 제목 탭 → 책 정보(#11). books.getById 로 단건 조회. ── */
+// HTML 엔티티 디코드 (#562/#578) — 외부 description 의 `&lt; &gt; &amp;` raw 노출 방지. library.js 와 동일 패턴(컴포넌트 파일 자립).
+function decodeEntities(s) {
+  const str = String(s == null ? '' : s);
+  if (!str || str.indexOf('&') < 0) return str;
+  if (typeof document !== 'undefined' && document.createElement) {
+    try { const t = document.createElement('textarea'); t.innerHTML = str; return t.value; } catch (e) { /* fall through */ }
+  }
+  const named = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: ' ' };
+  return str.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (m, ent) => {
+    if (ent[0] === '#') {
+      const code = (ent[1] === 'x' || ent[1] === 'X') ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+    }
+    return named[ent.toLowerCase()] || m;
+  });
+}
+
 function BookInfoModal({ bookId, onClose }) {
   const [bk, setBk] = useState(undefined); // undefined=로딩, null=없음
   const [manualPages, setManualPages] = useState(''); // 쪽수 메타 누락 시 수동 입력 (#204)
+  const [desc, setDesc] = useState(''); // 책 소개 (#578) — DB description 우선, 없으면 알라딘 폴백
   useEffect(() => {
     let alive = true;
     const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
@@ -623,6 +641,21 @@ function BookInfoModal({ bookId, onClose }) {
       .then(b => { if (alive) setBk(b || null); }).catch(() => { if (alive) setBk(null); });
     return () => { alive = false; };
   }, [bookId]);
+  // 책 소개 — DB books.description 우선, 비면 알라딘 프록시 폴백 (#578, library.js BookDetailModal §5.8 패턴)
+  useEffect(() => {
+    if (!bk) { setDesc(''); return; }
+    const dbDesc = (bk.description || '').trim();
+    if (dbDesc) { setDesc(dbDesc); return; }
+    let alive = true;
+    const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
+    const isbn = bk.isbn13 || bk.isbn || '';
+    if (!proxy || !isbn) { setDesc(''); return; }
+    fetch(`${proxy}?isbn=${encodeURIComponent(isbn)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!alive) return; const it = d && Array.isArray(d.items) && d.items[0]; setDesc((it && it.description) ? String(it.description).trim() : ''); })
+      .catch(() => { if (alive) setDesc(''); });
+    return () => { alive = false; };
+  }, [bk]);
   const kyoboUrl = bk ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(bk.isbn13 || bk.title)}` : '#';
   return (
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -643,6 +676,13 @@ function BookInfoModal({ bookId, onClose }) {
               <p style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 700, margin: 0 }}>{bk.author}{bk.publisher ? ' · ' + bk.publisher : ''}{bk.total_pages ? ' · ' + bk.total_pages + 'p' : ''}</p>
             </div>
             <a href={kyoboUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '12px', background: 'var(--brand-tint)', border: '1.5px solid var(--brand)', borderRadius: 8, color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, textDecoration: 'none', marginBottom: 10 }}>교보문고에서 보기 →</a>
+            {/* 책 소개 (#578) — 왜 읽는지 보여 읽고 싶게. DB description 우선·알라딘 폴백, 없으면 섹션 생략. */}
+            {desc && (
+              <div style={{ textAlign: 'left', marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>📚 책 소개</div>
+                <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
+              </div>
+            )}
             {/* 쪽수 메타 누락 시 수동 입력 — 진척률·읽기모드용 (#204) */}
             {!bk.total_pages && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--ink-2)', fontWeight: 700 }}>
@@ -653,7 +693,12 @@ function BookInfoModal({ bookId, onClose }) {
                 <span>p</span>
               </div>
             )}
-            <button className="submit-btn" style={{ margin: '4px 0 0' }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>📖 이 책 읽기</button>
+            {/* 찜 + 읽기 동선 (#578) — 인기 책에서 바로 '읽고 싶어요'(찜)로 담거나 읽기 시작 */}
+            <div style={{ display: 'flex', gap: 8, margin: '4px 0 0' }}>
+              <button onClick={() => { if (window.RG_addBookToShelf) window.RG_addBookToShelf(bk, 'wish'); onClose(); }}
+                style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>❤️ 읽고 싶어요</button>
+              <button className="submit-btn" style={{ flex: 1, margin: 0 }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>📖 이 책 읽기</button>
+            </div>
           </div>
         )}
       </div>
