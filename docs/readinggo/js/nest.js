@@ -925,8 +925,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
               {nestState.book.total > 0 && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>}
               <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>비우면 현재 진도</span>
             </div>
-            {/* 한 문장 독립 저장 (#497) — 페이지 섹션과 별개 버튼 */}
-            <button className="checkin-cta quick-submit" onClick={submitSentence} style={{ marginTop: 10 }}>✍️ 한 문장 저장</button>
+            {/* 한 문장 독립 저장 (#497) — 페이지 섹션과 별개 버튼. (선택)이므로 secondary 위계 (#614) */}
+            <button className="checkin-cta checkin-cta-secondary quick-submit" onClick={submitSentence} style={{ marginTop: 10 }}>✍️ 한 문장 저장</button>
           </div>
           {/* 크롭 오버레이 — 사진에서 원하는 영역만 잘라 OCR (#396·#498) */}
           {quickOcrFile && (

@@ -700,6 +700,16 @@ input,textarea{font-family:inherit;}
   transform: translateY(3px);
   border-bottom-width: 2px;
 }
+/* secondary CTA (#614) — '한 문장 저장'(선택) 등 부차 액션. primary 솔리드와 위계 구분(토널 그린). */
+.checkin-cta-secondary{
+  background: var(--brand-tint);
+  color: var(--brand-3);
+  border: 1.5px solid var(--brand);
+  border-bottom: 3px solid var(--brand);
+  font-size: 16px;
+}
+.checkin-cta-secondary:hover{ filter: brightness(.99); }
+.checkin-cta-secondary:active{ transform: translateY(2px); border-bottom-width: 1.5px; }
 .checkin-cta .pulse{
   width: 8px; height: 8px; border-radius: 50%;
   background: #fff;
