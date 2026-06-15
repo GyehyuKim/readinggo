@@ -654,7 +654,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   return (
     <section className="view active">
       {/* 프로필 정보 (#508) — 닉네임·한 줄 소개·팔로잉/팔로워/저장을 최상단으로(#428 '둥지 최상단' → 재배치, SNS 표준 UX) */}
-      <div style={{padding:'4px 16px 16px', position:'relative'}}>
+      <div style={{padding:'4px 16px 16px', position:'relative', textAlign:'center'}}>
         <div style={{position:'absolute', top:0, right:12, display:'flex', gap:8}}>
           {/* 설정 ⚙️는 하단 '설정' 탭으로 이전 (#488). 운영 대시보드(📊)만 헤더 유지. */}
           {isAdmin && (
@@ -665,7 +665,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         <div style={{fontSize:22, fontWeight:900, color:'var(--ink)'}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
         {/* 한 줄 소개 인라인 편집 (#515) — 탭 → 입력, Enter/저장 → 저장, ESC/바깥 → 취소 */}
         {bioEditing ? (
-          <div style={{marginTop:4, display:'flex', gap:6, alignItems:'center'}}>
+          <div style={{marginTop:4, display:'flex', gap:6, alignItems:'center', justifyContent:'center'}}>
             <input value={bioText} maxLength={100} autoFocus
               onChange={e => setBioText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') saveBio(); else if (e.key === 'Escape') { setBioText((window.RG_ME && window.RG_ME.bio) || ''); setBioEditing(false); } }}
@@ -683,7 +683,8 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           </div>
         )}
         {/* 팔로잉/팔로워/저장 (#471/#472) — 팔로우 수는 Supabase friends.counts 실데이터 (#516). 탭 시 유저 목록 모달 (#509) */}
-        <div style={{display:'flex', gap:24, marginTop:14}}>
+        {/* 가운데정렬 + 좌우 넓게 분배 — space-around 로 풀폭 균등 배치 */}
+        <div style={{display:'flex', justifyContent:'space-around', marginTop:14, padding:'0 8px'}}>
           <button onClick={() => setFollowModal('following')}
             style={{textAlign:'center', background:'none', border:'none', cursor:'pointer', padding:0}}>
             <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{followCounts.following}</div>
