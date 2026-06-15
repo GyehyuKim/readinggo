@@ -131,10 +131,20 @@ input,textarea{font-family:inherit;}
   flex-direction: column;
 }
 @media (min-width: 800px){
-  .stage{ padding: 32px 20px 64px; }
+  /* #615 데스크톱 프레이밍 — 카드 양옆 여백을 '빈 공간'이 아닌 의도된 무대로.
+     은은한 radial 페이드만(하드 블롭·도형 금지). 베이스를 --paper-2로 살짝 진하게 해
+     카드(--paper, 더 밝음)가 떠 보이게 한다. */
+  .stage{
+    padding: 32px 20px 64px;
+    background:
+      radial-gradient(1100px 620px at 50% -160px, #DDF6E7 0%, transparent 58%),
+      radial-gradient(720px 520px at 12% 16%, rgba(255,241,199,.45) 0%, transparent 55%),
+      radial-gradient(780px 580px at 88% 90%, rgba(221,246,231,.6) 0%, transparent 55%),
+      var(--paper-2);
+  }
   .app{
     border-radius: 36px;
-    box-shadow: 0 30px 80px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.05);
+    box-shadow: 0 30px 80px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.05);
     height: min(920px, calc(100vh - 64px));
     overflow: hidden;
     border: 1px solid var(--line);
