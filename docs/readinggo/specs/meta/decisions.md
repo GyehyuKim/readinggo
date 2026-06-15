@@ -3,6 +3,20 @@
 > **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §8. 변경 이력은 git log 참조.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
+## 7.9 스펙 라이프사이클 정책 (#639, 2026-06-16)
+
+스펙이 현실과 어긋날 때 상태별로 처리한다. **원칙: 삭제보다 "상태 표시 + 기록"** — 스펙은 의사결정 자산.
+
+| 상태 | 처리 | 위치 | spec-align | lint |
+|---|---|---|---|---|
+| 활성 | 유지 | `specs/` | invariant 유지 | 포함 |
+| 개명 | 파일·제목·링크 갱신 | `specs/` | 설명 갱신 | 포함 |
+| 보류 | 🅿️ 배너 + [open-issues.md](./open-issues.md) 기록 | `specs/` | invariant 미부여 | 포함 |
+| 폐기 | ⛔ 배너 + [rejected.md](./rejected.md) 사유·위임처 | `specs/`(배너 제자리) 또는 `_archive/`(링크 정합 시) | invariant 제거 | (제자리 시 포함) |
+
+- 본 정책 적용 (#639): **`social.md`→`feed.md` 개명**(소셜→피드, #488), **`resurface.md` 보류**(Phase later), **`village.md` 폐기**(마을 제거, [rejected.md](./rejected.md)).
+- 폐기 스펙의 물리적 `_archive` 이동은 아웃바운드 상대 링크가 깨지므로 **배너+rejected.md 기록으로 갈음 가능**(village는 제자리 폐기 유지).
+
 ## 8. 미결 → 확정 사항
 
 ### 8.0 v7 결정 (2026-06-01, web-first 롤백 — 아래 v5/v6 표보다 **우선**)
@@ -67,7 +81,7 @@
 
 | owner | 파일 |
 |---|---|
-| **gyehyu** | `social.md` · `profile.md` · `backend.md` · `onboarding.md` · `meta/*` · `README.md` |
+| **gyehyu** | `feed.md` · `profile.md` · `backend.md` · `onboarding.md` · `meta/*` · `README.md` |
 | **seungwon** | `nest.md` · `systems.md` · `design.md` |
 | **yunji** | `village.md` (마을) |
 
@@ -117,7 +131,7 @@
 
 | 이슈 | 결정 | 담당 | 비고 |
 |---|---|---|---|
-| **#179 한 문장 공개 범위** | ⚠️ **`is_private` binary → `visibility` 3단계 확장**: `public`(전체)·`followers`(상호 팔로워)·`private`(나만). Instagram 모델. **작성자가 공개해야만 타인에게 보임.** RLS 강제(`followers`=양방향 follows). 마이그레이션 `06_privacy_v2.sql`. **SSOT=[social.md §5.7.1](../social.md)** | social/backend | §8.1 "is_private 재도입"을 **대체** |
+| **#179 한 문장 공개 범위** | ⚠️ **`is_private` binary → `visibility` 3단계 확장**: `public`(전체)·`followers`(상호 팔로워)·`private`(나만). Instagram 모델. **작성자가 공개해야만 타인에게 보임.** RLS 강제(`followers`=양방향 follows). 마이그레이션 `06_privacy_v2.sql`. **SSOT=[feed.md §5.7.1](../feed.md)** | social/backend | §8.1 "is_private 재도입"을 **대체** |
 | **#159 로그인 방식** | **이메일 1회 가입 + 세션 유지**(Supabase 세션 자동 유지). 만료 시 재로그인. Google OAuth 병행. (§8.2 "매직링크 제외" **갱신**) | onboarding/backend | 재논의 결과 |
 | **이메일 템플릿 브랜딩** | 확인·매직링크 메일에 **ReadingGo 브랜딩 + 문의처(`readinggo.admin@gmail.com`)** 삽입 — 사용자가 발신 출처를 신뢰하고 클릭하도록. `admin-cli.mjs email-template set` | backend(운영) | 신규(#1 맥락) |
 | **#154 마을 Supabase 연동** | `village.js` 데모 하드코딩 → `DataStore.villages.listMine/listPublic/create/join` 실연동 | village(윤지) | 사용자 지시로 계휴 작업 |
@@ -134,7 +148,7 @@
 | 항목 | 결정 | 담당 | 비고 |
 |---|---|---|---|
 | **#3·4·5 타인 프로필 페이지** | 모달→**전체 페이지**. 책장 6권+더보기(읽은/읽는중 필터) + 책 탭 시 그 사람 평점·후기·한 문장 드릴다운. `users.publicShelf`·`bookContrib` 추가. '보고싶은'은 wish RLS 비공개라 본인만 | profile/backend | profile.md §5.8.2 반영 |
-| **#186 틴더 한 문장 카드** | ~~소셜 피드 '카드로 넘겨보기' → 스와이프 우=좋아요(짹+책갈피)/좌=넘김/아래=유예. Pointer Events 직접(Stack Lock)~~ → **2026-06-15 보류(§8.10/#540)** | social | social.md 반영 · 보류(§8.10) |
+| **#186 틴더 한 문장 카드** | ~~소셜 피드 '카드로 넘겨보기' → 스와이프 우=좋아요(짹+책갈피)/좌=넘김/아래=유예. Pointer Events 직접(Stack Lock)~~ → **2026-06-15 보류(§8.10/#540)** | social | feed.md 반영 · 보류(§8.10) |
 | **운영자 문의** | 설정 폼 → `inquiries` 테이블(09_inquiries.sql, RLS: 본인 insert/select+admin) → admin 대시보드 목록. LLM 자동처리는 Phase 2(Gemini) | profile/backend | DB 방식 채택 |
 | **한 문장 1000자** | 인용 200→**1000자**(감상과 동일). 클라(config)+DB(07_sentence_1000.sql) | nest/backend | ⚠️ **nest.md §5.4 '200자' → 1000자 갱신 필요(승원)** |
 | **한 문장=페이지 명시** | 입력 시 그 문장이 속한 페이지를 기록(진행률과 별개 개념). 읽기모드/체크인에 명시 | nest | ⚠️ **nest.md 반영 필요(승원)** |
@@ -246,9 +260,9 @@
 
 | 항목 | 결정 | SSOT |
 |---|---|---|
-| 카드 리뷰(#186) | **현재 제품 범위 제외(보류).** 스와이프 우=좋아요(짹+책갈피 동시)가 짹·책갈피 의미를 섞음. 피드 `🃏 카드로 넘겨보기` CTA·`TinderCards` 호출 연결은 후속 코드 PR에서 해제, **컴포넌트 코드·데이터는 삭제하지 않고 보존** | [social.md §5.7](../social.md) |
-| 좋아요 = 짹 | 타인 문장에 대한 **공개 반응**(개수 공개, XP +1 적용). 저장과 별개 동작 | [social.md §5.7](../social.md) |
-| 저장 = 책갈피 | 내·타인 문장의 **비공개 개인 보관**(공개 개수·XP 없음, `sentence_bookmarks`). 짹과 별개 동작 | [social.md §5.7](../social.md) · [profile.md §5.8.5](../profile.md) |
+| 카드 리뷰(#186) | **현재 제품 범위 제외(보류).** 스와이프 우=좋아요(짹+책갈피 동시)가 짹·책갈피 의미를 섞음. 피드 `🃏 카드로 넘겨보기` CTA·`TinderCards` 호출 연결은 후속 코드 PR에서 해제, **컴포넌트 코드·데이터는 삭제하지 않고 보존** | [feed.md §5.7](../feed.md) |
+| 좋아요 = 짹 | 타인 문장에 대한 **공개 반응**(개수 공개, XP +1 적용). 저장과 별개 동작 | [feed.md §5.7](../feed.md) |
+| 저장 = 책갈피 | 내·타인 문장의 **비공개 개인 보관**(공개 개수·XP 없음, `sentence_bookmarks`). 짹과 별개 동작 | [feed.md §5.7](../feed.md) · [profile.md §5.8.5](../profile.md) |
 | 절차 | spec-only PR(이 결정) 먼저 → 별도 코드 PR로 CTA·호출 연결만 해제 | — |
 
 ---

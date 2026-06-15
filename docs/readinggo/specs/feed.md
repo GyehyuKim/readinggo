@@ -1,5 +1,7 @@
-# 소셜 탭 — 화면 스펙
+# 피드 탭 — 화면 스펙
 
+> **v8 개명 (#488·#639, 2026-06-16)**: '소셜 탭' → **'피드 탭'**, 파일 `social.md`→`feed.md`. 하단 탭 라벨도 '피드'. (코드 호환상 내부 탭 키 `social`·`social.js`는 유지.)
+>
 > **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6. 원 위치: §5.7.
 > **v7 갱신 (2026-06-01)**: "모이"→"한 문장", **페이지 기반 스포일러 블라인드(§5.7.1) 신설** (`is_private` 폐기), 리액션 **짹** 확정. 피드는 **전체 공개**. 짹 XP는 [systems.md §6.3](./systems.md).
 > **v7.1 갱신 (2026-06-04, QA 2차)**: 피드 **팔로우/최근/추천 3탭**, `is_private` 재도입 + 감상 `note_private`. [decisions §8.1](./meta/decisions.md).

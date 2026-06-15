@@ -14,7 +14,7 @@
 | **온보딩** | [`onboarding.md`](./onboarding.md) | [§4](./onboarding.md) 가입 여정 A~H |
 | **둥지 탭** | [`nest.md`](./nest.md) | §5.1-5.4 둥지 진화·활성책·일일미션·성 컬렉션 |
 | **마을** (⚠️ 폐기, #440) | [`village.md`](./village.md) | §5.5 마을 — 탭 삭제(소셜로 일원화). 이력 보존용 |
-| **소셜 탭** | [`social.md`](./social.md) | [§5.7](./social.md) |
+| **소셜 탭** | [`feed.md`](./feed.md) | [§5.7](./feed.md) |
 | **내서재(프로필)** | [`profile.md`](./profile.md) | [§5.8](./profile.md)-5.9 (v6: AI 도서 추천 포함) |
 | **시스템 로직** | [`systems.md`](./systems.md) | §6 스트릭·방패·XP·NPC·휴식코스 |
 | **백엔드** | [`backend.md`](./backend.md) | [§7](./backend.md) |
@@ -31,7 +31,7 @@
 ### 어디를 고치나
 | 변경 종류 | 대상 파일 |
 |---|---|
-| 화면 스펙 (홈·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `social.md`, `profile.md`). `village.md`는 ⚠️ 폐기(#440, 이력 보존용) |
+| 화면 스펙 (홈·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `feed.md`, `profile.md`). `village.md`는 ⚠️ 폐기(#440, 이력 보존용) |
 | 가입 여정 | `onboarding.md` |
 | 시스템 로직 (스트릭·방패·XP·NPC·휴식코스) | `systems.md` |
 | 데이터 모델·플랫폼 | `backend.md` |
@@ -63,10 +63,10 @@
 |---|---|---|
 | `village.md` (마을, ⚠️ 폐기 #440) | **yunji** | 탭 삭제됨(`village.js`/`town.js` 제거). 이력 보존, spec PR은 윤지 |
 | `nest.md` · `systems.md` · `design.md` | **seungwon** | 둥지·XP 보상체계·디자인 |
-| `social.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 소셜·내서재·백엔드·로그인 |
+| `feed.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 소셜·내서재·백엔드·로그인 |
 | `meta/*` · `README.md` | **gyehyu** | 결정 기록·통합 (머지 담당) |
 
-> **SSOT 규칙**: XP 수치 = `systems.md`, 둥지 단계표 = `nest.md`, 스포일러 블라인드 = `social.md §5.7.1`. 타 파일은 복붙 말고 링크 참조.
+> **SSOT 규칙**: XP 수치 = `systems.md`, 둥지 단계표 = `nest.md`, 스포일러 블라인드 = `feed.md §5.7.1`. 타 파일은 복붙 말고 링크 참조.
 
 ---
 

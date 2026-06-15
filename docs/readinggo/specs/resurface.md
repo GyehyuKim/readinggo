@@ -1,5 +1,7 @@
 # 시간차 되감기 (Resurface) 스펙
 
+> 🅿️ **보류 (Phase later, #639, 2026-06-16)**: 본격 구현은 나중. 현 스펙은 참고·보존용이며 **현 단계 추가 작업 대상 아님**. spec-align invariant 미부여(보류 상태). 추적: [open-issues.md](./meta/open-issues.md).
+>
 > **신규 (v7.4, 2026-06-10)**: companion.md §5 플레이스홀더 구체화.
 > 근거: whytree-team-synthesis.md ("ChatGPT·북모리가 줄 수 없는 edge"), companion.md §5.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 준수.

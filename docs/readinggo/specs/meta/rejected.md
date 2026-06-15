@@ -10,6 +10,7 @@
 | 항목 | 검토 시점 | 기각 사유 | 재검토 트리거 |
 |---|---|---|---|
 | **OCR — 웹 환경** (Tesseract.js / Cloud Vision API) | 2026-05-22 | 라이브러리 무게(Tesseract.js 4MB+, 한국어 정확도) 또는 외부 API 비용 | — (Phase 0/1 웹 환경 한정 영구 기각). Capacitor 네이티브로 우회 |
+| **마을 탭** (커뮤니티 게시판, [village.md](../village.md)) | 2026-06 (#440·#639) | 소셜/피드로 일원화 — 별도 탭 분산이 핵심 루프(읽기·한 문장)를 희석. **위임**: 공개 한 문장·발견은 [feed.md](../feed.md), 같은 책 독자 연결은 추천 피드로 흡수 | 커뮤니티 수요·사용자 N 폭증 시 재검토 |
 | **OCR — 네이티브** (Capacitor + ML Kit/Vision) | 2026-05-22 → **2026-05-23 채택** | (이전 기각 사유: 학기 범위 비용) | **Capacitor 처음부터 진행 결정으로 비용 0 확인. Phase 2 P1로 채택 ([§3](../README.md), ROADMAP)** |
 | **음성 받아쓰기 — 웹** (Web Speech API) | 2026-05-22 | 브라우저별 지원 불일치, Chrome은 사실상 외부 API | — |
 | **음성 받아쓰기 — 네이티브** (Capacitor) | 2026-05-23 | (이전 기각 사유 해제) | **Phase 3 채택 — `@capacitor-community/speech-recognition`** |
