@@ -523,9 +523,11 @@ function App() {
         // 찜(읽고 싶어요, #409) — user_book 없이 wish_books 에만. 책 id 확보 후 add.
         if (shelf === 'wish') {
           let bookId = book.book_id || book.id || '';
-          if (!bookId && DataStore.books && DataStore.books.upsert) {
+          // Supabase 모드: 항상 books.upsert 로 캐노니컬 id 확보(#552) — 검색 raw id(b001/외서)는 books 행이
+          // 없어 wish_books FK 위반으로 저장 실패하던 버그. localStorage 모드는 upsert 부재 → 기존 book_id 유지.
+          if (DataStore.books && DataStore.books.upsert) {
             const up = await Promise.resolve(DataStore.books.upsert({ isbn13, title: book.title, author: book.author, publisher: book.publisher, total_pages: totalPages, cover_url: book.cover_url }));
-            bookId = up && up.id;
+            if (up && up.id) bookId = up.id;
           }
           if (bookId && DataStore.wishBooks && DataStore.wishBooks.add) {
             await Promise.resolve(DataStore.wishBooks.add(bookId));
