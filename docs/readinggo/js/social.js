@@ -21,11 +21,11 @@ function SocialView({ state }) {
   const [fq, setFq] = useState('');
   const [fres, setFres] = useState([]);
   const [followed, setFollowed] = useState({});    // userId -> true
-  const [top3, setTop3] = useState([]);            // 이번 주 새로 시작한 책 Top5 (§5.7, #525)
+  const [top3, setTop3] = useState([]);            // 최근 새로 시작한 책 Top5 (§5.7, #525)
   const [myStatus, setMyStatus] = useState({});    // bookId -> 'wish'|'reading'|'completed' — 모달 현재상태 강조 (#525)
   const [sheetBook, setSheetBook] = useState(null);// 책장 선택 바텀시트 대상 (#525)
 
-  // 이번 주 새로 시작한 책 Top5 — 공개 집계 RPC (§5.7). 마운트 1회 로드.
+  // 최근 새로 시작한 책 Top5 — 공개 집계 RPC (§5.7). 마운트 1회 로드.
   useEffect(() => {
     let alive = true;
     if (!(DataStore.books && DataStore.books.startedThisWeek)) return;
@@ -137,11 +137,11 @@ function SocialView({ state }) {
           {fq.trim() && fres.length === 0 && <div style={{ padding: 12, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>검색 결과 없음</div>}
         </div>
       )}
-      {/* 이번 주 새로 시작한 책 Top5 (§5.7, #525) — 세로 리스트. 탭 → 책장 선택 모달. 비어있으면 미표시 */}
+      {/* 최근 새로 시작한 책 Top5 (§5.7, #525) — 세로 리스트. 탭 → 책장 선택 모달. 비어있으면 미표시 */}
       {top3.length > 0 && (
         <div style={{ padding: '0 16px 12px' }}>
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', marginBottom: 6 }}>📚 이번 주 새로 시작한 책</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', marginBottom: 6 }}>📚 최근 새로 시작한 책</div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {top3.slice(0, 5).map((b, i) => {
                 const st = b.bookId && myStatus[b.bookId];
