@@ -107,6 +107,7 @@ users.publicSentences(userId)          → Sentence[]          // 공개 한 문
 users.publicStreak(userId)             → number              // 타인 스트릭 카운트 (공개)
 users.isHandleAvailable(handle)        → boolean             // 닉네임 중복 검사 (본인 제외)
 users.publicShelf(userId)              → UserBook[]          // v7.2: 타인 책장 — 읽는 중+완독(status 포함) (#4)
+users.publicWishlist(userId)           → WishBook[]          // v8.2: 타인 위시리스트 — wishlist_public=true인 경우만 반환, 아니면 [] (#558)
 users.bookContrib(userId, bookId)      → {userBook, sentences[]}  // v7.2: 그 사람의 그 책 평점·후기·한 문장 (#5)
 
 // 운영 대시보드 — is_admin=true 전용 (#161, Phase 2 기본)
@@ -152,6 +153,7 @@ users
   active_user_book_id   uuid NULL FK user_books.id   -- 현재 활성 책
   settings              jsonb DEFAULT '{}'   -- 알림 시간 등
   xp                    int  DEFAULT 0
+  wishlist_public       bool DEFAULT false   -- v8.2 #558: 위시리스트 타인 공개 여부
   created_at            timestamptz
   -- v7 제거: is_operator (운영자 짹 폐기)
   -- 성(🏰) 개수는 floor(xp / 1600) 에서 파생 — 별도 컬럼/테이블 없음
@@ -360,7 +362,8 @@ village_parts(village_id, part_order)                    -- v7 신설
 - `follows`: follower_id가 본인인 행만 insert/delete
 - `claps`: from_user_id가 본인인 행만 insert
 - `pokes`: from_user_id가 본인인 행만 insert. to_user_id가 본인이면 select (수신 확인용)
-- `wish_books`, `sentence_bookmarks`: 본인만 insert/select/delete
+- `wish_books`: insert/update/delete = 본인만. select = 소유자 OR 대상 user의 `wishlist_public=true` (v8.2, #558, `25_wishlist_public.sql`)
+- `sentence_bookmarks`: 본인만 insert/select/delete
 - `inquiries` (v7.2): 본인만 insert(user_id=auth.uid()). select = 본인 OR `is_admin()`. update = `is_admin()`만(상태 변경)
 - `village_members` (v7.2): leave = 본인 행 delete (마을 탈퇴, #9)
 - `villages`: 누구나 공개 마을 목록 select. insert는 로그인 사용자. `village_members` 의 멤버만 피드/멤버 현황 select (구경 불가는 §village 에서 규정)

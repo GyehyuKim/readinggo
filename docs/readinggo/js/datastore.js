@@ -611,6 +611,13 @@ const DataStore = {
     },
   },
 
+  /* 유저 공개 데이터 — Phase 0 로컬 어댑터 stub (표면 일치용)
+     Phase 1 에서 SupabaseDataStore.users 로 실구현. */
+  users: {
+    // 위시리스트 공개 — 로컬/게스트 모드는 항상 [] (Supabase 없이 공개 불가). (#558)
+    publicWishlist(/* userId */) { return []; },
+  },
+
   /* 스포일러 (read-side 계산, 저장 컬럼 없음) ─────────
      spoiler.myCurrentPage: 활성/지정 책의 내 현재 페이지 → 블라인드 판정용. */
   spoiler: {

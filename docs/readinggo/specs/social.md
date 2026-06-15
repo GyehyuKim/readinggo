@@ -4,6 +4,7 @@
 > **v7 갱신 (2026-06-01)**: "모이"→"한 문장", **페이지 기반 스포일러 블라인드(§5.7.1) 신설** (`is_private` 폐기), 리액션 **짹** 확정. 피드는 **전체 공개**. 짹 XP는 [systems.md §6.3](./systems.md).
 > **v7.1 갱신 (2026-06-04, QA 2차)**: 피드 **팔로우/최근/추천 3탭**, `is_private` 재도입 + 감상 `note_private`. [decisions §8.1](./meta/decisions.md).
 > **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, Instagram 모델 — §5.7.1). [decisions §8.3](./meta/decisions.md).
+> **v8.2 갱신 (2026-06-15, #558)**: **위시리스트(관심 책) 공개 토글** 신설 — `users.wishlist_public` 컬럼 + RLS 확장 + 설정 토글 + 타인 프로필 섹션 (§5.7.2).
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 준수.
 
 ### 5.7 소셜 탭
@@ -74,3 +75,33 @@
 - @닉네임 검색 → Phase 0 `NPC_SEARCH_USERS` 풀(`@book_bear`, `@activist_raccoon`, `@reading_owl`, `@page_fox`) 실시간 필터
 - "팔로우" → `friends`에 추가, 마을 그리드 즉시 반영. 이미 팔로우 시 "팔로잉 ✓"
 - Phase 1+: `users` 테이블 검색, 맞팔 요청
+
+#### 5.7.2 위시리스트(관심 책) 선택적 공개 (#558, v8.2)
+
+기본값: **비공개**. 사용자가 설정에서 ON으로 바꾸면 타인 프로필에 위시리스트 섹션이 노출된다.
+
+**DB 계약**
+
+| 항목 | 내용 |
+|---|---|
+| 컬럼 | `users.wishlist_public BOOLEAN NOT NULL DEFAULT FALSE` |
+| 마이그레이션 | `25_wishlist_public.sql` — 컬럼 추가 + `wish_all` RLS 정책 교체 |
+| RLS (`wish_all`) | `SELECT`: 소유자(`user_id = auth.uid()`) OR 대상 user의 `wishlist_public = TRUE`. `INSERT/UPDATE/DELETE`: 소유자만 (`user_id = auth.uid()`). |
+
+**DataStore 계약** (local·supabase 어댑터 동일 시그니처)
+
+```
+users.publicWishlist(userId)  → WishBook[]   // wishlist_public=true인 타인의 위시리스트. false이면 [] 반환.
+```
+
+**설정 UI** (`SettingsModal`)
+
+- "❤️ 읽고 싶은 책 공개" 토글 항목 추가 (스포일러 토글 아래).
+- ON → `DataStore.profile.update({ wishlist_public: true })` / OFF → `false`.
+- Supabase 모드에서만 활성(로컬/게스트는 비활성 + "로그인 후 이용 가능" 안내).
+
+**타인 프로필** (`UserProfileModal`)
+
+- 대상 user의 `wishlist_public = true`이면 책장 아래에 "❤️ 읽고 싶어하는 책" 섹션 표시.
+- 섹션 구성: 가로 스크롤 표지 카드(표지 + 제목). 탭 → 책 드릴다운(기존 `BookCard`·`bookView` 패턴 재활용).
+- `wishlist_public = false`(기본)이면 섹션 자체를 렌더하지 않음(※ 안내 문구도 표시 안 함).

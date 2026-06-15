@@ -561,6 +561,15 @@
           .eq('user_id', userId).in('status', ['reading', 'completed'])
           .order('status', { ascending: true }).order('completed_at', { ascending: false }));
       },
+      // 타인 위시리스트 — wishlist_public=true 인 경우만 반환, 아니면 [] (#558)
+      async publicWishlist(userId) {
+        if (!userId) return [];
+        // users 행의 wishlist_public 을 먼저 확인. RLS도 동일 조건이지만 클라에서도 guard.
+        const userRow = unwrap(await sb().from('users').select('wishlist_public').eq('id', userId).maybeSingle());
+        if (!userRow || !userRow.wishlist_public) return [];
+        return unwrap(await sb().from('wish_books').select('*, book:books(*)')
+          .eq('user_id', userId).order('created_at', { ascending: false })) || [];
+      },
       // 타인의 특정 책 기여 — 그 책 평점·후기 + 공개 한 문장 (#5)
       async bookContrib(userId, bookId) {
         const ub = unwrap(await sb().from('user_books').select('id, rating, review_text, status, current_page')

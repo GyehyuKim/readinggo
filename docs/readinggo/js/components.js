@@ -198,14 +198,15 @@ function UserProfileModal({ handle, onClose }) {
         if (!DS || !DS.users || !DS.users.getByHandle) { if (alive) setData(null); return; }
         const u = await DS.users.getByHandle(handle);
         if (!u) { if (alive) setData(null); return; }
-        const [shelf, sents] = await Promise.all([
+        const [shelf, sents, wishlist] = await Promise.all([
           DS.users.publicShelf ? DS.users.publicShelf(u.id).catch(() => []) : DS.users.publicBooks(u.id).catch(() => []),
           DS.users.publicSentences(u.id).catch(() => []),
+          DS.users.publicWishlist ? DS.users.publicWishlist(u.id).catch(() => []) : Promise.resolve([]),
         ]);
         const all = shelf || [];
         const completed = all.filter((b) => b.status === 'completed');
         const reading = all.filter((b) => b.status === 'reading');
-        if (alive) setData({ user: u, completed, reading, sents: sents || [] }); // 스트릭 미표시 (#557)
+        if (alive) setData({ user: u, completed, reading, sents: sents || [], wishlist: wishlist || [] }); // 스트릭 미표시 (#557)
         const myId = window.RG_ME && window.RG_ME.id;
         if (myId && u.id !== myId && DS.friends && DS.friends.isFollowing) {
           const f = await DS.friends.isFollowing(u.id).catch(() => false);
@@ -340,12 +341,39 @@ function UserProfileModal({ handle, onClose }) {
                     </div>
                     {filtered.length === 0 ? <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>없어요</div>
                       : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 14 }}>{filtered.map((ub) => <BookCard key={ub.id} ub={ub} />)}</div>}
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>※ '보고 싶은 책'은 비공개라 본인만 볼 수 있어요</div>
+                    {(!data.wishlist || data.wishlist.length === 0) && (
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>※ '읽고 싶은 책'은 이 분이 비공개로 설정했어요</div>
+                    )}
                   </>
                 )}
               </div>
             );
           })()}
+
+          {/* 위시리스트 — wishlist_public=true 인 경우만 노출 (#558) */}
+          {data.wishlist && data.wishlist.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>❤️ 읽고 싶어하는 책 {data.wishlist.length}</div>
+              <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 6 }}>
+                {data.wishlist.map((wb) => {
+                  const bk = wb.book || {};
+                  return (
+                    <div key={wb.id || wb.book_id} style={{ flex: '0 0 auto' }}
+                      onClick={() => bk.id && setBookView({ bookId: bk.id, title: bk.title, cover: bk.cover_url })}>
+                      <div style={{ width: 84, cursor: bk.id ? 'pointer' : 'default' }}>
+                        <div style={{ width: 84, height: 118, borderRadius: 6, overflow: 'hidden', background: 'var(--line)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {bk.cover_url
+                            ? <img src={bk.cover_url} alt={bk.title} loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <span style={{ fontSize: 28 }}>❤️</span>}
+                        </div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{bk.title}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 공개 한 문장 */}
           <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>✏️ 공개 한 문장 {data.sents.length}</div>
@@ -382,6 +410,22 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [hmsg, setHmsg] = useState('');
   const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes'); // 데이터 활용 동의 (#294)
   const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'); // 참새 질문 결 (#375)
+  // 위시리스트 공개 토글 (#558) — Supabase 모드에서만 유효. 초기값은 me.wishlist_public.
+  const isSupabase = window.DataStore === window.SupabaseDataStore;
+  const [wishPublic, setWishPublic] = useState(!!(me.wishlist_public));
+  const toggleWishPublic = () => {
+    if (!isSupabase) { showToast('로그인 후 이용할 수 있어요'); return; }
+    const next = !wishPublic;
+    Promise.resolve(
+      window.DataStore && window.DataStore.profile && window.DataStore.profile.update
+        ? window.DataStore.profile.update({ wishlist_public: next })
+        : null
+    ).then(() => {
+      setWishPublic(next);
+      if (window.RG_ME) window.RG_ME.wishlist_public = next;
+      showToast(next ? '❤️ 읽고 싶은 책이 공개됐어요' : '❤️ 읽고 싶은 책이 비공개로 바뀌었어요');
+    }).catch(() => showToast('저장 실패 — 잠시 후 다시'));
+  };
   // 한 줄 소개(bio) 편집은 프로필 헤더 인라인으로 이동 (#515) — 여기서 제거.
   // 닉네임 1개 통합(Model A): 화면 표시·고유성은 handle 로, 저장 시 display_name 도 동기화.
   // 내부 식별은 불변 UUID — 닉네임을 바꿔도 기록은 갈리지 않는다.
@@ -456,6 +500,17 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             <button onClick={() => setSpoilerReveal(v => !v)} aria-pressed={spoilerReveal} title="스포일러 토글"
               style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: 'pointer', background: spoilerReveal ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
               <span style={{ position: 'absolute', top: 3, left: spoilerReveal ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+            </button>
+          </div>
+          {/* 위시리스트 공개 토글 (#558) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>❤️ 읽고 싶은 책 공개</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
+            </div>
+            <button onClick={toggleWishPublic} aria-pressed={wishPublic} title="위시리스트 공개 토글"
+              style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: isSupabase ? 'pointer' : 'default', background: (isSupabase && wishPublic) ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0, opacity: isSupabase ? 1 : 0.45 }}>
+              <span style={{ position: 'absolute', top: 3, left: (isSupabase && wishPublic) ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
           {/* 닉네임 — 피드·프로필에 표시되는 고유 이름(중복 불가, 언제든 변경). 내부 UUID 는 불변. */}
