@@ -33,6 +33,9 @@ jobs:
       - name: 둥지 XP 주기 단계·성·단일 소스 (#521/#522)
         run: node tests/nest-cycle.test.mjs
 
+      - name: books Supabase canonical + isbn13 매칭 (#490)
+        run: node tests/supabase-books.test.mjs
+
       - name: Worker syntax
         run: node --check worker/index.mjs
 

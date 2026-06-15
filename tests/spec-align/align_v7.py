@@ -136,6 +136,8 @@ INVARIANTS = [
         ["datastore-supabase.js"], r"user_book:user_books\(book_id"),
     ("B", "present", "어댑터 대칭 — localStorage sentences.setNote/random",
         ["datastore.js"], r"setNote[\s\S]*random\(\)|random\(\)[\s\S]*setNote"),
+    ("B", "present", "books Supabase canonical 적재 + isbn13 인덱스 (#490)",
+        ["data.js"], r"_mapDbBook[\s\S]*_indexBooks|from\('books'\)[\s\S]*_mapDbBook"),
     ("B", "present", "관련 도서 추천 — recommendRelated + books.related (#496)",
         ["data.js", "datastore.js"], r"recommendRelated"),
     ("B", "present", "관련 도서 ISBN 환각 필터 — filterRelatedCandidates (#496)",

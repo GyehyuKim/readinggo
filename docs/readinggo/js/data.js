@@ -287,13 +287,59 @@ function _fbForId(id) {
   return _FB_PALETTE[h % _FB_PALETTE.length];
 }
 
-// 인라인 12권의 fb/toc 오버라이드 맵
+// 인라인 12권의 fb/toc 오버라이드 맵 (id 기준)
 const _SEED_META = Object.fromEntries(RG_BOOKS.map(b => [b.id, { fb: b.fb, toc: b.toc }]));
+// #490(A): isbn13 매칭 — Supabase 책(uuid id)에도 인라인 12권의 fb/toc 시드를 isbn 으로 잇는다.
+const _SEED_META_BY_ISBN = Object.fromEntries(RG_BOOKS.filter(b => b.isbn).map(b => [b.isbn, { fb: b.fb, toc: b.toc }]));
 
 let _booksCache = null;
 
+// 책 인덱스 — id + isbn13 양쪽 키로 BOOK_BY_ID 채움 (#490 A: isbn13 매칭으로 b001↔uuid 동일시).
+function _indexBooks(list) {
+  (list || []).forEach((b) => {
+    if (b.id) window.BOOK_BY_ID[b.id] = b;
+    if (b.isbn) window.BOOK_BY_ID[b.isbn] = b;
+  });
+}
+// Supabase books 행 → data.js book 형태. fb/toc 는 isbn 시드(없으면 기본).
+function _mapDbBook(b) {
+  const id = String(b.id || '');
+  const isbn = String(b.isbn13 || b.isbn || '').trim();
+  const seed = _SEED_META[id] || (isbn ? _SEED_META_BY_ISBN[isbn] : null);
+  return {
+    id,
+    isbn,
+    title: (b.title || '').trim(),
+    author: (b.author || '').trim(),
+    pub: (b.publisher || '').trim(),
+    total: parseInt(b.total_pages, 10) || 0,
+    cover: (b.cover_url || '').trim(),
+    description: (b.description || '').trim(),
+    fb: seed ? seed.fb : _fbForId(id),
+    toc: seed ? seed.toc : [],
+  };
+}
+
 async function loadBooks() {
   if (_booksCache) return _booksCache;
+  // #490(A): Supabase `books` 가 canonical. 게스트도 publishable key + anon RLS read 로 같은 카탈로그.
+  // 책 식별은 isbn13 매칭(id 체계 b001↔uuid 무관). 실패/빈/미설정 → 정적 TSV 폴백(데모 무중단).
+  try {
+    const sb = (window.RG_SB && window.RG_SB.client) ? window.RG_SB.client() : null;
+    if (sb) {
+      const { data, error } = await sb.from('books')
+        .select('id,isbn13,title,author,publisher,total_pages,cover_url,description')
+        .limit(2000);
+      if (!error && Array.isArray(data) && data.length) {
+        _booksCache = data.map(_mapDbBook).filter(b => b.id && b.title);
+        _indexBooks(_booksCache);
+        return _booksCache;
+      }
+    }
+  } catch (e) {
+    console.warn('[ReadingGo] Supabase books 로드 실패, TSV 폴백:', e && e.message);
+  }
+  // 폴백: 정적 TSV (네트워크/부팅 실패·게스트 미설정 시 최소 보장)
   try {
     const res = await fetch('data/books.tsv?v=1');
     if (!res.ok) throw new Error('books.tsv HTTP ' + res.status);
@@ -316,12 +362,12 @@ async function loadBooks() {
         toc: seed ? seed.toc : [],
       };
     }).filter(b => b.id && b.title);
-    // BOOK_BY_ID 갱신 (TSV 로드 후 전체 목록 참조 가능)
-    _booksCache.forEach(b => { window.BOOK_BY_ID[b.id] = b; });
+    _indexBooks(_booksCache);  // id + isbn13 인덱스 (#490 A)
     return _booksCache;
   } catch (e) {
     console.warn('[ReadingGo] books.tsv 로드 실패, 인라인 12권 사용:', e.message);
     _booksCache = RG_BOOKS;
+    _indexBooks(_booksCache);
     return _booksCache;
   }
 }

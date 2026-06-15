@@ -332,6 +332,9 @@ function App() {
     return window.RG_SB.onAuthChange(u => setAuthUser(u || null));
   }, []);
 
+  // #490: 부팅 시 books 카탈로그 적재 — getBook 동기 캐시 워밍(게스트도 anon RLS read, 실패 시 TSV 폴백).
+  useEffect(() => { if (window.loadBooks) Promise.resolve(window.loadBooks()).catch(() => {}); }, []);
+
   // 로그인 후 Supabase 실데이터 → appState (1회)
   useEffect(() => {
     if (!_supa || !authUser || authUser === 'local') return;
