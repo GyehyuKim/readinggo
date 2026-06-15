@@ -580,6 +580,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
   const [quickText, setQuickText] = _useState('');
+  const [quickSentPage, setQuickSentPage] = _useState('');   // 한 문장의 페이지 (#589) — 비우면 현재 진도. 페이지 업데이트 섹션의 quickPage 와 분리.
   // 빠른입력 OCR (#498) — 책 사진 → quickText 프리필
   const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
   const [quickOcrFile, setQuickOcrFile] = _useState(null);
@@ -772,8 +773,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   const submitSentence = () => {
     const t = quickText.trim();
     if (!t) { showToast('한 문장을 입력해주세요'); return; }
-    handleCheckin({ page: _quickTargetPage(), sentence: t, kind: 'quote' });
-    setQuickText(''); setQuickPage('');
+    // #589: 한 문장 전용 페이지(quickSentPage) 사용. 비우면 현재 진도. 진도 역행 방지(_quickTargetPage 와 동일 규칙).
+    const cur = nestState.book.cur || 0, total = nestState.book.total || 0;
+    const raw = quickSentPage === '' ? cur : (parseInt(quickSentPage, 10) || cur);
+    const page = Math.max(cur, total ? Math.min(total, raw) : raw);
+    handleCheckin({ page, sentence: t, kind: 'quote' });
+    setQuickText(''); setQuickSentPage('');
   };
 
   // 데모 '하루 거르기' 핸들러 폐기 (#481) — onSimSkip prop은 하위호환 위해 시그니처에 유지(미사용).
@@ -920,6 +925,16 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
             <button className="quick-ocr" onClick={() => { if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }} disabled={quickOcrBusy}>
               {quickOcrBusy ? '읽는 중…' : '📷 촬영해서 입력'}
             </button>
+            {/* 이 문장의 페이지 (#589) — 비우면 현재 진도. 페이지 업데이트 섹션과 분리된 quickSentPage */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>📖 페이지</span>
+              <input type="number" inputMode="numeric" min="0" max="99999" value={quickSentPage}
+                placeholder={String(nestState.book.cur || 0)}
+                onChange={(e) => setQuickSentPage(e.target.value)}
+                style={{ width: 78, textAlign: 'center', padding: '7px 6px', border: '1.5px solid var(--line)', borderRadius: 8, fontSize: 13, fontWeight: 700 }} />
+              {nestState.book.total > 0 && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>}
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>비우면 현재 진도</span>
+            </div>
             {/* 한 문장 독립 저장 (#497) — 페이지 섹션과 별개 버튼 */}
             <button className="checkin-cta quick-submit" onClick={submitSentence} style={{ marginTop: 10 }}>✍️ 한 문장 저장</button>
           </div>
