@@ -724,10 +724,10 @@ function StreakCalendarModal({ streak, onClose }) {
 window.StreakCalendarModal = StreakCalendarModal;
 
 /* ── SentenceCollectionModal: 내 한 문장 모아보기(전체/책별/좋아요) + 읽었음 카운터(#171) ── */
-function SentenceCollectionModal({ onClose }) {
+function SentenceCollectionModal({ onClose, initialFilter }) {
   const [mine, setMine] = useState(undefined);
   const [favIds, setFavIds] = useState(new Set());
-  const [filter, setFilter] = useState('all'); // all | book | fav
+  const [filter, setFilter] = useState(initialFilter || 'all'); // all | book | fav — 저장(❤️) 진입 시 'fav' (#510)
   useEffect(() => {
     let alive = true;
     const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
@@ -736,7 +736,7 @@ function SentenceCollectionModal({ onClose }) {
       Promise.resolve((DS.bookmarks && DS.bookmarks.list) ? DS.bookmarks.list() : []).catch(() => []),
     ]).then(([sents, bms]) => {
       if (!alive) return;
-      setMine((sents || []).map(s => ({
+      const mineList = (sents || []).map(s => ({
         id: s.id, text: s.text, page: s.page,
         bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '',
         bookId: (s.user_book && s.user_book.book_id) || s.book_id || '',
@@ -744,7 +744,22 @@ function SentenceCollectionModal({ onClose }) {
         note: s.my_note || '',   // 저장된 참새 대화 — 재오픈 시 이어보기(#418)
         kind: s.kind || 'quote',
         isPrivate: !!s.is_private,
-      })));
+      }));
+      // 저장(❤️)한 타인/소셜 문장 — bookmarks 임베드 중 내 문장 목록에 없는 것 추가 (#510).
+      // 이게 없으면 저장한 타인 문장이 listMine 에 없어 '좋아요' 필터가 비어 보였다.
+      const mineIds = new Set(mineList.map(s => s.id));
+      const savedExtra = (bms || []).filter(b => b && b.sentence && !mineIds.has(b.sentence_id)).map(b => {
+        const se = b.sentence || {};
+        const ub = se.user_book || {};
+        return {
+          id: b.sentence_id, text: se.text || '', page: se.page,
+          bookTitle: (ub.book && ub.book.title) || se.bookTitle || '',
+          bookId: ub.book_id || se.book_id || '',
+          author: (ub.book && ub.book.author) || se.author || '',
+          note: '', kind: se.kind || 'quote', isPrivate: false, saved: true,
+        };
+      });
+      setMine([...mineList, ...savedExtra]);
       setFavIds(new Set((bms || []).map(b => b.sentence_id)));
     }).catch(() => { if (alive) setMine([]); });
     return () => { alive = false; };
@@ -781,7 +796,7 @@ function SentenceCollectionModal({ onClose }) {
           {mine === undefined ? (
             <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20 }}>불러오는 중…</div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20 }}>{filter === 'fav' ? '좋아요한 문장이 없어요' : '아직 한 문장이 없어요'}</div>
+            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20, lineHeight: 1.6 }}>{filter === 'fav' ? '아직 저장한 문장이 없어요 · 소셜 탭에서 마음에 드는 문장에 ❤️를 눌러보세요' : '아직 한 문장이 없어요'}</div>
           ) : filter === 'book' ? (
             Object.keys(byBook).map(title => (
               <div key={title} style={{ marginBottom: 14 }}>
