@@ -60,7 +60,7 @@ create table if not exists public.user_books (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null references public.users(id) on delete cascade,
   book_id       uuid not null references public.books(id),
-  status        text not null default 'reading',   -- 'reading' | 'completed' | 'archived'
+  status        text not null default 'reading',   -- 'reading' | 'completed' | 'aborted'(#593 중단, 되돌리기 가능) | 'archived'(예약, 미사용)
   current_page  int not null default 0,
   rating        numeric(2,1),                       -- 완독 별점 0.5~5 (0.5 단위, 반별점)
   review_text   text,

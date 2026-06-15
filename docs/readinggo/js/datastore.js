@@ -276,6 +276,26 @@ const DataStore = {
         return _applyBookOverrides(ub);
       });
     },
+    // 읽던 책 중단 (#593) — status='aborted'. current_page 보존(되돌리기 가능),
+    // 활성 책이면 active 해제 → "읽는 중"·둥지 캐러셀에서 빠지고 "중단" 탭으로 이동.
+    abort(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) return null;
+        ub.status = 'aborted';
+        if (s.active_user_book_id === ub.id) s.active_user_book_id = null;
+        return _applyBookOverrides(ub);
+      });
+    },
+    // 중단 책 다시 읽기 (#593) — 'aborted' → 'reading'. completed_at 미설정(완독과 무관).
+    resume(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) return null;
+        ub.status = 'reading';
+        return _applyBookOverrides(ub);
+      });
+    },
   },
 
   /* 일일 기록 (세션) ──────────────────────────────

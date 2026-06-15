@@ -159,6 +159,21 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .then(() => showToast('🏰 완독으로 표시했어요 — 새로고침하면 반영돼요'))
       .catch(() => showToast('완독 처리 실패 — 다시 시도'));
   };
+  // 읽기 중단 (#593): 읽던 책을 '중단' 탭으로. 삭제 아님 — 진척 보존, '다시 읽기'로 복구 가능.
+  const abortBook = () => {
+    if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.abort)) return;
+    if (!window.confirm(`'${book.title}' 읽기를 중단할까요?\n진척은 보존되고, '중단' 탭에서 다시 읽을 수 있어요.`)) return;
+    Promise.resolve(DataStore.myBooks.abort(book.ubId))
+      .then(() => { showToast('⏸️ 읽기를 중단했어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
+      .catch(() => showToast('중단 처리 실패 — 다시 시도'));
+  };
+  // 다시 읽기 (#593): 중단 책을 '읽는 중'으로 복귀. current_page 그대로 이어감.
+  const resumeBook = () => {
+    if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.resume)) return;
+    Promise.resolve(DataStore.myBooks.resume(book.ubId))
+      .then(() => { showToast('📖 다시 읽기 시작 — 읽는 중으로 옮겼어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
+      .catch(() => showToast('다시 읽기 실패 — 다시 시도'));
+  };
   const saveNote = (q) => {
     if (!q.id || !(DataStore.sentences && DataStore.sentences.setNote)) { setEditingId(null); return; }
     Promise.resolve(DataStore.sentences.setNote(q.id, draft))
@@ -396,11 +411,27 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </div>
           )}
 
-          {/* 수동 완독 표시 (#265): 미완독 등록 책에만 노출 — 100% 트리거를 놓친 '망령 책' 복구. */}
-          {!bookshelfEntry && book.ubId && (
+          {/* 다시 읽기 (#593): 중단(aborted) 책 → 읽는 중 복귀. current_page 보존. */}
+          {book.status === 'aborted' && book.ubId && (
+            <button onClick={resumeBook}
+              style={{display:'block', width:'100%', textAlign:'center', padding:'12px 14px', background:'var(--brand)', border:'none', borderRadius:'8px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
+              📖 다시 읽기
+            </button>
+          )}
+
+          {/* 수동 완독 표시 (#265): 미완독·미중단 등록 책에만 노출 — 100% 트리거를 놓친 '망령 책' 복구. */}
+          {!bookshelfEntry && book.status !== 'aborted' && book.ubId && (
             <button onClick={markDone}
               style={{display:'block', width:'100%', textAlign:'center', padding:'11px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
               🏰 완독으로 표시
+            </button>
+          )}
+
+          {/* 읽기 중단 (#593): 읽는 중 책 → '중단' 탭. 삭제 아님(진척 보존·복구 가능). */}
+          {!bookshelfEntry && book.status !== 'aborted' && book.ubId && (
+            <button onClick={abortBook}
+              style={{display:'block', width:'100%', textAlign:'center', padding:'11px 14px', background:'transparent', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
+              ⏸️ 읽기 중단
             </button>
           )}
 
@@ -700,6 +731,14 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
     return () => window.removeEventListener('rg:wish-changed', reload);
   }, []);
 
+  // #593: 중단 탭은 책 있을 때만 노출 → 마지막 중단 책을 다시 읽기로 옮기면 탭이 사라진다.
+  // activeSubtab 이 'aborted'에 머물면 빈 화면이 되므로 '읽는 중'으로 되돌린다.
+  _useEffect(() => {
+    if (activeSubtab === 'aborted' && (myBooks || []).every(b => b.status !== 'aborted')) {
+      setActiveSubtab('reading');
+    }
+  }, [myBooks, activeSubtab]);
+
   // 찜 삭제 (#403) — 위시리스트 카드 ✕. 낙관적 제거 + 토스트.
   const removeWish = (e, bookId) => {
     if (e) e.stopPropagation();
@@ -713,6 +752,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const readingBooks = books.filter(b => b.status === 'reading')
     .sort((a, b) => (a.id === activeBookId ? -1 : b.id === activeBookId ? 1 : (b.cur || 0) - (a.cur || 0)));
   const completedBooks = books.filter(b => b.status === 'completed');
+  const abortedBooks = books.filter(b => b.status === 'aborted');   // #593 읽다 중단한 책
 
   const allItems = books.concat(wishlistBooks);
   const selectedBook = selectedBookId ? (allItems.find(x => x.id === selectedBookId) || null) : null;
@@ -721,6 +761,8 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
     { id: 'wishlist', label: '❤️ 읽고 싶은 책', books: wishlistBooks },
     { id: 'reading', label: '📖 읽고 있는 책', books: readingBooks },
     { id: 'completed', label: '✅ 읽은 책', books: completedBooks },
+    // 중단 탭(#593): 읽다 그만둔 책. 책이 있을 때만 노출(빈 탭 노이즈 방지).
+    ...(abortedBooks.length > 0 ? [{ id: 'aborted', label: '⏸️ 중단', books: abortedBooks }] : []),
   ];
 
   const currentTab = tabsData.find(t => t.id === activeSubtab);
@@ -894,7 +936,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
               const isCompleted = b.status === 'completed';
               const progText = isCompleted
                 ? (typeof b.rating === 'number' ? `⭐ ${b.rating.toFixed(1)}` : '완독')
-                : (b.cur > 0 ? `${b.cur}/${b.total}p` : '미완독');
+                : b.status === 'aborted'
+                  ? (b.cur > 0 ? `⏸️ ${b.cur}/${b.total}p` : '⏸️ 중단')
+                  : (b.cur > 0 ? `${b.cur}/${b.total}p` : '미완독');
               return (
                 <div
                   key={b.ubId || b.id}
@@ -920,6 +964,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
               {activeSubtab === 'wishlist' && '찜한 책이 없어요'}
               {activeSubtab === 'reading' && '읽는 책이 없어요'}
               {activeSubtab === 'completed' && (onlyHighRating ? '4점 이상 완독한 책이 없어요' : '완독한 책이 없어요')}
+              {activeSubtab === 'aborted' && '중단한 책이 없어요'}
             </div>
           </div>
         )}

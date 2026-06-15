@@ -159,6 +159,21 @@
           .select('*, book:books(*)').maybeSingle());
         return row ? _applyBookOverrides(row) : null;
       },
+      // 읽던 책 중단 (#593) — status='aborted'. current_page 보존(되돌리기 가능),
+      // 활성 책이면 active 해제 → "중단" 탭으로 이동.
+      async abort(userBookId) {
+        const u = await A.profile.get();
+        const row = unwrap(await sb().from('user_books').update({ status: 'aborted' }).eq('id', userBookId)
+          .select('*, book:books(*)').maybeSingle());
+        if (u && u.active_user_book_id === userBookId) await A.profile.update({ active_user_book_id: null });
+        return row ? _applyBookOverrides(row) : null;
+      },
+      // 중단 책 다시 읽기 (#593) — 'aborted' → 'reading'. completed_at 미설정(완독과 무관).
+      async resume(userBookId) {
+        const row = unwrap(await sb().from('user_books').update({ status: 'reading' }).eq('id', userBookId)
+          .select('*, book:books(*)').maybeSingle());
+        return row ? _applyBookOverrides(row) : null;
+      },
     },
     activeBook: {
       async get() {
