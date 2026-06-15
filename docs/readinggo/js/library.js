@@ -798,8 +798,8 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const tabQuotes = (state.myQuotes || [])
     .filter(q => currentBookIds.includes(q.bookId))
     .sort((a, b) => {
-      const dateA = a.when || a.createdAt || '';
-      const dateB = b.when || b.createdAt || '';
+      const dateA = String(a.when || a.createdAt || '');
+      const dateB = String(b.when || b.createdAt || '');
       return dateB.localeCompare(dateA); // 최신순
     });
 
