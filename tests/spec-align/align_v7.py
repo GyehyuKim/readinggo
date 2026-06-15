@@ -89,6 +89,8 @@ INVARIANTS = [
         ["library.js"], r"NestTheatre\s+xp=\{state\.xp\}"),
     ("S4", "present", "둥지 단계 안내 가이드 팝업 (#511)",
         ["nest.js"], r"둥지가 자라는 방법"),
+    ("S4", "present", "세리머니 한 문장 카드 정직 표시 — bookQuoteCount (#549)",
+        ["nest.js"], r"bookQuoteCount"),
     ("S4", "present", "5단계 이모지 시퀀스 🪵🪹🏠🏡🏰", ADAPTER_FILES,
         r"🪵[\s\S]*🪹[\s\S]*🏠[\s\S]*🏡[\s\S]*🏰"),
     ("S4", "present", "1,600 XP 주기 단계 임계값 (maxXp 99/399/899/1599)", ADAPTER_FILES,

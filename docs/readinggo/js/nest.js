@@ -115,7 +115,7 @@ function Ceremony({ data, onClose, onComplete }) {
   // 둥지 진척도 bar — 체크인 전(prevXp) → 후(newXp) 애니메이션. mount 후 다음 프레임에 목표값으로 전환.
   const [barPct, setBarPct] = _useState(null);
   if (!data) return null;
-  const { xpGain, xpParts, sentence, nestUp, castleGained, castleCount, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
+  const { xpGain, xpParts, sentence, bookQuoteCount, nestUp, castleGained, castleCount, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
   let leadText;
   if (!isNewDay && !wasReset) {
     leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료 🐦`;
@@ -189,10 +189,11 @@ function Ceremony({ data, onClose, onComplete }) {
             <div className="val">+{xpGain}</div>
             <div className="lbl">XP</div>
           </div>
+          {/* 한 문장 카드 (#549) — 문장 입력 시 '저장됨', 미입력 시 거짓 표시 대신 이 책 누적 수/0건 독려 */}
           <div className="reward-card gold">
-            <span className="ico">🔖</span>
-            <div className="val">저장됨</div>
-            <div className="lbl">한 문장</div>
+            <span className="ico">{sentence ? '🔖' : (bookQuoteCount > 0 ? '📖' : '✍️')}</span>
+            <div className="val">{sentence ? '저장됨' : (bookQuoteCount > 0 ? `${bookQuoteCount}개` : '0개')}</div>
+            <div className="lbl">{sentence ? '한 문장' : (bookQuoteCount > 0 ? '이 책 한 문장' : '한 문장 남겨봐요')}</div>
           </div>
         </div>
 
@@ -718,7 +719,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       if (copy) showToast(`${getNestStageByXp(ns.xp).short} ${copy}`);
     }
 
-    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, castleGained, castleCount: newCastles, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
+    // 이 책에서 모은 한 문장 수 (#549) — 세리머니가 거짓 '저장됨' 대신 정직한 누적/독려 표시.
+    const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
+    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, bookQuoteCount, nestUp, castleGained, castleCount: newCastles, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
   };
