@@ -655,8 +655,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   };
 
   const books = myBooks || [];
+  const activeBookId = (state.book || {}).id;   // #580: 활성 책 없으면 state.book undefined → 책장 렌더 크래시 방지
   const readingBooks = books.filter(b => b.status === 'reading')
-    .sort((a, b) => (a.id === state.book.id ? -1 : b.id === state.book.id ? 1 : (b.cur || 0) - (a.cur || 0)));
+    .sort((a, b) => (a.id === activeBookId ? -1 : b.id === activeBookId ? 1 : (b.cur || 0) - (a.cur || 0)));
   const completedBooks = books.filter(b => b.status === 'completed');
 
   const allItems = books.concat(wishlistBooks);
@@ -843,10 +844,10 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
               return (
                 <div
                   key={b.ubId || b.id}
-                  className={'shelf-grid-item' + (b.id === state.book.id ? ' active' : '')}
+                  className={'shelf-grid-item' + (b.id === activeBookId ? ' active' : '')}
                   onClick={() => setSelectedBookId(b.id)}
                 >
-                  {b.id === state.book.id && <span className="shelf-grid-active-pill">읽는중</span>}
+                  {b.id === activeBookId && <span className="shelf-grid-active-pill">읽는중</span>}
                   {b.status === 'wish' && (
                     <button onClick={(e) => removeWish(e, b.id)} title="찜 삭제" aria-label="찜 삭제"
                       className="shelf-grid-remove-wish">✕</button>
