@@ -400,17 +400,15 @@ function UserProfileModal({ handle, onClose }) {
   );
 }
 
-/* ── SettingsModal: 설정 (프로필 ⚙️ 진입, §5.8) ──
-   스포일러 전역 토글(여기로 이전) + 닉네임 변경 + 로그아웃. */
+/* ── SettingsModal: 설정 (#567 #568 재배치)
+   그룹: ① 계정 ② 개인정보·데이터 ③ 읽기 환경 ④ 지원 ⑤ 정보
+   닉네임 편집 → 프로필 헤더 인라인 (#568), 내보내기 → 서재 (#568),
+   한 줄 소개 편집 → 프로필 헤더 인라인 (#515). */
 function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
-  const me = window.RG_ME || {};
-  const V = window.RG_VALIDATE || {};
-  const [hdl, setHdl] = useState(me.handle || '');
-  const [hbusy, setHbusy] = useState(false);
-  const [hmsg, setHmsg] = useState('');
   const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes'); // 데이터 활용 동의 (#294)
   const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'); // 참새 질문 결 (#375)
   // 위시리스트 공개 토글 (#558) — Supabase 모드에서만 유효. 초기값은 me.wishlist_public.
+  const me = window.RG_ME || {};
   const isSupabase = window.DataStore === window.SupabaseDataStore;
   const [wishPublic, setWishPublic] = useState(!!(me.wishlist_public));
   const toggleWishPublic = () => {
@@ -426,30 +424,6 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
       showToast(next ? '❤️ 읽고 싶은 책이 공개됐어요' : '❤️ 읽고 싶은 책이 비공개로 바뀌었어요');
     }).catch(() => showToast('저장 실패 — 잠시 후 다시'));
   };
-  // 한 줄 소개(bio) 편집은 프로필 헤더 인라인으로 이동 (#515) — 여기서 제거.
-  // 닉네임 1개 통합(Model A): 화면 표시·고유성은 handle 로, 저장 시 display_name 도 동기화.
-  // 내부 식별은 불변 UUID — 닉네임을 바꿔도 기록은 갈리지 않는다.
-  const saveHandle = async () => {
-    if (hbusy) return;
-    const r = V.handle ? V.handle(hdl) : { ok: true, value: (hdl || '').replace(/^@/, '').trim() };
-    if (!r.ok) { setHmsg(r.msg); return; }
-    if (r.value === (me.handle || '')) { setHmsg('현재 닉네임이에요'); return; }
-    setHbusy(true); setHmsg('확인 중…');
-    try {
-      const ok = (DataStore.users && DataStore.users.isHandleAvailable)
-        ? await Promise.resolve(DataStore.users.isHandleAvailable(r.value)) : true;
-      if (!ok) { setHmsg('이미 사용 중인 닉네임이에요'); return; }
-      if (DataStore.profile && DataStore.profile.update) await Promise.resolve(DataStore.profile.update({ handle: r.value, display_name: r.value }));
-      if (window.RG_ME) { window.RG_ME.handle = r.value; window.RG_ME.displayName = r.value; }
-      setHmsg('✓ 저장됨'); showToast('닉네임 저장됨 — 새로고침하면 피드에 반영돼요');
-    } catch (e) { setHmsg('이미 사용 중이거나 저장 실패'); }
-    finally { setHbusy(false); }
-  };
-  const logout = () => {
-    if (window.RG_SB && window.RG_SB.signOut) {
-      Promise.resolve(window.RG_SB.signOut()).finally(() => window.location.reload());
-    }
-  };
   // 운영자 문의 (DB 저장 → admin 대시보드)
   const [inqMsg, setInqMsg] = useState('');
   const [inqBusy, setInqBusy] = useState(false);
@@ -464,108 +438,46 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
       .catch(() => showToast('전송 실패 — 잠시 후 다시'))
       .finally(() => setInqBusy(false));
   };
-  // 데이터 내보내기(#172) — 데이터 주권: 내 프로필·책·한 문장을 JSON 으로.
-  const exportData = async () => {
-    try {
-      const [meRow, books, sents] = await Promise.all([
-        Promise.resolve((DataStore.profile && DataStore.profile.get) ? DataStore.profile.get() : null).catch(() => null),
-        Promise.resolve((DataStore.myBooks && DataStore.myBooks.list) ? DataStore.myBooks.list() : []).catch(() => []),
-        Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : []).catch(() => []),
-      ]);
-      const payload = { app: 'ReadingGo', exported_at: new Date().toISOString(), profile: meRow, books, sentences: sents };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `readinggo-export-${(meRow && meRow.handle) || 'me'}.json`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      showToast('데이터를 내보냈어요 (JSON)');
-    } catch (e) { showToast('내보내기 실패'); }
+  const logout = () => {
+    if (window.RG_SB && window.RG_SB.signOut) {
+      Promise.resolve(window.RG_SB.signOut()).finally(() => window.location.reload());
+    }
   };
+  const groupLabel = (text) => (
+    <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 20, marginBottom: 6, paddingLeft: 2 }}>{text}</div>
+  );
   return (
     <div className="modal-backdrop show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label="설정">
         <div className="sheet-grip" />
         <div style={{ padding: '8px 20px 24px' }}>
-          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>⚙️ 설정</span>
             <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ink-3)' }} title="닫기">✕</button>
           </div>
-          {/* 스포일러 토글 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>스포일러 모두 보기</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>안 읽은 페이지의 한 문장도 표시</div>
-            </div>
-            <button onClick={() => setSpoilerReveal(v => !v)} aria-pressed={spoilerReveal} title="스포일러 토글"
-              style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: 'pointer', background: spoilerReveal ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
-              <span style={{ position: 'absolute', top: 3, left: spoilerReveal ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-            </button>
-          </div>
-          {/* 위시리스트 공개 토글 (#558) */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>❤️ 읽고 싶은 책 공개</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
-            </div>
-            <button onClick={toggleWishPublic} aria-pressed={wishPublic} title="위시리스트 공개 토글"
-              style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: isSupabase ? 'pointer' : 'default', background: (isSupabase && wishPublic) ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0, opacity: isSupabase ? 1 : 0.45 }}>
-              <span style={{ position: 'absolute', top: 3, left: (isSupabase && wishPublic) ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-            </button>
-          </div>
-          {/* 닉네임 — 피드·프로필에 표시되는 고유 이름(중복 불가, 언제든 변경). 내부 UUID 는 불변. */}
-          <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line)' }}>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 4 }}>닉네임</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>피드·프로필에 <b>@닉네임</b>으로 표시돼요. 다른 사람과 겹칠 수 없고, 언제든 바꿀 수 있어요.</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ color: 'var(--ink-3)', fontWeight: 800 }}>@</span>
-              <input value={hdl} maxLength={20} onChange={e => { setHdl(e.target.value); setHmsg(''); }} placeholder="myname"
-                style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none' }} />
-              <button onClick={saveHandle} disabled={hbusy} style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: hbusy ? 'default' : 'pointer', opacity: hbusy ? 0.6 : 1 }}>저장</button>
-            </div>
-            {hmsg && <div style={{ fontSize: 12, color: hmsg.indexOf('✓') === 0 ? 'var(--brand)' : '#d33', marginTop: 6 }}>{hmsg}</div>}
-          </div>
-          {/* 한 줄 소개 편집은 프로필 헤더 인라인으로 이동 (#515) — 설정에서 제거 */}
-          {/* 데이터 내보내기 (#172) — 데이터 주권: 내 기록은 내 것 */}
-          <button onClick={exportData} style={{ marginTop: 18, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📦 내 데이터 내보내기 (JSON)</button>
 
-          {/* 운영자 문의 — DB 저장 → admin 대시보드 */}
-          <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink-2)', marginBottom: 8 }}>✉️ 운영자에게 문의</div>
-            {inqDone ? (
-              <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--card)', borderRadius: 10, padding: 12 }}>전송됐어요. 운영자가 확인 후 답변드립니다 🐦 <button onClick={() => setInqDone(false)} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, cursor: 'pointer' }}>다시 쓰기</button></div>
-            ) : (
-              <>
-                <textarea value={inqMsg} onChange={(e) => { if (e.target.value.length <= 2000) setInqMsg(e.target.value); }} placeholder="버그·불편·제안 무엇이든 적어주세요 (최대 2000자)" rows={3}
-                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1.5px solid var(--line)', padding: 10, fontSize: 14, lineHeight: 1.5, resize: 'none' }} />
-                <button onClick={sendInquiry} disabled={inqBusy} style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: inqBusy ? 'default' : 'pointer', opacity: inqBusy ? 0.6 : 1 }}>{inqBusy ? '보내는 중…' : '문의 보내기'}</button>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>또는 readinggo.admin@gmail.com</div>
-              </>
-            )}
-          </div>
-
-          {/* 게스트: 로그인=저장 / 로그인 사용자: 로그아웃 (onboarding.md §4 E) */}
+          {/* ① 계정 */}
+          {groupLabel('계정')}
           {(window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured() && window.DataStore !== window.SupabaseDataStore) ? (
             <button onClick={() => { onClose && onClose(); if (window.RG_login) window.RG_login(); }}
-              style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+              style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
               🐦 로그인하고 내 기록 저장하기
             </button>
           ) : (
             <>
-              {/* 다른 기기 로그아웃 (멀티 디바이스 관리) */}
               <button onClick={() => {
                 if (!window.confirm('이 기기만 남기고 다른 모든 기기에서 로그아웃할까요?')) return;
                 if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
                   Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
                 }
-              }} style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📱 다른 기기에서 로그아웃</button>
-              {/* 로그아웃 */}
-              <button onClick={logout} style={{ marginTop: 10, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>
+              }} style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📱 다른 기기에서 로그아웃</button>
+              <button onClick={logout} style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>
             </>
           )}
 
-          {/* 데이터 수집·AI 활용 동의 (#294, analytics.md §5) */}
-          <div style={{ marginTop: 14, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          {/* ② 개인정보·데이터 */}
+          {groupLabel('개인정보·데이터')}
+          <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>독서 대화 AI·분석 활용</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>한 문장·대화를 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해요. 끄면 로컬 질문만(외부 전송·수집 없음).</div>
@@ -576,9 +488,33 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
+          {/* 위시리스트 공개 (#558) */}
+          <div style={{ marginTop: 8, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>❤️ 읽고 싶은 책 공개</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
+            </div>
+            <button onClick={toggleWishPublic} aria-pressed={wishPublic} aria-label="위시리스트 공개 토글"
+              style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: isSupabase ? 'pointer' : 'default', background: (isSupabase && wishPublic) ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', opacity: isSupabase ? 1 : 0.45 }}>
+              <span style={{ position: 'absolute', top: 3, left: (isSupabase && wishPublic) ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
+            </button>
+          </div>
 
-          {/* 참새 질문 결 프리셋 (#375, companion.md §4.4) — 고른 결이 다음 질문부터 반영. */}
-          <div style={{ marginTop: 14, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
+          {/* ③ 읽기 환경 */}
+          {groupLabel('읽기 환경')}
+          {/* 스포일러 토글 — 설정에서 유지 (#3 결정) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--ink)' }}>스포일러 모두 보기</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>안 읽은 페이지의 한 문장도 표시</div>
+            </div>
+            <button onClick={() => setSpoilerReveal(v => !v)} aria-pressed={spoilerReveal} title="스포일러 토글"
+              style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: 'pointer', background: spoilerReveal ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: spoilerReveal ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+            </button>
+          </div>
+          {/* 참새 질문 결 프리셋 (#375) */}
+          <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>🐦 참새 질문 결</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, marginBottom: 10, lineHeight: 1.4 }}>참새가 던지는 질문의 방향을 골라요. 다음 질문부터 반영돼요.</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -595,8 +531,25 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             </div>
           </div>
 
-          {/* 앱 버전 (베타) */}
-          <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo v{(window.RG_VERSION || '0.000')} · beta</div>
+          {/* ④ 지원 */}
+          {groupLabel('지원')}
+          <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink-2)', marginBottom: 8 }}>✉️ 운영자에게 문의</div>
+            {inqDone ? (
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--card)', borderRadius: 10, padding: 12 }}>전송됐어요. 운영자가 확인 후 답변드립니다 🐦 <button onClick={() => setInqDone(false)} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, cursor: 'pointer' }}>다시 쓰기</button></div>
+            ) : (
+              <>
+                <textarea value={inqMsg} onChange={(e) => { if (e.target.value.length <= 2000) setInqMsg(e.target.value); }} placeholder="버그·불편·제안 무엇이든 적어주세요 (최대 2000자)" rows={3}
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1.5px solid var(--line)', padding: 10, fontSize: 14, lineHeight: 1.5, resize: 'none' }} />
+                <button onClick={sendInquiry} disabled={inqBusy} style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: inqBusy ? 'default' : 'pointer', opacity: inqBusy ? 0.6 : 1 }}>{inqBusy ? '보내는 중…' : '문의 보내기'}</button>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>또는 readinggo.admin@gmail.com</div>
+              </>
+            )}
+          </div>
+
+          {/* ⑤ 정보 */}
+          {groupLabel('정보')}
+          <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo v{(window.RG_VERSION || '0.000')} · beta</div>
         </div>
       </div>
     </div>

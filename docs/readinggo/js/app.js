@@ -717,11 +717,12 @@ function App() {
             { id: 'nest',     ico: '🏠', label: '홈'   },
             { id: 'social',   ico: '📰', label: '피드' },   // '소셜' → '피드' (#488)
             { id: 'profile',  ico: '📚', label: '책장' },   // '프로필' → '책장' (#487)
-            { id: 'settings', ico: '⚙️', label: '설정' },   // 설정 별도 탭 (#488)
+            { id: 'settings', ico: '⚙️', label: '설정' },   // 설정은 목적지 탭이 아닌 액션 (#488 #567)
           ].map(t => (
             <button
               key={t.id}
-              className={'tab' + ((t.id === 'settings' ? settingsOpen : activeTab === t.id) ? ' active' : '')}
+              className={'tab' + (t.id !== 'settings' && activeTab === t.id ? ' active' : '')}
+              style={t.id === 'settings' && settingsOpen ? { opacity: 0.7 } : undefined}
               onClick={() => { if (t.id === 'settings') setSettingsOpen(true); else switchTab(t.id); }}
             >
               <span className="ico">{t.ico}</span>

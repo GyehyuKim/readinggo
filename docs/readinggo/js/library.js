@@ -548,6 +548,48 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
       .then(() => { if (window.RG_ME) window.RG_ME.bio = v; setBioEditing(false); showToast('소개 저장됨'); })
       .catch(() => showToast('저장 실패 — 잠시 후 다시'));
   };
+  // 닉네임 인라인 편집 (#568) — SettingsModal에서 이동, bio 패턴 동일하게.
+  const [hdlEditing, setHdlEditing] = _useState(false);
+  const [hdlText, setHdlText] = _useState((window.RG_ME && window.RG_ME.handle) || '');
+  const [hdlMsg, setHdlMsg] = _useState('');
+  const [hdlBusy, setHdlBusy] = _useState(false);
+  const saveHandle = async () => {
+    if (hdlBusy) return;
+    const V = window.RG_VALIDATE || {};
+    const r = V.handle ? V.handle(hdlText) : { ok: true, value: (hdlText || '').replace(/^@/, '').trim() };
+    if (!r.ok) { setHdlMsg(r.msg); return; }
+    const me = window.RG_ME || {};
+    if (r.value === (me.handle || '')) { setHdlEditing(false); setHdlMsg(''); return; }
+    setHdlBusy(true); setHdlMsg('확인 중…');
+    try {
+      const ok = (DataStore.users && DataStore.users.isHandleAvailable)
+        ? await Promise.resolve(DataStore.users.isHandleAvailable(r.value)) : true;
+      if (!ok) { setHdlMsg('이미 사용 중인 닉네임이에요'); return; }
+      if (DataStore.profile && DataStore.profile.update) await Promise.resolve(DataStore.profile.update({ handle: r.value, display_name: r.value }));
+      if (window.RG_ME) { window.RG_ME.handle = r.value; window.RG_ME.displayName = r.value; }
+      setHdlEditing(false); setHdlMsg(''); showToast('닉네임 저장됨 — 새로고침하면 피드에 반영돼요');
+    } catch (e) { setHdlMsg('이미 사용 중이거나 저장 실패'); }
+    finally { setHdlBusy(false); }
+  };
+  // 데이터 내보내기 (#568 — SettingsModal에서 이동, 서재에서 직접)
+  const exportData = async () => {
+    try {
+      const me = window.RG_ME || {};
+      const [meRow, books, sents] = await Promise.all([
+        Promise.resolve((DataStore.profile && DataStore.profile.get) ? DataStore.profile.get() : null).catch(() => null),
+        Promise.resolve((DataStore.myBooks && DataStore.myBooks.list) ? DataStore.myBooks.list() : []).catch(() => []),
+        Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : []).catch(() => []),
+      ]);
+      const payload = { app: 'ReadingGo', exported_at: new Date().toISOString(), profile: meRow, books, sentences: sents };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `readinggo-export-${(meRow && meRow.handle) || me.handle || 'me'}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast('데이터를 내보냈어요 (JSON)');
+    } catch (e) { showToast('내보내기 실패'); }
+  };
   const isAdmin = !!(window.RG_ME && window.RG_ME.isAdmin);
 
   // 내 책(읽는중/완독) + 관심책 — 실 Supabase (양 어댑터 정규화). 데모 상수 미사용.
@@ -662,7 +704,30 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
               style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:'50%', width:34, height:34, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1}}>📊</button>
           )}
         </div>
-        <div style={{fontSize:22, fontWeight:900, color:'var(--ink)'}}>🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}</div>
+        {/* 닉네임 인라인 편집 (#568) — 탭 → 입력, Enter/저장 → 저장, ESC/바깥 → 취소 */}
+        {hdlEditing ? (
+          <div style={{marginTop:2, display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
+            <div style={{display:'flex', gap:6, alignItems:'center', justifyContent:'center'}}>
+              <span style={{fontSize:20}}>🐦</span>
+              <span style={{color:'var(--ink-3)', fontWeight:800, fontSize:16}}>@</span>
+              <input value={hdlText} maxLength={20} autoFocus
+                onChange={e => { setHdlText(e.target.value); setHdlMsg(''); }}
+                onKeyDown={e => { if (e.key === 'Enter') saveHandle(); else if (e.key === 'Escape') { setHdlText((window.RG_ME && window.RG_ME.handle) || ''); setHdlEditing(false); setHdlMsg(''); } }}
+                onBlur={() => { if (!hdlBusy) { setHdlText((window.RG_ME && window.RG_ME.handle) || ''); setHdlEditing(false); setHdlMsg(''); } }}
+                placeholder="닉네임"
+                style={{fontSize:16, fontWeight:900, padding:'4px 8px', border:'1.5px solid var(--brand)', borderRadius:6, color:'var(--ink)', background:'var(--card)', width:120, textAlign:'center'}} />
+              <button onMouseDown={e => { e.preventDefault(); saveHandle(); }} disabled={hdlBusy}
+                style={{padding:'4px 12px', borderRadius:6, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:hdlBusy ? 'default' : 'pointer', opacity:hdlBusy ? 0.6 : 1}}>저장</button>
+            </div>
+            {hdlMsg && <div style={{fontSize:11, color: hdlMsg.indexOf('✓') === 0 ? 'var(--brand)' : '#d33', fontWeight:700}}>{hdlMsg}</div>}
+          </div>
+        ) : (
+          <div onClick={() => { setHdlText((window.RG_ME && window.RG_ME.handle) || ''); setHdlEditing(true); setHdlMsg(''); }}
+            title="탭하여 닉네임 편집"
+            style={{fontSize:22, fontWeight:900, color:'var(--ink)', cursor:'pointer'}}>
+            🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'} ✏️
+          </div>
+        )}
         {/* 한 줄 소개 인라인 편집 (#515) — 탭 → 입력, Enter/저장 → 저장, ESC/바깥 → 취소 */}
         {bioEditing ? (
           <div style={{marginTop:4, display:'flex', gap:6, alignItems:'center', justifyContent:'center'}}>
@@ -852,6 +917,12 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             )}
           </div>
         )}
+
+        {/* 데이터 내보내기 (#568 — 설정에서 서재로 이동, 내 책·한 문장 맥락과 직결) */}
+        <button onClick={exportData}
+          style={{marginTop:20, width:'100%', padding:'12px', borderRadius:10, border:'1.5px solid var(--line)', background:'transparent', color:'var(--ink-2)', fontWeight:800, fontSize:14, cursor:'pointer'}}>
+          📦 내 데이터 내보내기 (JSON)
+        </button>
       </div>
 
       {/* 책 상세 모달 */}
