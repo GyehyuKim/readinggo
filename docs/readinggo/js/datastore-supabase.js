@@ -342,16 +342,23 @@
           .in('user_id', ids).order('created_at', { ascending: false }).limit(limit || 30));
       },
       // 같은 책 피드 — 특정 책의 *다른* 사용자 한 문장 (둥지 '같은 책 읽는 사람들', NPC 포함, #1)
-      async byBook(bookId, { limit } = {}) {
+      async byBook(bookId, { limit, sort } = {}) {
         // 데모 book id('b008' 등) 비-UUID 방어 — uuid 컬럼 질의 400 방지.
         if (!bookId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookId)) return [];
         const me = await uid();
+        // sort='likes'(#594): 짹 많은 순. PostgREST 임베드 집계(claps(count))를 받아 클라에서 정렬·슬라이스
+        // (임베드 aggregate 정렬은 PostgREST에서 불안정 → 후보 풀을 넉넉히 받아 JS 정렬). 기본 'recent'(최신순).
+        const likes = sort === 'likes';
+        const pool = likes ? 50 : (limit || 10);
         let q = sb().from('sentences')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author))')
+          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author)), clap_count:claps(count)')
           .eq('user_book.book_id', bookId)
-          .order('created_at', { ascending: false }).limit(limit || 10);
+          .order('created_at', { ascending: false }).limit(pool);
         if (me) q = q.neq('user_id', me);
-        return unwrap(await q);
+        let rows = unwrap(await q) || [];
+        rows = rows.map(r => ({ ...r, clapCount: (r.clap_count && r.clap_count[0] && r.clap_count[0].count) || 0 }));
+        if (likes) { rows.sort((a, b) => b.clapCount - a.clapCount); rows = rows.slice(0, limit || 5); }
+        return rows;
       },
       // 무작위 회상 — 내 과거 한 문장 1개 (profile §5.8.7)
       // 추천 — 내 서재의 책을 읽는 다른 사람들의 최근(1주) 한 문장 (유사도≈공유 책). 비면 최근 피드 폴백. (#8)

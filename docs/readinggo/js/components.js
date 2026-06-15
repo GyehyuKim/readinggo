@@ -634,11 +634,21 @@ function BookInfoModal({ bookId, onClose }) {
   const [bk, setBk] = useState(undefined); // undefined=로딩, null=없음
   const [manualPages, setManualPages] = useState(''); // 쪽수 메타 누락 시 수동 입력 (#204)
   const [desc, setDesc] = useState(''); // 책 소개 (#578) — DB description 우선, 없으면 알라딘 폴백
+  const [popular, setPopular] = useState([]); // 인기 한 문장 Top5 (#594) — 짹 많은 순, 게스트/빈 → []
   useEffect(() => {
     let alive = true;
     const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
     Promise.resolve((DS.books && DS.books.getById) ? DS.books.getById(bookId) : null)
       .then(b => { if (alive) setBk(b || null); }).catch(() => { if (alive) setBk(null); });
+    return () => { alive = false; };
+  }, [bookId]);
+  // 인기 한 문장 Top5 (#594) — 그 책 공개 문장 중 짹 많은 순. 게스트·비UUID·빈 결과 → 섹션 생략.
+  useEffect(() => {
+    let alive = true;
+    const DS = window.DataStore || {};
+    Promise.resolve((DS.sentences && DS.sentences.byBook) ? DS.sentences.byBook(bookId, { limit: 5, sort: 'likes' }) : [])
+      .then(rows => { if (alive) setPopular(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (alive) setPopular([]); });
     return () => { alive = false; };
   }, [bookId]);
   // 책 소개 — DB books.description 우선, 비면 알라딘 프록시 폴백 (#578, library.js BookDetailModal §5.8 패턴)
@@ -681,6 +691,28 @@ function BookInfoModal({ bookId, onClose }) {
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>📚 책 소개</div>
                 <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
+              </div>
+            )}
+            {/* 이 책의 인기 한 문장 Top5 (#594) — 짹 많은 순, 타인 공개 문장. 읽기 전용(짹 토글·대화 없음).
+                게스트·비UUID·빈 결과면 섹션 생략. "왜 읽는지"의 사회적 맥락. */}
+            {popular.length > 0 && (
+              <div style={{ textAlign: 'left', marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 8 }}>🔖 이 책의 한 문장</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {popular.map(s => {
+                    const u = s.user || {};
+                    const who = u.display_name || (u.handle ? '@' + u.handle : '익명');
+                    return (
+                      <div key={s.id} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12 }}>
+                        <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6, marginBottom: 8 }}>"{decodeEntities(s.text || '')}"</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>
+                          <span>{who}{typeof s.page === 'number' && s.page > 0 ? ` · p.${s.page}` : ''}</span>
+                          <span aria-label={`짹 ${s.clapCount || 0}`}>🐦 {s.clapCount || 0}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {/* 쪽수 메타 누락 시 수동 입력 — 진척률·읽기모드용 (#204) */}
