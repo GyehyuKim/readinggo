@@ -318,6 +318,7 @@ const NEST_CRACK_SVG = (
 
 function NestTheatre({ xp, health = 100 }) {
   // 둥지 = 누적 활동(XP). 책 진척률 아님 (#313). pct = 현재 레벨 내 진행도.
+  const [showGuide, setShowGuide] = _useState(false); // 둥지 단계 안내 팝업 (#511)
   const pct = _xpProg(xp);                 // 현재 주기 진행 % (cycleXp / 1600)
   const stage = getNestStageByXp(xp);      // 둥지 단계 = 현재 주기 XP (#520)
   const { next } = nestInfo(stage.lv);
@@ -338,10 +339,12 @@ function NestTheatre({ xp, health = 100 }) {
       <div className="nest-meta">
         <div className="nest-name-row">
           <div className="nest-name">
-            <span>Lv.{stage.lv} {stage.name}</span>
+            <span>{stage.short} {stage.name}</span>
             {next && (
               <span className="next-arrow">→ {next.short} {next.name}</span>
             )}
+            <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내" title="둥지가 자라는 방법"
+              style={{marginLeft:6, background:'none', border:'none', cursor:'pointer', color:'var(--ink-3)', fontSize:13, fontWeight:900, padding:'0 2px', lineHeight:1}}>?</button>
           </div>
           <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
         </div>
@@ -349,7 +352,7 @@ function NestTheatre({ xp, health = 100 }) {
           <div className="nest-health-fill" />
         </div>
         <div className="nest-microcopy">
-          {cur.short} {cur.name}{next ? ` · ${stageMicrocopy(pct, stage)}` : ''}
+          {stageMicrocopy(pct, stage)}
         </div>
       </div>
 
@@ -373,6 +376,31 @@ function NestTheatre({ xp, health = 100 }) {
           <span className="fall-twig">🍂</span>
         </div>
       </div>
+
+      {/* 둥지 단계 안내 팝업 (#511) — 5단계 XP 기준 + 성 획득 사이클. XP 기준은 NEST_STAGES SSOT(#520). */}
+      {showGuide && ReactDOM.createPortal(
+        <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) setShowGuide(false); }}>
+          <div className="sheet" role="dialog" aria-label="둥지 단계 안내">
+            <div className="sheet-grip" />
+            <button onClick={() => setShowGuide(false)} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1, zIndex:2}}>✕</button>
+            <div style={{padding:'8px 20px 24px'}}>
+              <div style={{textAlign:'center', fontSize:18, fontWeight:900, color:'var(--ink)', marginBottom:4}}>둥지가 자라는 방법</div>
+              <div style={{textAlign:'center', fontSize:13, color:'var(--ink-2)', fontWeight:700, marginBottom:16}}>활동하면 XP가 쌓이고 둥지가 자라요!</div>
+              {NEST_STAGES.map(s => (
+                <div key={s.lv} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, background: s.lv === stage.lv ? 'var(--brand-tint)' : 'transparent', marginBottom:4}}>
+                  <span style={{fontSize:22, lineHeight:1}}>{s.short}</span>
+                  <span style={{flex:1, fontSize:14, fontWeight:800, color:'var(--ink)'}}>{s.name}</span>
+                  <span style={{fontSize:12, color:'var(--ink-3)', fontWeight:700}}>{s.maxXp == null ? `${s.minXp.toLocaleString()} XP` : `${s.minXp.toLocaleString()}–${s.maxXp.toLocaleString()} XP`}</span>
+                </div>
+              ))}
+              <div style={{marginTop:14, padding:'12px 14px', background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:8, fontSize:13, color:'var(--brand-3)', fontWeight:800, lineHeight:1.6, textAlign:'center'}}>
+                🏰 1,600 XP 달성 → 성 획득! 다시 나뭇가지 자리부터 새 둥지를 시작해요.
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
