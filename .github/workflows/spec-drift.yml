@@ -30,6 +30,9 @@ jobs:
       - name: 관련 도서 ISBN 환각 필터 (#496)
         run: node tests/related-filter.test.mjs
 
+      - name: 둥지 XP 주기 단계·성·단일 소스 (#521/#522)
+        run: node tests/nest-cycle.test.mjs
+
       - name: Worker syntax
         run: node --check worker/index.mjs
 

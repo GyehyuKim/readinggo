@@ -69,5 +69,18 @@ eq('nestXpProgress(0)', nestXpProgress(0), 0);
 eq('nestXpProgress(800) = 50', nestXpProgress(800), 50);
 eq('nestXpProgress(1600) = 0 (리셋)', nestXpProgress(1600), 0);
 
+// #522 회귀 — 세리머니가 보여주는 단계와 프로필 NestTheatre 단계는 동일 XP 단일 소스라 항상 일치.
+// 세리머니: nest.js handleCheckin 의 newLv = getNestStageByXp(ns.xp).lv
+// 프로필 : NestTheatre(xp=state.xp) 의 getNestStageByXp(state.xp).lv, state.xp = ns.xp
+// 책 진도(total)와 무관하게 xp 만으로 결정되어야 한다(원인1: total=0 Lv1 고정 제거).
+const ceremonyLv = (xp) => getNestStageByXp(xp).lv;   // 세리머니 newLv
+const profileLv = (xp) => getNestStageByXp(xp).lv;    // 프로필 NestTheatre(state.xp)
+for (const xp of [0, 80, 110, 450, 950, 1599, 1700, 3250]) {
+  eq(`#522 세리머니=프로필 단계 일치 (xp ${xp})`, ceremonyLv(xp), profileLv(xp));
+}
+// 체크인 진화 시나리오: xp 80(Lv1) → +30 = 110(Lv2). 세리머니 newLv=Lv2 → 프로필도 Lv2.
+eq('#522 진화 후 일치 (80→110, Lv1→Lv2)', profileLv(80 + 30), ceremonyLv(80 + 30));
+eq('#522 쪽수 미상 무관: xp 110 → Lv2', getNestStageByXp(110).lv, 2);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

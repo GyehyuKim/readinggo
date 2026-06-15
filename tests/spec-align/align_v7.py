@@ -81,6 +81,12 @@ INVARIANTS = [
         r"nestHealth|twigCount|NEST_LADDER|daysSinceRead"),
     ("S4", "present", "NEST_STAGES 5단계 + getNestStageByXp", ADAPTER_FILES,
         r"NEST_STAGES[\s\S]*getNestStageByXp|getNestStageByXp[\s\S]*NEST_STAGES"),
+    # #522: 둥지 단계는 XP 단일 소스. NestTheatre 가 xp prop 으로 받아 getNestStageByXp 로 계산하고,
+    # 프로필(LibraryView)은 state.xp 를 그대로 넘긴다 → 세리머니(newLv)와 항상 일치(책 진도% 재도입 금지).
+    ("S4", "present", "NestTheatre 둥지 단계 = XP 단일 소스 (#522)",
+        ["nest.js"], r"function NestTheatre\(\{\s*xp"),
+    ("S4", "present", "프로필 NestTheatre 에 state.xp 전달 (#522 단일 소스)",
+        ["library.js"], r"NestTheatre\s+xp=\{state\.xp\}"),
     ("S4", "present", "5단계 이모지 시퀀스 🪵🪹🏠🏡🏰", ADAPTER_FILES,
         r"🪵[\s\S]*🪹[\s\S]*🏠[\s\S]*🏡[\s\S]*🏰"),
     ("S4", "present", "1,600 XP 주기 단계 임계값 (maxXp 99/399/899/1599)", ADAPTER_FILES,
