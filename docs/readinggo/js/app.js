@@ -575,6 +575,12 @@ function App() {
     return () => { window.RG_registerBook = null; };
   }, [handleSearchSelectBook]);
 
+  // 소셜 랭킹 등 책 카드 → 책장 선택(찜/읽는중/완독) 추가 경로 재사용 (#525). shelf 분기·토스트·둥지반영은 handleSearchSelectBook 이 처리.
+  useEffect(() => {
+    window.RG_addBookToShelf = (b, shelf) => handleSearchSelectBook({ book_id: b.bookId || b.book_id || b.id, isbn13: b.isbn13 || b.isbn, title: b.title, author: b.author, publisher: b.publisher, total_pages: b.total_pages, cover_url: b.cover_url }, shelf);
+    return () => { window.RG_addBookToShelf = null; };
+  }, [handleSearchSelectBook]);
+
   // 이미 등록된 user_book 으로 활성 전환 (서재에서 — 재등록 없이 activeBook.set).
   const handleActivateUserBook = useCallback((item) => {
     if (!item || !item.id) return;

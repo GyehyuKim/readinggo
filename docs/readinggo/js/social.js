@@ -21,17 +21,44 @@ function SocialView({ state }) {
   const [fq, setFq] = useState('');
   const [fres, setFres] = useState([]);
   const [followed, setFollowed] = useState({});    // userId -> true
-  const [top3, setTop3] = useState([]);            // 이번 주 신규 시작러 Top3 (§5.7)
+  const [top3, setTop3] = useState([]);            // 이번 주 새로 시작한 책 Top5 (§5.7, #525)
+  const [myStatus, setMyStatus] = useState({});    // bookId -> 'wish'|'reading'|'completed' — 모달 현재상태 강조 (#525)
+  const [sheetBook, setSheetBook] = useState(null);// 책장 선택 바텀시트 대상 (#525)
 
-  // 이번 주 새로 시작한 책 Top3 — 공개 집계 RPC (§5.7). 마운트 1회 로드.
+  // 이번 주 새로 시작한 책 Top5 — 공개 집계 RPC (§5.7). 마운트 1회 로드.
   useEffect(() => {
     let alive = true;
     if (!(DataStore.books && DataStore.books.startedThisWeek)) return;
-    Promise.resolve(DataStore.books.startedThisWeek(3))
+    Promise.resolve(DataStore.books.startedThisWeek(5))
       .then(rows => { if (alive) setTop3(rows || []); })
       .catch(() => { if (alive) setTop3([]); });
     return () => { alive = false; };
   }, []);
+
+  // 내 책장 상태 맵 (#525) — 랭킹 책이 이미 내 책장에 있으면 모달에서 현재 상태 강조.
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      Promise.resolve((DataStore.myBooks && DataStore.myBooks.list) ? DataStore.myBooks.list() : []).catch(() => []),
+      Promise.resolve((DataStore.wishBooks && DataStore.wishBooks.list) ? DataStore.wishBooks.list() : []).catch(() => []),
+    ]).then(([mine, wishes]) => {
+      if (!alive) return;
+      const m = {};
+      (mine || []).forEach(ub => { if (ub.book_id) m[ub.book_id] = ub.status; });
+      (wishes || []).forEach(w => { const id = (w && w.book && w.book.id) || (w && w.book_id); if (id && !m[id]) m[id] = 'wish'; });
+      setMyStatus(m);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // 랭킹 책 탭 → 선택한 책장(찜/읽는중/완독) 추가 (#525). app handleSearchSelectBook 재사용(토스트·둥지반영 포함).
+  const chooseRankShelf = (shelf) => {
+    const b = sheetBook;
+    setSheetBook(null);
+    if (!b) return;
+    if (window.RG_addBookToShelf) window.RG_addBookToShelf(b, shelf);
+    if (b.bookId) setMyStatus(m => ({ ...m, [b.bookId]: shelf })); // 낙관적 갱신
+  };
 
   // 친구 찾기: @닉 검색(users.search) → 팔로우 (#250)
   useEffect(() => {
@@ -110,25 +137,31 @@ function SocialView({ state }) {
           {fq.trim() && fres.length === 0 && <div style={{ padding: 12, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>검색 결과 없음</div>}
         </div>
       )}
-      {/* 이번 주 신규 시작러 Top3 (§5.7) — 비어있으면 미표시 */}
+      {/* 이번 주 새로 시작한 책 Top5 (§5.7, #525) — 세로 리스트. 탭 → 책장 선택 모달. 비어있으면 미표시 */}
       {top3.length > 0 && (
         <div style={{ padding: '0 16px 12px' }}>
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', marginBottom: 8 }}>📚 이번 주 새로 시작한 책</div>
-            <div style={{ display: 'flex', gap: 10, overflowX: 'auto' }}>
-              {top3.map((b, i) => (
-                <button key={b.bookId || i} onClick={() => { if (b.bookId && window.RG_openBook) window.RG_openBook(b.bookId); }}
-                  style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: 'none', cursor: (b.bookId && window.RG_openBook) ? 'pointer' : 'default', padding: 0, maxWidth: 200 }}>
-                  <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--brand-3)', minWidth: 18 }}>{i + 1}위</span>
-                  {b.cover_url
-                    ? <img src={b.cover_url} alt="" style={{ width: 28, height: 40, objectFit: 'cover', borderRadius: 4, flex: '0 0 auto' }} />
-                    : null}
-                  <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', minWidth: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</span>
-                    <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{b.starters}명 시작</span>
-                  </span>
-                </button>
-              ))}
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', marginBottom: 6 }}>📚 이번 주 새로 시작한 책</div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {top3.slice(0, 5).map((b, i) => {
+                const st = b.bookId && myStatus[b.bookId];
+                return (
+                  <button key={b.bookId || i} onClick={() => setSheetBook(b)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', borderTop: i === 0 ? 'none' : '1px solid var(--line-2, #f2ede2)', cursor: 'pointer', padding: '8px 2px', textAlign: 'left', width: '100%' }}>
+                    <span style={{ fontSize: 14, fontWeight: 900, color: i < 3 ? 'var(--brand-3)' : 'var(--ink-3)', minWidth: 20, textAlign: 'center' }}>{i + 1}</span>
+                    {b.cover_url
+                      ? <img src={b.cover_url} alt="" style={{ width: 30, height: 43, objectFit: 'cover', borderRadius: 4, flex: '0 0 auto' }} />
+                      : <span style={{ width: 30, height: 43, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--line)', borderRadius: 4, flex: '0 0 auto', fontSize: 16 }}>📖</span>}
+                    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</span>
+                      {b.author ? <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.author}</span> : null}
+                    </span>
+                    <span style={{ fontSize: 11, color: st ? 'var(--brand-3)' : 'var(--ink-3)', fontWeight: 800, flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+                      {st ? (st === 'wish' ? '❤️ 찜' : st === 'completed' ? '✅ 완독' : '📖 읽는 중') : `${b.starters}명 시작`}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -157,6 +190,34 @@ function SocialView({ state }) {
         </div>
       ) : (
         <div>{items.map((it, i) => (<SentenceCard key={it.id || i} item={it} bookId={it.bookId} />))}</div>
+      )}
+
+      {/* 책장 선택 바텀시트 (#525) — 랭킹 책 탭 시. 찜/읽는중/완독 분기, 현재 상태 강조. */}
+      {sheetBook && (
+        <div onClick={() => setSheetBook(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 10000 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              {sheetBook.cover_url && <img src={sheetBook.cover_url} alt="" style={{ width: 40, height: 57, objectFit: 'cover', borderRadius: 5, flex: '0 0 auto' }} />}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sheetBook.title}</div>
+                {sheetBook.author ? <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sheetBook.author}</div> : null}
+              </div>
+            </div>
+            {[['wish', '❤️ 읽고 싶어요'], ['reading', '📖 지금 읽는 중'], ['completed', '🏰 다 읽었어요']].map(([k, label]) => {
+              const cur = sheetBook.bookId && myStatus[sheetBook.bookId] === k;
+              return (
+                <button key={k} onClick={() => chooseRankShelf(k)}
+                  style={{ width: '100%', padding: '14px', marginBottom: 8, borderRadius: 12, border: cur ? '1.5px solid var(--brand)' : '1.5px solid var(--line)', background: cur ? 'var(--brand-tint)' : 'var(--card)', color: 'var(--ink)', fontWeight: 800, fontSize: 15, cursor: 'pointer', textAlign: 'left' }}>
+                  {label}{cur ? '  ✓ 현재' : ''}
+                </button>
+              );
+            })}
+            <button onClick={() => setSheetBook(null)}
+              style={{ width: '100%', padding: '10px', marginTop: 4, borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
+          </div>
+        </div>
       )}
     </section>
   );
