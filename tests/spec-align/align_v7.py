@@ -142,6 +142,8 @@ INVARIANTS = [
         ["components.js"], r"savedExtra"),
     ("B", "present", "한 줄 소개 인라인 편집 — 프로필 헤더 (#515)",
         ["library.js"], r"bioEditing[\s\S]*saveBio|saveBio[\s\S]*bioEditing"),
+    ("B", "present", "프로필 헤더 → 둥지 순서 (#508)",
+        ["library.js"], r"프로필 정보 \(#508\)[\s\S]*프로필 헤더 아래로 이동 \(#508"),
 
     # ── C: post-beta 기능 (스펙↔구현 동기화 강제, decisions §8.4/§8.5) ──
     # 읽기 모드(ReadingMode/타이머) invariant 폐기 (#505) — 홈 빠른입력으로 일원화, 독서시간 측정 폐기
