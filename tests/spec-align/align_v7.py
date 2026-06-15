@@ -79,12 +79,12 @@ INVARIANTS = [
     # ── S4: 둥지가 자란다 (진척률 5단계) ──────────────────────
     ("S4", "absent", "구 8단계 health-decay 둥지 잔재", None,
         r"nestHealth|twigCount|NEST_LADDER|daysSinceRead"),
-    ("S4", "present", "NEST_STAGES 5단계 + getNestStage", ADAPTER_FILES,
-        r"NEST_STAGES[\s\S]*getNestStage|getNestStage[\s\S]*NEST_STAGES"),
+    ("S4", "present", "NEST_STAGES 5단계 + getNestStageByXp", ADAPTER_FILES,
+        r"NEST_STAGES[\s\S]*getNestStageByXp|getNestStageByXp[\s\S]*NEST_STAGES"),
     ("S4", "present", "5단계 이모지 시퀀스 🪵🪹🏠🏡🏰", ADAPTER_FILES,
         r"🪵[\s\S]*🪹[\s\S]*🏠[\s\S]*🏡[\s\S]*🏰"),
-    ("S4", "present", "진척률 임계값 20/50/80/99/100", ADAPTER_FILES,
-        r"20[\s\S]{0,40}50[\s\S]{0,40}80[\s\S]{0,40}99[\s\S]{0,40}100"),
+    ("S4", "present", "1,600 XP 주기 단계 임계값 (maxXp 99/399/899/1599)", ADAPTER_FILES,
+        r"99[\s\S]{0,40}399[\s\S]{0,40}899[\s\S]{0,40}1599"),
     ("S4", "present", "진화 마이크로카피 4종", None,
         r"자리를 잡|살림을 차|다정한 이웃|성주"),
 

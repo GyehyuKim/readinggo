@@ -115,15 +115,18 @@ function Ceremony({ data, onClose, onComplete }) {
   // 둥지 진척도 bar — 체크인 전(prevXp) → 후(newXp) 애니메이션. mount 후 다음 프레임에 목표값으로 전환.
   const [barPct, setBarPct] = _useState(null);
   if (!data) return null;
-  const { xpGain, xpParts, sentence, nestUp, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
+  const { xpGain, xpParts, sentence, nestUp, castleGained, castleCount, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
   let leadText;
   if (!isNewDay && !wasReset) {
     leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료 🐦`;
   } else {
     leadText = `+${pagesAdded}쪽 읽었어요`;
   }
-  const prevStage = nestUp ? NEST_STAGES[prevLv - 1] : null;
-  const nowStage  = nestUp ? NEST_STAGES[newLv  - 1] : null;
+  // 진화 축하 화면(step 1) 트리거: 단계 상승(nestUp) 또는 성 획득(castleGained).
+  // 성 획득 시엔 둥지가 Lv4(다정한 집) → Lv5(참새의 성 🏰) 으로 완성되는 연출.
+  const evoUp = nestUp || castleGained;
+  const prevStage = evoUp ? (castleGained ? NEST_STAGES[3] : NEST_STAGES[prevLv - 1]) : null;
+  const nowStage  = evoUp ? (castleGained ? NEST_STAGES[4] : NEST_STAGES[newLv  - 1]) : null;
 
   const startPct = _xpProg(prevXp != null ? prevXp : newXp);
   const endPct   = _xpProg(newXp != null ? newXp : prevXp);
@@ -136,13 +139,15 @@ function Ceremony({ data, onClose, onComplete }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // nestUp 축하 화면 (step 1) — prevStage → nowStage 진화 시각화 + [계속 →]
-  if (step === 1 && nestUp && prevStage && nowStage) {
-    const evoCopy = getEvolutionCopy(prevLv, newLv);
+  // 진화 축하 화면 (step 1) — prevStage → nowStage 시각화 + [계속 →].
+  // 성 획득(castleGained)이면 Lv4 → Lv5(🏰) 완성 연출, 아니면 단계 상승 연출.
+  if (step === 1 && evoUp && prevStage && nowStage) {
+    const evoCopy = castleGained ? getEvolutionCopy(4, 5) : getEvolutionCopy(prevLv, newLv);
     return (
       <div className="ceremony show">
         <div className="inner">
-          <h2>✨ 둥지가 진화했어요!</h2>
+          <h2>{castleGained ? '🏰 성을 완성했어요!' : '✨ 둥지가 진화했어요!'}</h2>
+          {castleGained && <div className="nest-evo-copy">{castleCount}번째 성 · 다음 둥지가 새로 시작돼요</div>}
           <div className="nest-evo">
             <div className="nest-evo-stage">
               <img className="nest-evo-img" src={`assets/nest/lv${prevStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
@@ -219,7 +224,7 @@ function Ceremony({ data, onClose, onComplete }) {
             <span className="nest-progress-fill" style={{ width: (barPct != null ? barPct : startPct) + '%' }} />
           </div>
           <div className="nest-progress-sub">
-            {endPct >= 100 ? '다음 단계 진화 준비 완료!' : `다음 단계까지 ${100 - endPct}% 남았어요`}
+            {castleGained ? '🏰 1,600 XP 달성 — 성을 완성했어요!' : (endPct >= 100 ? '곧 1,600 XP — 성이 완성돼요!' : `성까지 ${100 - endPct}% 남았어요`)}
           </div>
         </div>
 
@@ -256,7 +261,7 @@ function Ceremony({ data, onClose, onComplete }) {
         <button
           className="next-btn"
           onClick={() => {
-            if (nestUp && prevStage && nowStage) {
+            if (evoUp && prevStage && nowStage) {
               setStep(1);
               return;
             }
@@ -313,12 +318,11 @@ const NEST_CRACK_SVG = (
 
 function NestTheatre({ xp, health = 100 }) {
   // 둥지 = 누적 활동(XP). 책 진척률 아님 (#313). pct = 현재 레벨 내 진행도.
-  const pct = _xpProg(xp);
-  const stage = getNestStageByXp(xp);
-  const { cur, next } = nestInfo(stage.lv);
-  // XP 라벨 — 레벨 배지(#425)·스트릭은 헤더로 일원화, 둥지는 누적 XP 진척만 보여준다 (#428).
-  const lv = calcLevel(xp);
-  const nextXp = xpForLevel(lv + 1);
+  const pct = _xpProg(xp);                 // 현재 주기 진행 % (cycleXp / 1600)
+  const stage = getNestStageByXp(xp);      // 둥지 단계 = 현재 주기 XP (#520)
+  const { next } = nestInfo(stage.lv);
+  // 둥지 라벨 — 상단바 레벨/스트릭은 헤더로 일원화(#425/#428). 둥지는 단계 + 현재 주기 XP 만.
+  const cycleXp = nestCycleXp(xp);
   // 둥지 일러스트는 진척률(stage.lv)로 그린다. health 는 §6.2 시각 상태(흔들림/균열)용.
   const hp = Math.max(0, Math.min(100, Math.round(health)));
   const hstate = nestVisualState(hp);
@@ -334,12 +338,12 @@ function NestTheatre({ xp, health = 100 }) {
       <div className="nest-meta">
         <div className="nest-name-row">
           <div className="nest-name">
-            <span>Lv.{lv}</span>
+            <span>Lv.{stage.lv} {stage.name}</span>
             {next && (
-              <span className="next-arrow">→ Lv.{lv + 1}</span>
+              <span className="next-arrow">→ {next.short} {next.name}</span>
             )}
           </div>
-          <div className="nest-health-num"><b>{(xp || 0).toLocaleString()}</b> / {nextXp.toLocaleString()} XP</div>
+          <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
         </div>
         <div className="nest-health-bar">
           <div className="nest-health-fill" />
@@ -647,7 +651,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     const wasReset = ns.streak === 0;
     const prevPct = _pctOf(ns.book);            // 책 진척(완독 판정용)
     const prevXp = ns.xp;
-    const prevLv = getNestStageByXp(prevXp).lv; // 둥지 단계 = 누적 XP (#313)
+    const prevLv = getNestStageByXp(prevXp).lv; // 둥지 단계 = 현재 주기 XP (#520)
+    const prevCastles = nestCastleCount(prevXp); // 성 개수 = floor(totalXp/1600) (#520/#521)
 
     ns.book = { ...ns.book, cur: page };
     if (wasReset) ns.streak = 1;
@@ -665,6 +670,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
     const newLv = getNestStageByXp(ns.xp).lv;   // XP 증가 후 둥지 단계
     const nestUp = newLv > prevLv;
+    const newCastles = nestCastleCount(ns.xp);
+    const castleGained = newCastles > prevCastles; // 1,600 XP 경계 통과 → 성 획득(#520/#521)
 
     if (sentence) {
       ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금', kind: kind || 'quote' }, ...ns.myQuotes];
@@ -674,13 +681,16 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     setNestState(ns);
     onCheckin(ns, newLv, xpGain, sentence, kind);
 
-    // 단계 상승 시 진화 마이크로카피 toast (§5.2)
-    if (nestUp) {
+    // 성 획득(1,600 주기 완료)은 단계 toast보다 우선 — 경계 통과 시 둥지 단계는 Lv4→Lv1로
+    // 리셋되어 nestUp=false 이므로, 성 획득은 별도로 안내한다 (#520/#521).
+    if (castleGained) {
+      showToast(`🏰 전설의 참새 성주! ${newCastles}번째 성을 완성했어요`);
+    } else if (nestUp) {
       const copy = getEvolutionCopy(prevLv, newLv);
       if (copy) showToast(`${getNestStageByXp(ns.xp).short} ${copy}`);
     }
 
-    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
+    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, nestUp, castleGained, castleCount: newCastles, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
   };

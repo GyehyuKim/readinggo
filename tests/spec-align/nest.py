@@ -46,15 +46,15 @@ INVARIANTS = [
     ),
     (
         "§5.2",
-        "진척률 임계값 20/50/80/99/100",
+        "1,600 XP 주기 단계 임계값 (maxXp 99/399/899/1599)",
         "data.js",
-        r"max:\s*20.*max:\s*50.*max:\s*80.*max:\s*99.*max:\s*100",
+        r"maxXp:\s*99\b.*maxXp:\s*399\b.*maxXp:\s*899\b.*maxXp:\s*1599\b",
     ),
     (
         "§5.2",
-        "getNestStage 함수",
+        "getNestStageByXp 함수 (XP 주기 단계)",
         "data.js",
-        r"function\s+getNestStage\b",
+        r"function\s+getNestStageByXp\b",
     ),
     (
         "§5.2",

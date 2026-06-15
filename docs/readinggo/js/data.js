@@ -29,33 +29,32 @@ const INITIAL_PROGRESS = {
   "b001": { cur: 21,  days: 8  },
 };
 
-/* ── 둥지 진화 5단계 (nest.md §5.2) ───────────────
-   단계 = 활성 책 진척률(current_page/total_pages*100), XP·스트릭 무관.
-   진척률 임계값(상한, 이하 포함): 20 / 50 / 80 / 99 / 100. lv 1-based. */
+/* ── 둥지 진화 5단계 — 1,600 XP 주기 (nest.md §5.2, #520 v8.1) ───────────────
+   둥지는 책과 분리된 XP 시각화. 표시는 현재 주기 값(cycleXp = totalXp % 1600)으로 계산.
+   주기 내 XP 임계값(상한, 이하 포함): 99 / 399 / 899 / 1599 / (1600=주기 완료). lv 1-based.
+   Lv5(참새의 성)는 1,600 도달 순간의 주기 완료 단계 — 상시 표시는 Lv1-4, Lv5는 세리머니 전용.
+   성 개수 = floor(totalXp / 1600). */
+const NEST_CYCLE_XP = 1600;
 const NEST_STAGES = [
-  { lv: 1, max: 20,  name: "나뭇가지 자리", short: "🪵", color: "#AFAFAF", bg: "#f3f4f6" },
-  { lv: 2, max: 50,  name: "빈 둥지",       short: "🪹", color: "#F59E0B", bg: "#FEF3C7" },
-  { lv: 3, max: 80,  name: "따뜻한 둥지",   short: "🏠", color: "#58CC02", bg: "#F0FDF4" },
-  { lv: 4, max: 99,  name: "다정한 집",     short: "🏡", color: "#1CB0F6", bg: "#EFF6FF" },
-  { lv: 5, max: 100, name: "참새의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
+  { lv: 1, minXp: 0,    maxXp: 99,   name: "나뭇가지 자리", short: "🪵", color: "#AFAFAF", bg: "#f3f4f6" },
+  { lv: 2, minXp: 100,  maxXp: 399,  name: "빈 둥지",       short: "🪹", color: "#F59E0B", bg: "#FEF3C7" },
+  { lv: 3, minXp: 400,  maxXp: 899,  name: "따뜻한 둥지",   short: "🏠", color: "#58CC02", bg: "#F0FDF4" },
+  { lv: 4, minXp: 900,  maxXp: 1599, name: "다정한 집",     short: "🏡", color: "#1CB0F6", bg: "#EFF6FF" },
+  { lv: 5, minXp: 1600, maxXp: null, name: "참새의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
 ];
-// 진척률(0~100) → 단계 객체. 경계 포함(<=). (레거시 — 책 진척률 표시용)
-function getNestStage(progressPct){
-  const p = Math.max(0, Math.min(100, progressPct || 0));
-  return NEST_STAGES.find(s => p <= s.max) || NEST_STAGES[NEST_STAGES.length - 1];
+// 현재 1,600 XP 주기 내 누적 XP (0~1599).
+function nestCycleXp(totalXp){ return Math.max(0, totalXp || 0) % NEST_CYCLE_XP; }
+// 획득한 성 개수 = floor(totalXp / 1600). 완독 권수와 무관(#520).
+function nestCastleCount(totalXp){ return Math.floor(Math.max(0, totalXp || 0) / NEST_CYCLE_XP); }
+// 누적 XP → 둥지 단계 (#520). 현재 주기 XP(cycleXp)로 매핑 — 책 진척률 아님.
+// cycleXp 는 0~1599 이므로 상시 반환은 Lv1-4. Lv5(성)는 1,600 경계 통과 세리머니 전용.
+function getNestStageByXp(totalXp){
+  const c = nestCycleXp(totalXp);
+  return NEST_STAGES.find(s => s.maxXp == null || c <= s.maxXp) || NEST_STAGES[0];
 }
-// 누적 XP → 둥지 단계 (#313). 둥지는 책이 아니라 전체 활동(XP/레벨)에 연동.
-// 레벨(calcLevel)을 5단계에 매핑: Lv1=🪵 … Lv5+=🏰(최대). 책을 바꿔도 유지.
-function getNestStageByXp(xp){
-  const lv = Math.min(NEST_STAGES.length, calcLevel(xp));
-  return NEST_STAGES[lv - 1];
-}
-// 현재 레벨 내 다음 레벨까지 진행도 % (둥지 진척 바·마이크로카피용). 최대단계 도달 후도 레벨 진행 표시.
-function nestXpProgress(xp){
-  const x = Math.max(0, xp || 0);
-  const lv = calcLevel(x);
-  const base = xpForLevel(lv), next = xpForLevel(lv + 1);
-  return next > base ? Math.max(0, Math.min(100, Math.round((x - base) / (next - base) * 100))) : 100;
+// 현재 1,600 XP 주기 진행도 % (둥지 진척 바·트윅·세리머니). cycleXp / 1600.
+function nestXpProgress(totalXp){
+  return Math.max(0, Math.min(100, Math.round(nestCycleXp(totalXp) / NEST_CYCLE_XP * 100)));
 }
 
 /* ── 진화 마이크로카피 4종 (nest.md §5.2) ─────────
@@ -417,8 +416,9 @@ async function recommendRelated(book, limit = 6) {
 
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
 window.INITIAL_PROGRESS=INITIAL_PROGRESS;
-window.NEST_STAGES=NEST_STAGES; window.getNestStage=getNestStage;
+window.NEST_STAGES=NEST_STAGES; window.NEST_CYCLE_XP=NEST_CYCLE_XP;
 window.getNestStageByXp=getNestStageByXp; window.nestXpProgress=nestXpProgress;
+window.nestCycleXp=nestCycleXp; window.nestCastleCount=nestCastleCount;
 window.NEST_STAGE_TRANSITIONS=NEST_STAGE_TRANSITIONS; window.getEvolutionCopy=getEvolutionCopy;
 window.XP_RULES=XP_RULES; window.calcLevel=calcLevel; window.xpForLevel=xpForLevel; window.computeCheckinXp=computeCheckinXp;
 window.reactionXpFor=reactionXpFor; window.grantXp=grantXp;

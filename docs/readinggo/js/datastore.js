@@ -101,9 +101,9 @@ const localStorageAdapter = (function () {
       });
     }
 
-    // 완독 책(성 컬렉션)을 INITIAL_BOOKSHELF 에서 시드 → castles.list 가
-    // 데모의 실제 완독 집합(프로필 "완독" 목록과 동일)을 반영. 별도 카운터 없이
-    // status==='completed' 행에서 파생(§5.2.1). 활성 책과 별개 행.
+    // 완독 책을 INITIAL_BOOKSHELF 에서 시드 → 프로필 "읽은 책" 목록(§5.8)에 반영.
+    // 성(🏰)은 완독 파생이 아니라 XP 주기 파생(floor(totalXp/1600), #520/#521) — 완독과 별개 축.
+    // 활성 책과 별개 행.
     const shelf = window.INITIAL_BOOKSHELF || {};
     Object.keys(shelf).forEach(bookId => {
       const entry = shelf[bookId];
@@ -495,8 +495,8 @@ const DataStore = {
   },
 
   /* 완독 / 성(🏰) ─────────────────────────────────
-     books.complete → status='completed' + completed_at.
-     castles.list → status==='completed' user_books 파생 (별도 카운터 금지). */
+     books.complete → status='completed' + completed_at (완독 상태·별점·소감, 성 직접 지급 없음).
+     castles.list → floor(totalXp / 1600) 파생 (#520/#521). 완독 권수와 분리. */
   books: {
     complete(userBookId, opts) {
       opts = opts || {};
@@ -542,10 +542,15 @@ const DataStore = {
     },
   },
   castles: {
+    // 성(🏰) = XP 주기 완료 수 (#520/#521, backend.md §7.2). length = floor(totalXp / 1600).
+    // 완독 권수 파생 폐기 — 완독과 성은 별개 축(완독 책은 '읽은 책' 목록에 남음).
     list() {
-      return localStorageAdapter.mutate(s =>
-        s.user_books.filter(ub => ub.status === 'completed')
-      );
+      return localStorageAdapter.mutate(s => {
+        const n = (typeof window.nestCastleCount === 'function')
+          ? window.nestCastleCount(s.xp)
+          : Math.floor(Math.max(0, s.xp || 0) / 1600);
+        return Array.from({ length: n }, (_, i) => ({ index: i + 1, earnedAtXp: (i + 1) * 1600 }));
+      });
     },
   },
 

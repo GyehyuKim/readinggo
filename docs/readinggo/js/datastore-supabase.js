@@ -105,7 +105,7 @@
           publisher: book.publisher, total_pages: book.total_pages, cover_url: book.cover_url,
         }, { onConflict: 'isbn13' }).select().single());
       },
-      // 완독 → status='completed' (+rating/review_text). 성(🏰) = castles.list 파생.
+      // 완독 → status='completed' (+rating/review_text). 성 직접 지급 없음 — 성(🏰)은 XP 주기 파생(castles.list, #520/#521).
       async complete(userBookId, opts) {
         opts = opts || {};
         const patch = { status: 'completed', completed_at: new Date().toISOString() };
@@ -397,10 +397,15 @@
 
     /* 성(🏰) 컬렉션 — 완독 파생 */
     castles: {
+      // 성(🏰) = XP 주기 완료 수 (#520/#521, backend.md §7.2). length = floor(totalXp / 1600).
+      // DB 조회 없이 users.xp 파생 — 완독(status='completed')과 분리.
       async list() {
-        const id = await uid();
-        return unwrap(await sb().from('user_books').select('*, book:books(*)')
-          .eq('user_id', id).eq('status', 'completed').order('completed_at', { ascending: false }));
+        const u = await A.profile.get();
+        const xp = (u && u.xp) || 0;
+        const n = (typeof window.nestCastleCount === 'function')
+          ? window.nestCastleCount(xp)
+          : Math.floor(Math.max(0, xp) / 1600);
+        return Array.from({ length: n }, (_, i) => ({ index: i + 1, earnedAtXp: (i + 1) * 1600 }));
       },
     },
 
