@@ -570,7 +570,9 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
   const [quickText, setQuickText] = _useState('');
-  const [quickSentPage, setQuickSentPage] = _useState('');   // 한 문장의 페이지 (#589) — 비우면 현재 진도. 페이지 업데이트 섹션의 quickPage 와 분리.
+  const [quickSentPage, setQuickSentPage] = _useState('');
+  const [showOcrMenu, setShowOcrMenu] = _useState(false);
+  const [sentFlip, setSentFlip] = _useState(false); // 문장 저장 시 일기장 넘기기 효과
   // 빠른입력 OCR (#498) — 책 사진 → quickText 프리필
   const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
   const [quickOcrFile, setQuickOcrFile] = _useState(null);
@@ -870,7 +872,10 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
               <p className="book-title">{nestState.book.title}</p>
               {/* 책 정보 수정 (#410) — 제목과 같은 행에서 현재 책 편집 맥락을 명확히 표시. */}
               <button className="book-jump" onClick={(e) => { e.stopPropagation(); setBookEditOpen(true); }} title="책 정보 수정" aria-label="책 정보 수정">
-                <span>⚙️</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
               </button>
             </div>
             <p className="book-author">{[nestState.book.author, nestState.book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
@@ -888,51 +893,63 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
       {/* 데모 '하루 거르기' 제거 (#481) */}
 
-      {/* 빠른 입력 (#462·#505) — 홈에서 페이지·한 문장·OCR 상시 입력. 읽기모드(타이머) 폐기. */}
-      <div className="quick-log">
-          {/* 페이지 진도 */}
-          <div className="quick-sec">
-            <div className="quick-sec-head">
-              <span>📖 오늘의 독서</span>
-            </div>
-            <div className="quick-stepper">
-              <button onClick={() => setQuickPage((s) => String(Math.max(0, (parseInt(s, 10) || nestState.book.cur || 0) - 1)))} aria-label="이전 쪽">−</button>
-              <input type="number" inputMode="numeric" value={quickPage} placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickPage(e.target.value)} />
-              <button onClick={() => setQuickPage((s) => String((parseInt(s, 10) || nestState.book.cur || 0) + 1))} aria-label="다음 쪽">+</button>
-              {nestState.book.total > 0 && <span className="quick-total">/ {nestState.book.total}p</span>}
-            </div>
-            {/* 페이지 독립 업데이트 (#497) — 한 문장과 별개로 진도만 저장 + XP */}
-            <button className="checkin-cta quick-submit" onClick={submitPage} style={{ marginTop: 10 }}>📖 페이지 업데이트</button>
-          </div>
-          {/* 한 문장 */}
-          <div className="quick-sec">
-            <div className="quick-sec-head"><span>✏️ 한 문장 남기기 <small>(선택)</small></span></div>
-            <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); }}
-              placeholder="떠오른 한 문장을 옮겨 적어요…" rows={2} />
-            {/* 책 사진 OCR (#498) — 사진 선택 → 크롭 영역만 OCR → quickText 프리필 */}
-            <input ref={_quickOcrInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setQuickOcrFile(f); e.target.value = ''; }} />
-            <button className="quick-ocr" onClick={() => { if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }} disabled={quickOcrBusy}>
-              {quickOcrBusy ? '읽는 중…' : '📷 촬영해서 입력'}
-            </button>
-            {/* 이 문장의 페이지 (#589) — 비우면 현재 진도. 페이지 업데이트 섹션과 분리된 quickSentPage */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>📖 페이지</span>
-              <input type="number" inputMode="numeric" min="0" max="99999" value={quickSentPage}
-                placeholder={String(nestState.book.cur || 0)}
-                onChange={(e) => setQuickSentPage(e.target.value)}
-                style={{ width: 78, textAlign: 'center', padding: '7px 6px', border: '1.5px solid var(--line)', borderRadius: 8, fontSize: 13, fontWeight: 700 }} />
-              {nestState.book.total > 0 && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>}
-              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>비우면 현재 진도</span>
-            </div>
-            {/* 한 문장 독립 저장 (#497) — 페이지 섹션과 별개 버튼. (선택)이므로 secondary 위계 (#614) */}
-            <button className="checkin-cta checkin-cta-secondary quick-submit" onClick={submitSentence} style={{ marginTop: 10 }}>✍️ 한 문장 저장</button>
-          </div>
-          {/* 크롭 오버레이 — 사진에서 원하는 영역만 잘라 OCR (#396·#498) */}
-          {quickOcrFile && (
-            <OcrCropOverlay file={quickOcrFile} onCancel={() => setQuickOcrFile(null)} onCrop={(blob) => { setQuickOcrFile(null); runOcrQuick(blob); }} />
+      {/* 진도 섹션 */}
+      <div style={{ marginTop: 10, background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 'var(--r-md)', padding: '14px 16px' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)', marginBottom: 10 }}>오늘은 어디까지 읽으셨나요?</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input type="number" inputMode="numeric" value={quickPage} placeholder={String(nestState.book.cur||0)}
+            onChange={e => setQuickPage(e.target.value)}
+            style={{ width: 72, textAlign: 'center', fontSize: 26, fontWeight: 900, color: 'var(--ink)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand)', outline: 'none', padding: '0 4px 2px', fontFamily: 'inherit' }} />
+          {nestState.book.total > 0
+            ? <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>
+            : <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>p</span>}
+          {nestState.book.total > 0 && (
+            <span style={{ fontSize: 12, color: 'var(--brand-3)', fontWeight: 800, background: 'var(--brand-tint)', borderRadius: 20, padding: '3px 10px' }}>
+              {Math.min(100, Math.round((parseInt(quickPage,10)||nestState.book.cur||0) / nestState.book.total * 100))}%
+            </span>
           )}
+          <button onClick={submitPage}
+            style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: 999, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 14, cursor: 'pointer', flexShrink: 0, letterSpacing: '-0.2px' }}>
+            저장하기
+          </button>
         </div>
+      </div>
+
+      {/* 한 문장 입력 */}
+      <div style={{ marginTop: 8, background: 'var(--card)', border: '1.5px solid var(--brand-soft)', borderRadius: 'var(--r-md)', padding: '14px 14px 12px', position: 'relative', transition: 'opacity 0.2s, transform 0.3s', opacity: sentFlip ? 0 : 1, transform: sentFlip ? 'translateY(-10px) scale(0.97)' : 'none' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)', marginBottom: 10 }}>마음에 남은 문장이 있나요?</div>
+        <button onClick={() => setShowOcrMenu(s => !s)}
+          style={{ position: 'absolute', top: 10, right: 12, background: 'none', border: 'none', fontSize: 20, color: 'var(--ink-3)', cursor: 'pointer', lineHeight: 1, padding: '2px 6px', letterSpacing: 1 }}>···</button>
+        {showOcrMenu && (
+          <div style={{ position: 'absolute', top: 36, right: 12, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '4px 0', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,.10)', minWidth: 140 }}>
+            <button onClick={() => { setShowOcrMenu(false); if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }}
+              style={{ display: 'block', width: '100%', padding: '9px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, fontWeight: 700, color: 'var(--ink)', cursor: 'pointer' }}>
+              {quickOcrBusy ? '읽는 중…' : '📷 사진으로 입력'}
+            </button>
+          </div>
+        )}
+        <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); }}
+          placeholder="오늘 읽은 문장을 남겨요…" rows={4}
+          style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', resize: 'none', padding: 0, fontFamily: 'inherit' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>p</span>
+          <input type="number" inputMode="numeric" min="0" max="99999" value={quickSentPage}
+            placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickSentPage(e.target.value)}
+            style={{ width: 60, textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
+          {nestState.book.total > 0 && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
+          <button onClick={() => { setSentFlip(true); setTimeout(() => { submitSentence(); setSentFlip(false); }, 280); }}
+            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.2px' }}>
+            남기기
+          </button>
+        </div>
+        <input ref={_quickOcrInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setQuickOcrFile(f); e.target.value = ''; }} />
+      </div>
+
+      {/* 크롭 오버레이 */}
+      {quickOcrFile && (
+        <OcrCropOverlay file={quickOcrFile} onCancel={() => setQuickOcrFile(null)} onCrop={(blob) => { setQuickOcrFile(null); runOcrQuick(blob); }} />
+      )}
 
       {/* '오늘 기록 완료 · N일 연속' nudge 제거 (#481) */}
 
@@ -967,7 +984,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
 
       {/* 이 책, 한 문장 (#499) — 현재 책 전체 기간 최신순 + 날짜·좋아요·삭제. */}
       <div className="section-head">
-        <h3>🔖 이 책, 한 문장 <span className="my-q-count">{bookQuotes.length}</span></h3>
+        <h3>내가 남긴 흔적 <span className="my-q-count">{bookQuotes.length}</span></h3>
         {nestState.myQuotes.length > 0 && (
           <button className="more" onClick={() => window.RG_openCollection && window.RG_openCollection()}>
             전체 문장 보기 →
@@ -985,7 +1002,19 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백하므로, id가 실제 일치할 때만 그 제목을 씀(사피엔스버그).
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
-          const dateText = _isTodayQuote(q) ? '오늘' : (q.createdAt ? String(q.createdAt).slice(0, 10) : (q.when || ''));
+          const dateText = _isTodayQuote(q) ? '오늘' : (q.createdAt ? (() => {
+            const v = q.createdAt;
+            let d;
+            if (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(String(v).trim()))) {
+              const n = typeof v === 'number' ? v : Number(v);
+              const ms = n > 1e13 ? n / 1000 : n > 1e10 ? n : n * 1000; // µs→ms, ms, s→ms
+              d = new Date(ms);
+            } else {
+              d = new Date(v);
+            }
+            if (isNaN(d.getTime())) return q.when || '';
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          })() : (q.when || ''));
           return (
             <div key={q.id || i} className="my-q-card">
               <div className="meta">
@@ -997,11 +1026,17 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
                 {q.id && (
                   <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 10, alignItems: 'center' }}>
                     <button onClick={() => toggleFav(q.id)} title="좋아요(즐겨찾기)" aria-label="좋아요"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}>
-                      {favIds.has(q.id) ? '❤️' : '🤍'}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', lineHeight: 1, color: favIds.has(q.id) ? '#f04' : 'var(--ink-3)', transition: 'color .15s' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill={favIds.has(q.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
                     </button>
                     <button onClick={() => delHomeQuote(q.id, q.bookId)} title="이 한 문장 삭제" aria-label="삭제"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0, opacity: 0.6, lineHeight: 1 }}>🗑</button>
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', lineHeight: 1, color: 'var(--ink-3)', transition: 'color .15s' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                      </svg>
+                    </button>
                   </span>
                 )}
               </div>

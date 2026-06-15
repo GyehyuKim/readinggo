@@ -214,8 +214,8 @@ input,textarea{font-family:inherit;}
   display:flex; gap:14px; align-items:flex-start;
 }
 .book-cover{
-  width: 64px; height: 88px;
-  border-radius: 8px;
+  width: 52px; height: 72px;
+  border-radius: 6px;
   background: linear-gradient(135deg, #F4D9A8, #E8B473);
   box-shadow: 0 4px 10px rgba(80,50,10,.18), inset 0 -4px 0 rgba(0,0,0,.08);
   position: relative; flex: none;
@@ -227,15 +227,15 @@ input,textarea{font-family:inherit;}
   display:flex; align-items:center; gap:8px; margin-bottom:2px;
 }
 .book-title{
-  font-weight: 900; font-size: 17px; letter-spacing:-.2px;
+  font-weight: 900; font-size: 15px; letter-spacing:-.2px;
   color: var(--ink); margin: 0; flex:1; min-width:0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.book-author{ font-size: 13px; color: var(--ink-3); margin: 0 0 10px; }
+.book-author{ font-size: 12px; color: var(--ink-3); margin: 0 0 8px; }
 .book-progress-row{ display:flex; align-items:center; gap:8px; }
 .book-progress{
   flex: 1;
-  height: 10px; border-radius: 999px;
+  height: 5px; border-radius: 999px;
   background: var(--line-2); overflow: hidden;
   position: relative;
 }
@@ -755,7 +755,8 @@ input,textarea{font-family:inherit;}
   margin: 22px 4px 10px;
 }
 .section-head h3{
-  margin: 0; font-size: 15px; font-weight: 900; color: var(--ink);
+  margin: 0; font-size: 16px; font-weight: 900; color: var(--ink);
+  letter-spacing: -0.3px;
   display:flex; align-items:center; gap:6px;
 }
 .section-head .more{
@@ -768,7 +769,7 @@ input,textarea{font-family:inherit;}
   border: 1.5px solid var(--line);
   border-radius: var(--r-md);
   padding: 14px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 .sentence-card .who{
   display:flex; align-items:center; gap:8px;
@@ -948,12 +949,13 @@ input,textarea{font-family:inherit;}
   cursor: pointer;
   font-size: 10px;
   color: var(--ink-3);
-  width: 16px;
-  height: 16px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  font-size: 12px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   z-index: 2;
 }
@@ -988,7 +990,7 @@ input,textarea{font-family:inherit;}
 }
 .tab .ico{ font-size: 22px; line-height: 1; }
 .tab.active{ color: var(--brand-3); }
-.tab.active .ico{ transform: translateY(-2px) scale(1.05); transition: transform .2s ease; }
+.tab.active .ico{ transform: translateY(-2px) scale(1.1); transition: transform .2s ease; filter: drop-shadow(0 0 4px rgba(63,209,127,0.4)); }
 
 .modal-backdrop{
   position: fixed; inset: 0; z-index: 50;

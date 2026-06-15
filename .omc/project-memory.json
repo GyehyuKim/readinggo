@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1779977004163,
+  "lastScanned": 1781529787916,
   "projectRoot": "C:\\Users\\gangs\\Documents\\정윤지\\claude\\glocalx",
   "techStack": {
     "languages": [],
@@ -39,21 +39,21 @@
       "path": "40. Development",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1779977004076,
+      "lastAccessed": 1781529787852,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1779977004079,
+      "lastAccessed": 1781529787853,
       "keyFiles": []
     },
     "loop": {
       "path": "loop",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1779977004080,
+      "lastAccessed": 1781529787854,
       "keyFiles": [
         "README.md"
       ]
@@ -62,14 +62,14 @@
       "path": "old",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1779977004080,
+      "lastAccessed": 1781529787855,
       "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 1,
-      "lastAccessed": 1779977004081,
+      "lastAccessed": 1781529787856,
       "keyFiles": [
         "README.md"
       ]
@@ -78,7 +78,7 @@
       "path": "tests\\data",
       "purpose": "Data files",
       "fileCount": 1,
-      "lastAccessed": 1779977004090,
+      "lastAccessed": 1781529787860,
       "keyFiles": [
         "validate-books.py"
       ]
@@ -86,105 +86,21 @@
   },
   "hotPaths": [
     {
-      "path": "docs\\readinggo\\demo-index.html",
-      "accessCount": 14,
-      "lastAccessed": 1779977039250,
-      "type": "file"
-    },
-    {
-      "path": "docs\\lecture-frameworks.md",
-      "accessCount": 11,
-      "lastAccessed": 1779780336158,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\index.html",
-      "accessCount": 9,
-      "lastAccessed": 1779977744799,
-      "type": "file"
-    },
-    {
-      "path": "CONTRIBUTING.md",
-      "accessCount": 6,
-      "lastAccessed": 1779771463310,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\js\\data.js",
-      "accessCount": 6,
-      "lastAccessed": 1779979550200,
-      "type": "file"
-    },
-    {
       "path": "docs\\readinggo\\js\\nest.js",
       "accessCount": 5,
-      "lastAccessed": 1779978854511,
+      "lastAccessed": 1781538003325,
       "type": "file"
     },
     {
-      "path": "CLAUDE.md",
-      "accessCount": 3,
-      "lastAccessed": 1779765829853,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\js\\app.js",
-      "accessCount": 3,
-      "lastAccessed": 1779978285884,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo-spec.md",
+      "path": ".claude\\worktrees\\sactions\\tests\\spec-align\\align_v7.py",
       "accessCount": 2,
-      "lastAccessed": 1779762057674,
+      "lastAccessed": 1781537661790,
       "type": "file"
     },
     {
-      "path": "tests\\data\\validate-books.py",
+      "path": ".claude\\worktrees\\sactions\\docs\\readinggo\\specs\\social.md",
       "accessCount": 2,
-      "lastAccessed": 1779952940738,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\js\\components.js",
-      "accessCount": 2,
-      "lastAccessed": 1779978134748,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\js\\village.js",
-      "accessCount": 2,
-      "lastAccessed": 1779978147418,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\js\\social.js",
-      "accessCount": 2,
-      "lastAccessed": 1779978156588,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\js\\library.js",
-      "accessCount": 2,
-      "lastAccessed": 1779978168211,
-      "type": "file"
-    },
-    {
-      "path": "tests\\README.md",
-      "accessCount": 1,
-      "lastAccessed": 1779952831422,
-      "type": "file"
-    },
-    {
-      "path": "tests\\e2e\\scenario-nest-load.md",
-      "accessCount": 1,
-      "lastAccessed": 1779953006024,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\data\\books.tsv",
-      "accessCount": 1,
-      "lastAccessed": 1779979067065,
+      "lastAccessed": 1781537695154,
       "type": "file"
     }
   ],

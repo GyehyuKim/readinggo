@@ -675,7 +675,7 @@ function App() {
               저장하기
             </button>
             <button onClick={() => setGuestBannerOff(true)} aria-label="배너 닫기"
-              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 16, padding: '0 2px' }}>
+              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 16, padding: '13px 14px', margin: '-13px -14px' }}>
               ×
             </button>
           </div>
