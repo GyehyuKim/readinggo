@@ -198,15 +198,14 @@ function UserProfileModal({ handle, onClose }) {
         if (!DS || !DS.users || !DS.users.getByHandle) { if (alive) setData(null); return; }
         const u = await DS.users.getByHandle(handle);
         if (!u) { if (alive) setData(null); return; }
-        const [shelf, sents, streak] = await Promise.all([
+        const [shelf, sents] = await Promise.all([
           DS.users.publicShelf ? DS.users.publicShelf(u.id).catch(() => []) : DS.users.publicBooks(u.id).catch(() => []),
           DS.users.publicSentences(u.id).catch(() => []),
-          DS.users.publicStreak ? DS.users.publicStreak(u.id).catch(() => 0) : 0,
         ]);
         const all = shelf || [];
         const completed = all.filter((b) => b.status === 'completed');
         const reading = all.filter((b) => b.status === 'reading');
-        if (alive) setData({ user: u, completed, reading, sents: sents || [], streak: streak || 0 });
+        if (alive) setData({ user: u, completed, reading, sents: sents || [] }); // 스트릭 미표시 (#557)
         const myId = window.RG_ME && window.RG_ME.id;
         if (myId && u.id !== myId && DS.friends && DS.friends.isFollowing) {
           const f = await DS.friends.isFollowing(u.id).catch(() => false);
@@ -305,10 +304,9 @@ function UserProfileModal({ handle, onClose }) {
           <div style={{ textAlign: 'center', marginBottom: 18 }}>
             <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--ink)' }}>🐦 {data.user.display_name || data.user.handle}</div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 8, fontSize: 12, color: 'var(--ink-2)', fontWeight: 800 }}>
-              <span>🏰 완독 {data.completed.length}</span>
+              <span>✅ 완독 {data.completed.length}</span>
               <span>📖 읽는 중 {data.reading.length}</span>
-              <span>🔥 {data.streak}일</span>
-              <span>✨ {data.user.xp || 0}</span>
+              <span>✨ {data.user.xp || 0} XP</span>
             </div>
             {following !== null && (
               <button onClick={toggleFollow}
@@ -327,7 +325,7 @@ function UserProfileModal({ handle, onClose }) {
             return (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ fontSize: 15, fontWeight: 900 }}>📚 책장 {totalShelf}</div>
+                  <div style={{ fontSize: 15, fontWeight: 900 }}>📚 책장</div>
                   {totalShelf > 6 && <button onClick={() => setShelfOpen((v) => !v)} style={{ background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{shelfOpen ? '접기' : '더 보기 ›'}</button>}
                 </div>
                 {!shelfOpen ? (
