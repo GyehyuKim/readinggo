@@ -873,7 +873,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           <button onClick={() => window.RG_openCollection && window.RG_openCollection({ filter: 'fav' })}
             style={{textAlign:'center', background:'none', border:'none', cursor:'pointer', padding:0}}>
             <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{savedCount}</div>
-            <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>❤️ 저장</div>
+            <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>📌 책갈피</div>{/* #587: '저장' → '책갈피'(§5.8.5 용어 정렬). 동작·모달 동일 */}
           </button>
         </div>
       </div>

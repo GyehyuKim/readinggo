@@ -152,6 +152,8 @@ INVARIANTS = [
         ["datastore-supabase.js"], r"sort === 'likes'[\s\S]*clap_count|clap_count[\s\S]*sort === 'likes'"),
     ("B", "present", "BookInfoModal 인기 한 문장 Top5 (#594)",
         ["components.js"], r"이 책의 한 문장[\s\S]*byBook|byBook\(bookId, \{ limit: 5, sort: 'likes'"),
+    ("B", "present", "프로필 스탯 라벨 '책갈피' — §5.8.5 용어 정렬 (#587)",
+        ["library.js"], r"📌 책갈피"),
     ("B", "present", "관련 도서 추천 — recommendRelated + books.related (#496)",
         ["data.js", "datastore.js"], r"recommendRelated"),
     ("B", "present", "관련 도서 ISBN 환각 필터 — filterRelatedCandidates (#496)",
