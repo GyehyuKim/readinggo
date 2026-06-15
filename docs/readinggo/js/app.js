@@ -268,7 +268,8 @@ function App() {
   useEffect(() => { window.RG_openCompanion = (s) => setCompanionSentence(s); return () => { window.RG_openCompanion = null; }; }, []);
   // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
   const [collectionOpen, setCollectionOpen] = useState(false);
-  useEffect(() => { window.RG_openCollection = () => setCollectionOpen(true); return () => { window.RG_openCollection = null; }; }, []);
+  const [collectionFilter, setCollectionFilter] = useState(null); // 저장(❤️) 진입 시 'fav' (#510)
+  useEffect(() => { window.RG_openCollection = (opts) => { setCollectionFilter(opts && opts.filter); setCollectionOpen(true); }; return () => { window.RG_openCollection = null; }; }, []);
   const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE }));
 
   // XP 적립 이벤트 버스 — 방문·반응 XP(grantXp → 'rg:xp')를 상단바 appState.xp 에 반영.
@@ -751,7 +752,7 @@ function App() {
 
         {/* 한 문장 모아보기 (#171) */}
         {collectionOpen && ReactDOM.createPortal(
-          <SentenceCollectionModal onClose={() => setCollectionOpen(false)} />,
+          <SentenceCollectionModal initialFilter={collectionFilter} onClose={() => setCollectionOpen(false)} />,
           document.body
         )}
 

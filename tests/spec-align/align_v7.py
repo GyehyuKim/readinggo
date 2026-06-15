@@ -136,6 +136,8 @@ INVARIANTS = [
         ["library.js"], r"함께 읽으면 좋은 책"),
     ("B", "present", "책 상세 책 소개(description) 표시 — DB 우선·폴백 (#530)",
         ["library.js"], r"book\.description[\s\S]*fetchBookDesc|fetchBookDesc[\s\S]*book\.description"),
+    ("B", "present", "저장(❤️) 스탯 → 저장 문장 모달 — bookmarks 임베드 머지 (#510)",
+        ["components.js"], r"savedExtra"),
 
     # ── C: post-beta 기능 (스펙↔구현 동기화 강제, decisions §8.4/§8.5) ──
     # 읽기 모드(ReadingMode/타이머) invariant 폐기 (#505) — 홈 빠른입력으로 일원화, 독서시간 측정 폐기

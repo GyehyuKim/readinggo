@@ -653,7 +653,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{followCounts.followers}</div>
             <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>팔로워</div>
           </button>
-          <button onClick={() => window.RG_openCollection && window.RG_openCollection()}
+          <button onClick={() => window.RG_openCollection && window.RG_openCollection({ filter: 'fav' })}
             style={{textAlign:'center', background:'none', border:'none', cursor:'pointer', padding:0}}>
             <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{savedCount}</div>
             <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>❤️ 저장</div>
