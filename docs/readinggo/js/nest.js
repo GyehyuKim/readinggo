@@ -331,10 +331,13 @@ function NestTheatre({ xp, health = 100 }) {
             {next && (
               <span className="next-arrow">→ {next.short} {next.name}</span>
             )}
-            <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내" title="둥지가 자라는 방법"
-              style={{marginLeft:6, background:'none', border:'none', cursor:'pointer', color:'var(--ink-3)', fontSize:13, fontWeight:900, padding:'0 2px', lineHeight:1}}>?</button>
           </div>
-          <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
+          {/* 가이드 버튼 ⓘ (#585): plain '?' 폐기 → ghost circle. 단계명 행 우측(진척 XP 옆)에 고정. */}
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
+            <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내" title="둥지가 자라는 방법"
+              style={{width:22, height:22, borderRadius:'50%', border:'1.5px solid var(--ink-3)', background:'transparent', color:'var(--ink-3)', fontSize:12, fontWeight:900, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, padding:0, lineHeight:1}}>ⓘ</button>
+          </div>
         </div>
         <div className="nest-health-bar">
           <div className="nest-health-fill" />
