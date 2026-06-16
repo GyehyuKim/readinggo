@@ -110,38 +110,35 @@ function SentenceCard({ item, bookId, noBlind }) {
   // 실 피드(Supabase)면 item.id(UUID)·item.isMine·item.bookTitle 사용, 데모면 합성값 폴백.
   const sentenceId = item.id || `${bookId}:${item.page}:${item.nick}`;
   const isMine = (typeof item.isMine !== 'undefined') ? item.isMine : (item.nick === '@jerome' || item.nick === 'jerome');
-  const canReact = !!item.id;  // 실 sentence(UUID)만 짹·책갈피 가능 — 합성 id 는 uuid 컬럼 400 (architect L1)
+  const canReact = !!item.id;  // 실 sentence(UUID)만 좋아요 가능 — 합성 id 는 uuid 컬럼 400 (architect L1)
   const [liked, setLiked] = useState(false);
   const initialLikedRef = React.useRef(false);
-  const [bookmarked, setBookmarked] = useState(false);
   // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백 → id 실제 일치 시에만 그 제목 사용(사피엔스 오표시 방지, #374 동일).
   const bk = getBook(bookId);
   const cardTitle = item.bookTitle || (bk && bk.id === bookId ? bk.title : '') || '';
   // optimistic likeCount: item.claps(피드 로드 시점) + 현재 상태 - 초기 상태 delta (#156)
   const likeCount = (item.claps || 0) + (liked ? 1 : 0) - (initialLikedRef.current ? 1 : 0);
+  // #641: 자기 문장 좋아요 허용(저장 통일) — mine 도 liked 상태 로드.
   React.useEffect(() => {
-    if (!canReact || isMine) return;
+    if (!canReact) return;
     Promise.resolve(DataStore.claps.isMine(sentenceId)).then(v => {
       setLiked(v);
       initialLikedRef.current = v;
     }).catch(() => {});
   }, [sentenceId]);
   const toggleLike = () => {
-    if (isMine || !canReact) return;
+    if (!canReact) return;
     Promise.resolve(DataStore.claps.toggle(sentenceId)).then((isLiked) => {
       setLiked(isLiked);
-      // 반응(engagement) XP — 짹을 *새로 켤 때만*, 일일 상한 적용. 해제 시 차감 없음(v7).
-      if (isLiked) {
+      // 반응(engagement) XP — 새로 켤 때만, 일일 상한. 해제 시 차감 없음(v7).
+      // #641: self-clap(자기 문장 저장)은 XP 비부여 — 타인 문장 좋아요만 engagement XP.
+      if (isLiked && !isMine) {
         const xp = reactionXpFor(_rgReactToday);
         if (xp > 0) { _rgReactToday += 1; grantXp(xp, 'reaction'); }
       }
     }).catch(() => {});
   };
-  const toggleBookmark = () => {
-    if (isMine || !canReact) return;
-    Promise.resolve(DataStore.bookmarks.toggle(sentenceId)).then(setBookmarked).catch(() => {});
-  };
-  const mineStyle = (isMine || !canReact) ? { opacity: 0.4, pointerEvents: 'none' } : undefined;
+  const mineStyle = !canReact ? { opacity: 0.4, pointerEvents: 'none' } : undefined;
   // 스포일러 블라인드: 전역 토글(revealAll) 또는 카드별 탭 공개 시 해제 (§5.7.1).
   const revealAll = React.useContext(SpoilerContext);
   const [revealed, setRevealed] = useState(false);
@@ -168,11 +165,9 @@ function SentenceCard({ item, bookId, noBlind }) {
         <div className="quote">"{item.q}"</div>
       )}
       <div className="react">
+        {/* #641: 좋아요(claps) 단일 — 구 저장 칩 제거, 자기 문장도 좋아요(저장) 가능 */}
         <span className={'chip' + (liked ? ' active' : '')} style={mineStyle} onClick={toggleLike}>
           좋아요 {likeCount}
-        </span>
-        <span className={'chip' + (bookmarked ? ' active' : '')} style={mineStyle} onClick={toggleBookmark}>
-          🔖
         </span>
       </div>
     </div>
@@ -353,7 +348,7 @@ function UserProfileModal({ handle, onClose }) {
           {/* 위시리스트 — wishlist_public=true 인 경우만 노출 (#558) */}
           {data.wishlist && data.wishlist.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>❤️ 읽고 싶어하는 책 {data.wishlist.length}</div>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>🔖 읽고 싶어하는 책 {data.wishlist.length}</div>
               <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 6 }}>
                 {data.wishlist.map((wb) => {
                   const bk = wb.book || {};
@@ -421,7 +416,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
     ).then(() => {
       setWishPublic(next);
       if (window.RG_ME) window.RG_ME.wishlist_public = next;
-      showToast(next ? '❤️ 읽고 싶은 책이 공개됐어요' : '❤️ 읽고 싶은 책이 비공개로 바뀌었어요');
+      showToast(next ? '🔖 읽고 싶은 책이 공개됐어요' : '🔖 읽고 싶은 책이 비공개로 바뀌었어요');
     }).catch(() => showToast('저장 실패 — 잠시 후 다시'));
   };
   // 운영자 문의 (DB 저장 → admin 대시보드)
@@ -491,7 +486,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           {/* 위시리스트 공개 (#558) */}
           <div style={{ marginTop: 8, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>❤️ 읽고 싶은 책 공개</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>🔖 읽고 싶은 책 공개</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
             </div>
             <button onClick={toggleWishPublic} aria-pressed={wishPublic} aria-label="위시리스트 공개 토글"
@@ -608,21 +603,22 @@ window.Toast = Toast;
 window.Confetti = Confetti;
 window.SentenceCard = SentenceCard;
 
-/* ── SentenceActions: 한 문장 액션 row (#610 계약 SSOT) ──────────
-   내 문장(mine): 공개범위 + 책갈피 + 수정 + 삭제 · 타인 문장: 좋아요 + 책갈피.
+/* ── SentenceActions: 한 문장 액션 row (#610 계약 SSOT, #641 단일화) ──────────
+   내 문장(mine): 공개범위 + 좋아요(=저장) + 수정 + 삭제 · 타인 문장: 좋아요.
+   #641: 짹+저장(구 bookmark) → 단일 좋아요(claps). 자기 문장 좋아요 허용(저장 통일).
    표면별 버튼 드리프트 방지를 위한 공용 단일 출처. align_v7 invariant 로 락.
-   props: sentence{id,text,bookId,bookTitle,author,page,note,visibility,isPrivate}, mine, fav(초기), onRemoved */
+   props: sentence{id,text,bookId,bookTitle,author,page,note,visibility,isPrivate}, mine, fav(좋아요 초기상태), onRemoved */
 const _SA_VIS = ['public', 'followers', 'private'];
 const _SA_VIS_ICON = { public: '🌐', followers: '👥', private: '🔒' };
 const _SA_VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '비공개' };
 function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const id = sentence && sentence.id;
   const [vis, setVis] = useState(sentence.visibility || (sentence.isPrivate ? 'private' : 'public'));
-  const [fav, setFav] = useState(!!favInit);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(!!favInit);
   const [likeN, setLikeN] = useState(sentence.claps || sentence.clapCount || 0);
+  // #641: mine 포함 좋아요 초기 상태 로드(자기 문장도 좋아요=저장 가능).
   useEffect(() => {
-    if (!id || mine || !(DataStore.claps && DataStore.claps.isMine)) return;
+    if (!id || !(DataStore.claps && DataStore.claps.isMine)) return;
     let alive = true;
     Promise.resolve(DataStore.claps.isMine(id)).then(v => { if (alive) setLiked(!!v); }).catch(() => {});
     return () => { alive = false; };
@@ -631,25 +627,22 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink-2)', padding: '3px 9px', lineHeight: 1 };
   const chipOn = { ...chip, background: 'var(--brand-tint)', borderColor: 'var(--brand)', color: 'var(--brand-3)' };
-  const toggleFav = (e) => { stop(e); if (!(DataStore.bookmarks && DataStore.bookmarks.toggle)) return; Promise.resolve(DataStore.bookmarks.toggle(id)).then(setFav).catch(() => {}); };
   const cycleVis = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.setVisibility)) return; const next = _SA_VIS[(_SA_VIS.indexOf(vis) + 1) % _SA_VIS.length]; setVis(next); sentence.visibility = next; Promise.resolve(DataStore.sentences.setVisibility(id, { visibility: next })).catch(() => {}); window.dispatchEvent(new CustomEvent('rg:sentence-vis', { detail: { id, visibility: next } })); };
   const edit = (e) => { stop(e); if (window.RG_openCompanion) window.RG_openCompanion({ id, text: sentence.text, bookId: sentence.bookId, bookTitle: sentence.bookTitle, author: sentence.author, page: sentence.page, note: sentence.note || sentence.my_note || '', kind: sentence.kind }); };
   const del = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.remove)) return; if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return; Promise.resolve(DataStore.sentences.remove(id)).then(() => { if (onRemoved) onRemoved(id); window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); showToast('🗑 한 문장을 삭제했어요'); }).catch(() => showToast('삭제 실패 — 잠시 후 다시')); };
   const toggleLike = (e) => { stop(e); if (!(DataStore.claps && DataStore.claps.toggle)) return; Promise.resolve(DataStore.claps.toggle(id)).then((on) => { setLiked(on); setLikeN(n => Math.max(0, n + (on ? 1 : -1))); }).catch(() => {}); };
+  const likeBtn = <button onClick={toggleLike} title="좋아요" style={liked ? chipOn : chip}>❤️ {likeN}</button>;
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }} onClick={stop}>
       {mine ? (
         <>
           <button onClick={cycleVis} title="공개 범위 변경 (전체→친구→비공개)" style={chip}><span>{_SA_VIS_ICON[vis]}</span><span>{_SA_VIS_LABEL[vis]}</span></button>
-          <button onClick={toggleFav} title="책갈피" style={fav ? chipOn : chip}>🔖</button>
+          {likeBtn}
           <button onClick={edit} title="수정·대화" style={chip}>✏️</button>
           <button onClick={del} title="삭제" style={chip}>🗑</button>
         </>
       ) : (
-        <>
-          <button onClick={toggleLike} title="좋아요" style={liked ? chipOn : chip}>좋아요 {likeN}</button>
-          <button onClick={toggleFav} title="책갈피" style={fav ? chipOn : chip}>🔖</button>
-        </>
+        likeBtn
       )}
     </div>
   );
@@ -785,7 +778,7 @@ function BookInfoModal({ bookId, onClose }) {
                 <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
               </div>
             )}
-            {/* 내 한 문장 (#610) — 읽은 책: 내가 남긴 문장 + 공용 SentenceActions(공개범위·책갈피·수정·삭제) */}
+            {/* 내 한 문장 (#610) — 읽은 책: 내가 남긴 문장 + 공용 SentenceActions(공개범위·좋아요·수정·삭제) */}
             {mySents.length > 0 && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 8 }}>✍️ 내 한 문장</div>
@@ -803,7 +796,7 @@ function BookInfoModal({ bookId, onClose }) {
             {popular.length > 0 && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 8 }}>🔖 이 책의 한 문장</div>
-                {/* 한 문장 액션 계약 (#610) — 타인 문장은 공용 SentenceCard 로 통일(좋아요+책갈피 보장). 발견 맥락이라 noBlind. */}
+                {/* 한 문장 액션 계약 (#610·#641) — 타인 문장은 공용 SentenceCard 로 통일(좋아요 보장). 발견 맥락이라 noBlind. */}
                 {popular.map(s => {
                   const u = s.user || {};
                   return (
@@ -831,7 +824,7 @@ function BookInfoModal({ bookId, onClose }) {
               <div style={{ display: 'flex', gap: 8, margin: '4px 0 0' }}>
                 {shelf === 'none' && (
                   <button onClick={() => { if (window.RG_addBookToShelf) window.RG_addBookToShelf(bk, 'wish'); onClose(); }}
-                    style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>❤️ 읽고 싶어요</button>
+                    style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>🔖 읽고 싶어요</button>
                 )}
                 <button className="submit-btn" style={{ flex: 1, margin: 0 }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>📖 이 책 읽기</button>
               </div>
@@ -895,9 +888,9 @@ window.StreakCalendarModal = StreakCalendarModal;
 /* ── SentenceCollectionModal: 내 한 문장 모아보기(전체/책별/좋아요) + 읽었음 카운터(#171) ── */
 function SentenceCollectionModal({ onClose, initialFilter }) {
   const [mine, setMine] = useState(undefined);
-  const [saved, setSaved] = useState([]);   // #608: 북마크한 타인 문장 — '좋아요' 필터 전용(전체/책별엔 미혼입)
+  const [saved, setSaved] = useState([]);   // #608/#641: 좋아요한 타인 문장 — '좋아요' 필터 전용(전체/책별엔 미혼입)
   const [favIds, setFavIds] = useState(new Set());
-  const [filter, setFilter] = useState(initialFilter || 'all'); // all | book | fav — 저장(❤️) 진입 시 'fav' (#510)
+  const [filter, setFilter] = useState(initialFilter || 'all'); // all | book | fav — 좋아요한 문장 진입 시 'fav' (#510)
   // 작성일자 표기 (#608) — created_at 은 number(localStorage)·ISO(Supabase) 모두 new Date 로 처리. 월/일만.
   const fmtWhen = (t) => { if (!t) return ''; const d = new Date(t); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }); };
   useEffect(() => {
@@ -905,7 +898,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
     const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
     Promise.all([
       Promise.resolve((DS.sentences && DS.sentences.listMine) ? DS.sentences.listMine() : []).catch(() => []),
-      Promise.resolve((DS.bookmarks && DS.bookmarks.list) ? DS.bookmarks.list() : []).catch(() => []),
+      Promise.resolve((DS.claps && DS.claps.list) ? DS.claps.list() : []).catch(() => []),  // #641: 좋아요한 문장(구 bookmarks.list)
     ]).then(([sents, bms]) => {
       if (!alive) return;
       const mineList = (sents || []).map(s => ({
@@ -918,7 +911,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
         isPrivate: !!s.is_private,
         when: fmtWhen(s.created_at),   // #608: 작성일자
       }));
-      // 저장(❤️)한 타인/소셜 문장 — bookmarks 임베드 중 내 문장 목록에 없는 것. (#510)
+      // 좋아요(❤️)한 타인 문장 — claps 임베드 중 내 문장 목록에 없는 것. (#510→#641)
       // #608: '전체'·'책별'엔 내 문장만 보이도록 별도 보관 → '좋아요' 필터에서만 합친다.
       const mineIds = new Set(mineList.map(s => s.id));
       const savedExtra = (bms || []).filter(b => b && b.sentence && !mineIds.has(b.sentence_id)).map(b => {
@@ -940,7 +933,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
     return () => { alive = false; };
   }, []);
   const list = mine || [];
-  // #608: 좋아요 필터 풀 = 내 문장 + 북마크한 타인 문장. 전체/책별은 내 문장(list)만.
+  // #608/#641: 좋아요 필터 풀 = 내 문장 + 좋아요한 타인 문장. 전체/책별은 내 문장(list)만.
   const favPool = list.concat(saved);
   const favCount = favPool.filter(s => favIds.has(s.id)).length;
   const filtered = filter === 'fav' ? favPool.filter(s => favIds.has(s.id)) : list;
@@ -953,7 +946,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
         {s.bookTitle ? s.bookTitle + ' · ' : ''}{s.page != null ? s.page + 'p' : ''}{s.when ? ' · ' + s.when : ''}
       </div>
       <div style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
-      {/* 한 문장 액션 계약 (#610) — 공용 SentenceActions: 내 문장=공개범위+책갈피+수정/삭제, 타인=좋아요+책갈피 */}
+      {/* 한 문장 액션 계약 (#610·#641) — 공용 SentenceActions: 내 문장=공개범위+좋아요+수정/삭제, 타인=좋아요 */}
       <SentenceActions sentence={s} mine={!s.saved} fav={favIds.has(s.id)}
         onRemoved={(rid) => { setMine(m => (m || []).filter(x => x.id !== rid)); setSaved(v => (v || []).filter(x => x.id !== rid)); }} />
     </div>
@@ -1161,7 +1154,7 @@ function AdminDashboardModal({ onClose }) {
 window.AdminDashboardModal = AdminDashboardModal;
 
 /* ── TinderCards: 한 문장 스와이프 리뷰 (#186) ──
-   책의 한 문장들을 카드로. 우=좋아요(짹+책갈피)/좌=싫어요(넘김)/아래=유예(뒤로).
+   책의 한 문장들을 카드로. 우=좋아요(claps 단일, #641)/좌=싫어요(넘김)/아래=유예(뒤로).
    Stack Lock 준수 — 라이브러리 없이 Pointer Events + transform 직접 구현. */
 function TinderCards({ items, title, onClose }) {
   const [queue, setQueue] = useState(items || []);
@@ -1175,8 +1168,7 @@ function TinderCards({ items, title, onClose }) {
     if (!card) return;
     if (dir === 'like') {
       setLiked((n) => n + 1);
-      if (card.id && DataStore.claps && DataStore.claps.toggle) Promise.resolve(DataStore.claps.toggle(card.id)).catch(() => {});
-      if (card.id && DataStore.bookmarks && DataStore.bookmarks.toggle) Promise.resolve(DataStore.bookmarks.toggle(card.id)).catch(() => {});
+      if (card.id && DataStore.claps && DataStore.claps.toggle) Promise.resolve(DataStore.claps.toggle(card.id)).catch(() => {});  // #641: 우스와이프 = 단일 좋아요(claps)
     }
     setDrag({ dx: 0, dy: 0, active: false });
     setQueue((q) => dir === 'defer' ? q.slice(1).concat(q[0]) : q.slice(1));

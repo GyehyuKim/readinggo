@@ -173,9 +173,9 @@ function SocialView({ state }) {
           </button>
         ))}
       </div>
-      {/* 카드 리뷰(#186) 보류 — '🃏 카드로 넘겨보기' CTA·TinderCards 진입 연결 제거 (#540, decisions §8.10).
-          우=좋아요(짹+책갈피 동시)가 짹(공개 반응)·책갈피(비공개 저장) 의미를 섞어 현재 범위 제외.
-          TinderCards 컴포넌트(components.js)는 보존 — 재도입 시 두 행동 분리 전제. */}
+      {/* 카드 리뷰(#186) 보류 — '🃏 카드로 넘겨보기' CTA·TinderCards 진입 연결 제거 (#540→#641, decisions §8.10/§8.11).
+          원 보류 사유(우스와이프가 좋아요·저장 두 의미 혼재)는 #641 단일화로 해소됐으나 카드 UI 자체가 범위 밖이라 보류 유지.
+          TinderCards 컴포넌트(components.js)는 보존 — 재도입 시 우스와이프=단일 좋아요. */}
       {items === null ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>불러오는 중…</div>
       ) : items.length === 0 ? (

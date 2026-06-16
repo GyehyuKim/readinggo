@@ -546,7 +546,7 @@ function App() {
           if (bookId && DataStore.wishBooks && DataStore.wishBooks.add) {
             await Promise.resolve(DataStore.wishBooks.add(bookId));
             window.dispatchEvent(new CustomEvent('rg:wish-changed'));
-            showToast(`❤️ '${book.title}' 읽고 싶은 책에 담았어요`);
+            showToast(`🔖 '${book.title}' 읽고 싶은 책에 담았어요`);
           } else { showToast('이 책은 찜할 수 없어요 — 잠시 후 다시'); }
           return;
         }

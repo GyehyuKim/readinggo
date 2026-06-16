@@ -441,7 +441,8 @@
       },
     },
 
-    /* 소셜 — 짹 / 책갈피 / 관심책 / 콕찌르기 / 팔로우 */
+    /* 소셜 — 좋아요(claps) / 관심책 / 콕찌르기 / 팔로우
+       #641: 짹+저장(구 bookmark) → claps 단일. 자기 문장 좋아요(저장) 허용 — RLS claps_mod(from_user_id=auth.uid())가 작성자 여부와 무관하게 insert 허용. */
     claps: {
       async toggle(sentenceId) {
         const id = await uid();
@@ -459,19 +460,12 @@
         const ex = unwrap(await sb().from('claps').select('id').eq('from_user_id', id).eq('to_sentence_id', sentenceId).maybeSingle());
         return !!ex;
       },
-    },
-    bookmarks: {
-      async toggle(sentenceId) {
-        const id = await uid();
-        const ex = unwrap(await sb().from('sentence_bookmarks').select('id').eq('user_id', id).eq('sentence_id', sentenceId).maybeSingle());
-        if (ex) { await sb().from('sentence_bookmarks').delete().eq('id', ex.id); return false; }
-        await sb().from('sentence_bookmarks').insert({ user_id: id, sentence_id: sentenceId });
-        return true;
-      },
+      // #641: 내가 좋아요한 문장 목록(sentence 임베드) — '좋아요한 문장 모아보기'. 구 bookmarks.list 대체.
+      // {sentence_id, sentence} 표면 유지(SentenceCollectionModal 호환). to_sentence_id → sentence_id 별칭.
       async list() {
         const id = await uid();
-        return unwrap(await sb().from('sentence_bookmarks').select('*, sentence:sentences(*, user_book:user_books(book_id, book:books(title)))')
-          .eq('user_id', id).order('created_at', { ascending: false }));
+        return unwrap(await sb().from('claps').select('sentence_id:to_sentence_id, sentence:sentences(*, user_book:user_books(book_id, book:books(title)))')
+          .eq('from_user_id', id).order('created_at', { ascending: false }));
       },
     },
     wishBooks: {

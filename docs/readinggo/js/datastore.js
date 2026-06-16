@@ -582,8 +582,9 @@ const DataStore = {
     },
   },
 
-  /* 소셜 (짹 / 책갈피 / 관심책) ─────────────────────
-     claps.toggle = 짹 (한 문장 좋아요) 토글. */
+  /* 소셜 (좋아요 / 관심책) ─────────────────────
+     claps.toggle = ❤️ 좋아요 (한 문장 반응+저장 단일화, #641) 토글.
+     #641: 짹+저장(구 bookmark) → claps 단일 수렴. 자기 문장 좋아요(저장) 허용 — localStorage는 작성자 구분 없이 토글. */
   claps: {
     toggle(sentenceId) {
       return localStorageAdapter.mutate(s => {
@@ -595,20 +596,11 @@ const DataStore = {
     isMine(sentenceId) {
       return localStorageAdapter.mutate(s => !!s.claps[sentenceId]);
     },
-  },
-  bookmarks: {
-    toggle(sentenceId) {
-      return localStorageAdapter.mutate(s => {
-        if (s.bookmarks[sentenceId]) delete s.bookmarks[sentenceId];
-        else s.bookmarks[sentenceId] = true;
-        return !!s.bookmarks[sentenceId];
-      });
-    },
-    // Supabase 어댑터와 표면 일치 — 책갈피한 문장 목록(sentence 임베드). 좋아요 뷰용(#11).
+    // #641: 내가 좋아요한 문장 목록(sentence 임베드) — '좋아요한 문장 모아보기'. 구 bookmarks.list 대체.
     list() {
       return localStorageAdapter.mutate(s => {
         const all = _allSentences(s);
-        return Object.keys(s.bookmarks || {}).filter(k => s.bookmarks[k]).map(sid => {
+        return Object.keys(s.claps || {}).filter(k => s.claps[k]).map(sid => {
           const se = all.find(x => x.id === sid) || null;
           return { sentence_id: sid, sentence: se };
         });

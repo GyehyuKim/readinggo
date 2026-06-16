@@ -183,18 +183,18 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .catch(() => {});
     setEditingId(null);
   };
-  // 내 한 문장 좋아요(즐겨찾기) — sentence_bookmarks 재활용, 토글 (#11)
+  // 내 한 문장 좋아요(즐겨찾기) — claps 단일(#641: 자기 문장 좋아요=저장 통일), 토글 (#11)
   const [bmarks, setBmarks] = _useState(null); // Set<sentenceId>
   _useEffect(() => {
     let alive = true;
-    Promise.resolve((DataStore.bookmarks && DataStore.bookmarks.list) ? DataStore.bookmarks.list() : [])
+    Promise.resolve((DataStore.claps && DataStore.claps.list) ? DataStore.claps.list() : [])
       .then(rows => { if (alive) setBmarks(new Set((rows || []).map(r => r.sentence_id))); })
       .catch(() => { if (alive) setBmarks(new Set()); });
     return () => { alive = false; };
   }, []);
   const toggleFav = (q) => {
-    if (!q.id || !(DataStore.bookmarks && DataStore.bookmarks.toggle)) return;
-    Promise.resolve(DataStore.bookmarks.toggle(q.id)).then(on => {
+    if (!q.id || !(DataStore.claps && DataStore.claps.toggle)) return;
+    Promise.resolve(DataStore.claps.toggle(q.id)).then(on => {
       setBmarks(prev => { const n = new Set(prev || []); if (on) n.add(q.id); else n.delete(q.id); return n; });
     }).catch(() => {});
   };
@@ -721,8 +721,8 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
       if (!alive) return;
       setWishlistBooks((rows || []).map(_mapWish));
     }).catch(() => { if (alive) setWishlistBooks([]); });
-    // ❤️ 저장(북마크) 문장 수 — stats행 저장 카운트 (#471/#472)
-    Promise.resolve((DataStore.bookmarks && DataStore.bookmarks.list) ? DataStore.bookmarks.list() : []).then(rows => { if (alive) setSavedCount((rows || []).length); }).catch(() => {});
+    // ❤️ 좋아요한 문장 수 — stats행 카운트 (#471/#472→#641 claps 단일)
+    Promise.resolve((DataStore.claps && DataStore.claps.list) ? DataStore.claps.list() : []).then(rows => { if (alive) setSavedCount((rows || []).length); }).catch(() => {});
     // 팔로잉/팔로워 수 — Supabase friends.counts (게스트/localStorage는 메서드 부재 → 0 유지) (#516)
     Promise.resolve((DataStore.friends && DataStore.friends.counts) ? DataStore.friends.counts() : { following: 0, followers: 0 }).then(c => { if (alive) setFollowCounts(c || { following: 0, followers: 0 }); }).catch(() => {});
     return () => { alive = false; };
@@ -779,7 +779,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const selectedBook = selectedBookId ? (allItems.find(x => x.id === selectedBookId) || null) : null;
 
   const tabsData = [
-    { id: 'wishlist', label: '❤️ 읽고 싶은 책', books: wishlistBooks },
+    { id: 'wishlist', label: '🔖 읽고 싶은 책', books: wishlistBooks },
     { id: 'reading', label: '📖 읽고 있는 책', books: readingBooks },
     { id: 'completed', label: '✅ 읽은 책', books: completedBooks },
     // 중단 탭(#593): 읽다 그만둔 책. 책이 있을 때만 노출(빈 탭 노이즈 방지).
@@ -881,7 +881,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           <button onClick={() => window.RG_openCollection && window.RG_openCollection({ filter: 'fav' })}
             style={{textAlign:'center', background:'none', border:'none', cursor:'pointer', padding:0}}>
             <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{savedCount}</div>
-            <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>📌 책갈피</div>{/* #587: '저장' → '책갈피'(§5.8.5 용어 정렬). 동작·모달 동일 */}
+            <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>❤️ 좋아요</div>{/* #641: 구 저장(📌) → ❤️ 좋아요 단일화. 동작·모달 동일(좋아요한 문장 모아보기) */}
           </button>
         </div>
       </div>

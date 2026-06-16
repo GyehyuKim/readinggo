@@ -804,18 +804,18 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       const rank = (q) => (q.when === '방금' ? 'ZZZZ-99' : String(q.createdAt || q.when || ''));
       return rank(b).localeCompare(rank(a));  // 최신순
     });
-  // 좋아요(❤️ = 책갈피) 상태 — bookmarks.list 로 favIds 로드 (#499)
+  // 좋아요(❤️ = claps) 상태 — claps.list 로 favIds 로드 (#499→#641: 자기 문장 좋아요=저장 단일화)
   const [favIds, setFavIds] = _useState(() => new Set());
   _useEffect(() => {
     let alive = true;
-    Promise.resolve((DataStore.bookmarks && DataStore.bookmarks.list) ? DataStore.bookmarks.list() : [])
+    Promise.resolve((DataStore.claps && DataStore.claps.list) ? DataStore.claps.list() : [])
       .then((rows) => { if (alive) setFavIds(new Set((rows || []).map((b) => b.sentence_id))); })
       .catch(() => {});
     return () => { alive = false; };
   }, [nestState.book.id, (nestState.myQuotes || []).length]);
   const toggleFav = (id) => {
-    if (!id || !(DataStore.bookmarks && DataStore.bookmarks.toggle)) return;
-    Promise.resolve(DataStore.bookmarks.toggle(id)).then((on) => {
+    if (!id || !(DataStore.claps && DataStore.claps.toggle)) return;
+    Promise.resolve(DataStore.claps.toggle(id)).then((on) => {
       setFavIds((prev) => { const n = new Set(prev); if (on) n.add(id); else n.delete(id); return n; });
     }).catch(() => showToast('잠시 후 다시'));
   };

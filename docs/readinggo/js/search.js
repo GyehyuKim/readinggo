@@ -296,7 +296,7 @@ const SearchModal = ({
             style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px 24px' }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', marginBottom: 4 }}>어떤 책장에 놓을까요?</div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingBook.title}</div>
-            {[['wish', '❤️ 읽고 싶어요'], ['reading', '📖 지금 읽는 중'], ['completed', '🏰 다 읽었어요']].map(([k, label]) => (
+            {[['wish', '🔖 읽고 싶어요'], ['reading', '📖 지금 읽는 중'], ['completed', '🏰 다 읽었어요']].map(([k, label]) => (
               <button key={k} onClick={() => chooseShelf(k)}
                 style={{ width: '100%', padding: '14px', marginBottom: 8, borderRadius: 12, border: '1.5px solid var(--line)', background: k === 'reading' ? 'var(--brand-tint)' : 'var(--card)', color: 'var(--ink)', fontWeight: 800, fontSize: 15, cursor: 'pointer', textAlign: 'left' }}>
                 {label}
