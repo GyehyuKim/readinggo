@@ -398,11 +398,11 @@ input,textarea{font-family:inherit;}
   background: var(--paper);
 }
 .nest-svg-wrap.nest-img-stack{
-  height: 140px;
+  height: 172px;
 }
 .nest-svg-wrap.nest-img-stack .nest-img{
   position: absolute; inset: 0; margin: auto;
-  width: 140px; height: 140px; object-fit: contain;
+  width: 168px; height: 168px; object-fit: contain;
   opacity: 0; transition: opacity .55s ease;
   filter: saturate(calc(1 - var(--decay) * 0.7)) brightness(calc(1 - var(--decay) * 0.06));
   -webkit-user-drag: none; user-select: none;
@@ -425,7 +425,7 @@ input,textarea{font-family:inherit;}
   50%   { transform: translateY(-3px) rotate(-.5deg); }
 }
 /* crack-overlay 를 이미지 둥지 본체(아래쪽)에 맞춤 */
-.nest-img-stack .crack-overlay{ width: 130px; height: 130px; top: 57%; }
+.nest-img-stack .crack-overlay{ width: 155px; height: 155px; top: 57%; }
 .nest-img-stack .crack-overlay svg{ width: 100%; height: 100%; display:block; }
 
 .nest-svg-wrap svg.nest-art .twig{
@@ -531,11 +531,11 @@ input,textarea{font-family:inherit;}
 }
 
 .nest-meta{
-  padding: 6px 16px 0;
+  padding: 2px 16px 14px;
 }
 .nest-name-row{
-  display:flex; align-items: baseline; justify-content: space-between;
-  margin-bottom: 8px;
+  display:flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
 }
 .nest-name{
   font-size: 17px; font-weight: 900; color: var(--ink);
@@ -557,10 +557,10 @@ input,textarea{font-family:inherit;}
 .nest-theatre.h-ruin    .nest-health-num b{ color: #C0392B; }
 
 .nest-health-bar{
-  height: 12px; border-radius: 999px;
-  background: rgba(0,0,0,.10);
+  height: 7px; border-radius: 999px;
+  background: rgba(0,0,0,.08);
   position: relative; overflow: hidden;
-  box-shadow: inset 0 2px 3px rgba(0,0,0,.10);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
 }
 .nest-health-fill{
   position:absolute; left:0; top:0; bottom:0;
@@ -568,7 +568,7 @@ input,textarea{font-family:inherit;}
   background: linear-gradient(90deg, var(--brand) 0%, #6FE3A1 100%);
   border-radius: 999px;
   transition: width .8s cubic-bezier(.2,.8,.2,1), background .6s ease;
-  box-shadow: inset 0 -3px 0 rgba(0,0,0,.10);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.08);
 }
 .nest-theatre.h-shaky   .nest-health-fill{ background: linear-gradient(90deg, #F4B400 0%, #FFC966 100%); }
 .nest-theatre.h-cracked .nest-health-fill{ background: linear-gradient(90deg, #FF8A3D 0%, #FFA86A 100%); }
@@ -585,7 +585,7 @@ input,textarea{font-family:inherit;}
 }
 
 .nest-microcopy{
-  margin-top: 10px;
+  margin-top: 8px;
   font-size: 13px; font-weight: 700;
   color: var(--ink-2);
   letter-spacing: -.1px;
@@ -752,8 +752,8 @@ input,textarea{font-family:inherit;}
 .quick-ocr:disabled{ opacity:.6; cursor:default; }
 
 /* 오늘의 한 문장 카드 AI 진입 (#469) */
-.my-q-card .q-ai{ margin-top:8px; display:inline-flex; align-items:center; gap:4px; background:var(--brand-tint); border:1px solid var(--brand-soft); color:var(--brand-3); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:800; cursor:pointer; }
-.my-q-card .q-ai:active{ transform:translateY(1px); }
+.my-q-card .q-ai{ margin-top:8px; display:inline-flex; align-items:center; gap:6px; background:var(--brand); border:none; color:#fff; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(63,209,127,0.35); }
+.my-q-card .q-ai:active{ transform:translateY(1px); box-shadow:0 1px 4px rgba(63,209,127,0.2); }
 
 .nudge{
   margin-top: 10px; text-align:center;
@@ -763,7 +763,8 @@ input,textarea{font-family:inherit;}
 
 .section-head{
   display:flex; align-items:center; justify-content:space-between;
-  margin: 22px 4px 10px;
+  margin: 20px 0 10px;
+  padding: 0 16px;
 }
 .section-head h3{
   margin: 0; font-size: 16px; font-weight: 900; color: var(--ink);

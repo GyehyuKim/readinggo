@@ -321,32 +321,22 @@ function NestTheatre({ xp, health = 100 }) {
       className={`nest-theatre nest-img-mode ${hstate.cls}`}
       style={{'--health': pct, '--decay': hstate.decay, '--stage-color': stage.color}}
     >
-      {/* LV·🔥 배지 제거 (#428·#425) — 레벨/스트릭은 상단바·프로필 헤더로 일원화 */}
-
-      {/* #471: XP 진척 정보·bar를 캐릭터 이미지 위로 */}
-      <div className="nest-meta">
-        <div className="nest-name-row">
-          <div className="nest-name">
-            <span>{stage.short} {stage.name}</span>
-            {next && (
-              <span className="next-arrow">→ {next.short} {next.name}</span>
-            )}
-          </div>
-          {/* 가이드 버튼 ⓘ (#585): plain '?' 폐기 → ghost circle. 단계명 행 우측(진척 XP 옆)에 고정. */}
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
-            <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내" title="둥지가 자라는 방법"
-              style={{width:22, height:22, borderRadius:'50%', border:'1.5px solid var(--ink-3)', background:'transparent', color:'var(--ink-3)', fontSize:12, fontWeight:900, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, padding:0, lineHeight:1}}>ⓘ</button>
-          </div>
-        </div>
-        <div className="nest-health-bar">
-          <div className="nest-health-fill" />
-        </div>
-        <div className="nest-microcopy">
-          {stageMicrocopy(pct, stage)}
-        </div>
-      </div>
-
+      <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내"
+        style={{position:'absolute', top:10, right:10, zIndex:2,
+          display:'inline-flex', alignItems:'center', gap:4,
+          background:'rgba(255,255,255,0.82)', backdropFilter:'blur(8px)',
+          border:'1px solid rgba(255,255,255,0.9)',
+          boxShadow:'0 1px 6px rgba(0,0,0,0.10)',
+          borderRadius:999, padding:'5px 11px 5px 9px',
+          fontSize:11, fontWeight:800, color:'var(--ink-2)',
+          cursor:'pointer', letterSpacing:'-0.1px', lineHeight:1}}>
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 5.5C2.5 2 4 1 5.5 1s3 1 4.5 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M3 5.5C3.8 3.8 4.6 3 5.5 3s1.7.8 2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          <circle cx="5.5" cy="7.5" r="1" fill="currentColor"/>
+        </svg>
+        둥지가 자라는 법
+      </button>
       <div className="nest-svg-wrap nest-img-stack">
         {[1, 2, 3, 4, 5].map(lv => (
           <img
@@ -365,6 +355,24 @@ function NestTheatre({ xp, health = 100 }) {
           <span className="fall-twig">🍂</span>
           <span className="fall-twig">🌿</span>
           <span className="fall-twig">🍂</span>
+        </div>
+      </div>
+
+      <div className="nest-meta">
+        <div className="nest-name-row">
+          <div className="nest-name">
+            <span>{stage.short} {stage.name}</span>
+            {next && (
+              <span className="next-arrow">→ {next.short} {next.name}</span>
+            )}
+          </div>
+          <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
+        </div>
+        <div className="nest-health-bar">
+          <div className="nest-health-fill" />
+        </div>
+        <div className="nest-microcopy">
+          {stageMicrocopy(pct, stage)}
         </div>
       </div>
 
@@ -980,7 +988,16 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       </div>
       {bookQuotes.length === 0 ? (
         <div className="my-q-empty">
-          <span className="ico">🐦</span>
+          <span className="ico">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="16" cy="20" rx="9" ry="7" fill="var(--brand-soft)"/>
+              <circle cx="21" cy="11" r="5.5" fill="var(--brand-soft)"/>
+              <circle cx="23" cy="9.5" r="1.4" fill="var(--ink-2)"/>
+              <path d="M25.5 12l3 .8-2.5 1.8" stroke="var(--ink-2)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M10 22l-3 2.5" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M14 25l-1.5 3" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </span>
           이 책에서 만난 한 줄을 짹 해보세요.<br />
           남긴 문장이 여기 쌓여요.
         </div>
@@ -1011,7 +1028,17 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
                 {dateText ? <span className="dot">·</span> : null}
                 {dateText ? <span>{dateText}</span> : null}
               </div>
-              <div className="quote" style={q.kind === 'thought' ? { fontStyle: 'normal' } : null}>{q.kind === 'thought' ? `💭 ${q.text}` : `"${q.text}"`}</div>
+              <div className="quote" style={q.kind === 'thought' ? { fontStyle: 'normal' } : null}>
+                {q.kind === 'thought' ? (
+                  <><span style={{display:'inline-flex',alignItems:'center',verticalAlign:'middle',marginRight:5}}>
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <ellipse cx="6.5" cy="5.5" rx="5.5" ry="4" fill="none" stroke="var(--ink-2)" strokeWidth="1.2"/>
+                      <circle cx="4" cy="10.5" r="1" fill="var(--ink-2)"/>
+                      <circle cx="2" cy="12.5" r="0.6" fill="var(--ink-3)"/>
+                    </svg>
+                  </span>{q.text}</>
+                ) : `"${q.text}"`}
+              </div>
               {/* 한 문장 액션 계약 (#610) — 자체 렌더 대신 공용 SentenceActions(공개범위+좋아요+수정+삭제) 경유.
                   삭제는 rg:sentence-removed 이벤트로 myQuotes 자동 갱신(기존 리스너). */}
               {q.id && window.SentenceActions && (
@@ -1023,7 +1050,15 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
                 const turns = q.note ? q.note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
                 return (
                   <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>
-                    {turns ? `🐦 짹과 대화 (${turns})` : '🐦 짹과 대화하기'}
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+                      <ellipse cx="7" cy="9" rx="5" ry="4" fill="currentColor" opacity="0.55"/>
+                      <circle cx="9.5" cy="5" r="3" fill="currentColor" opacity="0.75"/>
+                      <circle cx="11" cy="4" r="1" fill="currentColor"/>
+                      <path d="M12.5 5.5l2 .4-1.5 1.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M4.5 11.5l-2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
+                      <path d="M7 12.5l-1 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
+                    </svg>
+                    {turns ? `짹과 대화 (${turns})` : '짹과 대화하기'}
                   </button>
                 );
               })()}
@@ -1145,77 +1180,140 @@ function CompanionModal({ sentence, onClose }) {
     gen.then((q) => { setQuestion(q); setLoading(false); });
   };
   const rate = (val) => { rgTrack('companion_q_rated', { book_id: sentence.bookId || '', value: val }); setRated(val); };
+  const _JackAvatar = ({ size = 28 }) => (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: 'rgba(63,209,127,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="10" cy="13" rx="7" ry="5.5" fill="var(--brand)" opacity="0.35"/>
+        <circle cx="13" cy="8" r="4.5" fill="var(--brand)" opacity="0.55"/>
+        <circle cx="15" cy="6.5" r="1.3" fill="var(--brand-3)"/>
+        <path d="M17 9l2.5.6-2 1.6" stroke="var(--brand-3)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  );
   return ReactDOM.createPortal(
-    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ background: 'var(--card)', width: '100%', maxWidth: 430, maxHeight: '85vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 18px 8px' }}>
-          <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--brand-3)' }}>🐦 짹과 대화하기</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-3)', cursor: 'pointer' }}>×</button>
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: 'var(--card)', width: '100%', maxWidth: 430, height: '90vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* ── 헤더 ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px 12px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+          <_JackAvatar size={38} />
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>짹</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, marginTop: 2 }}>독서 동반자</div>
+          </div>
+          <button onClick={onClose} aria-label="닫기" style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.06)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-2)' }}>
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          </button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px 18px' }}>
+
+        {/* ── 스크롤 영역 ── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px 8px' }}>
+
+          {/* 문장 카드 */}
           {editing ? (
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 14 }}>
               {/* 인용↔내 생각 토글 (#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 편집. */}
               <textarea value={stext} onChange={(e) => { if (e.target.value.length <= 1000) setStext(e.target.value); }} rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--brand)', borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
+                style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--brand)', borderRadius: 12, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <button onClick={() => { setStext(sentence.text || ''); setSkind(sentence.kind === 'thought' ? 'thought' : 'quote'); setEditing(false); }} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 8, border: '1.5px solid var(--line)', background: 'transparent', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>취소</button>
-                <button onClick={saveText} style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>저장</button>
+                <button onClick={() => { setStext(sentence.text || ''); setSkind(sentence.kind === 'thought' ? 'thought' : 'quote'); setEditing(false); }}
+                  style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 999, border: '1.5px solid var(--line)', background: 'transparent', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>취소</button>
+                <button onClick={saveText}
+                  style={{ flex: 1, padding: '7px 14px', borderRadius: 999, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>저장</button>
               </div>
             </div>
           ) : (
-            <div style={{ position: 'relative', fontSize: 14, fontStyle: skind === 'thought' ? 'normal' : 'italic', color: 'var(--ink)', lineHeight: 1.5, padding: '10px 52px 10px 12px', background: 'var(--paper-2)', borderRadius: 10, marginBottom: 12 }}>
-              {skind === 'thought' ? `💭 ${sentence.text}` : `"${sentence.text}"`}
-              <span style={{ position: 'absolute', top: 6, right: 8, display: 'flex', gap: 6 }}>
+            <div style={{ position: 'relative', fontSize: 14, fontStyle: skind === 'thought' ? 'normal' : 'italic', color: 'var(--ink)', lineHeight: 1.55, padding: '10px 48px 10px 12px', background: 'var(--paper-2)', borderRadius: 12, marginBottom: 14 }}>
+              {skind === 'thought' ? (
+                <><span style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', marginRight: 5 }}>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><ellipse cx="6.5" cy="5.5" rx="5.5" ry="4" fill="none" stroke="var(--ink-2)" strokeWidth="1.2"/><circle cx="4" cy="10.5" r="1" fill="var(--ink-2)"/><circle cx="2" cy="12.5" r="0.6" fill="var(--ink-3)"/></svg>
+                </span>{sentence.text}</>
+              ) : `"${sentence.text}"`}
+              <span style={{ position: 'absolute', top: 6, right: 8, display: 'flex', gap: 4 }}>
                 <button onClick={() => { setStext(sentence.text || ''); setEditing(true); }} title="문장 수정" aria-label="문장 수정"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: 0.6, padding: 0 }}>✏️</button>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.55, padding: 3, display: 'flex', alignItems: 'center' }}>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M9 2l2 2-7 7H2v-2L9 2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
                 <button onClick={delQuote} title="이 한 문장 삭제" aria-label="삭제"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: 0.6, padding: 0 }}>🗑</button>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.55, padding: 3, display: 'flex', alignItems: 'center' }}>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 4h9M5 4V2.5h3V4M5.5 6v4M7.5 6v4M3 4l.7 7h5.6L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
               </span>
             </div>
           )}
-          {/* 말풍선 채팅 UI (#435) — 좌=참새 질문, 우=내 답 */}
+
+          {/* 말풍선 채팅 UI (#435) — 좌=짹 질문(아바타), 우=내 답 */}
           {exchanges.map((e, ei) => (
             <div key={ei}>
-              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 6 }}>
-                <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13.5, fontWeight: 700, lineHeight: 1.5 }}>{e.q}</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 6 }}>
+                <_JackAvatar size={28} />
+                <div style={{ maxWidth: '78%', background: 'rgba(63,209,127,0.12)', borderRadius: '16px 16px 16px 4px', padding: '9px 13px', fontSize: 13.5, fontWeight: 700, lineHeight: 1.55, color: 'var(--ink)' }}>{e.q}</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-                <div style={{ maxWidth: '85%', background: 'var(--brand)', color: '#fff', borderRadius: '14px 14px 4px 14px', padding: '8px 12px', fontSize: 13, lineHeight: 1.5 }}>{e.a}</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+                <div style={{ maxWidth: '78%', background: 'var(--brand)', color: '#fff', borderRadius: '16px 16px 4px 16px', padding: '9px 13px', fontSize: 13.5, lineHeight: 1.55 }}>{e.a}</div>
               </div>
             </div>
           ))}
+
+          {/* 현재 상태 */}
           {done ? (
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>오늘 짹이랑 깊이 이야기했네요 🐦</div>
-          ) : loading ? (
-            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
-              <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(63,209,127,0.08)', borderRadius: 14 }}>
+              <_JackAvatar size={28} />
+              <span style={{ fontSize: 13, color: 'var(--ink-2)', fontStyle: 'italic' }}>오늘 짹이랑 깊이 이야기했네요</span>
             </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
-                <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>{question}</div>
-                    <div style={{ flex: '0 0 auto', display: 'flex', gap: 4, fontSize: 13 }}>
-                      <button onClick={() => rate('up')} title="좋은 질문" aria-label="좋아요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'up' ? 1 : 0.45 }}>👍</button>
-                      <button onClick={() => rate('down')} title="별로예요" aria-label="싫어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: rated === 'down' ? 1 : 0.45 }}>👎</button>
-                      <button onClick={regen} title="다른 질문" aria-label="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, opacity: 0.55 }}>🔄</button>
-                    </div>
+          ) : loading ? (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10 }}>
+              <_JackAvatar size={28} />
+              <div style={{ background: 'rgba(63,209,127,0.12)', borderRadius: '16px 16px 16px 4px', padding: '12px 16px' }}>
+                <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                  {[0.8, 0.5, 0.3].map((op, i) => (
+                    <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)', opacity: op, display: 'block' }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : question ? (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10 }}>
+              <_JackAvatar size={28} />
+              <div style={{ maxWidth: '78%', background: 'rgba(63,209,127,0.12)', borderRadius: '16px 16px 16px 4px', padding: '9px 13px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>{question}</div>
+                  <div style={{ flex: '0 0 auto', display: 'flex', gap: 2 }}>
+                    <button onClick={() => rate('up')} title="좋은 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: rated === 'up' ? 1 : 0.4, display: 'flex', color: rated === 'up' ? 'var(--brand-3)' : 'currentColor' }}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 13V7h2L7 1.5v2.5h4a1 1 0 0 1 1 1l-1 4.5H7V13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <button onClick={() => rate('down')} title="별로예요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: rated === 'down' ? 1 : 0.4, display: 'flex', color: rated === 'down' ? 'var(--ink-2)' : 'currentColor' }}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12 1v6h-2L7 12.5V10H3a1 1 0 0 1-1-1l1-4.5H7V1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <button onClick={regen} title="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: 0.5, display: 'flex' }}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12 7a5 5 0 1 1-1.5-3.5L12 2v3.5H8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
                   </div>
                 </div>
               </div>
-              <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="떠오르는 대로 답해보세요" rows={2}
-                style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
-              {/* '마치기' 버튼 제거(#655) — 별도 종료 액션이 조기 종료 오해를 유발. 종료는 모달 이탈(✕/바깥)로만. */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={submit} disabled={!answer.trim()} style={{ flex: 1, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: answer.trim() ? 'pointer' : 'not-allowed', opacity: answer.trim() ? 1 : 0.55 }}>답하고 이어가기</button>
-              </div>
-            </>
-          )}
-          {/* 말단 anchor (#407) — 새 질문/답변 추가 시 활성 영역을 view로 고정해 화면 점프·오탭 방지 */}
+            </div>
+          ) : null}
+
+          {/* 말단 anchor (#407) */}
           <div ref={_compTailRef} />
         </div>
+
+        {/* ── 입력바 (고정) ── */}
+        {/* '마치기' 버튼 제거(#655) — 종료는 모달 이탈(✕/바깥)로만. */}
+        {!done && !loading && question && (
+          <div style={{ padding: '10px 16px 20px', borderTop: '1px solid var(--line)', flexShrink: 0, background: 'var(--card)' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+              <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && answer.trim()) { e.preventDefault(); submit(); } }}
+                placeholder="떠오르는 대로 답해보세요" rows={2}
+                style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 14, padding: '9px 12px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', background: 'var(--paper-2)', outline: 'none', boxSizing: 'border-box' }} />
+              <button onClick={submit} disabled={!answer.trim()} aria-label="전송"
+                style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: answer.trim() ? 'var(--brand)' : 'var(--line)', color: '#fff', cursor: answer.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}>
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9l14-7-7 14V9H2z" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>, document.body);
 }

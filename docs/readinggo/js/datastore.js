@@ -412,6 +412,14 @@ const DataStore = {
         return se;
       });
     },
+    // 공개 범위 변경 — Supabase 어댑터와 표면 일치
+    setVisibility(sentenceId, { visibility }) {
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (se) se.visibility = visibility;
+        return se;
+      });
+    },
     // 종류 변경 인용↔내 의견 (#381) — Supabase 어댑터와 표면 일치
     setKind(sentenceId, kind) {
       return localStorageAdapter.mutate(s => {
