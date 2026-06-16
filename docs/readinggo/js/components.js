@@ -651,11 +651,16 @@ const _SA_VIS_ICON = {
   private: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5.5" width="8" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
 };
 const _SA_VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '비공개' };
-function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
+function SentenceActions({ sentence, mine, fav: favInit, onRemoved, onUpdated }) {
   const id = sentence && sentence.id;
   const [vis, setVis] = useState(sentence.visibility || (sentence.isPrivate ? 'private' : 'public'));
   const [liked, setLiked] = useState(!!favInit);
   const [likeN, setLikeN] = useState(sentence.claps || sentence.clapCount || 0);
+  // #683: 수정 = 문장 본문 + 페이지 인라인 편집. (이전엔 잘못 동반자 대화 모달로 연결됨.)
+  const [editing, setEditing] = useState(false);
+  const [dText, setDText] = useState(sentence.text || '');
+  const [dPage, setDPage] = useState(sentence.page == null ? '' : String(sentence.page));
+  const [saving, setSaving] = useState(false);
   // #641: mine 포함 좋아요 초기 상태 로드(자기 문장도 좋아요=저장 가능).
   useEffect(() => {
     if (!id || !(DataStore.claps && DataStore.claps.isMine)) return;
@@ -673,7 +678,28 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     private:   { ...chip, background: 'rgba(120,120,130,0.1)', borderColor: 'rgba(120,120,130,0.35)', color: 'var(--ink-3)' },
   };
   const cycleVis = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.setVisibility)) return; const next = _SA_VIS[(_SA_VIS.indexOf(vis) + 1) % _SA_VIS.length]; setVis(next); sentence.visibility = next; Promise.resolve(DataStore.sentences.setVisibility(id, { visibility: next })).catch(() => {}); window.dispatchEvent(new CustomEvent('rg:sentence-vis', { detail: { id, visibility: next } })); };
-  const edit = (e) => { stop(e); if (window.RG_openCompanion) window.RG_openCompanion({ id, text: sentence.text, bookId: sentence.bookId, bookTitle: sentence.bookTitle, author: sentence.author, page: sentence.page, note: sentence.note || sentence.my_note || '', kind: sentence.kind }); };
+  // #683: 수정 = 인라인 편집 폼 열기 (동반자 대화 모달 X). 드래프트를 현재 값으로 리셋 후 진입.
+  const edit = (e) => { stop(e); setDText(sentence.text || ''); setDPage(sentence.page == null ? '' : String(sentence.page)); setEditing(true); };
+  const cancelEdit = (e) => { stop(e); setEditing(false); };
+  const saveEdit = (e) => {
+    stop(e);
+    const text = (dText || '').trim();
+    if (!text) { showToast('문장 내용을 입력해 주세요'); return; }
+    const pageRaw = (dPage || '').trim();
+    const page = pageRaw === '' ? null : parseInt(pageRaw, 10);
+    if (pageRaw !== '' && (!isFinite(page) || page < 0)) { showToast('페이지 번호를 확인해 주세요'); return; }
+    if (!(DataStore.sentences && DataStore.sentences.updateText)) { setEditing(false); return; }
+    setSaving(true);
+    const ops = [Promise.resolve(DataStore.sentences.updateText(id, text))];
+    if (DataStore.sentences.setPage) ops.push(Promise.resolve(DataStore.sentences.setPage(id, page)));
+    Promise.all(ops).then(() => {
+      sentence.text = text; sentence.page = page;   // 카드 즉시 정합
+      setEditing(false); setSaving(false);
+      if (onUpdated) onUpdated({ id, text, page });
+      window.dispatchEvent(new CustomEvent('rg:sentence-updated', { detail: { id, text, page } }));
+      showToast('✏️ 한 문장을 수정했어요');
+    }).catch(() => { setSaving(false); showToast('수정 실패 — 잠시 후 다시'); });
+  };
   const del = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.remove)) return; if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return; Promise.resolve(DataStore.sentences.remove(id)).then(() => { if (onRemoved) onRemoved(id); window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); showToast('🗑 한 문장을 삭제했어요'); }).catch(() => showToast('삭제 실패 — 잠시 후 다시')); };
   const toggleLike = (e) => { stop(e); if (!(DataStore.claps && DataStore.claps.toggle)) return; Promise.resolve(DataStore.claps.toggle(id)).then((on) => { setLiked(on); setLikeN(n => Math.max(0, n + (on ? 1 : -1))); }).catch(() => {}); };
   const likeBtn = <button onClick={toggleLike} title="좋아요" style={liked ? chipOn : chip}>
@@ -692,6 +718,24 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     </svg>
     공유
   </button> : null;
+  // #683: 인라인 편집 폼 — 문장 본문(textarea) + 페이지(number). 저장은 DataStore 계약 경유.
+  const inputBase = { width: '100%', boxSizing: 'border-box', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--card)', color: 'var(--ink)', fontSize: 13, padding: '8px 10px', fontFamily: 'inherit' };
+  const btnBase = { ...chip, padding: '6px 14px', fontSize: 12 };
+  if (mine && editing) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }} onClick={stop}>
+        <textarea value={dText} onChange={(e) => setDText(e.target.value)} rows={3} placeholder="문장 내용" style={{ ...inputBase, resize: 'vertical', lineHeight: 1.5 }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>페이지</label>
+          <input type="number" min="0" inputMode="numeric" value={dPage} onChange={(e) => setDPage(e.target.value)} placeholder="미상" style={{ ...inputBase, width: 110 }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={cancelEdit} disabled={saving} style={btnBase}>취소</button>
+          <button onClick={saveEdit} disabled={saving} style={{ ...btnBase, background: 'var(--brand)', borderColor: 'var(--brand)', color: '#fff', opacity: saving ? 0.6 : 1 }}>{saving ? '저장 중…' : '저장'}</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }} onClick={stop}>
       {mine ? (
@@ -699,7 +743,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
           <button onClick={cycleVis} title="공개 범위 변경 (전체→친구→비공개)" style={_visChip[vis]}><span>{_SA_VIS_ICON[vis]}</span><span>{_SA_VIS_LABEL[vis]}</span></button>
           {likeBtn}
           {shareBtn}
-          <button onClick={edit} title="수정·대화" style={chip}>
+          <button onClick={edit} title="수정 (문장·페이지)" style={chip}>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M9 2l2 2-7 7H2v-2L9 2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>

@@ -45,7 +45,7 @@
 
 | 맥락 | 공개범위 | 좋아요(❤️) | 수정/삭제 |
 |---|---|---|---|
-| **내 한 문장** | ✅ 순환 토글(전체공개→친구공개→비공개) | ✅ 자기 문장도 좋아요(=저장) 가능 | ✅ 본문 수정·삭제 |
+| **내 한 문장** | ✅ 순환 토글(전체공개→친구공개→비공개) | ✅ 자기 문장도 좋아요(=저장) 가능 | ✅ 본문·페이지 수정·삭제 |
 | **타인 한 문장** | — | ✅ | — |
 
 > **리액션·저장 단일화 (#641, #616/#540 갱신)**: 짹 + 책갈피(🔖) 두 행동을 **단일 "좋아요"(❤️, `claps`)** 로 수렴했다. 별도 🔖 책갈피 버튼·`sentence_bookmarks` 는 폐기(deprecate). "다시 보기"(저장) use-case 는 *"좋아요한 문장 모아보기"*([profile.md §5.8.8](./profile.md), `claps.list`)가 대체한다. 자기 문장 좋아요를 허용하므로(저장 통일) **self-clap 은 XP 비부여**(받은-짹 XP·주는-반응 XP 모두 제외 — 어뷰즈 방지). 공개 개수에는 합산(Phase 0 단순화, 자기 1표 제외는 후순위).
@@ -53,6 +53,7 @@
 - 디스플레이: **모든 책 상세 아래에 관련 한 문장** — 읽은 책=내 한 문장, 안 읽은 책=타인의 공개 한 문장.
 - `SentenceCard`는 `noBlind` 옵션 지원(발견 맥락=책 상세 인기 문장은 스포일러 블라인드 해제).
 - **공용 단위**: 카드 본문은 `SentenceCard`, **액션 버튼 row는 공용 `SentenceActions`**(components.js) — `mine` 이면 공개범위·좋아요·수정·삭제, 아니면 좋아요. 표면(SentenceCollectionModal 등)은 이 공용 컴포넌트만 끼운다.
+- **수정 버튼 = 인라인 편집 폼(#683)**: 수정(✏️)을 누르면 **그 문장의 본문(textarea) + 페이지 번호(number)** 를 고치는 인라인 폼이 카드 자리에서 열린다(동반자 대화 모달이 아님 — 이전 `RG_openCompanion` 오연결 수정). 저장은 DataStore 계약 `sentences.updateText`(본문)·`sentences.setPage`(페이지) 경유, 성공 시 카드 즉시 갱신 + `rg:sentence-updated` 이벤트 디스패치. 페이지 빈값=미상(null) 허용. 동반자 '짹과 대화'는 카드 본문 탭(`RG_openCompanion`)으로 별도 진입한다.
 - 점검: align_v7 invariant — "BookInfoModal 인기 한 문장이 SentenceCard 경유", "SentenceCard 좋아요(claps) 토글", "공용 SentenceActions 존재", "SentenceCollectionModal 한 문장이 SentenceActions 경유", **그리고 FEATURE_FILES 에 '책갈피' 단어 absent(영구 가드, #641)**. **홈 '이 책 한 문장'·책장 BookDetailModal 내 문장 카드도 공용 `SentenceActions` 경유로 통일 완료(#610)** — 자체 버튼 렌더 금지를 invariant 로 락.
 
 **한 문장 피드**:

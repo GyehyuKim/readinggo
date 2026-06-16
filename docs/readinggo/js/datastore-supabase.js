@@ -270,6 +270,11 @@
       async updateText(sentenceId, text) {
         return unwrap(await sb().from('sentences').update({ text: text || '' }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
       },
+      // 한 문장 페이지 번호 편집 (#683) — 본인 행만(RLS). null = 페이지 미상.
+      async setPage(sentenceId, page) {
+        const p = (typeof page === 'number' && isFinite(page)) ? page : null;
+        return unwrap(await sb().from('sentences').update({ page: p }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
+      },
       // 종류 변경 인용↔내 의견 (#381) — 본인 행만(RLS)
       async setKind(sentenceId, kind) {
         const k = kind === 'thought' ? 'thought' : 'quote';
