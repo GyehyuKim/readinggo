@@ -813,21 +813,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       .catch(() => {});
     return () => { alive = false; };
   }, [nestState.book.id, (nestState.myQuotes || []).length]);
-  const toggleFav = (id) => {
-    if (!id || !(DataStore.claps && DataStore.claps.toggle)) return;
-    Promise.resolve(DataStore.claps.toggle(id)).then((on) => {
-      setFavIds((prev) => { const n = new Set(prev); if (on) n.add(id); else n.delete(id); return n; });
-    }).catch(() => showToast('잠시 후 다시'));
-  };
-  const delHomeQuote = (id, bookId) => {
-    if (!id || !(DataStore.sentences && DataStore.sentences.remove)) return;
-    if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return;
-    Promise.resolve(DataStore.sentences.remove(id)).then(() => {
-      window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); // onRm → myQuotes 갱신
-      if (window.rgTrack) window.rgTrack('sentence_deleted', { book_id: bookId || '' });
-      showToast('🗑 한 문장을 삭제했어요');
-    }).catch(() => showToast('삭제 실패 — 잠시 후 다시'));
-  };
+  // #610: 자체 좋아요/삭제 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 '이 책 한 문장' 카드).
+  //   favIds 는 SentenceActions fav 초기값 시드용으로만 유지(claps.list 로 로드).
 
   // 활성 책 없음(신규/미등록): 데모책 대신 '책 등록' 온보딩 — 유령 책 체크인(영속 실패) 방지.
   if (!nestState.book || !nestState.book.id) {
@@ -1023,24 +1010,13 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
                 <span>{q.page}p</span>
                 {dateText ? <span className="dot">·</span> : null}
                 {dateText ? <span>{dateText}</span> : null}
-                {q.id && (
-                  <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 10, alignItems: 'center' }}>
-                    <button onClick={() => toggleFav(q.id)} title="좋아요(즐겨찾기)" aria-label="좋아요"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', lineHeight: 1, color: favIds.has(q.id) ? '#f04' : 'var(--ink-3)', transition: 'color .15s' }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill={favIds.has(q.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                      </svg>
-                    </button>
-                    <button onClick={() => delHomeQuote(q.id, q.bookId)} title="이 한 문장 삭제" aria-label="삭제"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', lineHeight: 1, color: 'var(--ink-3)', transition: 'color .15s' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                      </svg>
-                    </button>
-                  </span>
-                )}
               </div>
               <div className="quote" style={q.kind === 'thought' ? { fontStyle: 'normal' } : null}>{q.kind === 'thought' ? `💭 ${q.text}` : `"${q.text}"`}</div>
+              {/* 한 문장 액션 계약 (#610) — 자체 렌더 대신 공용 SentenceActions(공개범위+좋아요+수정+삭제) 경유.
+                  삭제는 rg:sentence-removed 이벤트로 myQuotes 자동 갱신(기존 리스너). */}
+              {q.id && window.SentenceActions && (
+                <SentenceActions sentence={{ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }} mine fav={favIds.has(q.id)} />
+              )}
               {q.id && (
                 <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>🐦 짹과 대화하기</button>
               )}

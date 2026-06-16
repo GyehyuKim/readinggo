@@ -58,13 +58,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     } catch (e) { showToast('저장 실패 — 잠시 후 다시'); }
     finally { setAddBusy(false); }
   };
-  const delQuote = (q) => {
-    if (!q.id) return;
-    if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return;
-    Promise.resolve(DataStore.sentences.remove(q.id))
-      .then(() => { setRemovedIds(m => ({ ...m, [q.id]: true })); showToast('🗑 한 문장을 삭제했어요'); if (window.rgTrack) window.rgTrack('sentence_deleted', { book_id: book.id }); })
-      .catch(() => showToast('삭제 실패 — 잠시 후 다시'));
-  };
+  // #610: 자체 삭제/좋아요/공개범위 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 한 문장 카드).
   const bookshelfEntry = (book.status === 'completed') ? { rating: book.rating, comment: book.comment } : null;
   // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
   const revealAll = React.useContext(SpoilerContext);
@@ -192,24 +186,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .catch(() => { if (alive) setBmarks(new Set()); });
     return () => { alive = false; };
   }, []);
-  const toggleFav = (q) => {
-    if (!q.id || !(DataStore.claps && DataStore.claps.toggle)) return;
-    Promise.resolve(DataStore.claps.toggle(q.id)).then(on => {
-      setBmarks(prev => { const n = new Set(prev || []); if (on) n.add(q.id); else n.delete(q.id); return n; });
-    }).catch(() => {});
-  };
-  // visibility 3단계: public(전체) | followers(친구만) | private(나만) (#179)
-  const _VIS_CYCLE = ['public', 'followers', 'private'];
-  const _VIS_ICON = { public: '🌐', followers: '👥', private: '🔒' };
-  const _VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '비공개' };
-  const [vis, setVis] = _useState({});
-  const getVis = (q) => vis[q.id] || q.visibility || (q.isPrivate ? 'private' : 'public');
-  const cycleVis = (q) => {
-    if (!q.id || !(DataStore.sentences && DataStore.sentences.setVisibility)) return;
-    const next = _VIS_CYCLE[(_VIS_CYCLE.indexOf(getVis(q)) + 1) % _VIS_CYCLE.length];
-    setVis(m => ({ ...m, [q.id]: next }));
-    Promise.resolve(DataStore.sentences.setVisibility(q.id, { visibility: next })).catch(() => {});
-  };
+  // #610: 좋아요·공개범위(3단계) 토글은 공용 SentenceActions 가 담당 → 자체 핸들러/상태 제거.
+  //   bmarks 는 SentenceActions fav 초기값 시드용으로만 유지.
   // note_private 별도 유지 (감상만 비공개)
   const [priv, setPriv] = _useState({});
   const isPrivNote = (q) => { const o = priv[q.id]; return (o && o.note_private !== undefined) ? o.note_private : !!q.notePrivate; };
@@ -542,24 +520,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   isSentenceBlinded(book.id, q.page);
                 return (
                   <div key={i} style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:'8px', padding:12, marginBottom:10}}>
-                    <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6}}>
                       <span>{q.page}p · {q.when}</span>
-                      {q.id && (
-                        <span style={{display:'flex', gap:8, alignItems:'center'}}>
-                          <button onClick={() => cycleVis(q)} title="탭하면 공개 범위 변경 (전체공개→친구공개→비공개)"
-                            style={{display:'inline-flex', alignItems:'center', gap:4, background:'var(--card)', border:'1px solid var(--line)', borderRadius:12, cursor:'pointer', fontSize:11, fontWeight:800, color:'var(--ink-2)', padding:'3px 9px', lineHeight:1}}>
-                            <span>{_VIS_ICON[getVis(q)]}</span><span>{_VIS_LABEL[getVis(q)]}</span>
-                          </button>
-                          <button onClick={() => toggleFav(q)} title="좋아요(즐겨찾기)"
-                            style={{background:'none', border:'none', cursor:'pointer', fontSize:14, padding:0, lineHeight:1}}>
-                            {(bmarks && bmarks.has(q.id)) ? '❤️' : '🤍'}
-                          </button>
-                          <button onClick={() => delQuote(q)} title="이 한 문장 삭제"
-                            style={{background:'none', border:'none', cursor:'pointer', fontSize:13, padding:0, lineHeight:1, opacity:0.7}}>
-                            🗑
-                          </button>
-                        </span>
-                      )}
                     </div>
                     {blinded ? (
                       <div className="spoiler-blind" onClick={() => setRevealed(r => ({ ...r, [i]: true }))}>
@@ -603,6 +565,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                           );
                         })()}
                       </>
+                    )}
+                    {/* 한 문장 액션 계약 (#610) — 자체 렌더 대신 공용 SentenceActions(공개범위+좋아요+수정+삭제) 경유.
+                        삭제는 rg:sentence-removed 이벤트로 목록 갱신(removedIds 리스너). blind 와 무관하게 내 문장 관리 가능. */}
+                    {q.id && window.SentenceActions && (
+                      <SentenceActions
+                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, note: q.note || q.my_note || '', kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
+                        mine fav={!!(bmarks && bmarks.has(q.id))}
+                        onRemoved={(rid) => setRemovedIds(m => ({ ...m, [rid]: true }))} />
                     )}
                   </div>
                 );

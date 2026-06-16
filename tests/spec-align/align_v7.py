@@ -96,8 +96,8 @@ INVARIANTS = [
         ["nest.js"], r"bookQuoteCount"),
     ("S4", "present", "빠른입력 페이지/한 문장 독립 제출 (#497)",
         ["nest.js"], r"submitPage[\s\S]*submitSentence|submitSentence[\s\S]*submitPage"),
-    ("S4", "present", "이 책 한 문장 전체기간 + 좋아요·삭제 (#499)",
-        ["nest.js"], r"bookQuotes[\s\S]*delHomeQuote|delHomeQuote[\s\S]*bookQuotes"),
+    ("S4", "present", "이 책 한 문장 전체기간 + 액션(SentenceActions 경유) (#499→#610)",
+        ["nest.js"], r"bookQuotes[\s\S]*<SentenceActions|<SentenceActions[\s\S]*bookQuotes"),
     ("S4", "present", "5단계 이모지 시퀀스 🪵🪹🏠🏡🏰", ADAPTER_FILES,
         r"🪵[\s\S]*🪹[\s\S]*🏠[\s\S]*🏡[\s\S]*🏰"),
     ("S4", "present", "1,600 XP 주기 단계 임계값 (maxXp 99/399/899/1599)", ADAPTER_FILES,
@@ -201,6 +201,11 @@ INVARIANTS = [
         ["components.js"], r"<SentenceActions sentence=\{s\}"),
     ("C", "present", "책 상세에 내 한 문장 섹션 — 읽은 책=내 문장(+SentenceActions) / 안읽음=타인 (#610)",
         ["components.js"], r"mySents\.map"),
+    # #610 표면 통일 락 — 홈·책장 내 문장 카드도 공용 SentenceActions 경유(자체 버튼 렌더 금지).
+    ("C", "present", "홈 '이 책 한 문장' 카드 SentenceActions 경유 (#610 표면 통일)",
+        ["nest.js"], r"<SentenceActions sentence=\{\{ id: q\.id"),
+    ("C", "present", "책장 BookDetailModal 한 문장 카드 SentenceActions 경유 (#610 표면 통일)",
+        ["library.js"], r"<SentenceActions"),
 ]
 
 
