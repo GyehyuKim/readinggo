@@ -412,6 +412,14 @@ const DataStore = {
         return se;
       });
     },
+    // 한 문장 페이지 번호 편집 (#683) — Supabase 어댑터와 표면 일치(§7.2). null = 페이지 미상.
+    setPage(sentenceId, page) {
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (se) se.page = (typeof page === 'number' && isFinite(page)) ? page : null;
+        return se;
+      });
+    },
     // 공개 범위 변경 — Supabase 어댑터와 표면 일치
     setVisibility(sentenceId, { visibility }) {
       return localStorageAdapter.mutate(s => {
