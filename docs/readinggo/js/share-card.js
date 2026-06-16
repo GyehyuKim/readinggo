@@ -111,12 +111,13 @@ function _buildCardNode(n, coverDataUrl) {
   // ② 문장 (주역) — 글자 수 반응형 폰트(§6 clamp 근사)
   const wrap = document.createElement('div');
   Object.assign(wrap.style, { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' });
+  // 글자 수 반응형 폰트(§6 clamp 근사) — 시안(share-card.html r11=27px@340≈86px@1080) 기준 상향(#651 디자인 정합).
   const len = n.text.length;
-  let fs = 78;
-  if (len > 18) fs = 66;
-  if (len > 32) fs = 54;
-  if (len > 52) fs = 44;
-  if (len > 80) fs = 36;
+  let fs = 88;
+  if (len > 18) fs = 74;
+  if (len > 32) fs = 60;
+  if (len > 52) fs = 50;
+  if (len > 80) fs = 40;
   const sentence = document.createElement('div');
   Object.assign(sentence.style, {
     textAlign: 'center', fontSize: fs + 'px', lineHeight: '1.45',
@@ -193,6 +194,32 @@ function _buildCardNode(n, coverDataUrl) {
   return root;
 }
 
+// Moneygraphy 폰트 임베드 CSS (#676) — 동일 오리진 otf 를 base64 @font-face 로. 1회 빌드 후 캐시.
+// 이유: skipFonts 면 빠르지만 브랜드 폰트가 빠져 시스템 폰트로 렌더돼 시안과 어긋남(디자인 저하).
+// fontEmbedCSS 를 주면 html-to-image 가 문서 스타일시트(크로스오리진 Google Fonts) 스캔을 건너뛰어
+// SecurityError·~5s 지연 없이 Moneygraphy 로 래스터(~0.4s).
+let _fontCssCache = null;
+async function _fontEmbedCSS() {
+  if (_fontCssCache !== null) return _fontCssCache;
+  const toDataUrl = async (url) => {
+    const r = await fetch(url); if (!r.ok) throw new Error('font ' + r.status);
+    const b = await r.blob();
+    return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+  };
+  try {
+    const [rnd, pix] = await Promise.all([
+      toDataUrl('fonts/Moneygraphy-Rounded.otf'),
+      toDataUrl('fonts/Moneygraphy-Pixel.otf'),
+    ]);
+    _fontCssCache =
+      "@font-face{font-family:'Moneygraphy Rounded';src:url(" + rnd + ") format('opentype');}" +
+      "@font-face{font-family:'Moneygraphy Pixel';src:url(" + pix + ") format('opentype');}";
+  } catch (e) {
+    _fontCssCache = '';  // 폰트 로드 실패 → '' (호출부에서 skipFonts 폴백)
+  }
+  return _fontCssCache;
+}
+
 // 카드 PNG Blob 생성. html-to-image(toBlob) 사용. 폰트 로드 완료 후 래스터.
 async function renderSentenceCardBlob(s) {
   if (!(window.htmlToImage && window.htmlToImage.toBlob)) {
@@ -205,13 +232,14 @@ async function renderSentenceCardBlob(s) {
   try {
     // 커스텀 폰트(Moneygraphy) 글리프 누락 방지 (spec §9).
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+    const fontCss = await _fontEmbedCSS();   // #676: Moneygraphy 임베드(브랜드 폰트). 실패 시 ''.
     const blob = await window.htmlToImage.toBlob(node, {
       width: 1080, height: 1080, pixelRatio: 1, backgroundColor: _SC.paper,
       cacheBust: false,  // 알라딘 표지는 위에서 data-URL 로 인라인 처리됨 → cacheBust 불필요
-      // QA(#673, 실브라우저 확정): 크로스오리진 Google Fonts 스타일시트 인라인 시도 시 SecurityError
-      // 재시도로 렌더가 ~5초까지 지연. 노드는 라이브 DOM(폰트 이미 적용)이라 임베드 불필요 →
-      // skipFonts 로 ~0.35s 로 단축, 콘솔 SecurityError 제거.
-      skipFonts: true,
+      // 폰트(#673·#676): fontEmbedCSS(Moneygraphy)를 주면 문서 스타일시트(크로스오리진 Google Fonts)
+      // 스캔을 건너뛰어 SecurityError·~5s 지연 없이 브랜드 폰트로 래스터(~0.4s). 폰트 로드 실패 시에만
+      // skipFonts 폴백(빠르되 시스템 폰트).
+      ...(fontCss ? { fontEmbedCSS: fontCss } : { skipFonts: true }),
     });
     if (!blob) throw new Error('toBlob 결과 없음');
     return blob;
