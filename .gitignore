@@ -42,7 +42,10 @@ docs/readinggo/supabase/package-lock.json
 .netlify/
 
 # ReadingGo 로컬 테스트 전용 (CDN 오프라인 대체 — 커밋 금지)
-docs/readinggo/vendor/
+# 디렉토리 자체가 아닌 내용물(*)을 무시해야 아래 negation 예외가 작동한다 (부모 dir 제외 시 재포함 불가).
+docs/readinggo/vendor/*
+# 예외: 자체 호스팅 Babel은 프로덕션 부팅 소스 — 반드시 커밋 (#691). 누락 시 vendor/ 404 → 전사이트 크래시.
+!docs/readinggo/vendor/babel.min.js
 docs/readinggo/index-local.html
 
 # Personal notices

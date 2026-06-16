@@ -1,0 +1,3 @@
+# 자체 호스팅 vendor 자산은 줄바꿈 정규화 금지 — npm 배포본과 바이트 동일 유지 (#691).
+# CRLF 변환이 일어나면 부팅 의존성이 변형될 수 있어 -text 로 고정.
+docs/readinggo/vendor/babel.min.js -text

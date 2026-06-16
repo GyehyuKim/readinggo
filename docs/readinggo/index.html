@@ -1385,8 +1385,9 @@ input,textarea{font-family:inherit;}
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <!-- Babel standalone (JSX 변환) — ⚠️ 버전 고정 필수. 미고정 시 @8 자동 업데이트로 preset-react
      기본 runtime이 'automatic'이 되어 변환 출력에 `import {jsx} from "react/jsx-runtime"`가 주입됨
-     → loadBabel이 classic 스크립트로 eval → "Cannot use import statement" 전사이트 크래시 (#687). -->
-<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
+     → loadBabel이 classic 스크립트로 eval → "Cannot use import statement" 전사이트 크래시 (#687).
+     자체 호스팅(vendor/) — unpkg CDN SPOF·버전 드리프트 제거 (#691). 동봉 파일은 @7.29.7 고정본. -->
+<script src="vendor/babel.min.js?v=7.29.7"></script>
 <!-- Fuse.js (Fuzzy search) -->
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
 <!-- html-to-image (한 문장 외부 공유 카드 #650 A) — 승인된 Stack Lock 예외. UMD 전역 `htmlToImage`. -->
@@ -1398,7 +1399,7 @@ input,textarea{font-family:inherit;}
 <script src="js/datastore-supabase.js"></script>
 
 <script>
-const _RG_V = '73';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
+const _RG_V = '74';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
 
 async function loadBabel(src) {
   const res = await fetch(src + '?v=' + _RG_V);
