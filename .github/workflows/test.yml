@@ -45,6 +45,19 @@ jobs:
       - name: DataStore contract
         run: node tests/contract/datastore-contract.mjs
 
+  boot-smoke:
+    name: boot-smoke (부팅 Babel 변환 회귀)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # index.html이 자체 호스팅 Babel(vendor/)로 loadBabel하는 js를 동일 옵션으로 변환,
+      # automatic runtime 회귀(#687 전사이트 "Cannot use import statement" 크래시)를 빌드 없이 차단 (#691).
+      - name: Boot smoke (vendor babel transform)
+        run: node tests/boot-smoke.mjs
+
   lint:
     name: lint (biome)
     runs-on: ubuntu-latest
