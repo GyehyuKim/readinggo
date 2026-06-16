@@ -1075,7 +1075,7 @@ function CompanionModal({ sentence, onClose }) {
   const [stext, setStext] = _useState(sentence.text || '');
   const [skind, setSkind] = _useState(sentence.kind === 'thought' ? 'thought' : 'quote'); // 인용↔내 의견 (#381)
   const _compTailRef = _useRef(null);                      // 대화 말단 anchor (#407 화면 점프 방지)
-  const MAX = 3;
+  const MAX = 5; // 멀티턴 무료 캡 (#655, 이전 3). 5턴 초과 무제한은 수익화 후속(워커 exchanges slice 상향).
   const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
   const bt = sentence.bookTitle || '', au = sentence.author || '';
   const saveText = () => {
@@ -1117,11 +1117,12 @@ function CompanionModal({ sentence, onClose }) {
   };
   const submit = () => {
     const a = answer.trim();
-    if (!a) { persist(exchanges); setDone(true); return; }
+    if (!a) return; // 빈 답은 no-op — '마치기' 제거(#655) 후 종료는 모달 이탈(✕/바깥)로만. 빈 전송으로 대화 끝내지 않음.
     const ex = [...exchanges, { q: question, a }];
     setExchanges(ex); setAnswer(''); persist(ex);
     rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
     archiveCompanion(sentence.bookId, sentence.text, question, a); // 서버 아카이브 (#295)
+    // 5턴 도달 또는 미동의(단발) → 따뜻한 마무리로 종료. 이 5턴 경계가 향후 '더 이야기하기 = 업그레이드' 수익화 훅(#655).
     if (ex.length >= MAX || consent !== 'yes') { setQuestion(null); setDone(true); return; }
     setLoading(true); setQuestion(null); setRated(null);
     genCompanionFollowup(sentence.text, ex, bt, au, sentence.kind).then((q) => { setQuestion(q); setLoading(false); });
@@ -1178,7 +1179,7 @@ function CompanionModal({ sentence, onClose }) {
             </div>
           ))}
           {done ? (
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>🐦 대화 저장됨</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>오늘 짹이랑 깊이 이야기했네요 🐦</div>
           ) : loading ? (
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
               <div style={{ maxWidth: '85%', background: 'rgba(123,224,168,0.16)', borderRadius: '14px 14px 14px 4px', padding: '8px 12px', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>참새가 곰곰이 생각 중…</div>
@@ -1199,9 +1200,9 @@ function CompanionModal({ sentence, onClose }) {
               </div>
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="떠오르는 대로 답해보세요" rows={2}
                 style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 10, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
+              {/* '마치기' 버튼 제거(#655) — 별도 종료 액션이 조기 종료 오해를 유발. 종료는 모달 이탈(✕/바깥)로만. */}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={() => { persist(exchanges); setDone(true); }} style={{ flex: '0 0 auto', padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>마치기</button>
-                <button onClick={submit} style={{ flex: 1, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{exchanges.length >= MAX - 1 ? '답 남기고 마치기' : '답하고 이어가기'}</button>
+                <button onClick={submit} disabled={!answer.trim()} style={{ flex: 1, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: answer.trim() ? 'pointer' : 'not-allowed', opacity: answer.trim() ? 1 : 0.55 }}>답하고 이어가기</button>
               </div>
             </>
           )}
