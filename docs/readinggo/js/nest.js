@@ -170,13 +170,13 @@ function Ceremony({ data, onClose, onComplete }) {
           <div className="nest-evo">
             <div className="nest-evo-stage">
               <img className="nest-evo-img" src={`assets/nest/lv${prevStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
-              <span className="em">{prevStage.short}</span>
+              <span className="em">{window.nestArt(prevStage.lv, 52)}</span>
               <div className="name">{prevStage.name}</div>
             </div>
             <div className="nest-evo-arrow">→</div>
             <div className="nest-evo-stage now">
               <img className="nest-evo-img" src={`assets/nest/lv${nowStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
-              <span className="em">{nowStage.short}</span>
+              <span className="em">{window.nestArt(nowStage.lv, 52)}</span>
               <div className="name">{nowStage.name}</div>
             </div>
           </div>
@@ -237,7 +237,7 @@ function Ceremony({ data, onClose, onComplete }) {
         <div className="nest-progress">
           <img className="nest-progress-img" src={`assets/nest/lv${curStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
           <div className="nest-progress-head">
-            <span className="em">{curStage.short}</span>
+            <span className="em">{window.nestArt(curStage.lv, 48)}</span>
             <span className="name">{curStage.name}</span>
           </div>
           <div className="nest-progress-bar">
@@ -308,12 +308,11 @@ function Ceremony({ data, onClose, onComplete }) {
 // XP 단계 진행 카피 (QA ISSUE-001): pct = 다음 단계까지 진행률(책 진도 아님).
 // 구버전은 pct 구간별 이모지 하드코딩 + '곧 완독' 책 기준 문구 → 단계명과 어긋났음.
 function stageMicrocopy(pct, stage) {
-  const em = stage.short || '🪹';
-  if (pct >= 100) return `${em} ${stage.name} — 둥지가 진화했어요!`;
-  if (pct >= 81)  return `${em} ${stage.name} — 다음 둥지가 코앞이에요. 오늘도 한 쪽!`;
-  if (pct >= 51)  return `${em} ${stage.name} — 둥지가 부쩍 자랐어요. 계속 쌓아봐요.`;
-  if (pct >= 21)  return `${em} ${stage.name} — 둥지가 모양을 갖춰가요.`;
-  return `${em} ${stage.name} — 가지를 하나 놓았어요. 활동이 둥지를 키워요.`;
+  if (pct >= 100) return `${stage.name} — 둥지가 진화했어요!`;
+  if (pct >= 81)  return `${stage.name} — 다음 둥지가 코앞이에요. 오늘도 한 쪽!`;
+  if (pct >= 51)  return `${stage.name} — 둥지가 부쩍 자랐어요. 계속 쌓아봐요.`;
+  if (pct >= 21)  return `${stage.name} — 둥지가 모양을 갖춰가요.`;
+  return `${stage.name} — 가지를 하나 놓았어요. 활동이 둥지를 키워요.`;
 }
 
 // health(0~100) → 4단계 시각 상태 클래스 + 탈색량(--decay). (§6.2)
@@ -399,9 +398,9 @@ function NestTheatre({ xp, health = 100 }) {
       <div className="nest-meta">
         <div className="nest-name-row">
           <div className="nest-name">
-            <span>{stage.short} {stage.name}</span>
+            <span style={{display:'inline-flex', alignItems:'center', gap:6}}>{window.nestArt(stage.lv, 22)} {stage.name}</span>
             {next && (
-              <span className="next-arrow">→ {next.short} {next.name}</span>
+              <span className="next-arrow" style={{display:'inline-flex', alignItems:'center', gap:4}}>→ {window.nestArt(next.lv, 16)} {next.name}</span>
             )}
           </div>
           <div className="nest-health-num">
@@ -413,8 +412,8 @@ function NestTheatre({ xp, health = 100 }) {
         <div className="nest-health-bar">
           <div className="nest-health-fill" />
         </div>
-        <div className="nest-microcopy">
-          {stageMicrocopy(pct, stage)}
+        <div className="nest-microcopy" style={{display:'flex', alignItems:'center', gap:6}}>
+          {window.nestArt(stage.lv, 18)}<span>{stageMicrocopy(pct, stage)}</span>
         </div>
       </div>
 
@@ -429,7 +428,7 @@ function NestTheatre({ xp, health = 100 }) {
               <div style={{textAlign:'center', fontSize:13, color:'var(--ink-2)', fontWeight:700, marginBottom:16}}>활동하면 XP가 쌓이고 둥지가 자라요!</div>
               {NEST_STAGES.map(s => (
                 <div key={s.lv} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, background: s.lv === stage.lv ? 'var(--brand-tint)' : 'transparent', marginBottom:4}}>
-                  <span style={{fontSize:22, lineHeight:1}}>{s.short}</span>
+                  <span style={{display:'inline-flex'}}>{window.nestArt(s.lv, 28)}</span>
                   <span style={{flex:1, fontSize:14, fontWeight:800, color:'var(--ink)'}}>{s.name}</span>
                   <span style={{fontSize:12, color:'var(--ink-3)', fontWeight:700}}>{s.maxXp == null ? `${s.minXp.toLocaleString()} XP` : `${s.minXp.toLocaleString()}–${s.maxXp.toLocaleString()} XP`}</span>
                 </div>
