@@ -683,8 +683,10 @@ function BookInfoModal({ bookId, onClose }) {
   const [bk, setBk] = useState(undefined); // undefined=로딩, null=없음
   const [manualPages, setManualPages] = useState(''); // 쪽수 메타 누락 시 수동 입력 (#204)
   const [desc, setDesc] = useState(''); // 책 소개 (#578) — DB description 우선, 없으면 알라딘 폴백
+  const [descSource, setDescSource] = useState(''); // 소개 출처 (#642) — 'llm'이면 AI 작성 칩
   const [popular, setPopular] = useState([]); // 인기 한 문장 Top5 (#594) — 짹 많은 순, 게스트/빈 → []
   const [mySents, setMySents] = useState([]); // 내 한 문장 (#610) — 이 책에 내가 남긴 것 (읽은 책)
+  const [shelf, setShelf] = useState(null); // 서재 상태 (#644) — null=미상, 'reading'|'completed'|'aborted'|'wish'|'none'
   useEffect(() => {
     let alive = true;
     const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
@@ -692,6 +694,29 @@ function BookInfoModal({ bookId, onClose }) {
       .then(b => { if (alive) setBk(b || null); }).catch(() => { if (alive) setBk(null); });
     return () => { alive = false; };
   }, [bookId]);
+  // 서재 상태 판정 (#644) — 이미 내 책(읽는중/완독/중단)이면 발견용 찜·읽기 버튼을 숨겨
+  // 홈/책장 동선을 통일한다. 찜만 한 상태면 '읽고 싶어요'만 숨기고 '이 책 읽기'는 유지.
+  useEffect(() => {
+    if (!bk) { setShelf(null); return; }
+    let alive = true;
+    const DS = window.DataStore || {};
+    const isbn = bk.isbn13 || bk.isbn || '';
+    const match = (b) => b && (b.id === bk.id || (isbn && b.isbn13 === isbn));
+    Promise.resolve((DS.myBooks && DS.myBooks.list) ? DS.myBooks.list() : [])
+      .then(rows => {
+        if (!alive) return null;
+        const ub = (Array.isArray(rows) ? rows : []).find(u => u.book_id === bk.id || match(u.book));
+        if (ub) { setShelf(ub.status || 'reading'); return null; } // 내 책이면 위시 조회 생략
+        return Promise.resolve((DS.wishBooks && DS.wishBooks.list) ? DS.wishBooks.list() : []);
+      })
+      .then(wishes => {
+        if (!alive || wishes === null) return;
+        const wished = (Array.isArray(wishes) ? wishes : []).some(w => w.book_id === bk.id || match(w.book));
+        setShelf(wished ? 'wish' : 'none');
+      })
+      .catch(() => { if (alive) setShelf('none'); });
+    return () => { alive = false; };
+  }, [bk]);
   // 인기 한 문장 Top5 (#594) — 그 책 공개 문장 중 짹 많은 순. 게스트·비UUID·빈 결과 → 섹션 생략.
   useEffect(() => {
     let alive = true;
@@ -716,17 +741,17 @@ function BookInfoModal({ bookId, onClose }) {
   }, [bookId]);
   // 책 소개 — DB books.description 우선, 비면 알라딘 프록시 폴백 (#578, library.js BookDetailModal §5.8 패턴)
   useEffect(() => {
-    if (!bk) { setDesc(''); return; }
+    if (!bk) { setDesc(''); setDescSource(''); return; }
     const dbDesc = (bk.description || '').trim();
-    if (dbDesc) { setDesc(dbDesc); return; }
+    if (dbDesc) { setDesc(dbDesc); setDescSource(bk.source || ''); return; } // #642: DB 소개의 출처 표기
     let alive = true;
     const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
     const isbn = bk.isbn13 || bk.isbn || '';
-    if (!proxy || !isbn) { setDesc(''); return; }
+    if (!proxy || !isbn) { setDesc(''); setDescSource(''); return; }
     fetch(`${proxy}?isbn=${encodeURIComponent(isbn)}`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (!alive) return; const it = d && Array.isArray(d.items) && d.items[0]; setDesc((it && it.description) ? String(it.description).trim() : ''); })
-      .catch(() => { if (alive) setDesc(''); });
+      .then(d => { if (!alive) return; const it = d && Array.isArray(d.items) && d.items[0]; setDesc((it && it.description) ? String(it.description).trim() : ''); setDescSource((it && it.source) || ''); }) // #642: 폴백 응답 source 동반
+      .catch(() => { if (alive) { setDesc(''); setDescSource(''); } });
     return () => { alive = false; };
   }, [bk]);
   const kyoboUrl = bk ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(bk.isbn13 || bk.title)}` : '#';
@@ -752,7 +777,11 @@ function BookInfoModal({ bookId, onClose }) {
             {/* 책 소개 (#578) — 왜 읽는지 보여 읽고 싶게. DB description 우선·알라딘 폴백, 없으면 섹션 생략. */}
             {desc && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>📚 책 소개</div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>📚 책 소개</span>
+                  {/* AI 작성 칩 (#642) — LLM 생성 소개일 때만. 회색 작은 칩, 본문 디스클레이머 없음. */}
+                  {descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--ink-3)', background: 'var(--line)', borderRadius: 5, padding: '1px 6px', letterSpacing: 0.3 }}>AI</span>}
+                </div>
                 <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
               </div>
             )}
@@ -795,12 +824,18 @@ function BookInfoModal({ bookId, onClose }) {
                 <span>p</span>
               </div>
             )}
-            {/* 찜 + 읽기 동선 (#578) — 인기 책에서 바로 '읽고 싶어요'(찜)로 담거나 읽기 시작 */}
-            <div style={{ display: 'flex', gap: 8, margin: '4px 0 0' }}>
-              <button onClick={() => { if (window.RG_addBookToShelf) window.RG_addBookToShelf(bk, 'wish'); onClose(); }}
-                style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>❤️ 읽고 싶어요</button>
-              <button className="submit-btn" style={{ flex: 1, margin: 0 }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>📖 이 책 읽기</button>
-            </div>
+            {/* 찜 + 읽기 동선 (#578, #644) — 발견용 액션. 이미 내 책(읽는중/완독/중단)이면 숨겨
+                홈/책장 상세 동선을 통일. 찜만 한 상태면 '읽고 싶어요'는 생략하고 '이 책 읽기'만 노출.
+                서재 상태 조회 전(shelf===null)에는 깜빡임 방지를 위해 버튼을 그리지 않는다. */}
+            {(shelf === 'none' || shelf === 'wish') && (
+              <div style={{ display: 'flex', gap: 8, margin: '4px 0 0' }}>
+                {shelf === 'none' && (
+                  <button onClick={() => { if (window.RG_addBookToShelf) window.RG_addBookToShelf(bk, 'wish'); onClose(); }}
+                    style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>❤️ 읽고 싶어요</button>
+                )}
+                <button className="submit-btn" style={{ flex: 1, margin: 0 }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>📖 이 책 읽기</button>
+              </div>
+            )}
           </div>
         )}
       </div>

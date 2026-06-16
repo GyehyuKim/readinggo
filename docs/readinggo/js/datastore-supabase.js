@@ -161,11 +161,19 @@
       },
       // 읽던 책 중단 (#593) — status='aborted'. current_page 보존(되돌리기 가능),
       // 활성 책이면 active 해제 → "중단" 탭으로 이동.
+      // 활성 책 중단 시 남은 '읽는 중' 책으로 active 승계 (#643) — 홈이 빈 상태로 떨어지지 않게.
+      // 승계 대상은 가장 최근 시작한 reading 책(started_at desc, 캐러셀 순서와 일치). 없으면 null.
       async abort(userBookId) {
         const u = await A.profile.get();
         const row = unwrap(await sb().from('user_books').update({ status: 'aborted' }).eq('id', userBookId)
           .select('*, book:books(*)').maybeSingle());
-        if (u && u.active_user_book_id === userBookId) await A.profile.update({ active_user_book_id: null });
+        if (u && u.active_user_book_id === userBookId) {
+          const id = await uid();
+          const next = unwrap(await sb().from('user_books').select('id')
+            .eq('user_id', id).eq('status', 'reading').neq('id', userBookId)
+            .order('started_at', { ascending: false }).limit(1).maybeSingle());
+          await A.profile.update({ active_user_book_id: next ? next.id : null });
+        }
         return row ? _applyBookOverrides(row) : null;
       },
       // 중단 책 다시 읽기 (#593) — 'aborted' → 'reading'. completed_at 미설정(완독과 무관).

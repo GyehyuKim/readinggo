@@ -187,6 +187,10 @@ books
   aladin_link          text     NULL  -- 알라딘 상세 링크
   adult                bool     NULL  -- 성인 여부
   source               text     NULL  -- 메타 출처: 'aladin'|'google'|'openlibrary'|'llm' (폴백 추적·신뢰 카피 차등)
+  -- #642: source='llm' ⟺ "책 소개를 LLM이 생성". 책 상세 "📚 책 소개" 제목 옆 작은 회색 `AI` 칩으로 표기
+  --   (본문 디스클레이머 없음). 대상 = components.js BookInfoModal · library.js BookDetailModal.
+  --   library는 알라딘 실시간 폴백 경로도 응답 `items[0].source`를 함께 받아 칩 판정.
+  --   (환각 가드·사실 검증은 스코프 아웃 — 표기만. 영속 정책 재검토는 후순위.)
   enriched_at          timestamptz NULL  -- 메타 보강 시각 — 빈 필드 재보강 cron 추적(#489)
   rank_recent   int  NULL
   rank_steady   int  NULL

@@ -278,12 +278,17 @@ const DataStore = {
     },
     // 읽던 책 중단 (#593) — status='aborted'. current_page 보존(되돌리기 가능),
     // 활성 책이면 active 해제 → "읽는 중"·둥지 캐러셀에서 빠지고 "중단" 탭으로 이동.
+    // 활성 책 중단 시 남은 '읽는 중' 책으로 active 승계 (#643) — 홈이 빈 상태로 떨어지지 않게.
+    // 남은 reading 책이 없을 때만 null 유지(빈 상태가 올바름). 승계 대상은 캐러셀 순서(저장 순)의 첫 책.
     abort(userBookId) {
       return localStorageAdapter.mutate(s => {
         const ub = _ubById(s, userBookId);
         if (!ub) return null;
         ub.status = 'aborted';
-        if (s.active_user_book_id === ub.id) s.active_user_book_id = null;
+        if (s.active_user_book_id === ub.id) {
+          const next = (s.user_books || []).find(u => u.id !== ub.id && (u.status || 'reading') === 'reading');
+          s.active_user_book_id = next ? next.id : null;
+        }
         return _applyBookOverrides(ub);
       });
     },

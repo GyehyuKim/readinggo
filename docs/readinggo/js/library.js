@@ -104,12 +104,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 책 소개(description) 화면 표시 (#530) — DB 우선(book.description), 없을 때만 알라딘 실시간 폴백(쿼터 절약).
   const [bookDesc, setBookDesc] = _useState((book.description || '').trim());
   const [descLoading, setDescLoading] = _useState(false);
+  // 소개 출처 (#642) — 'llm'이면 'AI 작성' 칩 노출. DB book.source 우선, 실시간 폴백이면 응답 source 승계.
+  const [descSource, setDescSource] = _useState(book.source || '');
   _useEffect(() => {
-    if ((book.description || '').trim()) { setBookDesc(book.description.trim()); return; }
+    if ((book.description || '').trim()) { setBookDesc(book.description.trim()); setDescSource(book.source || ''); return; }
     let alive = true;
     setDescLoading(true);
     Promise.resolve(fetchBookDesc())
-      .then(d => { if (alive) { setBookDesc((d || '').trim()); setDescLoading(false); } })
+      .then(({ desc, source }) => { if (alive) { setBookDesc((desc || '').trim()); setDescSource(source || ''); setDescLoading(false); } })
       .catch(() => { if (alive) setDescLoading(false); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,14 +226,15 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 책 소개(description) 조회 (#316) — 알라딘 프록시 ISBN 단건. graceful(실패·미배포 시 빈 값).
   const fetchBookDesc = async () => {
     const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
-    if (!proxy || !book.isbn) return '';
+    if (!proxy || !book.isbn) return { desc: '', source: '' };
     try {
       const r = await fetch(`${proxy}?isbn=${encodeURIComponent(book.isbn)}`);
-      if (!r.ok) return '';
+      if (!r.ok) return { desc: '', source: '' };
       const d = await r.json();
       const it = d && Array.isArray(d.items) && d.items[0];
-      return (it && it.description) ? String(it.description).trim() : '';
-    } catch (e) { return ''; }
+      const desc = (it && it.description) ? String(it.description).trim() : '';
+      return { desc, source: (it && it.source) || '' }; // #642: LLM 생성 소개 표기용 source 동반
+    } catch (e) { return { desc: '', source: '' }; }
   };
 
   // Markdown Export (§5.8.4, #315/#316) — 책 메타·소개 + 완독정보 + 한 문장(페이지·날짜·감상). 북모리 양식 벤치마킹.
@@ -252,7 +255,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (meta.length) lines.push(meta.join(' · '));
     if (book.cover) { lines.push(''); lines.push(`![표지](${book.cover})`); }
     // 책 소개 (#316) — 알라딘 description. 없으면 섹션 생략.
-    const desc = decodeEntities(await fetchBookDesc());
+    const desc = decodeEntities((await fetchBookDesc()).desc);
     if (desc) { lines.push('', '---', '', '## 📚 책 소개', '', desc); }
     // 완독 정보
     if (book.status === 'completed') {
@@ -456,7 +459,11 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* 책 소개 (#530) — DB books.description 우선, 없으면 알라딘 실시간 폴백. 둘 다 없으면 섹션 생략. */}
           {(bookDesc || descLoading) && (
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:6}}>📚 책 소개</div>
+              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:6, display:'flex', alignItems:'center', gap:6}}>
+                <span>📚 책 소개</span>
+                {/* AI 작성 칩 (#642) — LLM 생성 소개일 때만. 회색 작은 칩, 본문 디스클레이머 없음. */}
+                {descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{fontSize:10, fontWeight:800, color:'var(--ink-3)', background:'var(--line)', borderRadius:5, padding:'1px 6px', letterSpacing:0.3}}>AI</span>}
+              </div>
               {descLoading && !bookDesc ? (
                 <div style={{fontSize:13, color:'var(--ink-3)', fontWeight:700}}>책 소개를 불러오는 중…</div>
               ) : (
@@ -706,6 +713,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at,
           recap: ub.companion_recap || '',   // 참새 완독 회고 캐시 (#352)
           description: (b.description || '').trim(),   // 책 소개 DB 값 (#530) — 모달이 우선 사용, 없으면 알라딘 폴백
+          source: b.source || '',   // 소개 출처 (#642) — 'llm'이면 AI 작성 칩
         };
       }));
     }).catch(() => { if (alive) setMyBooks([]); });
@@ -737,7 +745,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         setWishlistBooks((rows || []).map(_mapWish));
       }).catch(() => {});
       Promise.resolve(DataStore.myBooks.list()).then(rows => {
-        setMyBooks((rows || []).map(ub => { const b = ub.book || {}; return { ubId: ub.id, id: ub.book_id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, recap: ub.companion_recap || '', description: (b.description || '').trim() }; }));
+        setMyBooks((rows || []).map(ub => { const b = ub.book || {}; return { ubId: ub.id, id: ub.book_id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, recap: ub.companion_recap || '', description: (b.description || '').trim(), source: b.source || '' }; }));
       }).catch(() => {});
     };
     window.addEventListener('rg:wish-changed', reload);
