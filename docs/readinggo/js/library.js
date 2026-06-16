@@ -413,20 +413,21 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </button>
           )}
 
-          {/* 수동 완독 표시 (#265): 미완독·미중단 등록 책에만 노출 — 100% 트리거를 놓친 '망령 책' 복구. */}
+          {/* 완독 표시(#265) / 읽기 중단(#593) — 한 줄 좌우 2버튼 · SVG 아이콘(2026 UI, 이모지 제거).
+              미완독·미중단 등록 책에만 노출. 완독=체크, 중단=일시정지. */}
           {!bookshelfEntry && book.status !== 'aborted' && book.ubId && (
-            <button onClick={markDone}
-              style={{display:'block', width:'100%', textAlign:'center', padding:'11px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
-              🏰 완독으로 표시
-            </button>
-          )}
-
-          {/* 읽기 중단 (#593): 읽는 중 책 → '중단' 탭. 삭제 아님(진척 보존·복구 가능). */}
-          {!bookshelfEntry && book.status !== 'aborted' && book.ubId && (
-            <button onClick={abortBook}
-              style={{display:'block', width:'100%', textAlign:'center', padding:'11px 14px', background:'transparent', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
-              ⏸️ 읽기 중단
-            </button>
+            <div style={{display:'flex', gap:8, marginBottom:14}}>
+              <button onClick={markDone}
+                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--brand-tint)', border:'1.5px solid var(--brand-soft)', borderRadius:10, color:'var(--brand-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                완독으로 표시
+              </button>
+              <button onClick={abortBook}
+                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'transparent', border:'1.5px solid var(--line)', borderRadius:10, color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+                읽기 중단
+              </button>
+            </div>
           )}
 
           <a href={kyoboUrl} target="_blank" rel="noopener noreferrer"

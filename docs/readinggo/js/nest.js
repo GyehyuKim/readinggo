@@ -579,7 +579,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   const [quickPage, setQuickPage] = _useState('');
   const [quickText, setQuickText] = _useState('');
   const [quickSentPage, setQuickSentPage] = _useState('');
-  const [showOcrMenu, setShowOcrMenu] = _useState(false);
   const [sentFlip, setSentFlip] = _useState(false); // 문장 저장 시 일기장 넘기기 효과
   // 빠른입력 OCR (#498) — 책 사진 → quickText 프리필
   const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
@@ -913,20 +912,17 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       {/* 한 문장 입력 */}
       <div style={{ marginTop: 8, background: 'var(--card)', border: '1.5px solid var(--brand-soft)', borderRadius: 'var(--r-md)', padding: '14px 14px 12px', position: 'relative', transition: 'opacity 0.2s, transform 0.3s', opacity: sentFlip ? 0 : 1, transform: sentFlip ? 'translateY(-10px) scale(0.97)' : 'none' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)', marginBottom: 10 }}>마음에 남은 문장이 있나요?</div>
-        <button onClick={() => setShowOcrMenu(s => !s)}
-          style={{ position: 'absolute', top: 10, right: 12, background: 'none', border: 'none', fontSize: 20, color: 'var(--ink-3)', cursor: 'pointer', lineHeight: 1, padding: '2px 6px', letterSpacing: 1 }}>···</button>
-        {showOcrMenu && (
-          <div style={{ position: 'absolute', top: 36, right: 12, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '4px 0', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,.10)', minWidth: 140 }}>
-            <button onClick={() => { setShowOcrMenu(false); if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }}
-              style={{ display: 'block', width: '100%', padding: '9px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, fontWeight: 700, color: 'var(--ink)', cursor: 'pointer' }}>
-              {quickOcrBusy ? '읽는 중…' : '📷 사진으로 입력'}
-            </button>
-          </div>
-        )}
+        {/* OCR(사진 입력)은 하단 툴바의 카메라 아이콘 버튼으로 이동 — '···' 메뉴 제거(2026 UI). */}
         <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); }}
           placeholder="오늘 읽은 문장을 남겨요…" rows={4}
           style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', resize: 'none', padding: 0, fontFamily: 'inherit' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+          {/* 사진으로 입력(OCR) — SVG 카메라 아이콘 버튼 (2026 UI, '···' 메뉴 대체) */}
+          <button onClick={() => { if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }}
+            disabled={quickOcrBusy} title="사진으로 입력 (OCR)" aria-label="사진으로 입력 (OCR)"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 10, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>p</span>
           <input type="number" inputMode="numeric" min="0" max="99999" value={quickSentPage}
             placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickSentPage(e.target.value)}
