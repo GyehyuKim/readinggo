@@ -438,15 +438,15 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* 책 소개 (#530) — DB books.description 우선, 없으면 알라딘 실시간 폴백. 둘 다 없으면 섹션 생략. */}
           {(bookDesc || descLoading) && (
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:6, display:'flex', alignItems:'center', gap:6}}>
-                <span>📚 책 소개</span>
-                {/* AI 작성 칩 (#642) — LLM 생성 소개일 때만. 회색 작은 칩, 본문 디스클레이머 없음. */}
-                {descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{fontSize:10, fontWeight:800, color:'var(--ink-3)', background:'var(--line)', borderRadius:5, padding:'1px 6px', letterSpacing:0.3}}>AI</span>}
-              </div>
+              {/* 섹션 헤더 #696 — 이모지 prefix 폐기, 공용 SectionLabel(components.js, window 노출). */}
+              <SectionLabel icon="intro"
+                trailing={descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{fontSize:10, fontWeight:800, color:'var(--ink-3)', background:'var(--line)', borderRadius:5, padding:'1px 6px', letterSpacing:0.3}}>AI</span>}>
+                책 소개
+              </SectionLabel>
               {descLoading && !bookDesc ? (
-                <div style={{fontSize:13, color:'var(--ink-3)', fontWeight:700}}>책 소개를 불러오는 중…</div>
+                <div style={{...window.RG_SECTION_CARD, fontSize:13, color:'var(--ink-3)', fontWeight:700}}>책 소개를 불러오는 중…</div>
               ) : (
-                <div style={{fontSize:13, color:'var(--ink-2)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{decodeEntities(bookDesc)}</div>
+                <div style={{...window.RG_SECTION_CARD, fontSize:13, color:'var(--ink-2)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{decodeEntities(bookDesc)}</div>
               )}
             </div>
           )}
@@ -455,7 +455,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               실제 '함께 읽은 사람들' 집계는 Phase 1이므로 허위 카피("N명이 읽었어요") 금지. */}
           {related.length > 0 && (
             <div style={{marginBottom:14}}>
-              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:3}}>📚 함께 읽으면 좋은 책</div>
+              <SectionLabel icon="related" mb={3}>함께 읽으면 좋은 책</SectionLabel>
               <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:10}}>이 책을 좋아한다면 — 표지를 누르면 찜에 담겨요</div>
               <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:4, WebkitOverflowScrolling:'touch'}}>
                 {related.map(rb => (

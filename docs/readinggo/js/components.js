@@ -744,6 +744,30 @@ function decodeEntities(s) {
   });
 }
 
+/* ── SectionLabel (#696): 책 상세 섹션 헤더. 이모지 prefix(📚/🔖/✍️) 폐기 → currentColor 모노라인
+   SVG 아이콘 배지 + 라벨. library.js BookDetailModal 과 공유(window 노출). 본문이 텍스트인 섹션은
+   RG_SECTION_CARD 로 감싸 surface 위계를 준다. 빌드 도구 없음 → 인라인 SVG(Stack Lock). ── */
+const _RG_SEC_ICONS = {
+  intro:    <path d="M8 4.4C6.7 3.6 5 3.1 3 3.1v8.4c2 0 3.7.5 5 1.3 1.3-.8 3-1.3 5-1.3V3.1c-2 0-3.7.5-5 1.3zm0 0v8.4" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"/>,
+  sentence: <path d="M3 3.6h10a1 1 0 0 1 1 1v4.8a1 1 0 0 1-1 1H7l-3 2.4v-2.4H3a1 1 0 0 1-1-1V4.6a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>,
+  mine:     <path d="M10.6 2.6l2.8 2.8M3 11.4l7.2-7.2 2.6 2.6L5.6 14H3v-2.6z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round"/>,
+  related:  <g stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"><rect x="2.6" y="3.2" width="3.1" height="9.6" rx="0.7"/><path d="M6.9 12.8V4.6l3-.9 2 9.1-3.2.9"/></g>,
+};
+const RG_SECTION_CARD = { background: 'var(--card-soft)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '12px 14px' };
+function SectionLabel({ icon, children, trailing, mb = 9 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: mb }}>
+      <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 8, background: 'var(--brand-tint)', color: 'var(--brand-3)', flexShrink: 0 }}>
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">{_RG_SEC_ICONS[icon] || _RG_SEC_ICONS.intro}</svg>
+      </span>
+      <span style={{ fontSize: 12.5, fontWeight: 900, letterSpacing: 0.2, color: 'var(--ink)' }}>{children}</span>
+      {trailing}
+    </div>
+  );
+}
+window.SectionLabel = SectionLabel;
+window.RG_SECTION_CARD = RG_SECTION_CARD;
+
 function BookInfoModal({ bookId, onClose }) {
   const [bk, setBk] = useState(undefined); // undefined=로딩, null=없음
   const [manualPages, setManualPages] = useState(''); // 쪽수 메타 누락 시 수동 입력 (#204)
@@ -842,18 +866,17 @@ function BookInfoModal({ bookId, onClose }) {
             {/* 책 소개 (#578) — 왜 읽는지 보여 읽고 싶게. DB description 우선·알라딘 폴백, 없으면 섹션 생략. */}
             {desc && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>📚 책 소개</span>
-                  {/* AI 작성 칩 (#642) — LLM 생성 소개일 때만. 회색 작은 칩, 본문 디스클레이머 없음. */}
-                  {descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--ink-3)', background: 'var(--line)', borderRadius: 5, padding: '1px 6px', letterSpacing: 0.3 }}>AI</span>}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
+                <SectionLabel icon="intro"
+                  trailing={descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--ink-3)', background: 'var(--line)', borderRadius: 5, padding: '1px 6px', letterSpacing: 0.3 }}>AI</span>}>
+                  책 소개
+                </SectionLabel>
+                <div style={{ ...RG_SECTION_CARD, fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
               </div>
             )}
             {/* 내 한 문장 (#610) — 읽은 책: 내가 남긴 문장 + 공용 SentenceActions(공개범위·좋아요·수정·삭제) */}
             {mySents.length > 0 && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 8 }}>✍️ 내 한 문장</div>
+                <SectionLabel icon="mine">내 한 문장</SectionLabel>
                 {mySents.map(s => (
                   <div key={s.id} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
                     <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6 }}>"{decodeEntities(s.text)}"</div>
@@ -867,7 +890,7 @@ function BookInfoModal({ bookId, onClose }) {
                 게스트·비UUID·빈 결과면 섹션 생략. "왜 읽는지"의 사회적 맥락. */}
             {popular.length > 0 && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink)', marginBottom: 8 }}>🔖 이 책의 한 문장</div>
+                <SectionLabel icon="sentence">이 책의 한 문장</SectionLabel>
                 {/* 한 문장 액션 계약 (#610·#641) — 타인 문장은 공용 SentenceCard 로 통일(좋아요 보장). 발견 맥락이라 noBlind. */}
                 {popular.map(s => {
                   const u = s.user || {};
