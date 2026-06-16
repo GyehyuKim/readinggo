@@ -84,7 +84,10 @@ function _buildCardNode(n, coverDataUrl) {
   const W = 1080, PAD = Math.round(W * 0.08);
   const root = document.createElement('div');
   Object.assign(root.style, {
-    position: 'fixed', left: '-99999px', top: '0', zIndex: '-1',
+    // QA(#673, 실브라우저 확정): 오프스크린(left:-99999px)이면 html-to-image 가 foreignObject
+    // 자식을 그리지 못해 카드가 빈 배경으로 나옴. 온스크린(left:0)에서 렌더해야 내용이 들어간다.
+    // 사용자에게는 z-index 음수 + 불투명 paper 배경으로 가린다(렌더 ~0.35s 후 노드 제거).
+    position: 'fixed', left: '0', top: '0', zIndex: '-9999', pointerEvents: 'none',
     width: W + 'px', height: W + 'px', padding: PAD + 'px',
     boxSizing: 'border-box', background: _SC.paper, color: _SC.ink,
     fontFamily: _SC.fontRound, letterSpacing: '-0.2px',
@@ -100,7 +103,7 @@ function _buildCardNode(n, coverDataUrl) {
   Object.assign(chip.style, {
     alignSelf: 'flex-start', fontFamily: _SC.fontPixel, fontSize: '34px',
     letterSpacing: '1.5px', padding: '14px 30px', borderRadius: '999px',
-    color: accent, background: chipBg, lineHeight: '1',
+    color: accent, background: chipBg, lineHeight: '1', whiteSpace: 'nowrap',  // QA(#673): 알약 내 2줄 줄바꿈 방지
   });
   chip.textContent = isThought ? '💭 감상' : '❝ 인용';
   root.appendChild(chip);
@@ -158,12 +161,14 @@ function _buildCardNode(n, coverDataUrl) {
   }
   source.appendChild(cover);
   const meta = document.createElement('div');
-  Object.assign(meta.style, { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '0' });
+  Object.assign(meta.style, { display: 'flex', flexDirection: 'column', gap: '6px', flex: '1', minWidth: '0' });
+  // QA(#673): 제목·저자 음절 중간 줄바꿈 방지 — nowrap + 긴 제목만 말줄임(컬럼은 flex:1 로 폭 확보).
+  const ellip = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
   const t = document.createElement('span');
-  Object.assign(t.style, { fontSize: '42px', color: _SC.ink });
+  Object.assign(t.style, { fontSize: '42px', color: _SC.ink, ...ellip });
   t.textContent = n.title || '';
   const a = document.createElement('span');
-  Object.assign(a.style, { fontSize: '34px', color: _SC.ink2 });
+  Object.assign(a.style, { fontSize: '34px', color: _SC.ink2, ...ellip });
   // 감상은 "~을 읽고" 뉘앙스(spec §5)
   a.textContent = n.author ? (isThought ? n.author + '를 읽고' : n.author) : '';
   meta.appendChild(t); meta.appendChild(a);
@@ -203,6 +208,10 @@ async function renderSentenceCardBlob(s) {
     const blob = await window.htmlToImage.toBlob(node, {
       width: 1080, height: 1080, pixelRatio: 1, backgroundColor: _SC.paper,
       cacheBust: false,  // 알라딘 표지는 위에서 data-URL 로 인라인 처리됨 → cacheBust 불필요
+      // QA(#673, 실브라우저 확정): 크로스오리진 Google Fonts 스타일시트 인라인 시도 시 SecurityError
+      // 재시도로 렌더가 ~5초까지 지연. 노드는 라이브 DOM(폰트 이미 적용)이라 임베드 불필요 →
+      // skipFonts 로 ~0.35s 로 단축, 콘솔 SecurityError 제거.
+      skipFonts: true,
     });
     if (!blob) throw new Error('toBlob 결과 없음');
     return blob;
