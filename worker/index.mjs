@@ -44,13 +44,6 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return relatedProxy(request, env);
     }
-    // 표지 이미지 프록시 (#676) — 알라딘 CDN은 CORS 헤더가 없어 클라가 캔버스로 그리면 tainted canvas.
-    // 서버가 대신 받아 동일출처로 돌려주면 공유 카드가 표지를 taint 없이 인라인 가능. 알라딘 호스트만 허용(오픈 프록시 방지).
-    if (p === '/api/img') {
-      const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
-      return imgProxy(url.searchParams);
-    }
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.
     return env.ASSETS.fetch(request);
   },
@@ -380,29 +373,6 @@ async function companionRecap(body, env) {
   } catch (e) {
     return json({ recap: recapMock(bookTitle, sentences), demo: true, error: String((e && e.message) || e) }, 200);
   }
-}
-
-/* ── 표지 이미지 프록시 (#676) ───────────────────────────
-   알라딘 표지를 동일출처로 중계해 공유 카드의 tainted canvas 회피.
-   보안: 알라딘 이미지 호스트만 허용(오픈 프록시 악용 방지), image/* 만 통과. */
-async function imgProxy(searchParams) {
-  const raw = searchParams.get('url') || '';
-  let u;
-  try { u = new URL(raw); } catch { return json({ error: 'bad url' }, 400); }
-  const host = u.hostname.toLowerCase();
-  const allowed = (u.protocol === 'https:' || u.protocol === 'http:')
-    && (host === 'aladin.co.kr' || host.endsWith('.aladin.co.kr'));
-  if (!allowed) return json({ error: 'host not allowed' }, 403);
-  let r;
-  try { r = await fetch(u.toString(), { cf: { cacheTtl: 86400, cacheEverything: true } }); }
-  catch (e) { return json({ error: 'upstream fetch failed' }, 502); }
-  if (!r.ok) return new Response(null, { status: r.status });
-  const ct = r.headers.get('content-type') || 'image/jpeg';
-  if (!ct.toLowerCase().startsWith('image/')) return json({ error: 'not an image' }, 415);
-  return new Response(r.body, {
-    status: 200,
-    headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' },
-  });
 }
 
 /* ── 알라딘 프록시 (aladin.js 포팅) ─────────────────────── */
