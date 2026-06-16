@@ -987,9 +987,9 @@ function BookInfoModal({ bookId, onClose }) {
               <div style={{ display: 'flex', gap: 8, margin: '4px 0 0' }}>
                 {shelf === 'none' && (
                   <button onClick={() => { if (window.RG_addBookToShelf) window.RG_addBookToShelf(bk, 'wish'); onClose(); }}
-                    style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>🔖 읽고 싶어요</button>
+                    style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{rgIcon('bookmark', 15)} 읽고 싶어요</button>
                 )}
-                <button className="submit-btn" style={{ flex: 1, margin: 0 }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>📖 이 책 읽기</button>
+                <button className="submit-btn" style={{ flex: 1, margin: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => { if (window.RG_registerBook) { const tp = bk.total_pages || (parseInt(manualPages, 10) || 0); window.RG_registerBook({ ...bk, total_pages: tp }); } onClose(); }}>{rgIcon('book', 15)} 이 책 읽기</button>
               </div>
             )}
           </div>
