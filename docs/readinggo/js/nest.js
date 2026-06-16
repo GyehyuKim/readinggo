@@ -447,8 +447,8 @@ function NestTheatre({ xp, health = 100 }) {
 }
 
 /* ── NestView ─────────────────────────────────────────── */
-/* ── 짹(Jacky) 대화 헬퍼 (#184 읽기모드/타이머 폐기 #505 — 빠른입력·CompanionModal 공용) ── */
-// 짹(Jacky) 대화 (companion.md §4) — Worker /api/companion(solar-pro3) 호출. 실패/키없음 시 목 폴백.
+/* ── 재키(Jacky) 대화 헬퍼 (#184 읽기모드/타이머 폐기 #505 — 빠른입력·CompanionModal 공용) ── */
+// 재키(Jacky) 대화 (companion.md §4) — Worker /api/companion(solar-pro3) 호출. 실패/키없음 시 목 폴백.
 const COMPANION_QS = [
   '왜 이 문장이 마음에 걸렸어요?',
   '이 문장, 지금 내 상황이랑 연결되는 게 있어요?',
@@ -1005,7 +1005,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={resurfaceTalk}
               style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-              짹과 다시 대화하기
+              재키와 다시 대화하기
             </button>
             <button onClick={resurfaceLater}
               style={{ padding: '10px 18px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
@@ -1083,7 +1083,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
                 <SentenceActions sentence={{ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }} mine fav={favIds.has(q.id)} />
               )}
               {q.id && (() => {
-                // 짹 대화 턴 수 (#654) — my_note의 Q. 블록 수. 책 상세(library.js)와 동일 계산·어휘.
+                // 재키 대화 턴 수 (#654) — my_note의 Q. 블록 수. 책 상세(library.js)와 동일 계산·어휘.
                 // 축적 신호이지 할당량이 아님 → 분수(3/3) 표기 안 함. 0이면 숨김.
                 const turns = q.note ? q.note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
                 return (
@@ -1096,7 +1096,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
                       <path d="M4.5 11.5l-2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
                       <path d="M7 12.5l-1 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
                     </svg>
-                    {turns ? `짹과 대화 (${turns})` : '짹과 대화하기'}
+                    {turns ? `재키와 대화 (${turns})` : '재키와 대화하기'}
                   </button>
                 );
               })()}
@@ -1236,7 +1236,7 @@ function CompanionModal({ sentence, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px 12px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
           <_JackAvatar size={38} />
           <div>
-            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>짹</div>
+            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>재키</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, marginTop: 2 }}>독서 동반자</div>
           </div>
           <button onClick={onClose} aria-label="닫기" style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.06)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-2)' }}>
@@ -1280,7 +1280,7 @@ function CompanionModal({ sentence, onClose }) {
             </div>
           )}
 
-          {/* 말풍선 채팅 UI (#435) — 좌=짹 질문(아바타), 우=내 답 */}
+          {/* 말풍선 채팅 UI (#435) — 좌=재키 질문(아바타), 우=내 답 */}
           {exchanges.map((e, ei) => (
             <div key={ei}>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 6 }}>
@@ -1297,7 +1297,7 @@ function CompanionModal({ sentence, onClose }) {
           {done ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(63,209,127,0.08)', borderRadius: 14 }}>
               <_JackAvatar size={28} />
-              <span style={{ fontSize: 13, color: 'var(--ink-2)', fontStyle: 'italic' }}>오늘 짹이랑 깊이 이야기했네요</span>
+              <span style={{ fontSize: 13, color: 'var(--ink-2)', fontStyle: 'italic' }}>오늘 재키랑 깊이 이야기했네요</span>
             </div>
           ) : loading ? (
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10 }}>

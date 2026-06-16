@@ -70,9 +70,10 @@ INVARIANTS = [
     ("S2", "absent", "👏/🥹 3종 리액션 이모지 잔재", None, r"👏|🥹"),
     ("S2", "absent", "claps/tears/marks 3종 리액션 필드 잔재", None, r"\btears\b|clapActive|tearActive|markActive"),
     ("S2", "present", "좋아요 단일 리액션 (#641 — 짹+책갈피 → claps 좋아요)", FEATURE_FILES, r"좋아요"),
-    # #641 영구 가드: '책갈피' 단어 재유입 차단(좋아요/claps 단일화). 리액션 짹은 문맥 한정이라 absent 처리하지 않음(Jacky·문장등록 짹 보존).
+    # #641 영구 가드: '책갈피' 단어 재유입 차단(좋아요/claps 단일화). 리액션 짹은 문맥 한정이라 absent 처리하지 않음(문장등록 동사 '짹' 보존).
     ("S2", "absent", "'책갈피' 단어 잔재 — 좋아요(claps) 단일화 (#641 영구 가드)", FEATURE_FILES, r"책갈피"),
-    ("S2", "present", "참새 '짹' 캐릭터·문장등록 동사 보존 (#641 1단어 3의미 분리)", ["nest.js"], r"짹"),
+    # #684: 동반자 캐릭터 호칭은 '재키'로 분리. nest.js의 '짹'은 이제 문장등록 동사("오늘의 짹"·"짹 등록"·"내일도 짹")로만 존재 — present 유지.
+    ("S2", "present", "문장등록 동사 '짹' 보존 (#684 — 캐릭터 호칭은 '재키'로 분리, 액션 동사만 잔존)", ["nest.js"], r"짹"),
 
     # ── S3: 구조 제거 (The Path, 주간 리그) ────────────────────
     ("S3", "absent", "The Path / 세션 노드 지그재그 잔재", None,

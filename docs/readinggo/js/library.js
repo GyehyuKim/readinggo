@@ -555,13 +555,13 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                               </div>
                               <button onClick={openChat}
                                 style={{marginTop:4, background:'none', border:'none', color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:'pointer', padding:'2px 0'}}>
-                                🐦 짹과 대화 이어가기{turns ? ' (' + turns + ')' : ''}
+                                🐦 재키와 대화 이어가기{turns ? ' (' + turns + ')' : ''}
                               </button>
                             </div>
                           ) : (
                             <button onClick={openChat}
                               style={{marginTop:6, padding:'5px 12px', borderRadius:8, border:'1px dashed var(--line)', background:'transparent', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer'}}>
-                              🐦 짹과 대화하기
+                              🐦 재키와 대화하기
                             </button>
                           );
                         })()}

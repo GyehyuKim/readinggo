@@ -260,8 +260,8 @@ const ScreenC2 = ({ book, isManual, onBack, onConfirm }) => {
 };
 
 
-// ── Screen Jacky: 짹(AI 독서 친구) 소개 (#502) ───────────────────────────────
-// 첫 한 문장을 남긴 직후, 짹이 그 문장을 읽고 함께 생각을 나누는 AI 친구임을 전달.
+// ── Screen Jacky: 재키(AI 독서 친구) 소개 (#502) ───────────────────────────────
+// 첫 한 문장을 남긴 직후, 재키가 그 문장을 읽고 함께 생각을 나누는 AI 친구임을 전달.
 const ScreenJacky = ({ onContinue }) => (
   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center', height: '100%', background: '#fff', padding: '0 24px',
@@ -270,10 +270,10 @@ const ScreenJacky = ({ onContinue }) => (
       🐦
     </div>
     <h2 className="pop-in" style={{ fontWeight: 900, fontSize: 24, color: '#1F1F1F', margin: '0 0 12px', textAlign: 'center' }}>
-      참새 ‘짹’을 소개할게요
+      참새 ‘재키’를 소개할게요
     </h2>
     <p style={{ fontSize: 15, color: '#5B5B5B', lineHeight: 1.65, textAlign: 'center', margin: '0 0 10px', fontWeight: 600, maxWidth: 300 }}>
-      짹은 당신의 <b style={{ color: '#1F1F1F' }}>AI 독서 친구</b>예요.<br/>
+      재키는 당신의 <b style={{ color: '#1F1F1F' }}>AI 독서 친구</b>예요.<br/>
       방금 남긴 한 문장을 읽고, 함께 생각을 나눠요.
     </p>
     <p style={{ fontSize: 13, color: '#AFAFAF', margin: '0 0 30px', fontWeight: 700, textAlign: 'center' }}>
