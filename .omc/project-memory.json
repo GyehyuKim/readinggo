@@ -87,146 +87,26 @@
   "hotPaths": [
     {
       "path": "docs\\readinggo\\js\\nest.js",
-      "accessCount": 50,
-      "lastAccessed": 1781536376921,
-      "type": "directory"
+      "accessCount": 5,
+      "lastAccessed": 1781538003325,
+      "type": "file"
+    },
+    {
+      "path": ".claude\\worktrees\\sactions\\tests\\spec-align\\align_v7.py",
+      "accessCount": 2,
+      "lastAccessed": 1781537661790,
+      "type": "file"
+    },
+    {
+      "path": ".claude\\worktrees\\sactions\\docs\\readinggo\\specs\\social.md",
+      "accessCount": 2,
+      "lastAccessed": 1781537695154,
+      "type": "file"
     },
     {
       "path": "docs\\readinggo\\index.html",
-      "accessCount": 20,
-      "lastAccessed": 1781537095772,
-      "type": "file"
-    },
-    {
-      "path": "docs/readinggo/js/nest.js",
-      "accessCount": 9,
-      "lastAccessed": 1781536345525,
-      "type": "directory"
-    },
-    {
-      "path": "docs\\readinggo\\js\\app.js",
-      "accessCount": 9,
-      "lastAccessed": 1781537029806,
-      "type": "file"
-    },
-    {
-      "path": "docs/readinggo/index.html",
-      "accessCount": 5,
-      "lastAccessed": 1781536241430,
-      "type": "directory"
-    },
-    {
-      "path": "docs\\readinggo\\js",
-      "accessCount": 4,
-      "lastAccessed": 1781533270778,
-      "type": "directory"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\first-impression.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531046214,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\scroll-mid.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531075331,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\scroll-bottom.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531389646,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\mobile.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531390158,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\home-clean.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531414605,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\home-bottom.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531414764,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\tab-feed.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531439111,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\tab-library.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531439323,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\tab-settings.png",
-      "accessCount": 1,
-      "lastAccessed": 1781531439653,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo\\js\\components.js",
-      "accessCount": 1,
-      "lastAccessed": 1781531664341,
-      "type": "file"
-    },
-    {
-      "path": "docs\\readinggo",
-      "accessCount": 1,
-      "lastAccessed": 1781531668210,
-      "type": "directory"
-    },
-    {
-      "path": "docs\\readinggo\\js\\social.js",
-      "accessCount": 1,
-      "lastAccessed": 1781531678051,
-      "type": "directory"
-    },
-    {
-      "path": "docs/readinggo/js/components.js",
-      "accessCount": 1,
-      "lastAccessed": 1781531790684,
-      "type": "directory"
-    },
-    {
-      "path": "docs/readinggo/js",
-      "accessCount": 1,
-      "lastAccessed": 1781531798163,
-      "type": "directory"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\fix01-before.png",
-      "accessCount": 1,
-      "lastAccessed": 1781532157842,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\fix01-after.png",
-      "accessCount": 1,
-      "lastAccessed": 1781532158148,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\fix02-05-home.png",
-      "accessCount": 1,
-      "lastAccessed": 1781532256608,
-      "type": "file"
-    },
-    {
-      "path": ".gstack\\design-audit-20260615\\screenshots\\fix05-feed.png",
-      "accessCount": 1,
-      "lastAccessed": 1781532256921,
+      "accessCount": 2,
+      "lastAccessed": 1781622160674,
       "type": "file"
     }
   ],
