@@ -424,6 +424,17 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [inqMsg, setInqMsg] = useState('');
   const [inqBusy, setInqBusy] = useState(false);
   const [inqDone, setInqDone] = useState(false);
+  // 로그인 계정 주소 표기 (#671) — currentUser()는 로컬 세션(무네트워크). 미로그인/로컬모드면 ''.
+  const [acctEmail, setAcctEmail] = useState('');
+  React.useEffect(() => {
+    let alive = true;
+    if (window.RG_SB && window.RG_SB.currentUser) {
+      Promise.resolve(window.RG_SB.currentUser())
+        .then((u) => { if (alive) setAcctEmail((u && u.email) || ''); })
+        .catch(() => {});
+    }
+    return () => { alive = false; };
+  }, []);
   const sendInquiry = () => {
     const m = inqMsg.trim();
     if (!m) { showToast('문의 내용을 적어주세요'); return; }
@@ -461,13 +472,23 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             </button>
           ) : (
             <>
-              <button onClick={() => {
-                if (!window.confirm('이 기기만 남기고 다른 모든 기기에서 로그아웃할까요?')) return;
-                if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
-                  Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
-                }
-              }} style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📱 다른 기기에서 로그아웃</button>
-              <button onClick={logout} style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>로그아웃</button>
+              {/* 계정 주소 표기 (#671) — 로그인 시에만 */}
+              {acctEmail && (
+                <div style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>👤</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acctEmail}</span>
+                </div>
+              )}
+              {/* 로그아웃 2종 한 줄 (#671) — 다른 기기 / 이 기기 */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => {
+                  if (!window.confirm('이 기기만 남기고 다른 모든 기기에서 로그아웃할까요?')) return;
+                  if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
+                    Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
+                  }
+                }} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>📱 다른 기기 로그아웃</button>
+                <button onClick={logout} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>이 기기 로그아웃</button>
+              </div>
             </>
           )}
 
