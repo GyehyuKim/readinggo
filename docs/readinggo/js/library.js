@@ -605,7 +605,14 @@ function _mapWish(w) {
 function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const [selectedBookId, setSelectedBookId] = _useState(null);
   const [activeSubtab, setActiveSubtab] = _useState('reading'); // 'wishlist' | 'reading' | 'completed'
-  const [completedSort, setCompletedSort] = _useState('recent'); // 'recent' | 'rating' | 'title' — 읽은 책 정렬 (#513)
+  // 읽은 책 정렬 (#513 → #649 3단 토글). key=정렬축('recent'|'rating'|'title'), dir=방향(1=1차/내림·ㄱ→ㅎ, -1=2차/오름·ㅎ→ㄱ). key=null → 정렬 해제(원본 순서).
+  const [completedSort, setCompletedSort] = _useState({ key: 'recent', dir: 1 }); // 기본 최근순(#513 동작 보존)
+  // 같은 버튼 반복 클릭 시 3단 사이클: 1차 방향 → 2차 방향 → 해제. 다른 버튼 클릭 시 그 축 1차 방향으로.
+  const cycleSort = (key) => setCompletedSort(prev =>
+    prev.key !== key ? { key, dir: 1 }     // 다른 축 → 1차
+      : prev.dir === 1 ? { key, dir: -1 }  // 1차 → 2차
+        : { key: null, dir: 1 }            // 2차 → 해제
+  );
   const [onlyHighRating, setOnlyHighRating] = _useState(false); // 4점 이상만 필터 (#513)
   const [myBooks, setMyBooks] = _useState(null);   // null=로딩
   const [wishlistBooks, setWishlistBooks] = _useState([]);
@@ -759,16 +766,18 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const currentTab = tabsData.find(t => t.id === activeSubtab);
   const currentBooks = currentTab?.books || [];
 
-  // 읽은 책 탭: 정렬/필터 적용 (#513). 무평점은 0점 취급(최하). 다른 탭은 원본 순서 유지.
+  // 읽은 책 탭: 정렬/필터 적용 (#513 → #649). 무평점은 0점 취급(최하). 다른 탭은 원본 순서 유지.
+  // dir=1: 1차(최근순/별점 높은순/ㄱ→ㅎ), dir=-1: 2차(오래된순/별점 낮은순/ㅎ→ㄱ). key=null이면 원본 순서.
+  const filteredCompleted = completedBooks.filter(b => !onlyHighRating || (b.rating || 0) >= 4);
   const displayBooks = activeSubtab === 'completed'
-    ? completedBooks
-        .filter(b => !onlyHighRating || (b.rating || 0) >= 4)
-        .slice()
-        .sort((a, b) => {
-          if (completedSort === 'rating') return (b.rating || 0) - (a.rating || 0);
-          if (completedSort === 'title') return (a.title || '').localeCompare(b.title || '');
-          return String(b.completedAt || '').localeCompare(String(a.completedAt || '')); // 최근순
-        })
+    ? (completedSort.key === null
+        ? filteredCompleted // 정렬 해제 — myBooks.list() 원본 순서 유지
+        : filteredCompleted.slice().sort((a, b) => {
+            const d = completedSort.dir;
+            if (completedSort.key === 'rating') return ((b.rating || 0) - (a.rating || 0)) * d;
+            if (completedSort.key === 'title') return (a.title || '').localeCompare(b.title || '') * d;
+            return String(b.completedAt || '').localeCompare(String(a.completedAt || '')) * d; // 최근순
+          }))
     : currentBooks;
 
   // 탭에 속한 책들의 ID 목록 추출 및 문장 필터링(필터 무관 — 탭 전체 문장)
@@ -909,10 +918,19 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         {/* 읽은 책 탭 정렬/필터 컨트롤 (#513) — 성 컬렉션 선반 대체. 완독 책이 있을 때만 노출. */}
         {activeSubtab === 'completed' && completedBooks.length > 0 && (
           <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:16, paddingLeft:4}}>
-            {[['recent', '최근순'], ['rating', '별점순'], ['title', '제목순']].map(([id, label]) => (
-              <button key={id} onClick={() => setCompletedSort(id)}
-                style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: completedSort === id ? 'var(--brand)' : 'var(--card)', color: completedSort === id ? '#fff' : 'var(--ink-2)', boxShadow: completedSort === id ? 'none' : 'inset 0 0 0 1px var(--line)'}}>{label}</button>
-            ))}
+            {/* 3단 토글 (#649): 활성 축은 방향에 따라 라벨/화살표를 바꿔 표시. 비활성은 1차 방향 라벨. */}
+            {[
+              ['recent', { 1: '최근순 ↓', '-1': '오래된순 ↑' }],
+              ['rating', { 1: '별점 높은순 ↓', '-1': '별점 낮은순 ↑' }],
+              ['title', { 1: '제목순 ㄱ→ㅎ', '-1': '제목순 ㅎ→ㄱ' }],
+            ].map(([id, labels]) => {
+              const active = completedSort.key === id;
+              const label = active ? labels[completedSort.dir] : labels[1];
+              return (
+                <button key={id} onClick={() => cycleSort(id)}
+                  style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: active ? 'var(--brand)' : 'var(--card)', color: active ? '#fff' : 'var(--ink-2)', boxShadow: active ? 'none' : 'inset 0 0 0 1px var(--line)'}}>{label}</button>
+              );
+            })}
             <button onClick={() => setOnlyHighRating(v => !v)}
               style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: onlyHighRating ? 'var(--gold)' : 'var(--card)', color: onlyHighRating ? '#fff' : 'var(--ink-2)', boxShadow: onlyHighRating ? 'none' : 'inset 0 0 0 1px var(--line)'}}>⭐ 4점 이상</button>
           </div>
