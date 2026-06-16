@@ -1017,9 +1017,16 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
               {q.id && window.SentenceActions && (
                 <SentenceActions sentence={{ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }} mine fav={favIds.has(q.id)} />
               )}
-              {q.id && (
-                <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>🐦 짹과 대화하기</button>
-              )}
+              {q.id && (() => {
+                // 짹 대화 턴 수 (#654) — my_note의 Q. 블록 수. 책 상세(library.js)와 동일 계산·어휘.
+                // 축적 신호이지 할당량이 아님 → 분수(3/3) 표기 안 함. 0이면 숨김.
+                const turns = q.note ? q.note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
+                return (
+                  <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>
+                    {turns ? `🐦 짹과 대화 (${turns})` : '🐦 짹과 대화하기'}
+                  </button>
+                );
+              })()}
             </div>
           );
         })
