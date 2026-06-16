@@ -645,7 +645,11 @@ window.SentenceCard = SentenceCard;
    표면별 버튼 드리프트 방지를 위한 공용 단일 출처. align_v7 invariant 로 락.
    props: sentence{id,text,bookId,bookTitle,author,page,note,visibility,isPrivate}, mine, fav(좋아요 초기상태), onRemoved */
 const _SA_VIS = ['public', 'followers', 'private'];
-const _SA_VIS_ICON = { public: '🌐', followers: '👥', private: '🔒' };
+const _SA_VIS_ICON = {
+  public: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/><ellipse cx="6" cy="6" rx="2.5" ry="5" stroke="currentColor" strokeWidth="1.2"/><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1.2"/></svg>,
+  followers: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="4.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1 10c0-2 1.5-3 3.5-3s3.5 1 3.5 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="9" cy="3.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/><path d="M8 10c0-1.5.8-2.5 2-2.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>,
+  private: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5.5" width="8" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
+};
 const _SA_VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '비공개' };
 function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const id = sentence && sentence.id;
@@ -663,23 +667,48 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink-2)', padding: '3px 9px', lineHeight: 1 };
   const chipOn = { ...chip, background: 'var(--brand-tint)', borderColor: 'var(--brand)', color: 'var(--brand-3)' };
+  const _visChip = {
+    public:    { ...chip, background: 'rgba(63,209,127,0.1)', borderColor: 'rgba(63,209,127,0.4)', color: '#1a9e5a' },
+    followers: { ...chip, background: 'rgba(88,130,255,0.1)', borderColor: 'rgba(88,130,255,0.4)', color: '#3a5fcc' },
+    private:   { ...chip, background: 'rgba(120,120,130,0.1)', borderColor: 'rgba(120,120,130,0.35)', color: 'var(--ink-3)' },
+  };
   const cycleVis = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.setVisibility)) return; const next = _SA_VIS[(_SA_VIS.indexOf(vis) + 1) % _SA_VIS.length]; setVis(next); sentence.visibility = next; Promise.resolve(DataStore.sentences.setVisibility(id, { visibility: next })).catch(() => {}); window.dispatchEvent(new CustomEvent('rg:sentence-vis', { detail: { id, visibility: next } })); };
   const edit = (e) => { stop(e); if (window.RG_openCompanion) window.RG_openCompanion({ id, text: sentence.text, bookId: sentence.bookId, bookTitle: sentence.bookTitle, author: sentence.author, page: sentence.page, note: sentence.note || sentence.my_note || '', kind: sentence.kind }); };
   const del = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.remove)) return; if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return; Promise.resolve(DataStore.sentences.remove(id)).then(() => { if (onRemoved) onRemoved(id); window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); showToast('🗑 한 문장을 삭제했어요'); }).catch(() => showToast('삭제 실패 — 잠시 후 다시')); };
   const toggleLike = (e) => { stop(e); if (!(DataStore.claps && DataStore.claps.toggle)) return; Promise.resolve(DataStore.claps.toggle(id)).then((on) => { setLiked(on); setLikeN(n => Math.max(0, n + (on ? 1 : -1))); }).catch(() => {}); };
-  const likeBtn = <button onClick={toggleLike} title="좋아요" style={liked ? chipOn : chip}>❤️ {likeN}</button>;
+  const likeBtn = <button onClick={toggleLike} title="좋아요" style={liked ? chipOn : chip}>
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 10.5C6 10.5 1 7.5 1 4.5a2.5 2.5 0 0 1 5-0.5 2.5 2.5 0 0 1 5 .5c0 3-5 6-5 6z" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+    {likeN > 0 ? likeN : '좋아요'}
+  </button>;
   // #650 A: 외부 공유 — 이미지 카드(html-to-image) + Web Share/텍스트 폴백. share-card.js.
   const share = (e) => { stop(e); if (window.shareSentence) window.shareSentence({ id, text: sentence.text, bookId: sentence.bookId, bookTitle: sentence.bookTitle, author: sentence.author, page: sentence.page, note: sentence.note, kind: sentence.kind }); };
-  const shareBtn = window.shareSentence ? <button onClick={share} title="외부 공유 (이미지 카드)" style={chip}>↗️ 공유</button> : null;
+  const shareBtn = window.shareSentence ? <button onClick={share} title="외부 공유 (이미지 카드)" style={chip}>
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 7.5v3H1.5v-7H4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M7 1.5h3.5v3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="10.5" y1="1.5" x2="5" y2="7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+    공유
+  </button> : null;
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }} onClick={stop}>
       {mine ? (
         <>
-          <button onClick={cycleVis} title="공개 범위 변경 (전체→친구→비공개)" style={chip}><span>{_SA_VIS_ICON[vis]}</span><span>{_SA_VIS_LABEL[vis]}</span></button>
+          <button onClick={cycleVis} title="공개 범위 변경 (전체→친구→비공개)" style={_visChip[vis]}><span>{_SA_VIS_ICON[vis]}</span><span>{_SA_VIS_LABEL[vis]}</span></button>
           {likeBtn}
           {shareBtn}
-          <button onClick={edit} title="수정·대화" style={chip}>✏️</button>
-          <button onClick={del} title="삭제" style={chip}>🗑</button>
+          <button onClick={edit} title="수정·대화" style={chip}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 2l2 2-7 7H2v-2L9 2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button onClick={del} title="삭제" style={chip}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 4h9M5 4V2.5h3V4M5.5 6v4M7.5 6v4M3 4l.7 7h5.6L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </>
       ) : (
         <>
@@ -1001,18 +1030,26 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
         <button onClick={onClose} aria-label="닫기" style={{ position: 'absolute', top: 10, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, fontSize: 16, cursor: 'pointer', color: 'var(--ink-2)', lineHeight: 1, zIndex: 2 }}>✕</button>
         <div style={{ padding: '8px 20px 20px', maxHeight: '74vh', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--ink)' }}>📓 내 한 문장</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>읽었음 {list.length}개 · ❤️ 좋아요 {favCount}개</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--ink)' }}>내 한 문장</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              읽었음 {list.length}개 ·
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 10.5C6 10.5 1 7.5 1 4.5a2.5 2.5 0 0 1 5-0.5 2.5 2.5 0 0 1 5 .5c0 3-5 6-5 6z" fill="var(--brand)" stroke="var(--brand)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              좋아요 {favCount}개
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, justifyContent: 'center' }}>
             {[['all', '전체'], ['book', '책별'], ['fav', '좋아요']].map(([id, label]) => (
-              <button key={id} onClick={() => setFilter(id)} style={{ padding: '6px 14px', borderRadius: 16, border: filter === id ? 'none' : '1px solid var(--line)', background: filter === id ? 'var(--brand)' : 'transparent', color: filter === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+              <button key={id} onClick={() => setFilter(id)} style={{ padding: '6px 14px', borderRadius: 999, border: filter === id ? 'none' : '1px solid var(--line)', background: filter === id ? 'var(--ink)' : 'transparent', color: filter === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
             ))}
           </div>
           {mine === undefined ? (
             <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20 }}>불러오는 중…</div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20, lineHeight: 1.6 }}>{filter === 'fav' ? '아직 저장한 문장이 없어요 · 소셜 탭에서 마음에 드는 문장에 ❤️를 눌러보세요' : '아직 한 문장이 없어요'}</div>
+            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20, lineHeight: 1.6 }}>
+              {filter === 'fav' ? (
+                <>아직 저장한 문장이 없어요 · 소셜 탭에서 마음에 드는 문장에 <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{display:'inline',verticalAlign:'middle'}}><path d="M6 10.5C6 10.5 1 7.5 1 4.5a2.5 2.5 0 0 1 5-0.5 2.5 2.5 0 0 1 5 .5c0 3-5 6-5 6z" fill="var(--brand)" stroke="var(--brand)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/></svg>를 눌러보세요</>
+              ) : '아직 한 문장이 없어요'}
+            </div>
           ) : filter === 'book' ? (
             Object.keys(byBook).map(title => (
               <div key={title} style={{ marginBottom: 14 }}>
