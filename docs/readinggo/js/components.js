@@ -410,6 +410,30 @@ function UserProfileModal({ handle, onClose }) {
   );
 }
 
+/* ── RG_ICONS (#710): 공용 모노라인 SVG 아이콘 셋. 기능 아이콘을 이모지에서 통일.
+   currentColor → 버튼/텍스트 색 상속. config.js 질문 결 칩은 icon 키만 갖고 여기서 렌더(rgIcon). ── */
+const RG_ICONS = {
+  settings: <g stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="6" cy="4.5" r="1.7" fill="var(--card)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10" cy="8" r="1.7" fill="var(--card)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="5" cy="11.5" r="1.7" fill="var(--card)"/></g>,
+  close: <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>,
+  user: <g stroke="currentColor" strokeWidth="1.4" fill="none"><circle cx="8" cy="5.5" r="2.8"/><path d="M3 13.5c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5" strokeLinecap="round"/></g>,
+  devices: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"><rect x="2" y="3.5" width="8" height="6" rx="1"/><path d="M1 11.5h10" strokeLinecap="round"/><rect x="10.5" y="6.5" width="3.5" height="6" rx="1"/></g>,
+  bookmark: <path d="M4 2.5h8v11l-4-2.8-4 2.8z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/>,
+  mail: <g stroke="currentColor" strokeWidth="1.4" fill="none"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M2.5 5L8 9l5.5-4" strokeLinecap="round" strokeLinejoin="round"/></g>,
+  chat: <path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H6l-3 2.3V10.5h-.5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round"/>,
+  balance: <g><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor"/></g>,
+  deep: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"><circle cx="7" cy="7" r="4"/><line x1="10" y1="10" x2="13.5" y2="13.5"/></g>,
+  light: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"><path d="M13 3c0 5.5-4 9.5-9 10C3.5 7.5 7.5 3.5 13 3z"/><path d="M4 13c2.5-3 4.5-5 7.5-6.5" strokeLinecap="round"/></g>,
+  heart: <path d="M8 13.5S2.5 9.7 2.5 6A2.8 2.8 0 0 1 8 4.7 2.8 2.8 0 0 1 13.5 6c0 3.7-5.5 7.5-5.5 7.5z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/>,
+  critical: <g stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5v11M4.5 13.5h7M3 5.5h10"/><path d="M3 5.5L1.3 9a1.8 1.8 0 0 0 3.4 0L3 5.5z"/><path d="M13 5.5L11.3 9a1.8 1.8 0 0 0 3.4 0L13 5.5z"/></g>,
+  book: <path d="M8 4.4C6.7 3.6 5 3.1 3 3.1v8.4c2 0 3.7.5 5 1.3 1.3-.8 3-1.3 5-1.3V3.1c-2 0-3.7.5-5 1.3zm0 0v8.4" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round" strokeLinecap="round"/>,
+};
+function rgIcon(name, size) {
+  const s = size || 16;
+  return <svg width={s} height={s} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">{RG_ICONS[name] || null}</svg>;
+}
+window.RG_ICONS = RG_ICONS;
+window.rgIcon = rgIcon;
+
 /* ── SettingsModal: 설정 (#567 #568 재배치)
    그룹: ① 계정 ② 개인정보·데이터 ③ 읽기 환경 ④ 지원 ⑤ 정보
    닉네임 편집 → 프로필 헤더 인라인 (#568), 내보내기 → 서재 (#568),
@@ -473,8 +497,8 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
         <div className="sheet-grip" />
         <div style={{ padding: '8px 20px 24px' }}>
           <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>⚙️ 설정</span>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ink-3)' }} title="닫기">✕</button>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{rgIcon('settings', 19)} 설정</span>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex', alignItems: 'center', padding: 2 }} title="닫기">{rgIcon('close', 18)}</button>
           </div>
 
           {/* ① 계정 */}
@@ -489,7 +513,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               {/* 계정 주소 표기 (#671) — 로그인 시에만 */}
               {acctEmail && (
                 <div style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>👤</span>
+                  <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>{rgIcon('user', 17)}</span>
                   <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acctEmail}</span>
                 </div>
               )}
@@ -500,7 +524,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                   if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
                     Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
                   }
-                }} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>📱 다른 기기 로그아웃</button>
+                }} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{rgIcon('devices', 14)} 다른 기기 로그아웃</button>
                 <button onClick={logout} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>이 기기 로그아웃</button>
               </div>
             </>
@@ -522,7 +546,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           {/* 위시리스트 공개 (#558) */}
           <div style={{ marginTop: 8, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>🔖 읽고 싶은 책 공개</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('bookmark', 14)} 읽고 싶은 책 공개</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
             </div>
             <button onClick={toggleWishPublic} aria-pressed={wishPublic} aria-label="위시리스트 공개 토글"
@@ -546,16 +570,16 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           </div>
           {/* 참새 질문 결 프리셋 (#375) */}
           <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>🐦 참새 질문 결</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, marginBottom: 10, lineHeight: 1.4 }}>참새가 던지는 질문의 방향을 골라요. 다음 질문부터 반영돼요.</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('chat', 15)} 재키 질문 결</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, marginBottom: 10, lineHeight: 1.4 }}>재키가 던지는 질문의 방향을 골라요. 다음 질문부터 반영돼요.</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {(window.RG_COMPANION_PRESETS || []).map((p) => {
                 const on = qPreset === p.key;
                 return (
                   <button key={p.key} onClick={() => { setQPreset(p.key); if (window.RG_companionPreset) window.RG_companionPreset.set(p.key); }}
                     aria-pressed={on}
-                    style={{ padding: '6px 12px', borderRadius: 16, border: on ? 'none' : '1px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--ink-2)', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>
-                    {p.emoji} {p.label}
+                    style={{ padding: '6px 12px', borderRadius: 16, border: on ? 'none' : '1px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--ink-2)', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {rgIcon(p.icon, 14)} {p.label}
                   </button>
                 );
               })}
@@ -565,7 +589,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           {/* ④ 지원 */}
           {groupLabel('지원')}
           <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink-2)', marginBottom: 8 }}>✉️ 운영자에게 문의</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink-2)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('mail', 15)} 운영자에게 문의</div>
             {inqDone ? (
               <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--card)', borderRadius: 10, padding: 12 }}>전송됐어요. 운영자가 확인 후 답변드립니다 🐦 <button onClick={() => setInqDone(false)} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, cursor: 'pointer' }}>다시 쓰기</button></div>
             ) : (
