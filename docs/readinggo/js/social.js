@@ -104,34 +104,59 @@ function SocialView({ state }) {
     return () => { alive = false; };
   }, [tab]);
 
+  const IcoFlame = () => (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6.5 1C6.5 1 9.5 4 9.5 7a3 3 0 0 1-6 0c0-1.2.6-2.2 1.2-3C5.2 3.4 5.5 2.2 6.5 1Z" fill="var(--fire)" opacity=".9"/>
+      <path d="M6.5 6c0 0 1.5 1.2 1.5 2.5a1.5 1.5 0 0 1-3 0C5 7.2 6.5 6 6.5 6Z" fill="var(--gold)"/>
+    </svg>
+  );
+  const IcoUsers = () => (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="5" cy="4" r="2" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M1 11c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      <circle cx="10.5" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/>
+      <path d="M12.5 10.5c0-1.5-1-2.5-2-2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+    </svg>
+  );
+  const IcoBook = () => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 2h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" stroke="var(--ink-3)" strokeWidth="1.3"/>
+      <path d="M11 2h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1" stroke="var(--ink-3)" strokeWidth="1.3"/>
+      <path d="M5 5.5h5M5 8h3" stroke="var(--ink-3)" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  );
+
   return (
     <section className="view active">
       {/* ① 지금 인기 있는 책 Top5 (§5.7, #525, #578) — 상단 배치. 탭 → 책 상세(BookInfoModal). 비어있으면 미표시 */}
       {top3.length > 0 && (
-        <div style={{ padding: '0 16px 12px' }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', marginBottom: 6 }}>🔥 지금 인기 있는 책</div>
+        <div style={{ padding: '0 16px 4px' }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', marginBottom: 8 }}>
+              <IcoFlame />지금 인기 있는 책
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {top3.slice(0, 5).map((b, i) => {
                 const st = b.bookId && myStatus[b.bookId];
                 // starters 카운트: 2명 이상일 때만 'N명 시작' 표시 (#578)
                 const starterLabel = st
-                  ? (st === 'wish' ? '❤️ 찜' : st === 'completed' ? '✅ 완독' : '📖 읽는 중')
+                  ? (st === 'wish' ? '찜' : st === 'completed' ? '완독' : '읽는 중')
                   : (b.starters >= 2 ? `${b.starters}명 시작` : '');
                 return (
                   <button key={b.bookId || i}
                     onClick={() => { if (b.bookId && window.RG_openBook) window.RG_openBook(b.bookId); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', borderTop: i === 0 ? 'none' : '1px solid var(--line-2, #f2ede2)', cursor: 'pointer', padding: '8px 2px', textAlign: 'left', width: '100%' }}>
-                    <span style={{ fontSize: 14, fontWeight: 900, color: i < 3 ? 'var(--brand-3)' : 'var(--ink-3)', minWidth: 20, textAlign: 'center' }}>{i + 1}</span>
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', borderTop: i === 0 ? 'none' : '1px solid var(--line-2, #f2ede2)', cursor: 'pointer', padding: '9px 2px', textAlign: 'left', width: '100%' }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: i < 3 ? 'var(--brand-3)' : 'var(--ink-3)', minWidth: 18, textAlign: 'center' }}>{i + 1}</span>
                     {b.cover_url
                       ? <img src={b.cover_url} alt="" style={{ width: 30, height: 43, objectFit: 'cover', borderRadius: 4, flex: '0 0 auto' }} />
-                      : <span style={{ width: 30, height: 43, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--line)', borderRadius: 4, flex: '0 0 auto', fontSize: 16 }}>📖</span>}
+                      : <span style={{ width: 30, height: 43, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--line)', borderRadius: 4, flex: '0 0 auto' }}><IcoBook /></span>}
                     <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                       <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</span>
                       {b.author ? <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.author}</span> : null}
                     </span>
                     {starterLabel ? (
-                      <span style={{ fontSize: 11, color: st ? 'var(--brand-3)' : 'var(--ink-3)', fontWeight: 800, flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 11, color: st ? 'var(--brand-3)' : 'var(--ink-3)', fontWeight: 800, flex: '0 0 auto', whiteSpace: 'nowrap',
+                        background: st ? 'var(--brand-tint)' : 'var(--paper-2)', borderRadius: 999, padding: '2px 7px' }}>
                         {starterLabel}
                       </span>
                     ) : null}
@@ -144,8 +169,11 @@ function SocialView({ state }) {
       )}
       {/* ② 한 문장 피드 헤더 + 유저 찾기 — 랭킹 아래 (#578) */}
       <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3>📚 한 문장 피드</h3>
-        <button onClick={() => setFindOpen(v => !v)} title="유저 찾기" aria-label="유저 찾기" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--brand-tint)', border: '1px solid var(--brand-soft)', color: 'var(--brand-3)', borderRadius: 999, fontSize: 13, fontWeight: 800, cursor: 'pointer', padding: '5px 12px' }}><span style={{ fontSize: 15 }}>👥</span> 유저 찾기</button>
+        <h3>한 문장 피드</h3>
+        <button onClick={() => setFindOpen(v => !v)} title="유저 찾기" aria-label="유저 찾기"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--brand-tint)', border: '1px solid var(--brand-soft)', color: 'var(--brand-3)', borderRadius: 999, fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: '5px 11px' }}>
+          <IcoUsers />유저 찾기
+        </button>
       </div>
       {findOpen && (
         <div style={{ padding: '0 16px 12px' }}>
@@ -153,11 +181,11 @@ function SocialView({ state }) {
             style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
           {fres.map(u => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid var(--line-2)' }}>
-              <span style={{ fontSize: 20 }}>{(u.display_name && u.display_name[0]) || '🐦'}</span>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{(u.display_name && u.display_name[0]) || '🐦'}</span>
               <button onClick={() => window.RG_openProfile && window.RG_openProfile(u.handle)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', fontSize: 14, fontWeight: 700, color: 'var(--brand-3)', cursor: 'pointer' }}>@{u.handle}</button>
               <button onClick={() => doFollow(u)} disabled={!!followed[u.id]}
-                style={{ padding: '5px 12px', borderRadius: 14, border: 'none', background: followed[u.id] ? 'var(--line-2)' : 'var(--brand)', color: followed[u.id] ? 'var(--ink-3)' : '#fff', fontSize: 12, fontWeight: 800, cursor: followed[u.id] ? 'default' : 'pointer' }}>
-                {followed[u.id] ? '팔로잉 ✓' : '팔로우'}
+                style={{ padding: '5px 14px', borderRadius: 999, border: 'none', background: followed[u.id] ? 'var(--line-2)' : 'var(--brand)', color: followed[u.id] ? 'var(--ink-3)' : '#fff', fontSize: 12, fontWeight: 800, cursor: followed[u.id] ? 'default' : 'pointer' }}>
+                {followed[u.id] ? '팔로잉' : '팔로우'}
               </button>
             </div>
           ))}
@@ -165,10 +193,10 @@ function SocialView({ state }) {
         </div>
       )}
       {/* ③ 팔로우/최근/추천 탭 (#7) */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 16px 10px' }}>
+      <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
         {[['following', '팔로우'], ['recent', '최근'], ['recommend', '추천']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
-            style={{ padding: '6px 14px', borderRadius: 16, border: tab === id ? 'none' : '1px solid var(--line)', background: tab === id ? 'var(--brand)' : 'transparent', color: tab === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+            style={{ padding: '6px 16px', borderRadius: 999, border: tab === id ? 'none' : '1px solid var(--line)', background: tab === id ? 'var(--ink)' : 'transparent', color: tab === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.2px' }}>
             {label}
           </button>
         ))}
@@ -179,15 +207,15 @@ function SocialView({ state }) {
       {items === null ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>불러오는 중…</div>
       ) : items.length === 0 ? (
-        <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', lineHeight: 1.7 }}>
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', lineHeight: 1.8, fontSize: 14 }}>
           {tab === 'following'
-            ? (<>🐦 팔로우한 사람의 한 문장이 아직 없어요.<br />다른 독자 프로필에서 팔로우해보세요!</>)
+            ? (<>팔로우한 사람의 한 문장이 아직 없어요.<br />다른 독자 프로필에서 팔로우해보세요!</>)
             : tab === 'recommend'
-            ? (<>🐦 추천할 한 문장이 아직 없어요.<br />책을 등록하면 같은 책 독자의 문장을 추천해드려요.</>)
-            : (<>🐦 아직 공개된 한 문장이 없어요.<br />둥지에서 첫 문장을 남겨보세요!</>)}
+            ? (<>추천할 한 문장이 아직 없어요.<br />책을 등록하면 같은 책 독자의 문장을 추천해드려요.</>)
+            : (<>아직 공개된 한 문장이 없어요.<br />둥지에서 첫 문장을 남겨보세요!</>)}
         </div>
       ) : (
-        <div>{items.map((it, i) => (<SentenceCard key={it.id || i} item={it} bookId={it.bookId} />))}</div>
+        <div style={{ padding: '0 16px' }}>{items.map((it, i) => (<SentenceCard key={it.id || i} item={it} bookId={it.bookId} />))}</div>
       )}
     </section>
   );

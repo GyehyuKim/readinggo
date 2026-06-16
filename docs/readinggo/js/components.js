@@ -168,12 +168,20 @@ function SentenceCard({ item, bookId, noBlind }) {
       <div className="react">
         {/* #641: 좋아요(claps) 단일 — 구 저장 칩 제거, 자기 문장도 좋아요(저장) 가능 */}
         <span className={'chip' + (liked ? ' active' : '')} style={mineStyle} onClick={toggleLike}>
-          좋아요 {likeCount}
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 10.5C6 10.5 1 7.2 1 4a2.5 2.5 0 0 1 5 0 2.5 2.5 0 0 1 5 0c0 3.2-5 6.5-5 6.5Z"
+              fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+          </svg>
+          {likeCount > 0 ? likeCount : '좋아요'}
         </span>
         {/* #650 A: 외부 공유 — 이미지 카드 + Web Share/텍스트 폴백 (share-card.js) */}
         {window.shareSentence ? (
           <span className="chip" onClick={() => window.shareSentence({ id: item.id, text: item.q, bookId: bookId, bookTitle: cardTitle, author: item.author, page: item.page, kind: item.kind })}>
-            ↗️ 공유
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 1.5l2.5 2.5L8 6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M10.5 4H5C3.3 4 2 5.3 2 7v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            공유
           </span>
         ) : null}
       </div>
