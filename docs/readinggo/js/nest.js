@@ -321,32 +321,22 @@ function NestTheatre({ xp, health = 100 }) {
       className={`nest-theatre nest-img-mode ${hstate.cls}`}
       style={{'--health': pct, '--decay': hstate.decay, '--stage-color': stage.color}}
     >
-      {/* LV·🔥 배지 제거 (#428·#425) — 레벨/스트릭은 상단바·프로필 헤더로 일원화 */}
-
-      {/* #471: XP 진척 정보·bar를 캐릭터 이미지 위로 */}
-      <div className="nest-meta">
-        <div className="nest-name-row">
-          <div className="nest-name">
-            <span>{stage.short} {stage.name}</span>
-            {next && (
-              <span className="next-arrow">→ {next.short} {next.name}</span>
-            )}
-          </div>
-          {/* 가이드 버튼 ⓘ (#585): plain '?' 폐기 → ghost circle. 단계명 행 우측(진척 XP 옆)에 고정. */}
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
-            <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내" title="둥지가 자라는 방법"
-              style={{width:22, height:22, borderRadius:'50%', border:'1.5px solid var(--ink-3)', background:'transparent', color:'var(--ink-3)', fontSize:12, fontWeight:900, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0, padding:0, lineHeight:1}}>ⓘ</button>
-          </div>
-        </div>
-        <div className="nest-health-bar">
-          <div className="nest-health-fill" />
-        </div>
-        <div className="nest-microcopy">
-          {stageMicrocopy(pct, stage)}
-        </div>
-      </div>
-
+      <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내"
+        style={{position:'absolute', top:10, right:10, zIndex:2,
+          display:'inline-flex', alignItems:'center', gap:4,
+          background:'rgba(255,255,255,0.82)', backdropFilter:'blur(8px)',
+          border:'1px solid rgba(255,255,255,0.9)',
+          boxShadow:'0 1px 6px rgba(0,0,0,0.10)',
+          borderRadius:999, padding:'5px 11px 5px 9px',
+          fontSize:11, fontWeight:800, color:'var(--ink-2)',
+          cursor:'pointer', letterSpacing:'-0.1px', lineHeight:1}}>
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 5.5C2.5 2 4 1 5.5 1s3 1 4.5 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M3 5.5C3.8 3.8 4.6 3 5.5 3s1.7.8 2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          <circle cx="5.5" cy="7.5" r="1" fill="currentColor"/>
+        </svg>
+        둥지가 자라는 법
+      </button>
       <div className="nest-svg-wrap nest-img-stack">
         {[1, 2, 3, 4, 5].map(lv => (
           <img
@@ -365,6 +355,24 @@ function NestTheatre({ xp, health = 100 }) {
           <span className="fall-twig">🍂</span>
           <span className="fall-twig">🌿</span>
           <span className="fall-twig">🍂</span>
+        </div>
+      </div>
+
+      <div className="nest-meta">
+        <div className="nest-name-row">
+          <div className="nest-name">
+            <span>{stage.short} {stage.name}</span>
+            {next && (
+              <span className="next-arrow">→ {next.short} {next.name}</span>
+            )}
+          </div>
+          <div className="nest-health-num"><b>{cycleXp.toLocaleString()}</b> / {NEST_CYCLE_XP.toLocaleString()} XP</div>
+        </div>
+        <div className="nest-health-bar">
+          <div className="nest-health-fill" />
+        </div>
+        <div className="nest-microcopy">
+          {stageMicrocopy(pct, stage)}
         </div>
       </div>
 

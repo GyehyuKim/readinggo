@@ -757,9 +757,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
 
   // 탭 라벨 축약(#648): 상단 '📚 내 서재' 헤더가 '책' 맥락을 주므로 반복어 '책' 제거 → 가로 스크롤 방지.
   const tabsData = [
-    { id: 'wishlist', label: '🔖 읽고 싶은', books: wishlistBooks },
-    { id: 'reading', label: '📖 읽고 있는', books: readingBooks },
-    { id: 'completed', label: '✅ 읽은', books: completedBooks },
+    { id: 'wishlist', label: '읽고 싶은 책', books: wishlistBooks },
+    { id: 'reading', label: '읽고 있는 책', books: readingBooks },
+    { id: 'completed', label: '읽은 책', books: completedBooks },
     // 중단 탭(#593): 읽다 그만둔 책. 책이 있을 때만 노출(빈 탭 노이즈 방지).
     ...(abortedBooks.length > 0 ? [{ id: 'aborted', label: '⏸️ 중단', books: abortedBooks }] : []),
   ];
@@ -794,7 +794,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   return (
     <section className="view active">
       {/* 프로필 정보 (#508) — 닉네임·한 줄 소개·팔로잉/팔로워/저장을 최상단으로(#428 '둥지 최상단' → 재배치, SNS 표준 UX) */}
-      <div style={{padding:'4px 16px 16px', position:'relative', textAlign:'center'}}>
+      <div style={{padding:'16px 16px 20px', position:'relative', textAlign:'center'}}>
         <div style={{position:'absolute', top:0, right:12, display:'flex', gap:8}}>
           {/* 설정 ⚙️는 하단 '설정' 탭으로 이전 (#488). 운영 대시보드(📊)만 헤더 유지. */}
           {isAdmin && (
@@ -822,8 +822,12 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
         ) : (
           <div onClick={() => { setHdlText((window.RG_ME && window.RG_ME.handle) || ''); setHdlEditing(true); setHdlMsg(''); }}
             title="탭하여 닉네임 편집"
-            style={{fontSize:22, fontWeight:900, color:'var(--ink)', cursor:'pointer'}}>
-            🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'} ✏️
+            style={{fontSize:22, fontWeight:900, color:'var(--ink)', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:6}}>
+            🐦 {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
           </div>
         )}
         {/* 한 줄 소개 인라인 편집 (#515) — 탭 → 입력, Enter/저장 → 저장, ESC/바깥 → 취소 */}
@@ -842,7 +846,13 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           <div onClick={() => { setBioText((window.RG_ME && window.RG_ME.bio) || ''); setBioEditing(true); }}
             title="탭하여 한 줄 소개 편집"
             style={{fontSize:13, color:'var(--ink-3)', marginTop:4, minHeight:18, cursor:'pointer'}}>
-            {(window.RG_ME && window.RG_ME.bio) ? `${window.RG_ME.bio} ✏️` : '한 줄 소개를 입력해보세요 ✏️'}
+            <span style={{display:'inline-flex', alignItems:'center', gap:4}}>
+              {(window.RG_ME && window.RG_ME.bio) ? window.RG_ME.bio : '한 줄 소개를 입력해보세요'}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </span>
           </div>
         )}
         {/* 팔로잉/팔로워/저장 (#471/#472) — 팔로우 수는 Supabase friends.counts 실데이터 (#516). 탭 시 유저 목록 모달 (#509) */}
@@ -861,18 +871,21 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           <button onClick={() => window.RG_openCollection && window.RG_openCollection({ filter: 'fav' })}
             style={{textAlign:'center', background:'none', border:'none', cursor:'pointer', padding:0}}>
             <div style={{fontSize:17, fontWeight:900, color:'var(--ink)'}}>{savedCount}</div>
-            <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2}}>❤️ 좋아요</div>{/* #641: 구 저장(📌) → ❤️ 좋아요 단일화. 동작·모달 동일(좋아요한 문장 모아보기) */}
+            <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2, display:'flex', alignItems:'center', justifyContent:'center', gap:3}}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              좋아요
+            </div>{/* #641: 구 저장(📌) → ❤️ 좋아요 단일화. 동작·모달 동일(좋아요한 문장 모아보기) */}
           </button>
         </div>
       </div>
 
       {/* 둥지 캐릭터(NestTheatre) — 프로필 헤더 아래로 이동 (#508, #428 갱신) */}
-      {window.NestTheatre && <NestTheatre xp={state.xp} />}
+      <div style={{margin:'0 0 20px'}}>
+        {window.NestTheatre && <NestTheatre xp={state.xp} />}
+      </div>
 
-      {/* 💭 과거 문장 회상 카드 제거 (#471) */}
-
-      {/* 독서 활동 잔디 (#195) — 좌우 여백 축소로 스크롤 방지 (#11) */}
-      <div style={{padding:'0 8px', marginBottom:20}}>
+      {/* 독서 활동 잔디 (#195) */}
+      <div style={{padding:'0 16px', marginBottom:28}}>
         <ActivityHeatmap days={182} />
       </div>
 
@@ -881,8 +894,8 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
       {/* 내 한 문장 섹션 제거(#439) — 프로필 → 내서재 → 읽고 있는 책 클릭 → 책 상세에서 그 책의 한 문장 + 참새 대화 확인 */}
 
       {/* 내 서재 섹션 */}
-      <div style={{padding:'0 12px', marginBottom:20}}>
-        <div style={{fontSize:18, fontWeight:900, marginBottom:12, paddingLeft:4}}>📚 내 서재</div>
+      <div style={{padding:'0 16px', marginBottom:20}}>
+        <div style={{fontSize:16, fontWeight:900, color:'var(--ink)', letterSpacing:'-0.3px', marginBottom:12}}>내 서재</div>
         
         {/* 탭 버튼들 */}
         <div style={{display:'flex', gap:8, marginBottom:16, overflowX:'auto', paddingBottom:8, scrollBehavior:'smooth'}}>
@@ -991,7 +1004,20 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
                   const bkTitle = q.bookTitle || (_bk && (_bk.id === q.bookId || _bk.book_id === q.bookId) ? _bk.title : '') || '책';
                   const typeText = q.kind === 'thought' ? '💭내생각' : '📖책속';
                   const pageText = q.page ? `${q.page}p` : '';
-                  const dateText = q.when || (q.createdAt ? String(q.createdAt).slice(0, 10) : '');
+                  const _rawDate = q.when || q.createdAt || '';
+                  const dateText = (() => {
+                    if (!_rawDate) return '';
+                    const s = String(_rawDate);
+                    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+                    const n = Number(s);
+                    if (!isNaN(n) && n > 0) {
+                      const ms = n < 1e10 ? n * 1000 : n;
+                      const d = new Date(ms);
+                      if (!isNaN(d)) return d.toISOString().slice(0, 10);
+                    }
+                    try { const d = new Date(s); if (!isNaN(d)) return d.toISOString().slice(0, 10); } catch(e){}
+                    return '';
+                  })();
 
                   return (
                     <div key={i} className="my-q-card" onClick={() => setSelectedBookId(q.bookId)} style={{cursor:'pointer'}}>

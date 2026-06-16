@@ -1317,7 +1317,7 @@ function ActivityHeatmap({ days }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-        <div style={{ fontSize: 15, fontWeight: 900 }}>🌱 독서 활동</div>
+        <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.3px' }}>독서 활동</div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{Math.round(N / 7)}주 · {activeDays}일 · {totalPages}쪽</div>
       </div>
       <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
