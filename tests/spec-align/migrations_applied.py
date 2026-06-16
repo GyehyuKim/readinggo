@@ -12,7 +12,9 @@
 
 Read-only — DDL 을 실행하지 않는다 (감지 전용). 적용은 사람이 확인 후 수동/승인.
 
-Exit 0: 전부 적용됨.  Exit 1: 미적용 객체 존재(punch list).  Exit 2: 설정/통신 오류.
+Exit 0: 전부 적용됨 — 또는 API 일시 5xx·네트워크/타임아웃으로 검사 불가 시 skip(경고).
+Exit 1: 미적용 객체 존재(punch list).
+Exit 2: 설정 오류(토큰 미설정, 4xx 토큰/프로젝트). (CI는 토큰 미설정을 test.yml 래퍼에서 미리 skip.)
 
 Env:
   SUPABASE_ACCESS_TOKEN   Management API 토큰(sbp_...). 없으면 ROOT/.env 폴백.
@@ -115,9 +117,27 @@ def main() -> int:
             "select table_name from information_schema.tables "
             "where table_schema='public';",
         )
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
-        print(f"FAIL: Management API error: {e}", file=sys.stderr)
+    except urllib.error.HTTPError as e:
+        # 5xx = Supabase 쪽 일시 서버 장애(502/503/504 등) → 드리프트 신호 아님 → 경고+skip.
+        # 4xx = 토큰(401/403)·프로젝트(404) 설정 오류 → 진짜 문제 → fail.
+        # (HTTPError 가 URLError 하위클래스라 먼저 잡는다.)
+        if e.code >= 500:
+            print(
+                f"::warning::migrations 검사 skip — Management API 일시 오류 "
+                f"(HTTP {e.code}). 마이그레이션 드리프트 아님(서버 측). (#699)",
+                file=sys.stderr,
+            )
+            return 0
+        print(f"FAIL: Management API 설정 오류: HTTP {e.code} {e.reason}", file=sys.stderr)
         return 2
+    except (urllib.error.URLError, TimeoutError) as e:
+        # 네트워크 불가/타임아웃 = 검사 자체가 불가능 ≠ 드리프트 확정 → 경고+skip (토큰 미설정과 동일 철학).
+        print(
+            f"::warning::migrations 검사 skip — Management API 통신 실패 ({e}). "
+            f"네트워크/타임아웃. (#699)",
+            file=sys.stderr,
+        )
+        return 0
 
     live_cols = {(r["table_name"].lower(), r["column_name"].lower()) for r in col_rows}
     live_tables = {r["table_name"].lower() for r in tbl_rows}
