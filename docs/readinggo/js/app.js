@@ -208,7 +208,7 @@ function LoginScreen({ onLogin, onBack }) {
       )}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '0 32px', textAlign: 'center' }}>
         <span style={{ fontSize: 54 }}>🐦</span>
-        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)' }}>reading<span style={{ color: 'var(--brand)' }}>GO</span></div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)' }}>Reading<span style={{ color: 'var(--brand)' }}>Go</span></div>
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>지금까지 남긴 기록을<br />계정에 안전하게 간직해요.</div>
         <button onClick={onLogin} style={{ marginTop: 8, padding: '14px 22px', borderRadius: 14, border: '1.5px solid var(--line)', background: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
           <span style={{ fontSize: 18 }}>🟢</span> Google로 시작하기
@@ -635,12 +635,12 @@ function App() {
               onClick={() => switchTab('nest')}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchTab('nest'); }}>
               <span className="sparrow" aria-hidden="true">🐦</span>
-              <span>reading<span className="go">GO</span></span>
+              <span>Reading<span className="go">Go</span></span>
             </div>
             <div className="topbar-stats">
               {/* 상단바 XP 수치 표시 (#493) — Lv 왼쪽에 현재 보유 XP. appState.xp 라 변경 시 즉시 반영. */}
               <span className="stat xp" title="현재 XP (systems.md §6.3)">
-                <span>Xp {(appState.xp || 0).toLocaleString()}</span>
+                <span>XP {(appState.xp || 0).toLocaleString()}</span>
               </span>
               <span className="stat lv" title="레벨 (systems.md §6.3)">
                 <span>Lv.{calcLevel(appState.xp)}</span>
