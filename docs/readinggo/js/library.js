@@ -748,10 +748,11 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
   const allItems = books.concat(wishlistBooks);
   const selectedBook = selectedBookId ? (allItems.find(x => x.id === selectedBookId) || null) : null;
 
+  // 탭 라벨 축약(#648): 상단 '📚 내 서재' 헤더가 '책' 맥락을 주므로 반복어 '책' 제거 → 가로 스크롤 방지.
   const tabsData = [
-    { id: 'wishlist', label: '🔖 읽고 싶은 책', books: wishlistBooks },
-    { id: 'reading', label: '📖 읽고 있는 책', books: readingBooks },
-    { id: 'completed', label: '✅ 읽은 책', books: completedBooks },
+    { id: 'wishlist', label: '🔖 읽고 싶은', books: wishlistBooks },
+    { id: 'reading', label: '📖 읽고 있는', books: readingBooks },
+    { id: 'completed', label: '✅ 읽은', books: completedBooks },
     // 중단 탭(#593): 읽다 그만둔 책. 책이 있을 때만 노출(빈 탭 노이즈 방지).
     ...(abortedBooks.length > 0 ? [{ id: 'aborted', label: '⏸️ 중단', books: abortedBooks }] : []),
   ];
@@ -881,12 +882,12 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
               key={tab.id}
               onClick={() => setActiveSubtab(tab.id)}
               style={{
-                padding:'10px 14px',
+                padding:'8px 12px',   // #648 패딩 소폭 축소 — 4탭 너비 내 수용
                 background: activeSubtab === tab.id ? 'var(--brand)' : 'var(--card)',
                 color: activeSubtab === tab.id ? 'white' : 'var(--ink)',
                 border: activeSubtab === tab.id ? 'none' : '1px solid var(--line)',
                 borderRadius:'20px',
-                fontSize:12,
+                fontSize:11.5,   // #648 폰트 소폭 축소
                 fontWeight:700,
                 cursor:'pointer',
                 whiteSpace:'nowrap',
