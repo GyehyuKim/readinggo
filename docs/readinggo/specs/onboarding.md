@@ -68,6 +68,7 @@ Confetti: 18조각, 8색 `#3FD17F #FFC233 #FF8A3D #5AB5F0 #F08A9A #B690F0 #2EB86
 
 - 별도 랜딩 없음. D 세리머니 CTA가 OAuth 트리거
 - OAuth 성공 후: localStorage 임시 데이터 → Supabase 동기화 ([backend.md §7.7](./backend.md)), 닉네임 미입력 시 E-1, 바로 **H**(홈)
+- **계정 선택 강제 (#721)**: OAuth 요청은 항상 `prompt=select_account` 를 보낸다. 미지정 시 로그아웃(`signOut`=Supabase 세션만 정리) 후 재로그인하면 브라우저 잔류 Google 세션을 자동 선택해 **다른 계정으로 바꿀 수 없다**. 매번 계정 선택 화면을 띄워 계정 전환·추가를 보장.
 
 > **게스트 우선 원칙 (v7.3, 2026-06-08)**: 로그인은 **벽이 아니라 저장 시점의 선택**이다.
 > Supabase 모드에서도 **비로그인 사용자는 게스트로 앱 전체를 둘러볼 수 있다** (localStorage 백킹).
