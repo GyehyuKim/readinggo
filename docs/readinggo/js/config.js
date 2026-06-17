@@ -7,6 +7,9 @@ window.RG_CONFIG = {
   SUPABASE_URL: 'https://cttllwwkaddghqttyhkg.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_R-f42NFOGq3dxqMlootNlQ_Us4AdUd-',
   ALADIN_PROXY: '/.netlify/functions/aladin',   // 서버리스 프록시 (TTBKey 서버에만)
+  // 추천 피드 점수 (#787) — 신선도 반감기(일)·좋아요 가중·후보 풀 크기.
+  // 데이터가 적으면 좋아요=0 → log항=0 → 신선도(최신순)로 수렴하므로 빈 단계에서도 안전.
+  FEED_RECOMMEND: { halfLifeDays: 10, clapWeight: 1.2, poolSize: 120 },
 };
 
 // 앱 버전 (#748) — 프로덕션에선 워커가 배포 ID(짧은 8자)를 자동 주입한다.
