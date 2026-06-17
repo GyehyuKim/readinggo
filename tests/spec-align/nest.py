@@ -70,13 +70,6 @@ INVARIANTS = [
         r"RG_activateBook",
     ),
     (
-        # v7.2: 일일 미션(오늘 기록하기) = CheckinModal. 구 MissionModal 명칭 대체.
-        "§5.4",
-        "CheckinModal 컴포넌트 (오늘 기록하기 — 체크인)",
-        "nest.js",
-        r"function\s+CheckinModal\b",
-    ),
-    (
         "§5.2",
         "완독 세리머니 (🏰 표시)",
         "nest.js",

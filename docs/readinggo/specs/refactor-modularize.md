@@ -1,7 +1,8 @@
 # 리팩토링 — monolith 분할 (모듈화)
 
 > **신설 (#761, 2026-06-17)**: `components.js`(1626줄) 등 monolith를 기능별 파일로 분할. 목적은 **병렬 작업 충돌 영구 감소** + 인브라우저 Babel 파싱 에러 **blast radius 축소**(#687류). 개발 중지·pre-beta(저트래픽) 시점에 수행.
-> **1차 완료 (2026-06-17)**: components.js 5개 모듈 추출 종료(#763·#764·#765·#766·#767). 1626→718줄. prod 작동확인 완료. 2차(components.js 잔여)·nest/library 분할은 **보류**(§3.1) — 충돌 실발생 시 착수.
+> **1차 완료 (2026-06-17)**: components.js 5개 모듈 추출 종료(#763·#764·#765·#766·#767). 1626→718줄.
+> **3차 완료 (2026-06-17)**: nest.js(1406→632)·library.js(1163→507) 분할 종료(#773·#775·#776·#777) + CheckinModal 폐기 제거(#778). monolith 3종 모두 core view + 모듈로 분리. prod 작동확인. **2차(components.js 잔여)만 보류**(§3.1) — 충돌 실발생 시 착수.
 > **편집 정책**: 분할 계획 변경은 이 파일 PR로. spec-only 준수. 추출 코드는 후속 PR 시리즈.
 
 ## 1. 목적·범위
@@ -34,7 +35,7 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 
 - **결과**: `components.js` 1626→718줄(≈56% 감소). 모든 추출 PR은 boot-smoke(vendor Babel 변환)·align_v7·nest.py 통과 후 머지, prod `_RG_V '82'` 반영·작동확인 완료.
 - **`decodeEntities` 잔류 결정(#767)**: 맵은 book-info-modal.js 동반 이동을 적었으나, `sentence-card.js`(components 직후 로드)가 **로드 시점**에 `window.decodeEntities`를 alias하므로 components.js에 잔류(util host). 로드 순서 제약이 맵보다 우선.
-- 공통 유틸(`rgTrack`·`decodeEntities` 등)은 사용처 따라 적절한 파일로(중복 정의 금지). `library.js`는 자체 `decodeEntities` 복사본 보유(기존 중복, 후속 정리 대상).
+- 공통 유틸(`rgTrack`·`decodeEntities` 등)은 사용처 따라 적절한 파일로(중복 정의 금지). `library.js` 자체 `decodeEntities` 복사본은 #773(book-detail-modal 추출)에서 제거 — `window.decodeEntities`(components.js)로 통일.
 
 ## 3.1 2차 후보 (components.js 잔여 — 평가만, 착수 보류)
 
@@ -55,28 +56,33 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 
 - `nest.js`·`library.js`는 1차 완료 후 별도 spec 갱신으로 진행 → **§3.2**.
 
-## 3.2 3차 — nest.js·library.js 분할 맵 (#761, 2026-06-17)
+## 3.2 3차 — nest.js·library.js 분할 맵 (#761, 2026-06-17) — ✅ 완료
 
 1차(components.js)와 독립한 **더 큰 hot monolith** 두 개. 같은 strangler 원칙(§2): 한 번에 1개, 순수 이동, `window.X` shim, leaf→hot, tiny PR 직렬 머지. 각 파일 내부는 같은 원본을 삭제하니 **파일별로 직렬**, 두 파일은 서로 독립이라 병렬 가능.
 
-### nest.js (1406줄) → core(NestView) 잔류 + 추출
+> **결과 (2026-06-17)**: nest.js 1406→632줄, library.js 1163→507줄. core view(NestView·LibraryView)만 잔류. 전 추출 boot-smoke·align_v7·nest.py 통과 후 머지, prod 작동확인.
 
-| 순서 | 새 파일 | 옮길 것 | 의존(window alias) | 비고 |
+### nest.js → core(NestView) 잔류 + 추출
+
+| 순서 | 새 파일 | 옮긴 것 | PR | 상태 |
 |---|---|---|---|---|
-| 1 | `companion.js` | `CompanionModal`·`parseNoteToExchanges`·`pickCompanionQ`·`archiveCompanion` | datastore·LLM 프록시 | AI 대화 — 응집·자립, 가장 독립적(~250줄) |
-| 2 | `ocr-crop-overlay.js` | `OcrCropOverlay` | — | OCR 크롭, 자립(~82줄) |
-| 3 | `checkin-modal.js` | `CheckinModal` | — | 체크인(짹) 모달(~94줄) |
-| 4 | `ceremony.js` | `Ceremony`·`stageMicrocopy` | Confetti·icons | 완독 세리머니(~200줄) |
-| 5 | `nest-theatre.js` | `NestTheatre`·`nestVisualState` | NEST_ART/nestArt(icons) | 둥지 비주얼(~140줄) |
-| 잔류 | `nest.js` | `NestView`(core 홈) | 위 추출분을 window로 소비 | hot view, 최후 잔류 |
+| 1 | `companion.js` | `CompanionModal`·`parseNoteToExchanges`·`pickCompanionQ`·`genCompanionQuestion`·`genCompanionFollowup`·`archiveCompanion` | #775 | ✅ |
+| 2 | `ocr-crop-overlay.js` | `OcrCropOverlay` | #776 | ✅ |
+| 3 | ~~`checkin-modal.js`~~ | ~~`CheckinModal`~~ | — | ❌ 추출 안 함 — **#252로 폐기된 죽은 코드**(렌더·노출 0). 추출 대신 **삭제**(#778). |
+| 4 | `ceremony.js` | `Ceremony` | #777 | ✅ |
+| 5 | `nest-theatre.js` | `NestTheatre`·`stageMicrocopy`·`nestVisualState`·`NEST_CRACK_SVG` | #777 | ✅ |
+| 잔류 | `nest.js` | `NestView`(core 홈) + `BookEditModal` | — | hot view, 최후 잔류 |
 
-### library.js (1163줄) → core(LibraryView) 잔류 + 추출
+### library.js → core(LibraryView) 잔류 + 추출
 
-| 순서 | 새 파일 | 옮길 것 | 의존(window alias) | 비고 |
+| 순서 | 새 파일 | 옮긴 것 | PR | 상태 |
 |---|---|---|---|---|
-| 1 | `book-detail-modal.js` | `BookDetailModal` | `decodeEntities`·`SentenceActions`·`RG_SECTION_CARD` 등 | **최대 컴포넌트(~587줄)** — 단일 추출 고가치 |
-| 2 | `follow-list-modal.js` | `FollowListModal` | datastore | 팔로우 목록, 자립(~53줄) |
-| 잔류 | `library.js` | `LibraryView`(core 서재) | — | hot view, 최후 잔류 |
+| 1 | `book-detail-modal.js` | `BookDetailModal` | #773 | ✅ |
+| 2 | `follow-list-modal.js` | `FollowListModal` | #777 | ✅ |
+| 잔류 | `library.js` | `LibraryView`(core 서재) + `_mapWish` | — | hot view, 최후 잔류 |
+
+- **`_stageProg`/`_xpProg` 잔류**: Ceremony·NestTheatre·NestView 공유 헬퍼(nest.js 함수선언=전역). nest.js에 두고 추출본은 **render-time 전역 해소**.
+- **`DataStore` bare 유지**: 런타임 재할당(어댑터 교체, app.js)되므로 로드시점 `const` alias 금지 — bare 참조로 call-time 해소.
 
 - **`decodeEntities` 중복 해소**: `library.js` 자체 복사본(§37)은 `BookDetailModal`이 주 소비자. 추출 시 `book-detail-modal.js`가 `window.decodeEntities`(components.js)를 alias → library.js 잔여(LibraryView)가 미사용이면 로컬 복사본 제거(중복 정의 금지). LibraryView가 여전히 쓰면 잔류.
 - **로드 순서**: 추출 파일은 의존(icons·components·sentence-card)이 먼저 로드된 뒤, `nest.js`/`library.js`(core) **이전**에 로드(core가 window로 소비). 1차와 동일 패턴.
