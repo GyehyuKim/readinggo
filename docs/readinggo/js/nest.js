@@ -1,7 +1,7 @@
 /* =========================================================
    ReadingGo — nest.js
-   둥지 탭: 책 카드, NestTheatre, 체크인 CTA,
-            내 한 문장, 같은 책 피드, CheckinModal, Ceremony
+   둥지 탭(NestView): 책 카드, 체크인 CTA(짹), 내 한 문장, 같은 책 피드 + 책정보 수정(BookEditModal).
+   NestTheatre·Ceremony·CompanionModal·OcrCropOverlay는 #761로 별도 모듈 분리, CheckinModal은 #252 폐기 후 제거.
    ========================================================= */
 const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _useMemo } = React;
 
@@ -35,100 +35,6 @@ function _absPct(xp, sp) {
 }
 
 // 한 문장 종류 휴리스틱(estimateSentenceKind, #420) 제거 — '내 생각'(thought) 폐기 (#596). 호출부 없던 죽은 코드.
-
-/* ── CheckinModal ─────────────────────────────────────── */
-function CheckinModal({ book, onClose, onSubmit }) {
-  const [page, setPage] = _useState(book.cur);
-  // 직접입력 문자열 상태 (#686) — page(숫자)와 분리. 빈 문자열·편집 중 부분값 허용,
-  // 매 키 입력마다 0으로 강제/클램프하지 않아 백스페이스·커서 편집이 정상 동작.
-  const [pageStr, setPageStr] = _useState(String(book.cur));
-  const [sentence, setSentence] = _useState('');
-
-  const _maxPage = book.total > 0 ? book.total : 99999; // 쪽수 미상이면 상한 없음 (#204)
-  const _clamp = (v) => Math.max(0, Math.min(_maxPage, v));
-  const adjustPage = (delta) => {
-    setPage(p => { const n = _clamp(p + delta); setPageStr(String(n)); return n; });
-  };
-  // 입력 중: 숫자만 허용하되 빈 문자열 보존(삭제 가능). page 는 파싱 가능할 때만 따라간다.
-  const handleInput = (e) => {
-    const raw = e.target.value;
-    if (raw === '') { setPageStr(''); return; }      // 빈 값 허용 — 0으로 강제하지 않음
-    if (!/^\d+$/.test(raw)) return;                  // 숫자 외 입력 무시(커서 보존)
-    setPageStr(raw);
-    setPage(_clamp(parseInt(raw, 10)));
-  };
-  // 포커스 아웃 시 클램프 확정 — 빈 값/범위 밖이면 page 기준으로 표시값 정규화.
-  const handleInputBlur = () => {
-    const v = pageStr === '' ? page : _clamp(parseInt(pageStr, 10) || 0);
-    setPage(v);
-    setPageStr(String(v));
-  };
-  const handleSentence = (e) => {
-    if (e.target.value.length <= 1000) setSentence(e.target.value);
-  };
-  const handleSubmit = () => {
-    // 제출 시 입력값 확정 클램프 (#686) — 빈 값/부분 입력은 page 기준 정규화.
-    const finalPage = pageStr === '' ? page : _clamp(parseInt(pageStr, 10) || 0);
-    if (finalPage === book.cur && sentence.trim().length === 0) {
-      showToast('한 쪽도 OK! +1만 눌러봐요 🐦');
-      return;
-    }
-    onSubmit({ page: finalPage, sentence: sentence.trim() });
-  };
-
-  return (
-    <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="sheet" role="dialog" aria-label="오늘의 체크인">
-        <div className="sheet-grip" />
-        <div className="sheet-head">
-          <h2>오늘의 짹 🐦</h2>
-          <div className="sub">한 쪽도 충분해요. 어디까지 읽으셨어요?</div>
-        </div>
-
-        <div className="sheet-section">
-          <div className="label">📖 어디까지 읽었어요?</div>
-          <div className="page-input">
-            <button className="page-btn" onClick={() => adjustPage(-1)}>−1</button>
-            <div className="page-num">
-              <span>{page}</span>
-              <span style={{fontSize:13, color:'var(--ink-3)', fontWeight:800}}>p</span>
-            </div>
-            <button className="page-btn" onClick={() => adjustPage(1)}>+1</button>
-            <button
-              className="page-btn"
-              style={{borderBottomColor:'var(--brand-shadow)', background:'var(--brand-tint)', color:'var(--brand-3)'}}
-              onClick={() => adjustPage(10)}
-            >+10</button>
-          </div>
-          <div className="page-direct">
-            직접 입력{' '}
-            <input type="text" inputMode="numeric" pattern="[0-9]*" value={pageStr} onChange={handleInput} onBlur={handleInputBlur} />
-            <span className="page-totalmark">{book.total > 0 ? '전체 ' + book.total + 'p' : '쪽수 미상'}</span>
-          </div>
-        </div>
-
-        <div className="sheet-section">
-          <div className="label">✏️ 오늘의 한 문장 <small style={{color:'var(--ink-3)', fontWeight:700}}>(선택)</small></div>
-          <textarea
-            className="sentence-area"
-            placeholder="책에서 마음에 남은 한 문장을 옮겨 적어보세요."
-            value={sentence}
-            onChange={handleSentence}
-          />
-          <div className="sentence-counter" style={{display:'flex', justifyContent:'space-between'}}>
-            <span style={{color:'var(--ink-3)', fontWeight:700}}>📍 {page}p 의 문장으로 기록돼요</span>
-            <span>{sentence.length} / 1000</span>
-          </div>
-        </div>
-
-        <button className="submit-btn" onClick={handleSubmit}>✨ 짹 등록하기</button>
-        <div className="helper" style={{textAlign:'center'}}>
-          한 쪽만 읽어도 출석은 인정됩니다. 끊기는 게 더 어려워요!
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ── NestView ─────────────────────────────────────────── */
 
