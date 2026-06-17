@@ -586,6 +586,7 @@ function App() {
         // 읽는중(기존) — 활성 책 + 둥지 반영.
         switchTab('nest');
         await Promise.resolve(DataStore.activeBook.set(ub.id));
+        if (window.rgTrack) window.rgTrack('book_opened', { book_id: ub.book_id || ub.id || '', entry_point: 'register' }); // 퍼널 시작 (#736)
         setAppState(s => ({
           ...s,
           book: {
@@ -628,6 +629,7 @@ function App() {
     if (item.ubId && DataStore.activeBook && DataStore.activeBook.set) {
       Promise.resolve(DataStore.activeBook.set(item.ubId)).catch(e => console.warn('[ReadingGo] 활성 전환 실패:', e));
     }
+    if (window.rgTrack) window.rgTrack('book_opened', { book_id: item.id || '', entry_point: 'switch' }); // 퍼널 시작 — 서재 활성전환 (#736)
   }, [switchTab]);
   // 활성 책 전환을 전역 노출 — 둥지 캐러셀(#185)이 호출
   useEffect(() => { window.RG_activateBook = handleActivateUserBook; return () => { window.RG_activateBook = null; }; }, [handleActivateUserBook]);
