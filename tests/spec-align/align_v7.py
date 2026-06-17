@@ -31,7 +31,7 @@ FEATURE_FILES = [
     "app.js", "components.js", "nest.js", "social.js",
     "library.js", "search.js", "onboarding.js",
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
-    "icons.js", "admin-dashboard.js", "sentence-card.js",
+    "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -157,7 +157,7 @@ INVARIANTS = [
     ("B", "present", "byBook 짹순 정렬 — sort='likes' + clap_count (#594)",
         ["datastore-supabase.js"], r"sort === 'likes'[\s\S]*clap_count|clap_count[\s\S]*sort === 'likes'"),
     ("B", "present", "BookInfoModal 인기 한 문장 Top5 (#594)",
-        ["components.js"], r"이 책의 한 문장[\s\S]*byBook|byBook\(bookId, \{ limit: 5, sort: 'likes'"),
+        ["book-info-modal.js"], r"이 책의 한 문장[\s\S]*byBook|byBook\(bookId, \{ limit: 5, sort: 'likes'"),
     ("B", "present", "프로필 스탯 라벨 '❤️ 좋아요' — 좋아요 단일화 (#587→#641)",
         ["library.js"], r"❤️ 좋아요"),
     ("B", "present", "한 문장 모아보기 — 전체/책별 내 문장만(좋아요한 타인은 fav 전용) + 작성일자 (#608)",
@@ -197,13 +197,13 @@ INVARIANTS = [
     ("C", "present", "공용 SentenceCard 에 좋아요(claps) 토글 (한 문장 액션 계약 #610·#641)",
         ["sentence-card.js"], r"const toggleLike"),
     ("C", "present", "BookInfoModal 인기 한 문장이 SentenceCard 경유 — 좋아요 보장 (#610·#641)",
-        ["components.js"], r"SentenceCard key=\{s\.id\} bookId=\{bk\.id\} noBlind"),
+        ["book-info-modal.js"], r"SentenceCard key=\{s\.id\} bookId=\{bk\.id\} noBlind"),
     ("C", "present", "공용 SentenceActions 액션 row — 내문장 공개범위·좋아요·수정·삭제 / 타인 좋아요 (#610·#641)",
         ["sentence-card.js"], r"function SentenceActions"),
     ("C", "present", "SentenceCollectionModal 한 문장이 SentenceActions 경유 (#610 계약)",
         ["components.js"], r"<SentenceActions sentence=\{s\}"),
     ("C", "present", "책 상세에 내 한 문장 섹션 — 읽은 책=내 문장(+SentenceActions) / 안읽음=타인 (#610)",
-        ["components.js"], r"mySents\.map"),
+        ["book-info-modal.js"], r"mySents\.map"),
     # #610 표면 통일 락 — 홈·책장 내 문장 카드도 공용 SentenceActions 경유(자체 버튼 렌더 금지).
     ("C", "present", "홈 '이 책 한 문장' 카드 SentenceActions 경유 (#610 표면 통일)",
         ["nest.js"], r"<SentenceActions sentence=\{\{ id: q\.id"),

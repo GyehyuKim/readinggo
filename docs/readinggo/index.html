@@ -1416,7 +1416,7 @@ input,textarea{font-family:inherit;}
 <script src="js/datastore-supabase.js"></script>
 
 <script>
-const _RG_V = '81';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
+const _RG_V = '82';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
 
 async function loadBabel(src) {
   const res = await fetch(src + '?v=' + _RG_V);
@@ -1436,6 +1436,7 @@ async function loadBabel(src) {
     await loadBabel('js/icons.js');       // #761 모듈화 — 공용 아이콘 셋(components 이전 로드)
     await loadBabel('js/components.js');
     await loadBabel('js/sentence-card.js');  // #761 모듈화 — SentenceCard·SentenceActions(components 이후, window.decodeEntities 의존)
+    await loadBabel('js/book-info-modal.js');  // #761 모듈화 — BookInfoModal(icons·sentence-card·decodeEntities 이후)
     await loadBabel('js/share-card.js');  // #650 A: 한 문장 외부 공유 (window.shareSentence)
     await loadBabel('js/search.js');
     await loadBabel('js/nest.js');
