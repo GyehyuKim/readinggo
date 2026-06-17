@@ -31,7 +31,7 @@ FEATURE_FILES = [
     "app.js", "components.js", "nest.js", "social.js",
     "library.js", "search.js", "onboarding.js",
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
-    "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js",
+    "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js", "book-detail-modal.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -153,7 +153,7 @@ INVARIANTS = [
     ("B", "present", "읽던 책 중단 — myBooks.abort/resume 계약 (#593)",
         ["datastore.js"], r"abort\(userBookId\)[\s\S]*aborted[\s\S]*resume\(userBookId\)"),
     ("B", "present", "서재 중단 탭 + 다시 읽기 (#593)",
-        ["library.js"], r"status === 'aborted'[\s\S]*resumeBook|abortBook"),
+        ["book-detail-modal.js"], r"status === 'aborted'[\s\S]*resumeBook|abortBook"),
     ("B", "present", "byBook 짹순 정렬 — sort='likes' + clap_count (#594)",
         ["datastore-supabase.js"], r"sort === 'likes'[\s\S]*clap_count|clap_count[\s\S]*sort === 'likes'"),
     ("B", "present", "BookInfoModal 인기 한 문장 Top5 (#594)",
@@ -167,9 +167,9 @@ INVARIANTS = [
     ("B", "present", "관련 도서 ISBN 환각 필터 — filterRelatedCandidates (#496)",
         ["data.js"], r"filterRelatedCandidates"),
     ("B", "present", "책 상세 관련 도서 캐러셀 (#496)",
-        ["library.js"], r"함께 읽으면 좋은 책"),
+        ["book-detail-modal.js"], r"함께 읽으면 좋은 책"),
     ("B", "present", "책 상세 책 소개(description) 표시 — DB 우선·폴백 (#530)",
-        ["library.js"], r"book\.description[\s\S]*fetchBookDesc|fetchBookDesc[\s\S]*book\.description"),
+        ["book-detail-modal.js"], r"book\.description[\s\S]*fetchBookDesc|fetchBookDesc[\s\S]*book\.description"),
     ("B", "present", "좋아요(❤️) 스탯 → 좋아요한 문장 모달 — claps 임베드 머지 (#510→#641)",
         ["components.js"], r"savedExtra"),
     ("B", "present", "한 줄 소개 인라인 편집 — 프로필 헤더 (#515)",
@@ -208,7 +208,7 @@ INVARIANTS = [
     ("C", "present", "홈 '이 책 한 문장' 카드 SentenceActions 경유 (#610 표면 통일)",
         ["nest.js"], r"<SentenceActions sentence=\{\{ id: q\.id"),
     ("C", "present", "책장 BookDetailModal 한 문장 카드 SentenceActions 경유 (#610 표면 통일)",
-        ["library.js"], r"<SentenceActions"),
+        ["book-detail-modal.js"], r"<SentenceActions"),
     # ── 2단 동의 게이팅 (analytics.md §5.4, #752) — 비필수(리플레이·식별)는 'yes'만. PIPA 회귀 락 ──
     ("C", "present", "RG_applyConsent — 'yes'만 startSessionRecording, 그 외 stopSessionRecording (#752)",
         ["components.js"], r"RG_applyConsent[\s\S]{0,260}startSessionRecording[\s\S]{0,160}stopSessionRecording"),
