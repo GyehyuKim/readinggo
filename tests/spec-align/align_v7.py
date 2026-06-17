@@ -32,7 +32,7 @@ FEATURE_FILES = [
     "library.js", "search.js", "onboarding.js",
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
     "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js", "book-detail-modal.js",
-    "companion.js", "ocr-crop-overlay.js",
+    "companion.js", "ocr-crop-overlay.js", "ceremony.js", "nest-theatre.js", "follow-list-modal.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -91,11 +91,11 @@ INVARIANTS = [
     # #522: 둥지 단계는 XP 단일 소스. NestTheatre 가 xp prop 으로 받아 getNestStageByXp 로 계산하고,
     # 프로필(LibraryView)은 state.xp 를 그대로 넘긴다 → 세리머니(newLv)와 항상 일치(책 진도% 재도입 금지).
     ("S4", "present", "NestTheatre 둥지 단계 = XP 단일 소스 (#522)",
-        ["nest.js"], r"function NestTheatre\(\{\s*xp"),
+        ["nest-theatre.js"], r"function NestTheatre\(\{\s*xp"),
     ("S4", "present", "프로필 NestTheatre 에 state.xp 전달 (#522 단일 소스)",
         ["library.js"], r"NestTheatre\s+xp=\{state\.xp\}"),
     ("S4", "present", "둥지 단계 안내 가이드 팝업 (#511)",
-        ["nest.js"], r"둥지가 자라는 방법"),
+        ["nest-theatre.js"], r"둥지가 자라는 방법"),
     ("S4", "present", "세리머니 한 문장 카드 정직 표시 — bookQuoteCount (#549)",
         ["nest.js"], r"bookQuoteCount"),
     ("S4", "present", "빠른입력 페이지/한 문장 독립 제출 (#497)",
