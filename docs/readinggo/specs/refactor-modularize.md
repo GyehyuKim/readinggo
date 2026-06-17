@@ -2,7 +2,8 @@
 
 > **신설 (#761, 2026-06-17)**: `components.js`(1626줄) 등 monolith를 기능별 파일로 분할. 목적은 **병렬 작업 충돌 영구 감소** + 인브라우저 Babel 파싱 에러 **blast radius 축소**(#687류). 개발 중지·pre-beta(저트래픽) 시점에 수행.
 > **1차 완료 (2026-06-17)**: components.js 5개 모듈 추출 종료(#763·#764·#765·#766·#767). 1626→718줄.
-> **3차 완료 (2026-06-17)**: nest.js(1406→632)·library.js(1163→507) 분할 종료(#773·#775·#776·#777) + CheckinModal 폐기 제거(#778). monolith 3종 모두 core view + 모듈로 분리. prod 작동확인. **2차(components.js 잔여)만 보류**(§3.1) — 충돌 실발생 시 착수.
+> **3차 완료 (2026-06-17)**: nest.js(1406→632)·library.js(1163→507) 분할 종료(#773·#775·#776·#777) + CheckinModal 폐기 제거(#778). monolith 3종 모두 core view + 모듈로 분리. prod 작동확인.
+> **2차 완료 (2026-06-17)**: components.js 잔여 큰 컴포넌트 3개 추출(#780, UserProfileModal·SentenceCollectionModal·TinderCards). 730→308줄. 작은 모달·공유 프리미티브·컨텍스트는 core 잔류(§3.1).
 > **편집 정책**: 분할 계획 변경은 이 파일 PR로. spec-only 준수. 추출 코드는 후속 PR 시리즈.
 
 ## 1. 목적·범위
@@ -37,22 +38,22 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 - **`decodeEntities` 잔류 결정(#767)**: 맵은 book-info-modal.js 동반 이동을 적었으나, `sentence-card.js`(components 직후 로드)가 **로드 시점**에 `window.decodeEntities`를 alias하므로 components.js에 잔류(util host). 로드 순서 제약이 맵보다 우선.
 - 공통 유틸(`rgTrack`·`decodeEntities` 등)은 사용처 따라 적절한 파일로(중복 정의 금지). `library.js` 자체 `decodeEntities` 복사본은 #773(book-detail-modal 추출)에서 제거 — `window.decodeEntities`(components.js)로 통일.
 
-## 3.1 2차 후보 (components.js 잔여 — 평가만, 착수 보류)
+## 3.1 2차 — components.js 잔여 (#779 후속, 2026-06-17) — ✅ 큰 컴포넌트 추출 완료
 
-1차 후 `components.js` 718줄에 남은 컴포넌트(9개). **현재 충돌 빈도·blast radius가 낮아 2차는 보류**, 아래는 착수 시 권장 경계.
+1차 후 `components.js`에 남았던 컴포넌트 중 **큰 3개를 추출**(#780). `components.js` 730→308줄. 나머지 작은 모달·공유 프리미티브·컨텍스트는 **core 호스트로 잔류**.
 
-| 컴포넌트 | 줄수(약) | 2차 후보 파일 | 메모 |
+| 컴포넌트 | 줄수(약) | 새 파일 | 상태 |
 |---|---|---|---|
-| `UserProfileModal` | ~218 | `user-profile-modal.js` | 잔여 최대. 자립적, 2차 1순위 |
-| `SentenceCollectionModal` | ~113 | `sentence-collection-modal.js` | sentence-card(`SentenceActions`) 의존 |
-| `TinderCards` | ~90 | `tinder-cards.js` | 자립 |
-| `ActivityHeatmap` | ~65 | (잔류 후보) | 작음 |
-| `ConsentBanner` | ~74 | (잔류/동의 모듈) | 프라이버시/동의 코드(C)와 함께 다룰 수 있음 |
-| `StreakCalendarModal` | ~48 | (잔류 후보) | 작음 |
-| `Toast`·`BookCover`·`Confetti` | ~70 합 | (잔류 — core) | 공유 프리미티브. `components.js`를 thin core로 유지 |
+| `UserProfileModal` | ~218 | `user-profile-modal.js` | ✅ #780 |
+| `SentenceCollectionModal` | ~108 | `sentence-collection-modal.js` | ✅ #780 (SentenceActions 의존) |
+| `TinderCards` | ~90 | `tinder-cards.js` | ✅ #780 (#186 보류·보존 컴포넌트) |
+| `ActivityHeatmap` | ~65 | (잔류) | core |
+| `ConsentBanner` | ~38 | (잔류) | core — `RG_consent`/`RG_applyConsent`와 동거 |
+| `StreakCalendarModal` | ~48 | (잔류) | core |
+| `Toast`·`BookCover`·`Confetti` | ~70 합 | (잔류) | 공유 프리미티브 |
 
-- 공유 컨텍스트·유틸(`SpoilerContext`·`isSentenceBlinded`·`showToast`·`rgTrack`·`decodeEntities`)은 `components.js`에 **core 호스트로 잔류**(다수 파일이 window alias로 소비).
-- **판단**: 2차는 줄 수가 아니라 "충돌이 실제로 발생할 때" 착수(YAGNI). 큰 컴포넌트(UserProfileModal)만 선제 분리 가치.
+- 공유 컨텍스트·유틸(`SpoilerContext`·`isSentenceBlinded`·`showToast`·`rgTrack`·`decodeEntities`)·동의(`RG_consent`/`RG_applyConsent`)는 `components.js`에 **core 호스트로 잔류**(다수 파일이 window 전역으로 소비). 순수 이동: 훅만 재선언, `DataStore`는 bare(런타임 재할당).
+- **판단**: 잔류 모달(Activity/Consent/Streak)은 작고 충돌 빈도 낮아 YAGNI로 둠. 큰 3개만 분리해 blast radius·충돌면 축소.
 
 - `nest.js`·`library.js`는 1차 완료 후 별도 spec 갱신으로 진행 → **§3.2**.
 

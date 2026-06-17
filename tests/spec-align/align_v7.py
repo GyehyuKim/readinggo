@@ -33,6 +33,7 @@ FEATURE_FILES = [
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
     "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js", "book-detail-modal.js",
     "companion.js", "ocr-crop-overlay.js", "ceremony.js", "nest-theatre.js", "follow-list-modal.js",
+    "user-profile-modal.js", "sentence-collection-modal.js", "tinder-cards.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -136,7 +137,7 @@ INVARIANTS = [
     ("B", "present", "알라딘 책 검색 (ALADIN_PROXY)",
         ["search.js"], r"ALADIN_PROXY"),
     ("B", "present", "타인 프로필 보기 (UserProfileModal)",
-        ["components.js"], r"UserProfileModal"),
+        ["user-profile-modal.js"], r"UserProfileModal"),
     ("B", "present", "DataStore→Supabase 스왑 (쓰기 경로 활성)",
         ["app.js"], r"window\.DataStore = window\.SupabaseDataStore"),
     ("B", "present", "sentences book_id 임베드 (무작위회상·사후감상 실모드)",
@@ -162,7 +163,7 @@ INVARIANTS = [
     ("B", "present", "프로필 스탯 라벨 '❤️ 좋아요' — 좋아요 단일화 (#587→#641)",
         ["library.js"], r"❤️ 좋아요"),
     ("B", "present", "한 문장 모아보기 — 전체/책별 내 문장만(좋아요한 타인은 fav 전용) + 작성일자 (#608)",
-        ["components.js"], r"favPool[\s\S]*fmtWhen|fmtWhen[\s\S]*favPool"),
+        ["sentence-collection-modal.js"], r"favPool[\s\S]*fmtWhen|fmtWhen[\s\S]*favPool"),
     ("B", "present", "관련 도서 추천 — recommendRelated + books.related (#496)",
         ["data.js", "datastore.js"], r"recommendRelated"),
     ("B", "present", "관련 도서 ISBN 환각 필터 — filterRelatedCandidates (#496)",
@@ -172,7 +173,7 @@ INVARIANTS = [
     ("B", "present", "책 상세 책 소개(description) 표시 — DB 우선·폴백 (#530)",
         ["book-detail-modal.js"], r"book\.description[\s\S]*fetchBookDesc|fetchBookDesc[\s\S]*book\.description"),
     ("B", "present", "좋아요(❤️) 스탯 → 좋아요한 문장 모달 — claps 임베드 머지 (#510→#641)",
-        ["components.js"], r"savedExtra"),
+        ["sentence-collection-modal.js"], r"savedExtra"),
     ("B", "present", "한 줄 소개 인라인 편집 — 프로필 헤더 (#515)",
         ["library.js"], r"bioEditing[\s\S]*saveBio|saveBio[\s\S]*bioEditing"),
     ("B", "present", "프로필 헤더 → 둥지 순서 (#508)",
@@ -188,7 +189,7 @@ INVARIANTS = [
     ("C", "present", "운영 대시보드 (profile.md §5.8.9, #161)",
         ["admin-dashboard.js"], r"AdminDashboardModal"),  # #761 모듈화: components.js → admin-dashboard.js
     ("C", "present", "한 문장 틴더 카드 (feed.md, #186)",
-        ["components.js"], r"TinderCards"),
+        ["tinder-cards.js"], r"TinderCards"),
     ("C", "present", "운영자 문의 (profile.md 설정, #문의)",
         ["datastore-supabase.js"], r"inquiries"),
     # 온보딩 — 정의 없는 Sparrow 컴포넌트 참조 금지 (#527). 🐦 이모지로 통일, 재도입 시 렌더 크래시.
@@ -202,7 +203,7 @@ INVARIANTS = [
     ("C", "present", "공용 SentenceActions 액션 row — 내문장 공개범위·좋아요·수정·삭제 / 타인 좋아요 (#610·#641)",
         ["sentence-card.js"], r"function SentenceActions"),
     ("C", "present", "SentenceCollectionModal 한 문장이 SentenceActions 경유 (#610 계약)",
-        ["components.js"], r"<SentenceActions sentence=\{s\}"),
+        ["sentence-collection-modal.js"], r"<SentenceActions sentence=\{s\}"),
     ("C", "present", "책 상세에 내 한 문장 섹션 — 읽은 책=내 문장(+SentenceActions) / 안읽음=타인 (#610)",
         ["book-info-modal.js"], r"mySents\.map"),
     # #610 표면 통일 락 — 홈·책장 내 문장 카드도 공용 SentenceActions 경유(자체 버튼 렌더 금지).

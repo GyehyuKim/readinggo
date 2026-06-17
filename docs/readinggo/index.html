@@ -1420,7 +1420,7 @@ input,textarea{font-family:inherit;}
 <script src="js/datastore-supabase.js"></script>
 
 <script>
-const _RG_V = '88';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
+const _RG_V = '89';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
 
 async function loadBabel(src) {
   const res = await fetch(src + '?v=' + _RG_V);
@@ -1441,6 +1441,9 @@ async function loadBabel(src) {
     await loadBabel('js/components.js');
     await loadBabel('js/sentence-card.js');  // #761 모듈화 — SentenceCard·SentenceActions(components 이후, window.decodeEntities 의존)
     await loadBabel('js/book-info-modal.js');  // #761 모듈화 — BookInfoModal(icons·sentence-card·decodeEntities 이후)
+    await loadBabel('js/user-profile-modal.js');  // #761 모듈화 2차 — UserProfileModal(components 이후, app 소비)
+    await loadBabel('js/sentence-collection-modal.js');  // #761 모듈화 2차 — SentenceCollectionModal(sentence-card 이후, app 소비)
+    await loadBabel('js/tinder-cards.js');  // #761 모듈화 2차 — TinderCards(#186 보류·보존, components 이후)
     await loadBabel('js/share-card.js');  // #650 A: 한 문장 외부 공유 (window.shareSentence)
     await loadBabel('js/search.js');
     await loadBabel('js/ocr-crop-overlay.js');  // #761 모듈화 — OcrCropOverlay(nest 이전 — NestView가 <OcrCropOverlay> 소비)
