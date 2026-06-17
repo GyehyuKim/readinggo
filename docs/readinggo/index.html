@@ -1416,7 +1416,7 @@ input,textarea{font-family:inherit;}
 <script src="js/datastore-supabase.js"></script>
 
 <script>
-const _RG_V = '79';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
+const _RG_V = '80';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
 
 async function loadBabel(src) {
   const res = await fetch(src + '?v=' + _RG_V);
@@ -1452,6 +1452,7 @@ async function loadBabel(src) {
         }
       }
     } catch (e) { console.warn('[ReadingGo] Supabase 스왑 스킵:', e.message); }
+    await loadBabel('js/settings-modal.js');  // #761 모듈화 — SettingsModal(app 이전 로드)
     await loadBabel('js/app.js');
   } catch (err) {
     console.error('[ReadingGo] 로드 실패:', err);
