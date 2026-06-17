@@ -434,7 +434,7 @@ function NestTheatre({ xp, health = 100 }) {
                 </div>
               ))}
               <div style={{marginTop:14, padding:'12px 14px', background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:8, fontSize:13, color:'var(--brand-3)', fontWeight:800, lineHeight:1.6, textAlign:'center'}}>
-                🏰 1,600 XP 달성 → 성 획득! 다시 나뭇가지 자리부터 새 둥지를 시작해요.
+                <span style={{display:'inline-block', verticalAlign:'-4px', marginRight:4}}>{window.nestArt(5, 18)}</span>1,600 XP 달성 → 성 획득! 다시 나뭇가지 자리부터 새 둥지를 시작해요.
               </div>
             </div>
           </div>
