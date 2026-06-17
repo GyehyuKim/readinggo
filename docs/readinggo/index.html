@@ -1416,7 +1416,7 @@ input,textarea{font-family:inherit;}
 <script src="js/datastore-supabase.js"></script>
 
 <script>
-const _RG_V = '78';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
+const _RG_V = '79';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
 
 async function loadBabel(src) {
   const res = await fetch(src + '?v=' + _RG_V);
@@ -1439,6 +1439,7 @@ async function loadBabel(src) {
     await loadBabel('js/search.js');
     await loadBabel('js/nest.js');
     await loadBabel('js/social.js');
+    await loadBabel('js/admin-dashboard.js');  // #761 모듈화 — AdminDashboardModal(library 이전 로드)
     await loadBabel('js/library.js');
     // Phase 1: 로그인 + Supabase 설정 시 DataStore 를 Supabase 로 교체.
     // 미로그인이면 localStorageAdapter 폴백 유지 → Phase 0 데모 동작 그대로(안전).
