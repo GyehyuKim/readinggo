@@ -1420,7 +1420,7 @@ input,textarea{font-family:inherit;}
 <script src="js/datastore-supabase.js"></script>
 
 <script>
-const _RG_V = '85';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
+const _RG_V = '86';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
 
 async function loadBabel(src) {
   const res = await fetch(src + '?v=' + _RG_V);
@@ -1443,6 +1443,7 @@ async function loadBabel(src) {
     await loadBabel('js/book-info-modal.js');  // #761 모듈화 — BookInfoModal(icons·sentence-card·decodeEntities 이후)
     await loadBabel('js/share-card.js');  // #650 A: 한 문장 외부 공유 (window.shareSentence)
     await loadBabel('js/search.js');
+    await loadBabel('js/ocr-crop-overlay.js');  // #761 모듈화 — OcrCropOverlay(nest 이전 — NestView가 <OcrCropOverlay> 소비)
     await loadBabel('js/nest.js');
     await loadBabel('js/companion.js');  // #761 모듈화 — CompanionModal+헬퍼(nest 이후, app 이전 — app이 <CompanionModal> 소비)
     await loadBabel('js/social.js');
