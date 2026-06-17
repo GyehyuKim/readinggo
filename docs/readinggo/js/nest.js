@@ -646,10 +646,13 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
     const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
     const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, note: d.note } : q) })); };
+    // 한 문장 본문·페이지 수정 (#683/#731) — '이 책 한 문장' 카드 즉시 반영.
+    const onUpd = (e) => { const d = e && e.detail; if (!d || !d.id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, text: d.text, page: d.page } : q) })); };
     window.addEventListener('rg:sentence-removed', onRm);
     window.addEventListener('rg:sentence-kind', onKind);
     window.addEventListener('rg:sentence-note', onNote);
-    return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); window.removeEventListener('rg:sentence-note', onNote); };
+    window.addEventListener('rg:sentence-updated', onUpd);
+    return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); window.removeEventListener('rg:sentence-note', onNote); window.removeEventListener('rg:sentence-updated', onUpd); };
   }, []);
 
   // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드. 둥지(XP 기반)는 유지 — 책과 무관(#313).
