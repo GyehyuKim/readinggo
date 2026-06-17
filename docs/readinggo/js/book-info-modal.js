@@ -17,6 +17,8 @@ function BookInfoModal({ bookId, onClose }) {
   const [desc, setDesc] = useState(''); // 책 소개 (#578) — DB description 우선, 없으면 알라딘 폴백
   const [descSource, setDescSource] = useState(''); // 소개 출처 (#642) — 'llm'이면 AI 작성 칩
   const [popular, setPopular] = useState([]); // 인기 한 문장 Top5 (#594) — 짹 많은 순, 게스트/빈 → []
+  const [popularResolved, setPopularResolved] = useState(false); // byBook 응답 도착 여부 (시드 트리거 게이트, #774)
+  const [seeds, setSeeds] = useState([]); // 마중물 시드 (#774) — popular 비었을 때 '남이 읽은 한 문장'
   const [mySents, setMySents] = useState([]); // 내 한 문장 (#610) — 이 책에 내가 남긴 것 (읽은 책)
   const [shelf, setShelf] = useState(null); // 서재 상태 (#644) — null=미상, 'reading'|'completed'|'aborted'|'wish'|'none'
   useEffect(() => {
@@ -53,11 +55,23 @@ function BookInfoModal({ bookId, onClose }) {
   useEffect(() => {
     let alive = true;
     const DS = window.DataStore || {};
+    setPopularResolved(false);
     Promise.resolve((DS.sentences && DS.sentences.byBook) ? DS.sentences.byBook(bookId, { limit: 5, sort: 'likes' }) : [])
-      .then(rows => { if (alive) setPopular(Array.isArray(rows) ? rows : []); })
-      .catch(() => { if (alive) setPopular([]); });
+      .then(rows => { if (alive) { setPopular(Array.isArray(rows) ? rows : []); setPopularResolved(true); } })
+      .catch(() => { if (alive) { setPopular([]); setPopularResolved(true); } });
     return () => { alive = false; };
   }, [bookId]);
+  // 마중물 시드 (#774) — 인기 한 문장이 0건(빈 책)일 때만 '남이 읽은 한 문장'을 /api/seed 로 가져와 채운다.
+  // 진짜 공개 문장이 있으면(popular>0) 시드는 안 부른다 → 자연 소멸(integrated-shelf.md §5.6).
+  useEffect(() => {
+    if (!bk || !bk.title || !popularResolved || popular.length > 0) { setSeeds([]); return; }
+    let alive = true;
+    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: bk.title, author: bk.author || '', isbn: bk.isbn13 || bk.isbn || '' }) })
+      .then(r => r.json())
+      .then(d => { if (alive) setSeeds((d && Array.isArray(d.seeds)) ? d.seeds : []); })
+      .catch(() => { if (alive) setSeeds([]); });
+    return () => { alive = false; };
+  }, [bk, popular, popularResolved]);
   // 내 한 문장 (#610) — 이 책에 내가 남긴 문장(byBook은 타인 전용이라 listMine 필터). 읽은 책이면 노출.
   useEffect(() => {
     let alive = true;
@@ -143,6 +157,25 @@ function BookInfoModal({ bookId, onClose }) {
                               page: s.page, time: '', claps: s.clapCount || 0, bookId: bk.id, bookTitle: '', isMine: false }} />
                   );
                 })}
+              </div>
+            )}
+            {/* 마중물 시드 (#774) — 공개 문장이 없을 때만 '남이 읽은 한 문장'(네이버 블로그 서평 정제 + 출처).
+                🌱 라벨·출처 링크로 진짜 유저 문장과 구분(저작권·진정성, integrated-shelf.md §5). 읽기 전용. */}
+            {popular.length === 0 && seeds.length > 0 && (
+              <div style={{ textAlign: 'left', marginBottom: 12 }}>
+                <SectionLabel icon="sentence">🌱 함께 읽은 이웃</SectionLabel>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-3)', margin: '0 0 8px', lineHeight: 1.4 }}>웹 서평에서 모은 다른 독자의 한 문장이에요 · 출처를 눌러 원글로</div>
+                {seeds.map((s, i) => (
+                  <div key={i} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                    <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6 }}>"{decodeEntities(s.text || '')}"</div>
+                    {s.sourceUrl && (
+                      <a href={s.sourceUrl} target="_blank" rel="noopener noreferrer nofollow"
+                        style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, textDecoration: 'none' }}>
+                        🔗 {s.sourceName || '출처'} →
+                      </a>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
             {/* 쪽수 메타 누락 시 수동 입력 — 진척률·읽기모드용 (#204) */}

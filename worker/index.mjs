@@ -58,6 +58,13 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return shelfImportProxy(request, env);
     }
+    // 통합 서가 ② 마중물 시드 (#774) — 빈 책에 '남이 읽은 한 문장'. 네이버 블로그 검색(준공식·출처제공)
+    // → solar-pro3 정제(한 문장·출처 보존). 저작권 가드: 인용 최소·출처 표기(integrated-shelf.md §5.2).
+    if (p === '/api/seed') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      return seedProxy(request, env);
+    }
     // 관련 도서 추천 — 이 책과 함께 읽을 책 (#496). LLM은 제목·저자만 제시하고,
     // 환각 필터(실존 도서 매칭)는 클라에서 books DB로 수행. 키는 서버에서만(클라 노출 금지). 동일출처만.
     if (p === '/api/related') {
@@ -413,6 +420,96 @@ async function shelfImportProxy(request, env) {
   } catch (e) {
     return json({ books: [], raw, partial: true, error: 'LLM 실패' }, 200);
   }
+}
+
+// 통합 서가 ② 마중물 시드 (#774) — 네이버 블로그 검색 → solar-pro3 정제.
+// HTML 태그·엔티티 제거(네이버 description 은 <b>매치</b> 강조 포함).
+function stripHtml(s) {
+  return String(s || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+const SEED_EXTRACT_SYSTEM = '너는 책 서평 블로그 스니펫에서 그 책(도서)에 대한 "독자의 한 문장 감상"만 뽑는 추출기다. 각 스니펫에서 책에 대한 인상·감상이 담긴 부분을 한 문장으로 자연스럽게 다듬어라(원문 의미 보존, 광고·방문자수·블로그 군더더기·해시태그 제거, 한 문장으로 압축). **동명의 영화·드라마·음반·동명이작 등 그 "책"이 아닌 것에 대한 글, 또는 감상이 없는 글은 반드시 건너뛴다.** 출력은 JSON 배열만: [{"i":원본인덱스,"text":"한 문장 감상"}]. 결과가 하나여도 반드시 배열로 감싸라. 없으면 빈 배열 []. 인용은 한 문장으로 제한하고 통째 전재하지 마라. 설명·코드펜스 없이 JSON 배열만.';
+
+function parseSeedJson(s) {
+  if (!s) return [];
+  let t = String(s).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  // 배열 우선, 없으면 단일 객체({...})도 수용(LLM이 결과 1개일 때 배열로 안 감싸는 경우).
+  const la = t.indexOf('['), lb = t.lastIndexOf(']');
+  if (la >= 0 && lb > la) t = t.slice(la, lb + 1);
+  else { const oa = t.indexOf('{'), ob = t.lastIndexOf('}'); if (oa >= 0 && ob > oa) t = '[' + t.slice(oa, ob + 1) + ']'; }
+  let arr;
+  try { arr = JSON.parse(t); } catch { return []; }
+  if (!Array.isArray(arr)) arr = [arr];
+  const out = [];
+  for (const it of arr) {
+    if (!it || typeof it !== 'object') continue;
+    const i = Number(it.i);
+    const text = String(it.text || '').trim();
+    if (!Number.isInteger(i) || i < 0 || !text) continue;
+    out.push({ i, text });
+  }
+  return out;
+}
+
+// 책별 시드 캐시 (best-effort in-memory) — 재크롤·재정제 억제. 콜드스타트 시 비워짐.
+const SEED_CACHE = new Map();
+const SEED_CACHE_MAX = 300;
+
+// 네이버 블로그 검색 1회 — items[] 반환(실패·비ok → []).
+async function naverBlogSearch(query, env) {
+  try {
+    const r = await fetch(`https://openapi.naver.com/v1/search/blog.json?query=${encodeURIComponent(query)}&display=10&sort=sim`, {
+      headers: { 'X-Naver-Client-Id': env.NAVER_CLIENT_ID, 'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET },
+    });
+    if (!r.ok) return [];
+    const d = await r.json();
+    return (d && d.items) || [];
+  } catch (e) { return []; }
+}
+
+async function seedProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  const title = String((body && body.title) || '').trim();
+  const author = String((body && body.author) || '').trim();
+  if (!title) return json({ seeds: [] }, 200);
+  const ck = (title + '|' + author).replace(/\s+/g, ' ').toLowerCase();
+  if (SEED_CACHE.has(ck)) return json({ seeds: SEED_CACHE.get(ck), cached: true }, 200, 3600);
+  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return json({ seeds: [], demo: true }, 200);
+  // 1) 네이버 블로그 검색 — '제목 저자 서평'. 0건이면 저자 빼고 재시도(동명이작 구분 ↔ 과협소 균형).
+  let items = await naverBlogSearch(title + (author ? ' ' + author : '') + ' 서평', env);
+  if (!items.length && author) items = await naverBlogSearch(title + ' 서평', env);
+  const cands = items.map((it) => ({ snippet: stripHtml(it.description), url: it.link, blog: stripHtml(it.bloggername) }))
+    .filter((c) => c.snippet && c.snippet.length >= 12).slice(0, 10);
+  if (!cands.length) return json({ seeds: [] }, 200);
+  // 2) solar-pro3 정제 — 스니펫에서 '한 문장 감상' 추출(생성 아님). 출처 매핑 보존.
+  if (!env.LLM_BASE_URL || !env.LLM_MODEL) {
+    // LLM 미설정: 스니펫 자체를 짧게 컷(출처 표기). best-effort.
+    const seeds = cands.slice(0, 3).map((c) => ({ text: c.snippet.slice(0, 120), sourceName: c.blog || '블로그', sourceUrl: c.url }));
+    return json({ seeds }, 200);
+  }
+  let parsed = [];
+  try {
+    const listText = cands.map((c, i) => `[${i}] ${c.snippet.slice(0, 220)}`).join('\n');
+    const out = await callLLM({
+      messages: [
+        { role: 'system', content: SEED_EXTRACT_SYSTEM },
+        { role: 'user', content: `책: ${title}${author ? ' (저자: ' + author + ')' : ''}\n블로그 서평 스니펫:\n${listText}` },
+      ], env, maxTokens: 900, temperature: 0.3,
+    });
+    parsed = parseSeedJson(out);
+  } catch (e) { return json({ seeds: [] }, 200); }
+  const seeds = parsed.map((p) => {
+    const c = cands[p.i];
+    return c ? { text: p.text, sourceName: c.blog || '블로그', sourceUrl: c.url } : null;
+  }).filter(Boolean).slice(0, 5);
+  if (SEED_CACHE.size > SEED_CACHE_MAX) SEED_CACHE.clear();
+  SEED_CACHE.set(ck, seeds);
+  return json({ seeds }, 200, 3600);
 }
 
 // 책 맥락 한 조각 (#373) — 참새 질문에 작품 소개를 녹이기 위한 서버측 조회.

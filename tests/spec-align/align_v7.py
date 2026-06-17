@@ -141,6 +141,8 @@ INVARIANTS = [
         ["user-profile-modal.js"], r"UserProfileModal"),
     ("B", "present", "스샷 서가 복원 — ShelfImportModal → /api/shelf-import (#772)",
         ["shelf-import.js"], r"/api/shelf-import"),
+    ("B", "present", "마중물 시드 — 빈 책에 /api/seed 로 남의 한 문장 (#774)",
+        ["book-info-modal.js"], r"/api/seed"),
     ("B", "present", "서가 복원 일괄 등록 — myBooks.addBatch (#772)",
         ["datastore.js"], r"addBatch"),
     ("B", "present", "DataStore→Supabase 스왑 (쓰기 경로 활성)",
