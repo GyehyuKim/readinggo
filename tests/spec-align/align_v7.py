@@ -31,7 +31,7 @@ FEATURE_FILES = [
     "app.js", "components.js", "nest.js", "social.js",
     "library.js", "search.js", "onboarding.js",
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
-    "icons.js", "admin-dashboard.js",
+    "icons.js", "admin-dashboard.js", "sentence-card.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -195,11 +195,11 @@ INVARIANTS = [
         ["onboarding.js"], r"<Sparrow"),
     # ── 한 문장 액션 계약 (#610) — 표면별 버튼 드리프트 자동 락 ──
     ("C", "present", "공용 SentenceCard 에 좋아요(claps) 토글 (한 문장 액션 계약 #610·#641)",
-        ["components.js"], r"const toggleLike"),
+        ["sentence-card.js"], r"const toggleLike"),
     ("C", "present", "BookInfoModal 인기 한 문장이 SentenceCard 경유 — 좋아요 보장 (#610·#641)",
         ["components.js"], r"SentenceCard key=\{s\.id\} bookId=\{bk\.id\} noBlind"),
     ("C", "present", "공용 SentenceActions 액션 row — 내문장 공개범위·좋아요·수정·삭제 / 타인 좋아요 (#610·#641)",
-        ["components.js"], r"function SentenceActions"),
+        ["sentence-card.js"], r"function SentenceActions"),
     ("C", "present", "SentenceCollectionModal 한 문장이 SentenceActions 경유 (#610 계약)",
         ["components.js"], r"<SentenceActions sentence=\{s\}"),
     ("C", "present", "책 상세에 내 한 문장 섹션 — 읽은 책=내 문장(+SentenceActions) / 안읽음=타인 (#610)",
