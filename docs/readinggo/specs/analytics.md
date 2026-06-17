@@ -52,11 +52,13 @@ rgTrack('app_error',           { message, tab })                 // 컴포넌트
 **⬜ 미구현 — 퍼널 완성 위해 추가 (후속 코드 PR ①):**
 
 ```js
-rgTrack('book_opened',         { book_id, entry_point })             // 읽기 모드 진입 = 퍼널 시작점 (nest.js)
-rgTrack('reading_session_end', { book_id, duration_sec, pages_logged }) // 독서 종료(체크인) = 인게이지먼트/리텐션 (nest.js)
+rgTrack('book_opened',         { book_id, entry_point })  // 책 읽기 시작 = 활성 책 설정·등록(RG_registerBook/activeBook.set). 퍼널 시작점
+rgTrack('reading_session_end', { book_id, pages_logged })  // 체크인(쪽수 기록, handleCheckin) = 인게이지먼트/리텐션
 ```
 
-이 둘이 없으면 **"책 열기 → 읽기 → 한 문장 → 완독" 퍼널을 끝까지 못 그린다**(시작·종료 누락).
+> ⚠️ **읽기모드(타이머) 폐기(#505) 반영**: 과거 카탈로그의 `book_opened`='읽기 모드 진입'은 더 이상 유효하지 않다(몰입 읽기모드·타이머 없음). 현재 핵심 루프는 **활성 책 설정 → 홈 체크인**이므로 `book_opened`=읽기 시작, `reading_session_end`=체크인으로 재정의. `duration_sec`는 타이머 폐기로 보류(체크인엔 신뢰 가능한 체류시간 없음).
+
+이 둘이 없으면 **"책 시작 → 체크인 → 한 문장 → 완독" 퍼널을 끝까지 못 그린다**(시작·세션 누락).
 
 **⏳ 후속 (해당 기능 도입 시):**
 
