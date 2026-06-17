@@ -22,7 +22,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
       : prev.dir === 1 ? { key, dir: -1 }  // 1차 → 2차
         : { key: null, dir: 1 }            // 2차 → 해제
   );
-  const [onlyHighRating, setOnlyHighRating] = _useState(false); // 4점 이상만 필터 (#513)
+  // 읽은 책 별점 필터 (#795) — 다중선택 버킷 Set(빈 Set=전체). 'none'=무평점(OCR 임포트 등 대량 유입 대비).
+  const [ratingFilter, setRatingFilter] = _useState(() => new Set());
+  const [ratingSheetOpen, setRatingSheetOpen] = _useState(false);
   const [myBooks, setMyBooks] = _useState(null);   // null=로딩
   const [wishlistBooks, setWishlistBooks] = _useState([]);
   const [savedCount, setSavedCount] = _useState(0); // ❤️ 저장(북마크) 문장 수 — stats행 (#471/#472)
@@ -178,7 +180,9 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
 
   // 읽은 책 탭: 정렬/필터 적용 (#513 → #649). 무평점은 0점 취급(최하). 다른 탭은 원본 순서 유지.
   // dir=1: 1차(최근순/별점 높은순/ㄱ→ㅎ), dir=-1: 2차(오래된순/별점 낮은순/ㅎ→ㄱ). key=null이면 원본 순서.
-  const filteredCompleted = completedBooks.filter(b => !onlyHighRating || (b.rating || 0) >= 4);
+  // 별점 버킷 (#795): 무평점→'none', 5.0→'5', 4.x→'4' … 0.5~1.x→'1' (정수 floor). 빈 Set=전체.
+  const ratingBucket = (r) => (r == null || r === 0) ? 'none' : (r >= 5 ? '5' : (r >= 1 ? String(Math.floor(r)) : '1'));
+  const filteredCompleted = completedBooks.filter(b => ratingFilter.size === 0 || ratingFilter.has(ratingBucket(b.rating)));
   const displayBooks = activeSubtab === 'completed'
     ? (completedSort.key === null
         ? filteredCompleted // 정렬 해제 — myBooks.list() 원본 순서 유지
@@ -354,8 +358,36 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
                   style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: active ? 'var(--brand)' : 'var(--card)', color: active ? '#fff' : 'var(--ink-2)', boxShadow: active ? 'none' : 'inset 0 0 0 1px var(--line)'}}>{label}</button>
               );
             })}
-            <button onClick={() => setOnlyHighRating(v => !v)}
-              style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: onlyHighRating ? 'var(--gold)' : 'var(--card)', color: onlyHighRating ? '#fff' : 'var(--ink-2)', boxShadow: onlyHighRating ? 'none' : 'inset 0 0 0 1px var(--line)'}}>⭐ 4점 이상</button>
+            <button onClick={() => setRatingSheetOpen(true)}
+              style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: ratingFilter.size ? 'var(--gold)' : 'var(--card)', color: ratingFilter.size ? '#fff' : 'var(--ink-2)', boxShadow: ratingFilter.size ? 'none' : 'inset 0 0 0 1px var(--line)'}}>⭐ 별점{ratingFilter.size ? ` ${ratingFilter.size}` : ''}</button>
+          </div>
+        )}
+
+        {/* 별점 필터 바텀시트 (#795) — 다중선택 버킷(★5~★1+무평점). 즉시 반영 + 초기화 + 완료. */}
+        {ratingSheetOpen && (
+          <div onClick={() => setRatingSheetOpen(false)}
+            style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1200, display:'flex', alignItems:'flex-end', justifyContent:'center'}}>
+            <div onClick={(e) => e.stopPropagation()}
+              style={{width:'100%', maxWidth:480, background:'var(--card)', borderRadius:'18px 18px 0 0', padding:'18px 18px calc(env(safe-area-inset-bottom) + 18px)'}}>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14}}>
+                <span style={{fontSize:15, fontWeight:900, color:'var(--ink)'}}>별점 필터</span>
+                <button onClick={() => setRatingFilter(new Set())}
+                  style={{background:'none', border:'none', color:'var(--ink-3)', fontSize:13, fontWeight:700, cursor:'pointer'}}>초기화</button>
+              </div>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16}}>
+                {[['5','⭐ 5점'],['4','⭐ 4점대'],['3','⭐ 3점대'],['2','⭐ 2점대'],['1','⭐ 1점대'],['none','· 무평점']].map(([k,lbl]) => {
+                  const on = ratingFilter.has(k);
+                  return (
+                    <button key={k} onClick={() => setRatingFilter(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; })}
+                      style={{padding:'11px 12px', borderRadius:12, border:'none', fontSize:13, fontWeight:800, cursor:'pointer', textAlign:'left', background: on ? 'var(--brand-tint)' : 'var(--paper)', color: on ? 'var(--brand-3)' : 'var(--ink-2)', boxShadow: on ? 'inset 0 0 0 1.5px var(--brand)' : 'inset 0 0 0 1px var(--line)'}}>
+                      {(on ? '☑ ' : '☐ ') + lbl}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setRatingSheetOpen(false)}
+                style={{width:'100%', padding:'13px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontWeight:900, fontSize:14, cursor:'pointer'}}>완료</button>
+            </div>
           </div>
         )}
 
@@ -395,7 +427,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             <div style={{fontSize:13, fontWeight:700}}>
               {activeSubtab === 'wishlist' && '찜한 책이 없어요'}
               {activeSubtab === 'reading' && '읽는 책이 없어요'}
-              {activeSubtab === 'completed' && (onlyHighRating ? '4점 이상 완독한 책이 없어요' : '완독한 책이 없어요')}
+              {activeSubtab === 'completed' && (ratingFilter.size ? '이 별점의 완독한 책이 없어요' : '완독한 책이 없어요')}
               {activeSubtab === 'aborted' && '중단한 책이 없어요'}
             </div>
             {/* 빈 서가 박멸 (#772) — 스샷으로 서가 복원 진입 */}
