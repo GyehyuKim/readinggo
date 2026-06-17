@@ -363,8 +363,10 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           </div>
         )}
 
-        {/* 별점 필터 바텀시트 (#795) — 다중선택 버킷(★5~★1+무평점). 즉시 반영 + 초기화 + 완료. */}
-        {ratingSheetOpen && (
+        {/* 별점 필터 바텀시트 (#795·#807) — createPortal로 .view 밖(body)에 렌더.
+            .view의 fadeUp 애니메이션(transform)이 containing block을 만들어 position:fixed를
+            가두는 문제 방지 — 이 코드베이스 모달 표준 패턴(app.js/library.js 다른 모달과 동일). */}
+        {ratingSheetOpen && ReactDOM.createPortal((
           <div onClick={() => setRatingSheetOpen(false)}
             style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1200, display:'flex', alignItems:'flex-end', justifyContent:'center'}}>
             <div onClick={(e) => e.stopPropagation()}
@@ -389,7 +391,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
                 style={{width:'100%', padding:'13px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontWeight:900, fontSize:14, cursor:'pointer'}}>완료</button>
             </div>
           </div>
-        )}
+        ), document.body)}
 
         {/* 책 목록 */}
         {myBooks === null ? (
