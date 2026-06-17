@@ -36,10 +36,10 @@ const INITIAL_PROGRESS = {
    성 개수 = floor(totalXp / 1600). */
 const NEST_CYCLE_XP = 1600;
 const NEST_STAGES = [
-  { lv: 1, minXp: 0,    maxXp: 99,   name: "나뭇가지 자리", short: "🪵", color: "#AFAFAF", bg: "#f3f4f6" },
+  { lv: 1, minXp: 0,    maxXp: 99,   name: "나뭇가지 자리", short: "🌿", color: "#AFAFAF", bg: "#f3f4f6" },
   { lv: 2, minXp: 100,  maxXp: 399,  name: "빈 둥지",       short: "🪹", color: "#F59E0B", bg: "#FEF3C7" },
-  { lv: 3, minXp: 400,  maxXp: 899,  name: "따뜻한 둥지",   short: "🏠", color: "#58CC02", bg: "#F0FDF4" },
-  { lv: 4, minXp: 900,  maxXp: 1599, name: "다정한 집",     short: "🏡", color: "#1CB0F6", bg: "#EFF6FF" },
+  { lv: 3, minXp: 400,  maxXp: 899,  name: "따뜻한 둥지",   short: "🪺", color: "#58CC02", bg: "#F0FDF4" },
+  { lv: 4, minXp: 900,  maxXp: 1599, name: "다정한 집",     short: "🐣", color: "#1CB0F6", bg: "#EFF6FF" },
   { lv: 5, minXp: 1600, maxXp: null, name: "참새의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
 ];
 // 현재 1,600 XP 주기 내 누적 XP (0~1599).

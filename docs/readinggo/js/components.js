@@ -465,13 +465,20 @@ const NEST_ART = {
     <path d="M5 20.5c1.6 9 7.7 13 15 13s13.4-4 15-13c-3 3-8.6 4.6-15 4.6S8 23.5 5 20.5z" fill="url(#rgNest3)" stroke="#3C8A02" strokeWidth="1.6"/>
   </g>,
   4: <g>
-    <defs><linearGradient id="rgHome4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#C6E9FC"/><stop offset="1" stopColor="#8CCDF5"/></linearGradient></defs>
-    <path d="M27 8c2.2-1 2-3.2 0-4.2" stroke="#C2DCEC" strokeWidth="1.7" fill="none" strokeLinecap="round"/>
-    <rect x="24" y="9" width="3.4" height="6" fill="#6FB0DA"/>
-    <path d="M20 6L33.5 17.5H6.5z" fill="#5FA9DC" stroke="#1592D6" strokeWidth="1.5" strokeLinejoin="round"/>
-    <rect x="9" y="17.5" width="22" height="15.5" rx="1.6" fill="url(#rgHome4)" stroke="#1592D6" strokeWidth="1.5"/>
-    <rect x="17" y="24.5" width="6" height="8.5" rx="1" fill="#5FA9DC" stroke="#1592D6" strokeWidth="1.2"/>
-    <rect x="11.5" y="20.5" width="5" height="5" rx="1" fill="#FFE48F" stroke="#1592D6" strokeWidth="1.1"/>
+    {/* #756: 집 → 부화 새끼(🐣) 둥지 테마. 알이 있던 lv3 다음 단계로 새끼가 깨어남. */}
+    <defs>
+      <linearGradient id="rgNest4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#F7CD82"/><stop offset="1" stopColor="#D9942B"/></linearGradient>
+      <linearGradient id="rgChick4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFE27A"/><stop offset="1" stopColor="#FBC02D"/></linearGradient>
+    </defs>
+    <ellipse cx="20" cy="17.5" rx="7" ry="7.5" fill="url(#rgChick4)" stroke="#E0A21A" strokeWidth="1.2"/>
+    <path d="M13.4 18c-1.6.2-2.6 1.1-2.9 2.6 1.5-.1 2.6-.9 2.9-2.6z" fill="#FBD24E"/>
+    <path d="M26.6 18c1.6.2 2.6 1.1 2.9 2.6-1.5-.1-2.6-.9-2.9-2.6z" fill="#FBD24E"/>
+    <circle cx="17.7" cy="16.2" r="1" fill="#3A2A12"/>
+    <circle cx="22.3" cy="16.2" r="1" fill="#3A2A12"/>
+    <path d="M18.8 18.2h2.4l-1.2 1.8z" fill="#FF9F1C" stroke="#E07B00" strokeWidth="0.6" strokeLinejoin="round"/>
+    <path d="M14.5 12.9l1.8 1.4 1.9-1.2 1.8 1.2 1.9-1.2 1.6 1.3" fill="none" stroke="#F1E7CC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M5 21.5c1.6 9 7.7 13 15 13s13.4-4 15-13c-3 3-8.6 4.6-15 4.6S8 24.5 5 21.5z" fill="url(#rgNest4)" stroke="#B0701E" strokeWidth="1.6"/>
+    <g stroke="#9A6418" strokeWidth="1.3" strokeLinecap="round" opacity="0.55" fill="none"><path d="M9 25.5l6-1.6M17 27.5l8-2M27 25.5l5-1.6"/></g>
   </g>,
   5: <g>
     <defs><linearGradient id="rgCastle5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#EAD7FC"/><stop offset="1" stopColor="#BE8DEC"/></linearGradient></defs>
