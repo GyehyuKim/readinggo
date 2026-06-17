@@ -1221,6 +1221,9 @@ function AdminDashboardModal({ onClose }) {
   const [inqs, setInqs] = useState(undefined); // 문의 목록
   const [popular, setPopular] = useState(null); // 인기책 TOP (#190)
   const [active, setActive] = useState(null);   // 활성 사용자 7/30일 (#190)
+  const [completion, setCompletion] = useState(null); // 완독률 (#744 ③)
+  const [cohort, setCohort] = useState(null);         // 가입 코호트 리텐션 (#744 ③)
+  const [resonance, setResonance] = useState(null);   // 콘텐츠 공명 (#744 ③)
   useEffect(() => {
     const DS = window.SupabaseDataStore;
     if (!DS || !DS.admin || !DS.admin.stats) { setStats({}); setInqs([]); return; }
@@ -1229,6 +1232,10 @@ function AdminDashboardModal({ onClose }) {
     else setInqs([]);
     if (DS.admin.popularBooks) Promise.resolve(DS.admin.popularBooks(5)).then((r) => setPopular(r || [])).catch(() => setPopular([]));
     if (DS.admin.activeUsers) Promise.resolve(DS.admin.activeUsers()).then(setActive).catch(() => setActive(null));
+    // 고도화 (#744 ③) — 완독률·코호트 리텐션·콘텐츠 공명 (29_admin_insights_v2.sql)
+    if (DS.admin.completionStats) Promise.resolve(DS.admin.completionStats()).then(setCompletion).catch(() => setCompletion(null));
+    if (DS.admin.cohortRetention) Promise.resolve(DS.admin.cohortRetention(8)).then((r) => setCohort(r || [])).catch(() => setCohort([]));
+    if (DS.admin.contentResonance) Promise.resolve(DS.admin.contentResonance(10)).then((r) => setResonance(r || [])).catch(() => setResonance([]));
   }, []);
   // 문의 상태 순환 (open→answered→closed→open)
   const cycleStatus = (q) => {
@@ -1248,12 +1255,13 @@ function AdminDashboardModal({ onClose }) {
   ];
   const trend = (stats && stats.trend) || [];
   return (
-    <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="sheet" role="dialog" aria-label="운영 대시보드">
-        <div className="sheet-grip" />
-        <button onClick={onClose} aria-label="닫기" style={{position:'absolute',top:10,right:14,background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'50%',width:30,height:30,fontSize:16,cursor:'pointer',color:'var(--ink-2)',lineHeight:1,zIndex:2}}>✕</button>
-        <div style={{padding:'16px 20px 28px'}}>
-          <div style={{fontSize:18,fontWeight:900,marginBottom:20,textAlign:'center'}}>⚙️ 운영 대시보드</div>
+    <div style={{position:'fixed',inset:0,background:'var(--paper)',overflowY:'auto',zIndex:60}} role="dialog" aria-label="운영 대시보드">
+      <div style={{maxWidth:600,margin:'0 auto',minHeight:'100%'}}>
+        <div style={{padding:'16px 20px 48px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
+            <div style={{fontSize:20,fontWeight:900,color:'var(--ink)'}}>운영 대시보드</div>
+            <button onClick={onClose} aria-label="닫기" style={{background:'var(--card)',border:'1.5px solid var(--line)',borderRadius:10,padding:'8px 14px',fontSize:13,fontWeight:800,color:'var(--ink-2)',cursor:'pointer'}}>닫기</button>
+          </div>
           {!stats ? (
             <div style={{textAlign:'center',color:'var(--ink-3)',padding:20}}>불러오는 중…</div>
           ) : (
@@ -1348,6 +1356,82 @@ function AdminDashboardModal({ onClose }) {
               ))}
             </div>
           )}
+          {/* 완독률 (#744 ③) */}
+          {completion && (
+            <div style={{ marginTop: 22, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 16px' }}>
+              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 8 }}>완독률</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <div style={{ fontSize: 30, fontWeight: 900, color: 'var(--brand)' }}>{completion.rate != null ? completion.rate + '%' : '—'}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>완독 {completion.completed} / 등록 {completion.total}</div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>읽는 중 {completion.reading} · 중단 {completion.aborted}</div>
+            </div>
+          )}
+          {/* 가입 코호트 리텐션 (#744 ③) — 가입 주차 × N주 후 체크인 잔존 % */}
+          {cohort && cohort.length > 0 && (() => {
+            const byCohort = {};
+            let maxW = 0;
+            cohort.forEach((r) => { const c = (byCohort[r.cohort] = byCohort[r.cohort] || { size: r.size, weeks: {} }); c.weeks[r.week] = r.retained; if (r.week > maxW) maxW = r.week; });
+            const cols = Array.from({ length: Math.min(maxW, 7) + 1 }, (_, i) => i);
+            const cwList = Object.keys(byCohort).sort();
+            return (
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>가입 코호트 리텐션</div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', fontSize: 11, width: '100%' }}>
+                    <thead><tr>
+                      <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--ink-3)', fontWeight: 700 }}>가입주차</th>
+                      <th style={{ padding: '4px 6px', color: 'var(--ink-3)', fontWeight: 700 }}>n</th>
+                      {cols.map((w) => <th key={w} style={{ padding: '4px 6px', color: 'var(--ink-3)', fontWeight: 700 }}>W{w}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      {cwList.map((cw) => {
+                        const row = byCohort[cw];
+                        return (
+                          <tr key={cw}>
+                            <td style={{ padding: '4px 6px', fontWeight: 700, whiteSpace: 'nowrap' }}>{String(cw).slice(5)}</td>
+                            <td style={{ padding: '4px 6px', textAlign: 'center', color: 'var(--ink-3)' }}>{row.size}</td>
+                            {cols.map((w) => {
+                              const ret = row.weeks[w];
+                              const pct = (ret != null && row.size) ? Math.round(100 * ret / row.size) : null;
+                              const bg = pct == null ? 'transparent' : 'rgba(63,209,127,' + (0.1 + 0.0075 * pct).toFixed(3) + ')';
+                              return <td key={w} style={{ padding: '4px 6px', textAlign: 'center', background: bg, fontWeight: 700, color: pct == null ? 'var(--ink-4)' : 'var(--ink)' }}>{pct == null ? '·' : pct + '%'}</td>;
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+          {/* 콘텐츠 공명 — 짹 많은 한 문장 (#744 ③) */}
+          {resonance && resonance.length > 0 && (
+            <div style={{ marginTop: 22 }}>
+              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>콘텐츠 공명 — 짹 많은 한 문장</div>
+              {resonance.map((s, i) => (
+                <div key={s.id || i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 4px', borderBottom: i < resonance.length - 1 ? '1px solid var(--line-2)' : 'none' }}>
+                  <div style={{ width: 20, fontWeight: 900, color: 'var(--ink-3)', textAlign: 'center', flexShrink: 0 }}>{i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5 }}>"{s.text}"</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 2 }}>{s.bookTitle}</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--brand-3)', fontWeight: 800, flexShrink: 0 }}>🐦 {s.claps}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* 행동 분석 — PostHog 링크아웃 (#744 ③) */}
+          <div style={{ marginTop: 22 }}>
+            <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 4 }}>행동 분석 (PostHog)</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 10 }}>퍼널·리텐션·세션 리플레이는 PostHog 콘솔에서</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[['독서 루프 퍼널', 'https://us.posthog.com/project/458802/insights'], ['세션 리플레이', 'https://us.posthog.com/project/458802/replay'], ['프로젝트', 'https://us.posthog.com/project/458802']].map(([label, href]) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand-3)', background: 'var(--brand-tint)', border: '1px solid var(--brand-soft)', borderRadius: 999, padding: '6px 12px', textDecoration: 'none' }}>{label} ↗</a>
+              ))}
+            </div>
+          </div>
           {/* 문의 목록 */}
           <div style={{ marginTop: 22 }}>
             <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>✉️ 문의 {inqs && inqs.length ? '(' + inqs.length + ')' : ''}</div>
