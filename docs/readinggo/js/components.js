@@ -436,6 +436,59 @@ function rgIcon(name, size) {
 window.RG_ICONS = RG_ICONS;
 window.rgIcon = rgIcon;
 
+/* ── NEST_ART (#716): 둥지 진화 5단계 커스텀 일러스트(이모지 🪵🪹🏠🏡🏰 대체).
+   단계별 컬러·그래디언트로 게임 시그니처 유지. viewBox 0 0 40 40. nestArt(lv,size)로 렌더. ── */
+const NEST_ART = {
+  1: <g>
+    <defs><linearGradient id="rgNest1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#C8A06F"/><stop offset="1" stopColor="#8E6A45"/></linearGradient></defs>
+    <path d="M6 21c2.5 7 7 10.5 14 10.5S31.5 28 34 21c-3.2 3.2-8.6 4.8-14 4.8S9.2 24.2 6 21z" fill="none" stroke="url(#rgNest1)" strokeWidth="3" strokeLinecap="round"/>
+    <path d="M9.5 18.5c2.2 5 6 7.5 10.5 7.5s8.3-2.5 10.5-7.5" fill="none" stroke="#B0875A" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+    <line x1="10" y1="20.5" x2="5" y2="16.5" stroke="url(#rgNest1)" strokeWidth="2.4" strokeLinecap="round"/>
+    <line x1="30" y1="20.5" x2="35" y2="16.5" stroke="url(#rgNest1)" strokeWidth="2.4" strokeLinecap="round"/>
+    <line x1="20" y1="22" x2="20" y2="13.5" stroke="#6FA32E" strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M20 15.5c.3-3 2.5-4.9 5.4-4.7-.5 3-2.7 4.8-5.4 4.7z" fill="#8BC34A"/>
+    <path d="M20 17.5c-.3-2.4-2.1-3.9-4.4-3.8.4 2.4 2.1 3.8 4.4 3.8z" fill="#A5D66B"/>
+  </g>,
+  2: <g>
+    <defs><linearGradient id="rgNest2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#F7CD82"/><stop offset="1" stopColor="#D9942B"/></linearGradient></defs>
+    <g transform="rotate(20 21 14)"><path d="M21 5c3.4 2.6 4 9 1 15-3-6-3.4-12.4-1-15z" fill="#FFFBF2" stroke="#B0701E" strokeWidth="1.3"/><line x1="21" y1="6.5" x2="21.5" y2="19.5" stroke="#B0701E" strokeWidth="1.1"/><path d="M21 9.5l-3-1.4M21.2 12l3.2-1.4M21 14.5l-3.4-1.2M21.3 17l3-1.2" stroke="#CF9B49" strokeWidth="1"/></g>
+    <path d="M5 21c1.6 9 7.7 13 15 13s13.4-4 15-13c-3 3-8.6 4.6-15 4.6S8 24 5 21z" fill="url(#rgNest2)" stroke="#B0701E" strokeWidth="1.6"/>
+    <g stroke="#9A6418" strokeWidth="1.3" strokeLinecap="round" opacity="0.55" fill="none"><path d="M9 25l6-1.6M17 27l8-2M27 25l5-1.6"/></g>
+  </g>,
+  3: <g>
+    <defs><linearGradient id="rgNest3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#AEE571"/><stop offset="1" stopColor="#46A302"/></linearGradient><linearGradient id="rgEgg3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffffff"/><stop offset="1" stopColor="#E9F6DA"/></linearGradient></defs>
+    <ellipse cx="15.5" cy="18.5" rx="3.6" ry="4.5" fill="url(#rgEgg3)" stroke="#46A302" strokeWidth="1.1"/>
+    <ellipse cx="24.5" cy="18.5" rx="3.6" ry="4.5" fill="url(#rgEgg3)" stroke="#46A302" strokeWidth="1.1"/>
+    <ellipse cx="20" cy="16" rx="3.6" ry="4.5" fill="url(#rgEgg3)" stroke="#46A302" strokeWidth="1.1"/>
+    <path d="M5 20.5c1.6 9 7.7 13 15 13s13.4-4 15-13c-3 3-8.6 4.6-15 4.6S8 23.5 5 20.5z" fill="url(#rgNest3)" stroke="#3C8A02" strokeWidth="1.6"/>
+  </g>,
+  4: <g>
+    <defs><linearGradient id="rgHome4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#C6E9FC"/><stop offset="1" stopColor="#8CCDF5"/></linearGradient></defs>
+    <path d="M27 8c2.2-1 2-3.2 0-4.2" stroke="#C2DCEC" strokeWidth="1.7" fill="none" strokeLinecap="round"/>
+    <rect x="24" y="9" width="3.4" height="6" fill="#6FB0DA"/>
+    <path d="M20 6L33.5 17.5H6.5z" fill="#5FA9DC" stroke="#1592D6" strokeWidth="1.5" strokeLinejoin="round"/>
+    <rect x="9" y="17.5" width="22" height="15.5" rx="1.6" fill="url(#rgHome4)" stroke="#1592D6" strokeWidth="1.5"/>
+    <rect x="17" y="24.5" width="6" height="8.5" rx="1" fill="#5FA9DC" stroke="#1592D6" strokeWidth="1.2"/>
+    <rect x="11.5" y="20.5" width="5" height="5" rx="1" fill="#FFE48F" stroke="#1592D6" strokeWidth="1.1"/>
+  </g>,
+  5: <g>
+    <defs><linearGradient id="rgCastle5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#EAD7FC"/><stop offset="1" stopColor="#BE8DEC"/></linearGradient></defs>
+    <line x1="20" y1="9" x2="20" y2="2" stroke="#A95EE6" strokeWidth="1.7" strokeLinecap="round"/>
+    <path d="M20 2.5l6.5 2L20 6.5z" fill="#FF7BAC"/>
+    <path d="M3 37V14h2.4v-3h2.6v3h2.6V9.5h3V14h2V8h3.6v6h2V9.5h3v4.5h2.6v-3h2.6v3H37v23z" fill="url(#rgCastle5)" stroke="#9A55D6" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M15 37v-7a5 5 0 0 1 10 0v7z" fill="#A968E0" stroke="#9A55D6" strokeWidth="1.2"/>
+    <rect x="6.5" y="20" width="2.8" height="4.6" rx="1.2" fill="#7B45B8"/>
+    <rect x="30.7" y="20" width="2.8" height="4.6" rx="1.2" fill="#7B45B8"/>
+    <circle cx="20" cy="16.5" r="1.8" fill="#FFD24D"/>
+  </g>,
+};
+function nestArt(lv, size) {
+  const s = size || 28;
+  return <svg width={s} height={s} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ display: 'block', flexShrink: 0 }}>{NEST_ART[lv] || NEST_ART[1]}</svg>;
+}
+window.NEST_ART = NEST_ART;
+window.nestArt = nestArt;
+
 /* ── SettingsModal: 설정 (#567 #568 재배치)
    그룹: ① 계정 ② 개인정보·데이터 ③ 읽기 환경 ④ 지원 ⑤ 정보
    닉네임 편집 → 프로필 헤더 인라인 (#568), 내보내기 → 서재 (#568),
