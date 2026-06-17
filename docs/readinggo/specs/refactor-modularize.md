@@ -53,7 +53,34 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 - 공유 컨텍스트·유틸(`SpoilerContext`·`isSentenceBlinded`·`showToast`·`rgTrack`·`decodeEntities`)은 `components.js`에 **core 호스트로 잔류**(다수 파일이 window alias로 소비).
 - **판단**: 2차는 줄 수가 아니라 "충돌이 실제로 발생할 때" 착수(YAGNI). 큰 컴포넌트(UserProfileModal)만 선제 분리 가치.
 
-- `nest.js`·`library.js`는 1차 완료 후 별도 spec 갱신으로 진행(더 큰 hot monolith, 2차와 독립).
+- `nest.js`·`library.js`는 1차 완료 후 별도 spec 갱신으로 진행 → **§3.2**.
+
+## 3.2 3차 — nest.js·library.js 분할 맵 (#761, 2026-06-17)
+
+1차(components.js)와 독립한 **더 큰 hot monolith** 두 개. 같은 strangler 원칙(§2): 한 번에 1개, 순수 이동, `window.X` shim, leaf→hot, tiny PR 직렬 머지. 각 파일 내부는 같은 원본을 삭제하니 **파일별로 직렬**, 두 파일은 서로 독립이라 병렬 가능.
+
+### nest.js (1406줄) → core(NestView) 잔류 + 추출
+
+| 순서 | 새 파일 | 옮길 것 | 의존(window alias) | 비고 |
+|---|---|---|---|---|
+| 1 | `companion.js` | `CompanionModal`·`parseNoteToExchanges`·`pickCompanionQ`·`archiveCompanion` | datastore·LLM 프록시 | AI 대화 — 응집·자립, 가장 독립적(~250줄) |
+| 2 | `ocr-crop-overlay.js` | `OcrCropOverlay` | — | OCR 크롭, 자립(~82줄) |
+| 3 | `checkin-modal.js` | `CheckinModal` | — | 체크인(짹) 모달(~94줄) |
+| 4 | `ceremony.js` | `Ceremony`·`stageMicrocopy` | Confetti·icons | 완독 세리머니(~200줄) |
+| 5 | `nest-theatre.js` | `NestTheatre`·`nestVisualState` | NEST_ART/nestArt(icons) | 둥지 비주얼(~140줄) |
+| 잔류 | `nest.js` | `NestView`(core 홈) | 위 추출분을 window로 소비 | hot view, 최후 잔류 |
+
+### library.js (1163줄) → core(LibraryView) 잔류 + 추출
+
+| 순서 | 새 파일 | 옮길 것 | 의존(window alias) | 비고 |
+|---|---|---|---|---|
+| 1 | `book-detail-modal.js` | `BookDetailModal` | `decodeEntities`·`SentenceActions`·`RG_SECTION_CARD` 등 | **최대 컴포넌트(~587줄)** — 단일 추출 고가치 |
+| 2 | `follow-list-modal.js` | `FollowListModal` | datastore | 팔로우 목록, 자립(~53줄) |
+| 잔류 | `library.js` | `LibraryView`(core 서재) | — | hot view, 최후 잔류 |
+
+- **`decodeEntities` 중복 해소**: `library.js` 자체 복사본(§37)은 `BookDetailModal`이 주 소비자. 추출 시 `book-detail-modal.js`가 `window.decodeEntities`(components.js)를 alias → library.js 잔여(LibraryView)가 미사용이면 로컬 복사본 제거(중복 정의 금지). LibraryView가 여전히 쓰면 잔류.
+- **로드 순서**: 추출 파일은 의존(icons·components·sentence-card)이 먼저 로드된 뒤, `nest.js`/`library.js`(core) **이전**에 로드(core가 window로 소비). 1차와 동일 패턴.
+- **착수 판단**: nest/library는 실제 편집 빈도·충돌이 잦은 hot 파일이라 components.js 2차(§3.1, 보류)와 달리 **선제 분할 가치 있음**. 단 큰 컴포넌트(CompanionModal·BookDetailModal) 우선, 작은 잔류 후보는 충돌 시.
 
 ## 4. prod-안전 배포 플로우 (필수)
 
