@@ -39,6 +39,17 @@
   function _dayDiff(from, to) {
     return Math.round((new Date(to + 'T00:00:00') - new Date(from + 'T00:00:00')) / 86400000);
   }
+  // 추천 점수 (#787) — claps 임베드 count 추출 + 신선도 감쇠 + 좋아요 가중.
+  // 데이터가 적으면 clap=0 → log항=0 → freshness(최신순)로 수렴 → 저트래픽서도 안전.
+  function _clapCount(r) { return (r && r.clap_count && r.clap_count[0] && r.clap_count[0].count) || 0; }
+  function _recScore(r) {
+    const W = (window.RG_CONFIG && window.RG_CONFIG.FEED_RECOMMEND) || {};
+    const halfLife = W.halfLifeDays || 10, clapW = (W.clapWeight == null ? 1.2 : W.clapWeight);
+    const t = typeof r.created_at === 'number' ? r.created_at : (Date.parse(r.created_at) || 0);
+    const ageDays = Math.max(0, (Date.now() - t) / 86400000);
+    const freshness = Math.pow(0.5, ageDays / halfLife);   // 1(방금)→0.5(반감기)→…
+    return freshness + Math.log1p(_clapCount(r)) * clapW;
+  }
   // 책 정보 수정(#410/#431) — user_books.publisher_override/total_pages_override를
   // ub.book.publisher/total_pages에 병합. books(공유 카탈로그)는 그대로 유지.
   function _applyBookOverrides(ub) {
@@ -392,20 +403,48 @@
         return rows;
       },
       // 무작위 회상 — 내 과거 한 문장 1개 (profile §5.8.7)
-      // 추천 — 내 서재의 책을 읽는 다른 사람들의 최근(1주) 한 문장 (유사도≈공유 책). 비면 최근 피드 폴백. (#8)
+      // 추천 (#787, v9) — 좋아요·신선도 점수 랭킹 + 계층 충전(backfill). 항상 N개를 채워 빈 화면을 막는다.
+      //   Tier1 같은 책 읽는 타인(점수 랭킹) → Tier2 인기 문장(좋아요순) → Tier3 최근 피드.
+      //   7일 하드컷 폐기(신선도 감쇠로 대체) + NPC/시드 문장 풀 포함(sentences 전체 조회). feed.md §추천 알고리즘.
       async feedRecommended({ limit } = {}) {
+        const N = limit || 50;
+        const W = (window.RG_CONFIG && window.RG_CONFIG.FEED_RECOMMEND) || {};
+        const pool = W.poolSize || 120;
         const me = await uid();
+        const seen = new Set(), out = [];
+        // Tier1: 같은 책(!inner) + 좋아요 임베드. Tier2: 전체 공개(outer join) + 좋아요 임베드.
+        const SEL_CORE = '*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author)), clap_count:claps(count)';
+        const SEL_POP = '*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author)), clap_count:claps(count)';
+        const take = (rows) => {
+          for (const r of (rows || [])) {
+            if (!r || seen.has(r.id)) continue;
+            seen.add(r.id); out.push(r);
+            if (out.length >= N) break;
+          }
+        };
+        // Tier 1 — 추천 코어: 내 서재 책을 읽는 타인 문장, 좋아요+신선도 점수 랭킹
         const mine = unwrap(await sb().from('user_books').select('book_id').eq('user_id', me));
         const bookIds = [...new Set((mine || []).map(r => r.book_id).filter(Boolean))];
-        if (!bookIds.length) return await A.sentences.feed({ limit });
-        const weekAgo = new Date(Date.now() - 7 * 86400 * 1000).toISOString();
-        let q = sb().from('sentences')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author))')
-          .in('user_book.book_id', bookIds).gte('created_at', weekAgo)
-          .order('created_at', { ascending: false }).limit(limit || 50);
-        if (me) q = q.neq('user_id', me);
-        const rows = unwrap(await q);
-        return (rows && rows.length) ? rows : await A.sentences.feed({ limit });
+        if (bookIds.length) {
+          let q = sb().from('sentences').select(SEL_CORE)
+            .in('user_book.book_id', bookIds)
+            .order('created_at', { ascending: false }).limit(pool);
+          if (me) q = q.neq('user_id', me);
+          const rows = (unwrap(await q) || []).slice().sort((a, b) => _recScore(b) - _recScore(a));
+          take(rows);
+        }
+        // Tier 2 — 부족분 충전: 전체 공개 문장 중 좋아요 많은 순(동률 최신). RLS가 공개범위 필터.
+        if (out.length < N) {
+          let q = sb().from('sentences').select(SEL_POP)
+            .order('created_at', { ascending: false }).limit(pool);
+          if (me) q = q.neq('user_id', me);
+          const rows = (unwrap(await q) || []).slice()
+            .sort((a, b) => (_clapCount(b) - _clapCount(a)) || (String(b.created_at) > String(a.created_at) ? 1 : -1));
+          take(rows);
+        }
+        // Tier 3 — 그래도 부족: 최근 전체 피드(내 문장 포함 가능)
+        if (out.length < N) take(await A.sentences.feed({ limit: N }));
+        return out.slice(0, N);
       },
       async random() {
         const mine = await A.sentences.listMine();

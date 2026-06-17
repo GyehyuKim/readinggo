@@ -410,6 +410,12 @@ const DataStore = {
         _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
       );
     },
+    // 추천 (#787) — Phase 0 은 타 사용자 없음 → feed()와 동형(내 문장 최신순). 표면 일치(§7.2).
+    feedRecommended() {
+      return localStorageAdapter.mutate(s =>
+        _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+      );
+    },
     // 사후 감상 추가·편집 (§5.8.4) — Supabase 어댑터와 표면 일치(§7.2)
     setNote(sentenceId, my_note) {
       return localStorageAdapter.mutate(s => {
