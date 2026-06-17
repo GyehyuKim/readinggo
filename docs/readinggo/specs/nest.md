@@ -55,19 +55,19 @@ castleCount = floor(totalXp / 1600)
 - Lv5는 **1,600 XP 달성 시 도달하는 주기 완료 단계**다. 성 획득 후 현재 주기 XP는 `0`이 되고 둥지는 Lv1부터 다시 시작한다.
 - 책을 바꾸거나 완독해도 `totalXp`와 현재 주기는 유지된다. 완독 자체는 성 획득 트리거가 아니다.
 
-**진척 표시 = "현재 단계 구간" 기준 (#682).** 진척 바·수치는 전체 주기(`cycleXp / 1600`)가 아니라 **현재 단계 구간**으로 계산한다. 현재 단계 시작 XP를 `0`으로 두고, 다음 단계 임계값까지의 폭을 분모로 한다.
+**진척 표시 = "절대 주기 XP / 다음 단계 임계값" 기준 (#743 — #682 갱신).** 진척 바·수치는 전체 주기(`cycleXp / 1600`)도, 단계-상대(`intoXp / spanXp`)도 아니라 **현재 주기 누적 XP를 다음 단계 임계값에 견준 절대값**으로 계산한다. 숫자와 바가 같은 기준이라 시각적으로 일치한다.
 
 ```text
 stage   = getNestStageByXp(totalXp)         # 현재 단계
 next    = 다음 단계 (없으면 최고 단계)
-intoXp  = cycleXp - stage.minXp             # 현재 단계 진입 XP (0-based)
-spanXp  = next.minXp - stage.minXp          # 분모 = 현재 단계 폭
-pct     = intoXp / spanXp * 100
+표시 숫자 = cycleXp / next.minXp            # 절대 누적 XP / 다음 단계 진입 임계값
+bar pct  = cycleXp / next.minXp * 100       # 숫자와 동일 기준
 ```
 
-- 예) 빈 둥지(100–399) 구간에서 `cycleXp=342` → `242 / 300 XP` (81%). bar 는 다음 단계(따뜻한 둥지) 임계값에서 정확히 100% 도달.
-- **최고 단계 예외**: 다음 임계값이 없으면(`next=null`) 분모 없이 **"최고 단계"**로 표기(`pct=100`). 실서비스에서는 1,600 경계가 곧 Lv1로 리셋되므로 방어적 처리.
-- 공유 헬퍼 `nestStageProgress(totalXp)` → `{ stage, next, intoXp, spanXp, pct, isMax }` (data.js). NestTheatre·체크인 세리머니 진척 바가 공통 사용.
+- 예) 빈 둥지(100–399) 구간에서 `cycleXp=342` → `342 / 400 XP` (86%). 따뜻한 둥지(`cycleXp=471`) → `471 / 900 XP` (52%).
+- **왜 #682(단계-상대)를 갱신했나**: 단계-상대는 `471`인데 화면에 `71 / 500`으로 나와 상단 XP(471)와 어긋났다(#743). 절대 기준은 상단 XP와 일치하고 숫자·바가 한 기준이라 직관적이다.
+- **최고 단계 예외**: 다음 임계값이 없으면(`next=null`, `isMax`) **"최고 단계"**로 표기(`pct=100`). 실서비스에서는 1,600 경계가 곧 Lv1로 리셋되므로 방어적 처리.
+- 공유 헬퍼 `nestStageProgress(totalXp)` → `{ stage, next, intoXp, spanXp, pct, isMax }` (data.js)는 그대로 두되, **표시 기준은 `cycleXp / next.minXp`** 다(nest.js `_absPct`/`_cycleXp`가 국소 계산). `intoXp/spanXp/pct`는 잔여 XP 문구 등 보조에만 쓴다. NestTheatre·체크인 세리머니 진척 바가 공통으로 절대 기준 사용.
 
 진화 시 마이크로카피:
 

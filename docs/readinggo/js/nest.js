@@ -19,6 +19,20 @@ function _stageProg(xp) {
   } catch (e) {}
   return { stage: { lv: 1, minXp: 0 }, next: null, intoXp: 0, spanXp: 0, pct: 0, isMax: false };
 }
+// 현재 주기 누적 XP(0~1599) 안전 래퍼 — nestCycleXp 미준비/예외 시 폴백.
+function _cycleXp(xp) {
+  try {
+    const fn = (typeof nestCycleXp === 'function') ? nestCycleXp : (window.nestCycleXp || null);
+    if (fn) return fn(xp);
+  } catch (e) {}
+  return Math.max(0, (xp || 0)) % 1600;
+}
+// 절대 기준 진행% (#743) — cycleXp / next.minXp. 표시 숫자(cycleXp / next.minXp)와
+// 진행바를 같은 기준으로 일치시킨다(단계-상대 71/500이 아니라 절대 471/900).
+function _absPct(xp, sp) {
+  if (!sp || sp.isMax || !sp.next || !sp.next.minXp) return 100;
+  return Math.max(0, Math.min(100, Math.round(_cycleXp(xp) / sp.next.minXp * 100)));
+}
 
 // 한 문장 종류 휴리스틱(estimateSentenceKind, #420) 제거 — '내 생각'(thought) 폐기 (#596). 호출부 없던 죽은 코드.
 
@@ -145,10 +159,12 @@ function Ceremony({ data, onClose, onComplete }) {
   const nowStage  = evoUp ? (castleGained ? NEST_STAGES[4] : NEST_STAGES[newLv  - 1]) : null;
 
   // 진척 바는 "현재 단계 구간" 기준 (#685 — #682 헬퍼 재사용). 현재 단계 시작 XP=0, 다음 단계 임계값=분모.
-  const startSP = _stageProg(prevXp != null ? prevXp : newXp);
-  const endSP   = _stageProg(newXp != null ? newXp : prevXp);
-  const startPct = startSP.pct;
-  const endPct   = endSP.pct;
+  const startXp = prevXp != null ? prevXp : newXp;
+  const endXp   = newXp != null ? newXp : prevXp;
+  const startSP = _stageProg(startXp);
+  const endSP   = _stageProg(endXp);
+  const startPct = _absPct(startXp, startSP); // 절대 기준(cycleXp/next.minXp) — NestTheatre 바와 일치 #743
+  const endPct   = _absPct(endXp, endSP);
   const curStage = endSP.stage;
 
   _useEffect(() => {
@@ -348,7 +364,8 @@ function NestTheatre({ xp, health = 100 }) {
   const sp = _stageProg(xp);
   const stage = sp.stage;                  // 둥지 단계 = 현재 주기 XP (#520)
   const next = sp.next;
-  const pct = sp.pct;                      // 현재 단계 구간 진행 % (intoXp / spanXp)
+  const cycleXp = _cycleXp(xp);            // 현재 주기 누적 XP (절대, 0~1599) #743
+  const pct = _absPct(xp, sp);             // 진행% = cycleXp / next.minXp (숫자와 동일 절대 기준) #743
   // 둥지 일러스트는 진척률(stage.lv)로 그린다. health 는 §6.2 시각 상태(흔들림/균열)용.
   const hp = Math.max(0, Math.min(100, Math.round(health)));
   const hstate = nestVisualState(hp);
@@ -406,7 +423,7 @@ function NestTheatre({ xp, health = 100 }) {
           <div className="nest-health-num">
             {sp.isMax
               ? <b>최고 단계</b>
-              : <span><b>{sp.intoXp.toLocaleString()}</b> / {sp.spanXp.toLocaleString()} XP</span>}
+              : <span><b>{cycleXp.toLocaleString()}</b> / {next.minXp.toLocaleString()} XP</span>}
           </div>
         </div>
         <div className="nest-health-bar">
