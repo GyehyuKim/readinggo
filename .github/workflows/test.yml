@@ -64,8 +64,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # 최소 룰셋(noDebugger·중복키)으로 시작 — 점진 강화 (#258).
+      # --yes: npx 가 미캐시 패키지 설치 확인 프롬프트에서 hang 하는 것 방지(비-TTY CI 멈춤, #797 QA).
       - name: Biome lint
-        run: npx @biomejs/biome@2 lint
+        run: npx --yes @biomejs/biome@2 lint
 
   issue-link:
     name: issue-link (PR↔이슈 연결 강제)

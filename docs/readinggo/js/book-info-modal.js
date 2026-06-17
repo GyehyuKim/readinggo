@@ -64,9 +64,9 @@ function BookInfoModal({ bookId, onClose }) {
   // 마중물 시드 (#774) — 인기 한 문장이 0건(빈 책)일 때만 '남이 읽은 한 문장'을 /api/seed 로 가져와 채운다.
   // 진짜 공개 문장이 있으면(popular>0) 시드는 안 부른다 → 자연 소멸(integrated-shelf.md §5.6).
   useEffect(() => {
-    if (!bk || !bk.title || !popularResolved || popular.length > 0) { setSeeds([]); return; }
+    if (!bk || !bk.title || !popularResolved || popular.length >= 10) { setSeeds([]); return; }
     let alive = true;
-    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: bk.title, author: bk.author || '', isbn: bk.isbn13 || bk.isbn || '' }) })
+    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: bk.title, author: bk.author || '', isbn: bk.isbn13 || bk.isbn || '', have: popular.length }) })
       .then(r => r.json())
       .then(d => { if (alive) setSeeds((d && Array.isArray(d.seeds)) ? d.seeds : []); })
       .catch(() => { if (alive) setSeeds([]); });
@@ -161,7 +161,7 @@ function BookInfoModal({ bookId, onClose }) {
             )}
             {/* 마중물 시드 (#774) — 공개 문장이 없을 때만 '남이 읽은 한 문장'(네이버 블로그 서평 정제 + 출처).
                 🌱 라벨·출처 링크로 진짜 유저 문장과 구분(저작권·진정성, integrated-shelf.md §5). 읽기 전용. */}
-            {popular.length === 0 && seeds.length > 0 && (
+            {popular.length < 10 && seeds.length > 0 && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <SectionLabel icon="sentence">🌱 함께 읽은 이웃</SectionLabel>
                 <div style={{ fontSize: 10.5, color: 'var(--ink-3)', margin: '0 0 8px', lineHeight: 1.4 }}>웹 서평에서 모은 다른 독자의 한 문장이에요 · 출처를 눌러 원글로</div>

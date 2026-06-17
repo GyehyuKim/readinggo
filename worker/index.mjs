@@ -454,9 +454,6 @@ function parseSeedJson(s) {
   return out;
 }
 
-// 책별 시드 캐시 (best-effort in-memory) — 재크롤·재정제 억제. 콜드스타트 시 비워짐.
-const SEED_CACHE = new Map();
-const SEED_CACHE_MAX = 300;
 
 // 네이버 블로그 검색 1회 — items[] 반환(실패·비ok → []).
 async function naverBlogSearch(query, env) {
@@ -470,27 +467,49 @@ async function naverBlogSearch(query, env) {
   } catch (e) { return []; }
 }
 
-async function seedProxy(request, env) {
-  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-  let body;
-  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
-  const title = String((body && body.title) || '').trim();
-  const author = String((body && body.author) || '').trim();
-  if (!title) return json({ seeds: [] }, 200);
-  const ck = (title + '|' + author).replace(/\s+/g, ' ').toLowerCase();
-  if (SEED_CACHE.has(ck)) return json({ seeds: SEED_CACHE.get(ck), cached: true }, 200, 3600);
-  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return json({ seeds: [], demo: true }, 200);
-  // 1) 네이버 블로그 검색 — '제목 저자 서평'. 0건이면 저자 빼고 재시도(동명이작 구분 ↔ 과협소 균형).
+const SEED_TARGET = 10;   // 책당 목표 문장 수(실 유저 + 시드)
+
+// 책 키 — isbn13 우선, 없으면 정규화 제목(소문자·공백 접기). Phase 0/1·데모 공통.
+function seedBookKey(title, isbn) {
+  const i = String(isbn || '').replace(/[^0-9Xx]/g, '');
+  if (i.length >= 10) return i;
+  return String(title || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+// seed_sentences read — 책 키로 저장된 시드(최대 SEED_TARGET).
+async function seedRead(env, bookKey) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  try {
+    const u = `${env.SUPABASE_URL}/rest/v1/seed_sentences?book_key=eq.${encodeURIComponent(bookKey)}&select=text,source_name,source_url&limit=${SEED_TARGET}`;
+    const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    return (rows || []).map((x) => ({ text: x.text, sourceName: x.source_name || '블로그', sourceUrl: x.source_url || '' }));
+  } catch (e) { return []; }
+}
+// seed_sentences write — 신규 시드 insert(중복 url은 유니크 인덱스가 무시: Prefer ignore-duplicates).
+async function seedWrite(env, bookKey, seeds) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !seeds.length) return;
+  try {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/seed_sentences`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates',
+      },
+      body: JSON.stringify(seeds.map((s) => ({ book_key: bookKey, text: s.text, source_name: s.sourceName || null, source_url: s.sourceUrl || null }))),
+    });
+  } catch (e) { /* best-effort */ }
+}
+// 네이버+LLM 으로 신규 시드 추출(최대 want개). 영속 저장은 호출부에서.
+async function seedFetchFresh(title, author, want, env) {
+  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return [];
   let items = await naverBlogSearch(title + (author ? ' ' + author : '') + ' 서평', env);
   if (!items.length && author) items = await naverBlogSearch(title + ' 서평', env);
   const cands = items.map((it) => ({ snippet: stripHtml(it.description), url: it.link, blog: stripHtml(it.bloggername) }))
     .filter((c) => c.snippet && c.snippet.length >= 12).slice(0, 10);
-  if (!cands.length) return json({ seeds: [] }, 200);
-  // 2) solar-pro3 정제 — 스니펫에서 '한 문장 감상' 추출(생성 아님). 출처 매핑 보존.
+  if (!cands.length) return [];
   if (!env.LLM_BASE_URL || !env.LLM_MODEL) {
-    // LLM 미설정: 스니펫 자체를 짧게 컷(출처 표기). best-effort.
-    const seeds = cands.slice(0, 3).map((c) => ({ text: c.snippet.slice(0, 120), sourceName: c.blog || '블로그', sourceUrl: c.url }));
-    return json({ seeds }, 200);
+    return cands.slice(0, want).map((c) => ({ text: c.snippet.slice(0, 120), sourceName: c.blog || '블로그', sourceUrl: c.url }));
   }
   let parsed = [];
   try {
@@ -502,14 +521,32 @@ async function seedProxy(request, env) {
       ], env, maxTokens: 900, temperature: 0.3,
     });
     parsed = parseSeedJson(out);
-  } catch (e) { return json({ seeds: [] }, 200); }
-  const seeds = parsed.map((p) => {
+  } catch (e) { return []; }
+  return parsed.map((p) => {
     const c = cands[p.i];
     return c ? { text: p.text, sourceName: c.blog || '블로그', sourceUrl: c.url } : null;
-  }).filter(Boolean).slice(0, 5);
-  if (SEED_CACHE.size > SEED_CACHE_MAX) SEED_CACHE.clear();
-  SEED_CACHE.set(ck, seeds);
-  return json({ seeds }, 200, 3600);
+  }).filter(Boolean).slice(0, want);
+}
+
+async function seedProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  const title = String((body && body.title) || '').trim();
+  const author = String((body && body.author) || '').trim();
+  const have = Math.max(0, parseInt((body && body.have), 10) || 0);   // 클라가 가진 실 공개 문장 수
+  if (!title) return json({ seeds: [] }, 200);
+  const bookKey = seedBookKey(title, body && body.isbn);
+  const targetSeeds = Math.max(0, SEED_TARGET - have);               // 시드로 채울 목표 수(10 - 실문장)
+  if (!targetSeeds) return json({ seeds: [] }, 200, 3600);            // 실 문장만으로 10 이상 → 시드 불필요
+  // 1) 저장된 시드 먼저(영속 — "픽한 책엔 글이 계속"). 한 번 충전된 책은 네이버·LLM 재호출 0.
+  const stored = await seedRead(env, bookKey);
+  if (stored.length > 0) return json({ seeds: stored.slice(0, targetSeeds) }, 200, 3600);
+  // 2) 미충전(빈) 책만 1회 크롤 — 목표만큼 네이버+LLM → 영속 저장 → 반환.
+  //    (같은 쿼리 재크롤은 같은 결과라 무의미 → stored>0이면 재시도 안 함. 새 책은 백필이 선충전.)
+  const fresh = await seedFetchFresh(title, author, targetSeeds, env);
+  if (fresh.length) await seedWrite(env, bookKey, fresh);
+  return json({ seeds: fresh.slice(0, targetSeeds) }, 200, 3600);
 }
 
 // 책 맥락 한 조각 (#373) — 참새 질문에 작품 소개를 녹이기 위한 서버측 조회.

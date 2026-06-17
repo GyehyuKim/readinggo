@@ -95,25 +95,53 @@
 
 - 1·2를 MVP, 3은 후속. 모든 시드는 **출처(sourceName·sourceUrl) 보존**.
 
-### 5.4 서버 — `POST /api/seed`
+### 5.4 서버 — `POST /api/seed` (영속·목표 10개, #774 갱신 2026-06-18)
 
-- 트리거: 책 상세/서가 진입 시 그 책 공개 한 문장(`sentences.byBook`)이 0건이면 시드 요청.
-- 동작: `{ title, isbn }` → 소스 팬아웃(§5.3 1·2) → `callLLM`(solar-pro3)로 **추출·정제·중복제거**(생성 아님 — 가져온 텍스트를 *고르고 다듬기*만, 무관 텍스트·광고 제거) → `{ seeds: [{ text, kind:'quote'|'review', sourceName, sourceUrl }] }`. 책별 **캐시**(재크롤 억제, Supabase/KV).
-- 키(네이버 API 등)는 **서버 secret**, 클라 노출 금지. 실패/0건 → 빈 배열(무중단, 섹션 숨김).
+- **규칙 (계휴 결정)**: 책 한 권의 **문장(실 유저 + 시드)이 10개 미만**이면 시드를 채워 **10개까지** 만든다. 한 번 채우면 **영속**(다음부터 즉시·콜드스타트에도 유지) → "내가 픽한 책엔 글이 계속 있다".
+- **워커 중심 영속**: `/api/seed`가 **Supabase `seed_sentences`(§5.7)에 직접 read/write**(service role). 클라는 `/api/seed`만 호출(직접 DB 안 건드림).
+- 입력: `{ title, author, isbn, have }` — `have`=클라가 이미 가진 실 공개 문장 수(`byBook` 길이). `need = max(0, 10 - have - 저장된시드수)`.
+- 동작:
+  1. `book_key`(= `isbn13` 있으면 그것, 없으면 정규화 제목) 로 `seed_sentences` 조회.
+  2. `have + 저장시드 ≥ 10` → 저장분 그대로 반환(재크롤 안 함).
+  3. 부족하면 `need`개만큼 네이버 블로그 검색(저자 폴백) → `callLLM` 정제(추출·한 문장·무관/광고 제거, 동명이작 제외) → **새 시드 `seed_sentences` insert**(중복 url 스킵) → 누적 반환.
+- 출력: `{ seeds: [{ text, sourceName, sourceUrl }] }` (저장분 + 신규, 최대 10−have).
+- 키(네이버·service role)는 **서버 secret**, 클라 노출 금지. 실패/0건 → 빈 배열(무중단).
+- 비용: 책당 1회 충전 후 영속 → 반복 호출은 DB read만(LLM·네이버 재호출 없음).
+- **전 책 백필(계휴 결정)**: 책 수가 적고 lazy 첫 호출이 느리므로, `docs/readinggo/supabase/seed_backfill.mjs`로 **카탈로그 전 책을 1회 선충전**(books 순회 → `/api/seed have=0` → seed_sentences 채움, 제한 동시성). idempotent(이미 10개면 재호출 비용 0) → 신규 책 추가 시 재실행. 실행은 배포 후(prod URL 대상).
 
 ### 5.5 표시
 
-- 책 상세/서가 "🌱 함께 읽은 이웃"(또는 "다른 곳의 한 문장") 섹션 — 실제 유저 문장과 **시각 구분**(배지·톤 다운) + **출처 링크 표기**(저작권·진정성). 짹/대화 허용 범위는 §7(권장: 읽기 전용 — 짹 무의미, 대화는 허용 검토).
+- 책 상세에서 실 공개 문장(`byBook`)이 **10개 미만**이면 `/api/seed`로 부족분을 채워 "🌱 함께 읽은 이웃" 섹션에 노출(실 문장과 합쳐 ~10). 실 문장 ≥10이면 시드 미호출(자연 소멸).
+- 실제 유저 문장과 **시각 구분**(🌱 배지·톤 다운) + **출처 링크 표기**(저작권·진정성). 짹/대화 허용 범위는 §7(권장: 읽기 전용 — 짹 무의미).
+- *주의*: 구현 #796은 "0건일 때만" 노출(live fetch). 본 갱신(영속·10개 충전)은 마이그레이션 적용 후 후속 코드 PR에서 `0건 → <10` 으로 확장.
 
 ### 5.6 진정성 — "뻥"으로 안 보이게
 
 - **🌱 마중물 라벨 + 출처**: 시드임을 투명 표기, *진짜 유저인 척 위장 금지*(신뢰 붕괴 방지). 출처가 있어 오히려 진정성↑.
 - **자연 소멸**: 진짜 유저 문장이 쌓이면 시드는 **후순위→숨김**. 마중물은 *초기 공백만* 채운다.
 
-### 5.7 데이터 모델
+### 5.7 데이터 모델 — 별도 `seed_sentences` 테이블 (#774 갱신)
 
-- `sentences.source`(#642) 활용 — 시드용 `source='seed'` + `is_seed=true` + `source_name`/`source_url` 컬럼, `user_id`는 시스템/`null`.
-- RLS: 시드는 공개 read, 유저 수정·삭제 불가(시스템 소유). 권리자 삭제 요청 처리용 운영 경로. 마이그레이션 별도 PR(.sql 수동 적용).
+`sentences`는 `user_id`·`user_book_id` **NOT NULL** + `byBook`이 user_books **inner join** 이라 "유저 없는 시드"를 담기 부적합. 데모 책 id도 비-UUID('b008'). → **별도 테이블**, **책 키 = isbn13/제목**(Phase 0/1·데모 공통), **워커 service role 전용**(클라 직접 접근 없음 → 공개 RLS 불필요).
+
+```sql
+create table public.seed_sentences (
+  id          uuid primary key default gen_random_uuid(),
+  book_key    text not null,          -- isbn13(우선) | 정규화 제목
+  text        text not null,          -- 한 문장(정제), 인용 최소
+  source_name text,                   -- 블로그/매체 이름
+  source_url  text,                   -- 원글 링크(저작권·진정성)
+  created_at  timestamptz not null default now()
+);
+create index on public.seed_sentences(book_key);
+-- 중복 방지: 같은 책+같은 출처 url 1회만
+create unique index on public.seed_sentences(book_key, source_url);
+alter table public.seed_sentences enable row level security;
+-- 정책 없음 → anon/authenticated 차단, service_role(워커)만 bypass. 권리자 삭제는 운영 콘솔/SQL.
+```
+
+- 마이그레이션: `docs/readinggo/supabase/30_seed_sentences.sql` (**수동 적용** — memory[[supabase-migrations-manual]]).
+- 클라는 `seed_sentences`를 직접 읽지 않고 `/api/seed` 응답만 표시 → Phase 0/1 어댑터 무관.
 
 ### 5.8 리스크 매트릭스 (실제 출처)
 
