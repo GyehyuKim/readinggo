@@ -185,14 +185,13 @@ function Ceremony({ data, onClose, onComplete }) {
           {castleGained && <div className="nest-evo-copy">{castleCount}번째 성 · 다음 둥지가 새로 시작돼요</div>}
           <div className="nest-evo">
             <div className="nest-evo-stage">
-              <img className="nest-evo-img" src={`assets/nest/lv${prevStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
-              <span className="em">{window.nestArt(prevStage.lv, 52)}</span>
+              {/* #754: 3D PNG 캐릭터만 — nestArt SVG 중첩 제거(테마 충돌). 로드 실패 시 단계명만. */}
+              <img className="nest-evo-img" src={`assets/nest/lv${prevStage.lv}.png`} alt={prevStage.name} referrerPolicy="no-referrer" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               <div className="name">{prevStage.name}</div>
             </div>
             <div className="nest-evo-arrow">→</div>
             <div className="nest-evo-stage now">
-              <img className="nest-evo-img" src={`assets/nest/lv${nowStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
-              <span className="em">{window.nestArt(nowStage.lv, 52)}</span>
+              <img className="nest-evo-img" src={`assets/nest/lv${nowStage.lv}.png`} alt={nowStage.name} referrerPolicy="no-referrer" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               <div className="name">{nowStage.name}</div>
             </div>
           </div>
@@ -251,9 +250,9 @@ function Ceremony({ data, onClose, onComplete }) {
         )}
 
         <div className="nest-progress">
-          <img className="nest-progress-img" src={`assets/nest/lv${curStage.lv}.png`} alt="" referrerPolicy="no-referrer" draggable="false" />
+          {/* #754: 풀스크린 세리머니는 3D PNG만 — nestArt SVG 중첩 제거. 로드 실패 시 단계명만. */}
+          <img className="nest-progress-img" src={`assets/nest/lv${curStage.lv}.png`} alt={curStage.name} referrerPolicy="no-referrer" draggable="false" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <div className="nest-progress-head">
-            <span className="em">{window.nestArt(curStage.lv, 48)}</span>
             <span className="name">{curStage.name}</span>
           </div>
           <div className="nest-progress-bar">
