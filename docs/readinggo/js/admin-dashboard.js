@@ -47,7 +47,8 @@ function AdminDashboardModal({ onClose }) {
   ];
   const trend = (stats && stats.trend) || [];
   return (
-    <div style={{position:'fixed',inset:0,background:'var(--paper)',overflowY:'auto',zIndex:60}} role="dialog" aria-label="운영 대시보드">
+    // ph-no-capture: 운영자 세션 리플레이에서도 타 유저 이메일·문장 노출 마스킹 (analytics.md §5.4, #752)
+    <div className="ph-no-capture" style={{position:'fixed',inset:0,background:'var(--paper)',overflowY:'auto',zIndex:60}} role="dialog" aria-label="운영 대시보드">
       <div style={{maxWidth:600,margin:'0 auto',minHeight:'100%'}}>
         <div style={{padding:'16px 20px 48px'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>

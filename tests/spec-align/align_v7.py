@@ -209,6 +209,13 @@ INVARIANTS = [
         ["nest.js"], r"<SentenceActions sentence=\{\{ id: q\.id"),
     ("C", "present", "책장 BookDetailModal 한 문장 카드 SentenceActions 경유 (#610 표면 통일)",
         ["library.js"], r"<SentenceActions"),
+    # ── 2단 동의 게이팅 (analytics.md §5.4, #752) — 비필수(리플레이·식별)는 'yes'만. PIPA 회귀 락 ──
+    ("C", "present", "RG_applyConsent — 'yes'만 startSessionRecording, 그 외 stopSessionRecording (#752)",
+        ["components.js"], r"RG_applyConsent[\s\S]{0,260}startSessionRecording[\s\S]{0,160}stopSessionRecording"),
+    ("C", "present", "PostHog identify는 선택 동의('yes')한 로그인 유저만 — 식별 게이팅 (#752)",
+        ["app.js"], r"RG_consent\.get\(\) === 'yes'[\s\S]{0,80}posthog\.identify"),
+    ("C", "present", "LLM 대화 backfill은 선택 동의('yes')만 (#394·#752)",
+        ["app.js"], r"RG_consent[\s\S]{0,40}=== 'yes'[\s\S]{0,200}backfill|backfillCompanionSessions[\s\S]{0,260}RG_consent[\s\S]{0,40}=== 'yes'"),
 ]
 
 

@@ -23,6 +23,10 @@
         api_host: 'https://us.i.posthog.com',
         defaults: '2026-05-30',
         person_profiles: 'identified_only',
+        // 2단 동의(analytics.md §5.4, #752) — 세션 리플레이 기본 OFF. 선택 동의('yes')만 RG_applyConsent로 startSessionRecording.
+        // 익명 이벤트·퍼널은 상시(필수·고지). 리플레이 녹화 시 입력값 전수 마스킹(PII).
+        disable_session_recording: true,
+        session_recording: { maskAllInputs: true },
     })
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1416,7 +1420,7 @@ input,textarea{font-family:inherit;}
 <script src="js/datastore-supabase.js"></script>
 
 <script>
-const _RG_V = '82';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
+const _RG_V = '83';  // ⚠️ 배포마다 bump — 캐시 스큐(일부 js만 stale → "X is not defined" 간헐 크래시) 방지
 
 async function loadBabel(src) {
   const res = await fetch(src + '?v=' + _RG_V);

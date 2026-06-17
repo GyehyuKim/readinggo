@@ -371,6 +371,18 @@ window.RG_consent = {
   get() { return (window.DataStore && window.DataStore.consent) ? window.DataStore.consent.get() : null; },
   set(v) { if (window.DataStore && window.DataStore.consent) window.DataStore.consent.set(v); },
 };
+// 선택 동의 게이팅 (analytics.md §5.4, #752) — 'yes'면 세션 리플레이 시작, 그 외(거부·미질문·철회) 중단.
+// 익명 이벤트·퍼널은 게이트 밖(필수·상시). identify는 로그인 컨텍스트가 필요해 app.js에서 별도 게이팅.
+window.RG_applyConsent = function (v) {
+  try {
+    if (!window.posthog) return;
+    if (v === 'yes') {
+      if (window.posthog.startSessionRecording) window.posthog.startSessionRecording();
+    } else {
+      if (window.posthog.stopSessionRecording) window.posthog.stopSessionRecording();
+    }
+  } catch (e) { /* posthog 미로드/실패 무시 */ }
+};
 window.Toast = Toast;
 window.Confetti = Confetti;
 

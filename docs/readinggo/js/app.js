@@ -263,6 +263,9 @@ function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   // 스포일러 전역 토글 (§5.7.1): true 면 모든 페이지 블라인드 해제.
   const [spoilerReveal, setSpoilerReveal] = useState(false);
+  // 저장된 동의 적용 (analytics.md §5.4, #752) — 복귀 'yes' 유저면 세션 리플레이 시작(init은 기본 off).
+  // 거부·미질문이면 no-op(이미 off). 식별은 로그인 흐름에서 별도 게이팅.
+  useEffect(() => { if (window.RG_applyConsent) window.RG_applyConsent(window.RG_consent && window.RG_consent.get()); }, []);
   // 타인 프로필 모달(§5.8.2) — @핸들 탭으로 열림. SentenceCard 가 window.RG_openProfile 호출.
   const [profileHandle, setProfileHandle] = useState(null);
   useEffect(() => { window.RG_openProfile = (h) => setProfileHandle(h); return () => { window.RG_openProfile = null; }; }, []);
@@ -370,9 +373,10 @@ function App() {
         await syncPendingToSupabase();   // 게스트 → 로그인: pending 책·문장 흡수(§7.7)
         backfillCompanionSessions();     // 과거 my_note → companion_sessions 1회 채움(#394, 비차단)
         const next = await buildStateFromSupabase();
-        // PostHog 유저 식별 (analytics.md §3.2) — 로그인 유저에 person profile 연결
+        // PostHog 유저 식별 (analytics.md §3.2·§5.4) — 선택 동의('yes')한 로그인 유저만 person profile 연결.
+        // 거부·미질문이면 식별 생략(익명 분석은 유지) — PIPA 비필수 분리(#752).
         try {
-          if (window.posthog && authUser && authUser.id) {
+          if (window.posthog && authUser && authUser.id && window.RG_consent && window.RG_consent.get() === 'yes') {
             window.posthog.identify(authUser.id, { email: authUser.email || undefined, books_count: (next && next.castleCount) || 0 });
           }
         } catch (e) {}
@@ -771,7 +775,7 @@ function App() {
 
         {/* 진입 동의 배너 (#331) — 비차단 하단. 첫 방문(consent===null) 시 1회. */}
         {showConsent && (
-          <ConsentBanner onChoose={(v) => { if (window.RG_consent) window.RG_consent.set(v); if (window.rgTrack) window.rgTrack('data_consent', { value: v, source: 'banner' }); setShowConsent(false); }} />
+          <ConsentBanner onChoose={(v) => { if (window.RG_consent) window.RG_consent.set(v); if (window.RG_applyConsent) window.RG_applyConsent(v); if (window.rgTrack) window.rgTrack('data_consent', { value: v, source: 'banner' }); setShowConsent(false); }} />
         )}
 
         {/* 전역 Toast */}
