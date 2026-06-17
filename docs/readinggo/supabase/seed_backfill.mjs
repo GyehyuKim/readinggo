@@ -43,7 +43,8 @@ async function fetchBooks() {
   const out = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
-    const r = await fetch(`${SB}/rest/v1/books?select=isbn13,title,author&order=title&limit=${PAGE}&offset=${from}`, {
+    // 인기순(sales_point desc) — 베스트/스테디셀러부터 채움. 중간에 끊겨도 인기 책 우선 확보(#774).
+    const r = await fetch(`${SB}/rest/v1/books?select=isbn13,title,author&order=sales_point.desc.nullslast,title&limit=${PAGE}&offset=${from}`, {
       headers: { apikey: SRK, Authorization: `Bearer ${SRK}` },
     });
     if (!r.ok) throw new Error('books 조회 실패 HTTP ' + r.status);

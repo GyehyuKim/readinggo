@@ -86,6 +86,7 @@ export default {
   // ── Cron: 인기도서 사전 아카이브 (#239) ──────────────────
   async scheduled(event, env, ctx) {
     ctx.waitUntil(archive(env));
+    ctx.waitUntil(prewarmSeeds(env));   // #774 인기 우선 시드 선충전(sales_point 상위 N권, idempotent)
   },
 };
 
@@ -503,8 +504,15 @@ async function seedWrite(env, bookKey, seeds) {
 // 네이버+LLM 으로 신규 시드 추출(최대 want개). 영속 저장은 호출부에서.
 async function seedFetchFresh(title, author, want, env) {
   if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return [];
-  let items = await naverBlogSearch(title + (author ? ' ' + author : '') + ' 서평', env);
-  if (!items.length && author) items = await naverBlogSearch(title + ' 서평', env);
+  // 다중 쿼리 폴백 — '제목 저자 서평'(정밀) → 점차 넓힘. 첫 비공백에서 멈춤(불필요 호출↓).
+  // '서평'만으론 0건 잦음(AND 매칭) → 리뷰·독후감·제목 단독까지 넓혀 커버리지↑.
+  const a = author ? ' ' + author : '';
+  const queries = [title + a + ' 서평', title + ' 서평', title + a + ' 리뷰', title + ' 독후감', title + ' 책'];
+  let items = [];
+  for (const q of queries) {
+    items = await naverBlogSearch(q, env);
+    if (items.length) break;
+  }
   const cands = items.map((it) => ({ snippet: stripHtml(it.description), url: it.link, blog: stripHtml(it.bloggername) }))
     .filter((c) => c.snippet && c.snippet.length >= 12).slice(0, 10);
   if (!cands.length) return [];
@@ -528,25 +536,46 @@ async function seedFetchFresh(title, author, want, env) {
   }).filter(Boolean).slice(0, want);
 }
 
+// 시드 채움 코어 — seedProxy(요청)·prewarmSeeds(cron) 공용. seed_sentences read/write.
+async function seedFill(env, { title, author, isbn, have }) {
+  const t = String(title || '').trim();
+  if (!t) return [];
+  const targetSeeds = Math.max(0, SEED_TARGET - Math.max(0, have || 0));
+  if (!targetSeeds) return [];
+  const bookKey = seedBookKey(t, isbn);
+  // 1) 저장분 먼저(영속). 한 번 충전된 책은 네이버·LLM 재호출 0.
+  const stored = await seedRead(env, bookKey);
+  if (stored.length > 0) return stored.slice(0, targetSeeds);
+  // 2) 미충전 책만 1회 크롤 → 영속 저장.
+  const fresh = await seedFetchFresh(t, String(author || '').trim(), targetSeeds, env);
+  if (fresh.length) await seedWrite(env, bookKey, fresh);
+  return fresh.slice(0, targetSeeds);
+}
+
 async function seedProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
-  const title = String((body && body.title) || '').trim();
-  const author = String((body && body.author) || '').trim();
-  const have = Math.max(0, parseInt((body && body.have), 10) || 0);   // 클라가 가진 실 공개 문장 수
-  if (!title) return json({ seeds: [] }, 200);
-  const bookKey = seedBookKey(title, body && body.isbn);
-  const targetSeeds = Math.max(0, SEED_TARGET - have);               // 시드로 채울 목표 수(10 - 실문장)
-  if (!targetSeeds) return json({ seeds: [] }, 200, 3600);            // 실 문장만으로 10 이상 → 시드 불필요
-  // 1) 저장된 시드 먼저(영속 — "픽한 책엔 글이 계속"). 한 번 충전된 책은 네이버·LLM 재호출 0.
-  const stored = await seedRead(env, bookKey);
-  if (stored.length > 0) return json({ seeds: stored.slice(0, targetSeeds) }, 200, 3600);
-  // 2) 미충전(빈) 책만 1회 크롤 — 목표만큼 네이버+LLM → 영속 저장 → 반환.
-  //    (같은 쿼리 재크롤은 같은 결과라 무의미 → stored>0이면 재시도 안 함. 새 책은 백필이 선충전.)
-  const fresh = await seedFetchFresh(title, author, targetSeeds, env);
-  if (fresh.length) await seedWrite(env, bookKey, fresh);
-  return json({ seeds: fresh.slice(0, targetSeeds) }, 200, 3600);
+  const seeds = await seedFill(env, {
+    title: body && body.title, author: body && body.author,
+    isbn: body && body.isbn, have: parseInt((body && body.have), 10) || 0,
+  });
+  return json({ seeds }, 200, 3600);
+}
+
+// 인기 우선 선충전 (#774) — 일일 cron. books 를 sales_point desc 로 상위 N권 미리 채워둔다.
+// idempotent(이미 채워진 책은 DB read만) → 사실상 신규·미충전 인기 책만 일함(쿼터·비용 안전).
+async function prewarmSeeds(env, limit = 150) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
+  let books = [];
+  try {
+    const u = `${env.SUPABASE_URL}/rest/v1/books?select=isbn13,title,author&sales_point=not.is.null&order=sales_point.desc.nullslast&limit=${limit}`;
+    const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+    if (r.ok) books = await r.json();
+  } catch (e) { return; }
+  for (const b of (books || [])) {
+    try { await seedFill(env, { title: b.title, author: b.author, isbn: b.isbn13, have: 0 }); } catch (e) { /* 개별 실패 스킵 */ }
+  }
 }
 
 // 책 맥락 한 조각 (#373) — 참새 질문에 작품 소개를 녹이기 위한 서버측 조회.

@@ -107,7 +107,10 @@
 - 출력: `{ seeds: [{ text, sourceName, sourceUrl }] }` (저장분 + 신규, 최대 10−have).
 - 키(네이버·service role)는 **서버 secret**, 클라 노출 금지. 실패/0건 → 빈 배열(무중단).
 - 비용: 책당 1회 충전 후 영속 → 반복 호출은 DB read만(LLM·네이버 재호출 없음).
-- **전 책 백필(계휴 결정)**: 책 수가 적고 lazy 첫 호출이 느리므로, `docs/readinggo/supabase/seed_backfill.mjs`로 **카탈로그 전 책을 1회 선충전**(books 순회 → `/api/seed have=0` → seed_sentences 채움, 제한 동시성). idempotent(이미 10개면 재호출 비용 0) → 신규 책 추가 시 재실행. 실행은 배포 후(prod URL 대상).
+- **전 책 백필(계휴 결정)**: 책 수가 적고 lazy 첫 호출이 느리므로, `docs/readinggo/supabase/seed_backfill.mjs`로 **카탈로그 전 책을 1회 선충전**(books 순회 → `/api/seed have=0` → seed_sentences 채움, 제한 동시성). idempotent(이미 채워진 책은 재호출 비용 0). **인기순(`sales_point` desc)으로 순회** — 베스트/스테디셀러부터.
+- **인기 우선 cron 선충전(#774)**: 워커 `scheduled()`(일 1회)에 `prewarmSeeds(env)` — `books`를 `sales_point` desc 상위 N권(기본 150) `seedFill`. idempotent라 사실상 **신규·미충전 인기 책만** 일함 → 수동 백필 없이도 자주 찾는 책이 미리 채워짐. 쿼터·비용 안전.
+- **쿼리 폴백**: `제목 저자 서평 → 서평 → 리뷰 → 독후감 → 책` 순으로 넓혀 0건율↓(네이버 AND 매칭 보완). 동명이작은 LLM 프롬프트로 제외.
+- ⚠️ **커버리지 한계**: 시드는 네이버가 실제 반환하는 양에 달림. 검증 환경에선 일부 인기 책도 0건 — 실제 네이버 도달/키 제한 여부는 네이버 콘솔 API 테스트로 확정 필요(추정 금지).
 
 ### 5.5 표시
 
