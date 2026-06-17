@@ -547,11 +547,18 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
   const hasSel = sel && sel.w >= 8 && sel.h >= 8;
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '100dvh', background: 'rgba(0,0,0,0.94)', zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '16px 18px 6px', color: '#fff', textAlign: 'center' }}>
+      {/* #728: 버튼을 상단으로 — 모바일에서 하단 영역이 브라우저 툴바/하단 탭 뒤로 잘려도
+          추출 버튼이 항상 보이고 눌리도록. 안내+액션을 위에 모으고 이미지는 아래 flex로 채운다. */}
+      <div style={{ padding: 'calc(env(safe-area-inset-top) + 12px) 16px 8px', color: '#fff', textAlign: 'center' }}>
         <div style={{ fontWeight: 900, fontSize: 15 }}>가져올 글귀를 드래그로 선택</div>
         <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>한 구절만 감싸면 배경·옆 페이지 없이 깔끔해요</div>
       </div>
-      <div ref={boxRef} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', touchAction: 'none', margin: '8px 12px' }}
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 10px', flexShrink: 0 }}>
+        <button onClick={onCancel} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
+        <button onClick={() => doCrop(true)} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>전체</button>
+        <button onClick={() => doCrop(false)} disabled={!hasSel} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', background: hasSel ? 'var(--brand)' : 'rgba(255,255,255,0.15)', color: hasSel ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: 900, fontSize: 14, cursor: hasSel ? 'pointer' : 'default' }}>{hasSel ? '✨ 선택 영역 추출' : '영역을 드래그하세요'}</button>
+      </div>
+      <div ref={boxRef} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', touchAction: 'none', margin: '0 12px 12px' }}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
         {url
           ? <img ref={imgRef} src={url} alt="" onLoad={measure} draggable={false}
@@ -560,11 +567,6 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
         {hasSel && imgGeo && (
           <div style={{ position: 'absolute', left: imgGeo.left + sel.x, top: imgGeo.top + sel.y, width: sel.w, height: sel.h, border: '2px solid var(--brand)', background: 'rgba(63,209,127,0.18)', borderRadius: 4, pointerEvents: 'none' }} />
         )}
-      </div>
-      <div style={{ display: 'flex', gap: 8, padding: '8px 16px calc(18px + env(safe-area-inset-bottom))' }}>
-        <button onClick={onCancel} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
-        <button onClick={() => doCrop(true)} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>전체</button>
-        <button onClick={() => doCrop(false)} disabled={!hasSel} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', background: hasSel ? 'var(--brand)' : 'rgba(255,255,255,0.15)', color: hasSel ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: 900, fontSize: 14, cursor: hasSel ? 'pointer' : 'default' }}>{hasSel ? '✨ 선택 영역 추출' : '영역을 드래그하세요'}</button>
       </div>
     </div>
   );
