@@ -863,6 +863,20 @@
         const r = (rows && rows[0]) || {};
         return { d7: r.d7 || 0, d30: r.d30 || 0 };
       },
+      // 고도화(#744 ③) — 완독률·코호트 리텐션·콘텐츠 공명 (29_admin_insights_v2.sql)
+      async completionStats() {
+        const rows = unwrap(await sb().rpc('admin_completion_stats'));
+        const r = (rows && rows[0]) || {};
+        return { total: r.total || 0, completed: r.completed || 0, reading: r.reading || 0, aborted: r.aborted || 0, rate: r.completion_rate || 0 };
+      },
+      async cohortRetention(weeks = 8) {
+        const rows = unwrap(await sb().rpc('admin_cohort_retention', { weeks }));
+        return (rows || []).map((x) => ({ cohort: x.cohort_week, size: x.cohort_size, week: x.week_offset, retained: x.retained }));
+      },
+      async contentResonance(lim = 10) {
+        const rows = unwrap(await sb().rpc('admin_content_resonance', { lim }));
+        return (rows || []).map((x) => ({ id: x.sentence_id, text: x.sentence_text, bookTitle: x.book_title, claps: x.claps }));
+      },
     },
 
     /* 문의 — 누구나(로그인) 작성 → admin이 대시보드에서 확인 */
