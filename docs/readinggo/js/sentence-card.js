@@ -107,7 +107,7 @@ const _SA_VIS_ICON = {
   followers: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="4.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1 10c0-2 1.5-3 3.5-3s3.5 1 3.5 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="9" cy="3.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/><path d="M8 10c0-1.5.8-2.5 2-2.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>,
   private: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5.5" width="8" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
 };
-const _SA_VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '비공개' };
+const _SA_VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '나만 보기' };
 function SentenceActions({ sentence, mine, fav: favInit, onRemoved, onUpdated }) {
   const id = sentence && sentence.id;
   const [vis, setVis] = useState(sentence.visibility || (sentence.isPrivate ? 'private' : 'public'));
@@ -197,7 +197,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved, onUpdated })
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }} onClick={stop}>
       {mine ? (
         <>
-          <button onClick={cycleVis} title="공개 범위 변경 (전체→친구→비공개)" style={_visChip[vis]}><span>{_SA_VIS_ICON[vis]}</span><span>{_SA_VIS_LABEL[vis]}</span></button>
+          <button onClick={cycleVis} title="공개 범위 변경 (전체→친구→나만 보기)" style={_visChip[vis]}><span>{_SA_VIS_ICON[vis]}</span><span>{_SA_VIS_LABEL[vis]}</span></button>
           {likeBtn}
           {shareBtn}
           <button onClick={edit} title="수정 (문장·페이지)" style={chip}>
