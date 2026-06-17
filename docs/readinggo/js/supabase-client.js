@@ -26,12 +26,18 @@
     isConfigured() { return !!client(); },
 
     // 구글 로그인 — OAuth 리디렉트(같은 출처로 복귀). Supabase Auth→Providers→Google + URL Config 필요.
+    // prompt=select_account (#721): 미지정 시 브라우저 잔류 Google 세션을 자동 선택 → 로그아웃 후
+    // 다른 계정 재로그인 불가(signOut 은 Supabase 세션만 정리, accounts.google.com 쿠키 잔류).
+    // 매번 계정 선택 화면을 띄워 계정 전환·추가를 보장.
     async signInWithGoogle() {
       const c = client();
       if (!c) throw new Error('Supabase 미설정');
       return c.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin },
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: { prompt: 'select_account' },
+        },
       });
     },
 

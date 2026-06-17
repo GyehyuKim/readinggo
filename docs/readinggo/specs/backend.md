@@ -47,7 +47,7 @@
 ```
 // 인증 / 프로필 / 설정
 auth.currentUser()                         → User | null     // #646: 클라 인증 판정은 getSession()(로컬 스토리지, 무네트워크). getUser()(매 호출 서버 토큰검증)는 모바일 네트워크 불안정 시 null로 떨어져 로그인 유저가 조용히 게스트(localStorage) 고착 → my_note(대화) 등 데이터 안 보임. uid()도 동일.
-auth.signInWithGoogle()                    → User           // Phase 0: 가짜 세션
+auth.signInWithGoogle()                    → User           // Phase 0: 가짜 세션. #721: signInWithOAuth 에 queryParams `prompt=select_account` 강제 — 미지정 시 브라우저 잔류 Google 세션을 자동 선택해 로그아웃 후 다른 계정 재로그인 불가(signOut 은 Supabase 세션만 정리, accounts.google.com 쿠키 잔류). 매번 계정 선택 화면 노출.
 profile.get(userId?)                       → User
 profile.update({display_name, avatar_url, bio})
 settings.get() / settings.update({reminder_hour, ...})
