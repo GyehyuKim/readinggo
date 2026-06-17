@@ -20,6 +20,7 @@
 | **백엔드** | [`backend.md`](./backend.md) | [§7](./backend.md) |
 | **운영: 문의 동기화** | [`inquiry-sync.md`](./inquiry-sync.md) | 신설 (#701) — inquiries → GitHub 이슈 |
 | **운영: 운영자 대시보드** | [`admin-dashboard.md`](./admin-dashboard.md) | 신설 (#744) — 풀페이지 하이브리드 대시보드 |
+| **법무: 개인정보처리방침** | [`privacy-policy.md`](./privacy-policy.md) | 신설 (#757) — 처리방침 정본·국외이전·게시 |
 | **디자인** | [`design.md`](./design.md) | [§11](./design.md) + [§12](./design.md) |
 | **메타: 여정** | [`meta/journey.md`](./meta/journey.md) | [§0.5](./meta/journey.md) |
 | **메타: 결정 이력** | [`meta/decisions.md`](./meta/decisions.md) | [§8](./meta/decisions.md) 미결 → 확정 |
