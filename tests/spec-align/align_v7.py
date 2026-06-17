@@ -30,6 +30,8 @@ JS_DIR = ROOT / "docs" / "readinggo" / "js"
 FEATURE_FILES = [
     "app.js", "components.js", "nest.js", "social.js",
     "library.js", "search.js", "onboarding.js",
+    # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
+    "icons.js", "admin-dashboard.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -183,7 +185,7 @@ INVARIANTS = [
     ("C", "present", "활성 책 캐러셀 전환 (nest.md §5.3, #185)",
         ["nest.js"], r"switchBook"),
     ("C", "present", "운영 대시보드 (profile.md §5.8.9, #161)",
-        ["components.js"], r"AdminDashboardModal"),
+        ["admin-dashboard.js"], r"AdminDashboardModal"),  # #761 모듈화: components.js → admin-dashboard.js
     ("C", "present", "한 문장 틴더 카드 (feed.md, #186)",
         ["components.js"], r"TinderCards"),
     ("C", "present", "운영자 문의 (profile.md 설정, #문의)",
