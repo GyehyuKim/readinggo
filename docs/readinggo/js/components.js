@@ -661,7 +661,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
 
           {/* ⑤ 정보 */}
           {groupLabel('정보')}
-          <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo v{(window.RG_VERSION || '0.000')} · beta</div>
+          <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo · build {(window.RG_VERSION || 'local')} · beta</div>
         </div>
       </div>
     </div>

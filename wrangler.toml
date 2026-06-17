@@ -12,6 +12,11 @@ compatibility_date = "2026-06-01"
 directory = "docs/readinggo"
 binding = "ASSETS"
 
+# 배포 버전 메타데이터 (#748) — 워커가 js/config.js 서빙 시 RG_VERSION에 배포 ID를 주입.
+# 수동 버전 카운터 드리프트 제거: 배포마다 고유 ID(커밋과 1:1) 자동 반영.
+[version_metadata]
+binding = "CF_VERSION"
+
 # 비밀 아님(클라에도 공개). service_role·UPSTAGE 키만 `wrangler secret put` 로.
 [vars]
 SUPABASE_URL = "https://cttllwwkaddghqttyhkg.supabase.co"

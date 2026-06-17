@@ -9,9 +9,12 @@ window.RG_CONFIG = {
   ALADIN_PROXY: '/.netlify/functions/aladin',   // 서버리스 프록시 (TTBKey 서버에만)
 };
 
-// 앱 버전 — 베타 0.XXX. **publish(배포) 1회마다 +0.001 수동 증가** (≈머지 PR 수).
-// 설정 표시 + 문의 작성 시 첨부 → 운영자가 "어느 버전 문제/해결인지" 추적.
-window.RG_VERSION = '0.203';
+// 앱 버전 (#748) — 프로덕션에선 워커가 배포 ID(짧은 8자)를 자동 주입한다.
+// 워커(worker/index.mjs)가 js/config.js 서빙 시 아래 리터럴을 version_metadata.id 로 치환 →
+// 배포(=커밋)마다 고유 ID가 자동 반영되어 수동 카운터 드리프트가 없다.
+// 아래 값은 워커를 거치지 않는 환경(로컬 파일 열기·wrangler dev 미바인딩)용 폴백.
+// 설정 표시 + 문의 작성 시 첨부 → 운영자가 "어느 배포의 문제/해결인지" 추적.
+window.RG_VERSION = 'local';
 
 // 재키 질문 방향성 프리셋 (#375, companion.md §4.4) — 사람마다 선호하는 질문 결이 달라
 // 프로필/설정에서 고른 값을 companion 호출에 실어 worker 프롬프트에 주입. 자유서술 아님(허들·악용 회피).

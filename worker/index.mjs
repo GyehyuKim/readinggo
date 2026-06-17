@@ -17,6 +17,20 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
+    // 버전 자동 주입 (#748) — js/config.js 서빙 시 RG_VERSION 리터럴을 배포 ID(짧은 8자)로 치환.
+    // 수동 +0.001 카운터의 드리프트를 제거: 배포(=커밋)마다 고유 ID가 자동 반영된다.
+    // version_metadata 미바인딩(로컬 wrangler dev 등)이면 원본 파일의 폴백 값을 그대로 둔다.
+    if (p === '/js/config.js') {
+      const res = await env.ASSETS.fetch(request);
+      const ver = env.CF_VERSION && env.CF_VERSION.id ? String(env.CF_VERSION.id).slice(0, 8) : null;
+      if (!ver) return res;
+      let body = await res.text();
+      body = body.replace(/window\.RG_VERSION\s*=\s*['"][^'"]*['"]/, `window.RG_VERSION = '${ver}'`);
+      const headers = new Headers(res.headers);
+      headers.set('Cache-Control', 'no-cache, must-revalidate'); // 배포 직후 새 ID 즉시 반영
+      headers.set('Content-Type', 'application/javascript; charset=utf-8');
+      return new Response(body, { status: res.status, headers });
+    }
     if (p === '/aladin' || p === '/.netlify/functions/aladin') {
       // CORS 제한(#255): 타 사이트 브라우저 JS의 교차출처 호출 차단(TTBKey 쿼터 남용 방지).
       // 동일출처 GET은 Origin 헤더 미전송 → 통과. 다른 출처면 Origin이 우리 도메인과 달라 403.
