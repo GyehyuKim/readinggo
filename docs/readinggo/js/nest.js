@@ -546,7 +546,7 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
   };
   const hasSel = sel && sel.w >= 8 && sel.h >= 8;
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '100dvh', background: 'rgba(0,0,0,0.94)', zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 'var(--app-h, 100dvh)', background: 'rgba(0,0,0,0.94)', zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
       {/* #728: 버튼을 상단으로 — 모바일에서 하단 영역이 브라우저 툴바/하단 탭 뒤로 잘려도
           추출 버튼이 항상 보이고 눌리도록. 안내+액션을 위에 모으고 이미지는 아래 flex로 채운다. */}
       <div style={{ padding: 'calc(env(safe-area-inset-top) + 12px) 16px 8px', color: '#fff', textAlign: 'center' }}>
