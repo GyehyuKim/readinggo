@@ -113,6 +113,7 @@ input,textarea{font-family:inherit;}
 
 .stage{
   min-height: 100vh;
+  min-height: 100dvh;   /* 모바일 동적 뷰포트(#733) — 주소창 포함 100vh로 화면 초과 방지 */
   display: flex;
   justify-content: center;
   background:
@@ -1356,6 +1357,7 @@ input,textarea{font-family:inherit;}
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;   /* 모바일 동적 뷰포트(#733) */
   gap: 16px;
   color: var(--ink-3);
   font-size: 13px;
