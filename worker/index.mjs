@@ -602,6 +602,29 @@ async function seedFetchFresh(title, author, isbn, want, env) {
   }).filter(Boolean).slice(0, want);
 }
 
+// 맥미니 collector 호출(spec: seed-collector.md §3.1·§9) — 예스24 "책 속으로" 우선 소스.
+// 워커는 브라우저를 못 돌리므로 헤드리스 크롤은 collector(맥미니)로 이관. collector 가 seed_sentences 적재까지 수행.
+//   반환: 시드 배열(성공) | null(미구성·타임아웃·실패·미커버 → 호출부가 블로그 폴백).
+const COLLECTOR_TIMEOUT_MS = 12000;  // spec §3.1: 동기 대기 상한(앱 로딩 흡수). 초과 시 폴백.
+async function seedCollectorFetch(title, author, isbn, env, forceRefresh) {
+  if (!env.COLLECTOR_URL || !env.COLLECTOR_TOKEN) return null;  // 미구성 → 폴백
+  try {
+    const base = String(env.COLLECTOR_URL).replace(/\/$/, '');
+    const r = await fetch(`${base}/collect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.COLLECTOR_TOKEN}` },
+      body: JSON.stringify({ title, author, isbn, forceRefresh: !!forceRefresh }),
+      signal: AbortSignal.timeout(COLLECTOR_TIMEOUT_MS),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const seeds = (d && Array.isArray(d.seeds)) ? d.seeds : [];
+    // 빈 결과(예스24 미커버)도 null 로 — 호출부가 블로그(#819) 폴백 시도.
+    if (!seeds.length) return null;
+    return seeds.map((s) => ({ text: s.text, sourceName: s.sourceName || '예스24 책속으로', sourceUrl: s.sourceUrl || '' }));
+  } catch (e) { return null; }  // 타임아웃·네트워크 실패 → 폴백
+}
+
 // 시드 채움 코어 — seedProxy(요청)·prewarmSeeds(cron) 공용. seed_sentences read/write.
 // forceRefresh(#806): 이미 충전된 책이라도 재크롤해 트렌드 갱신(cron이 TTL 만료 시에만 true 전달).
 async function seedFill(env, { title, author, isbn, have, forceRefresh }) {
@@ -613,13 +636,17 @@ async function seedFill(env, { title, author, isbn, have, forceRefresh }) {
   // 1) 저장분 먼저(영속). 한 번 충전된 책은 네이버·LLM 재호출 0.
   const stored = await seedRead(env, bookKey);
   if (stored.length > 0 && !forceRefresh) return stored.slice(0, targetSeeds);
-  // 1-b) TTL 만료 재크롤(#806) — 새 시드를 얻으면 교체, 못 얻으면 기존 유지(빈 화면 방지).
+  // 1-b) TTL 만료 재크롤(#806) — 예스24 collector 우선(자체 교체 적재), 실패 시 블로그 폴백, 그래도 없으면 기존 유지.
   if (stored.length > 0 && forceRefresh) {
+    const viaCollector = await seedCollectorFetch(t, String(author || '').trim(), isbn, env, true);
+    if (viaCollector) return viaCollector.slice(0, targetSeeds);  // collector 가 seed_sentences 교체 완료
     const refreshed = await seedFetchFresh(t, String(author || '').trim(), isbn, SEED_TARGET, env);
     if (refreshed.length) { await seedRefresh(env, bookKey, refreshed); return refreshed.slice(0, targetSeeds); }
     return stored.slice(0, targetSeeds);
   }
-  // 2) 미충전 책만 1회 크롤 → 영속 저장.
+  // 2) 미충전 책 — 예스24 collector 우선(브라우저 필요분 이관, 자체 적재). 실패·미커버 시 블로그(#819) 폴백.
+  const viaCollector = await seedCollectorFetch(t, String(author || '').trim(), isbn, env, false);
+  if (viaCollector) return viaCollector.slice(0, targetSeeds);  // collector 가 seed_sentences 적재 완료
   const fresh = await seedFetchFresh(t, String(author || '').trim(), isbn, targetSeeds, env);
   if (fresh.length) await seedWrite(env, bookKey, fresh);
   return fresh.slice(0, targetSeeds);
