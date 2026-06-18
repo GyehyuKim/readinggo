@@ -944,8 +944,7 @@
         if (!authEmail) {
           try { const { data } = await sb().auth.getSession(); authEmail = (data && data.session && data.session.user && data.session.user.email) || null; } catch (e) {} // #646: getSession(로컬)
         }
-        const ver = (typeof window !== 'undefined' && window.RG_VERSION) || null; // 어느 버전 문의인지 추적
-        return unwrap(await sb().from('inquiries').insert({ user_id: id, message: message || '', email: authEmail, app_version: ver }).select().single());
+        return unwrap(await sb().from('inquiries').insert({ user_id: id, message: message || '', email: authEmail }).select().single());
       },
     },
 

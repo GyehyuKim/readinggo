@@ -12,13 +12,6 @@ window.RG_CONFIG = {
   FEED_RECOMMEND: { halfLifeDays: 10, clapWeight: 1.2, poolSize: 120 },
 };
 
-// 앱 버전 (#748) — 프로덕션에선 워커가 배포 ID(짧은 8자)를 자동 주입한다.
-// 워커(worker/index.mjs)가 js/config.js 서빙 시 아래 리터럴을 version_metadata.id 로 치환 →
-// 배포(=커밋)마다 고유 ID가 자동 반영되어 수동 카운터 드리프트가 없다.
-// 아래 값은 워커를 거치지 않는 환경(로컬 파일 열기·wrangler dev 미바인딩)용 폴백.
-// 설정 표시 + 문의 작성 시 첨부 → 운영자가 "어느 배포의 문제/해결인지" 추적.
-window.RG_VERSION = 'local';
-
 // 재키 질문 방향성 프리셋 (#375, companion.md §4.4) — 사람마다 선호하는 질문 결이 달라
 // 프로필/설정에서 고른 값을 companion 호출에 실어 worker 프롬프트에 주입. 자유서술 아님(허들·악용 회피).
 // key 는 worker PRESET_TONE 과 1:1 일치해야 함(둘 다 바꿀 것). label=칩 표시.

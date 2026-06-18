@@ -172,7 +172,7 @@
 | **#170 마을 추천/검색 필터** | 추천·검색 둘 다 `myVillageIds` 제외(렌더 단계 이중 방어) | village(윤지) | 버그 수정 |
 | **공개 범위 토글 라벨** | 아이콘(🌐/👥/🔒) → **텍스트 칩 "전체공개/친구공개/비공개"**(아이콘만은 헷갈림) | social/profile | UX |
 | **틴더 카드 책표지** | ~~카드 중앙 상단에 표지·제목·저자(카드 본문 불변)~~ → **2026-06-15 보류(§8.10/#540)**. 피드 임베드 author 추가는 유지 | social | #186 후속 · 보류(§8.10) |
-| **앱 버전 체계** | `RG_VERSION`(config.js) = 베타 **0.XXX**. **publish 1회마다 +0.001 수동**(≈머지 PR 수). 설정 표시 + 문의에 `app_version` 첨부(10_inquiry_version.sql) → "어느 버전 문제/해결" 추적 | backend/profile | 시작 0.192 |
+| ~~**앱 버전 체계**~~ | **폐기 (#799)** — `RG_VERSION`·버전 표기 전체 제거(불필요). 설정엔 `ReadingGo · beta`만 표시. 문의 `app_version` 첨부 중단(컬럼은 잔존, drop 안 함) | backend/profile | #799 |
 | **문의 답변 메일** | 문의 작성 시 **auth 이메일 캡처**(닉 변경 무관) → admin 대시보드 mailto 답장 + 상태 토글(open/answered/closed) | backend/profile | #189 |
 | **세션 관리** | 멀티 디바이스 유지 + 설정 "다른 기기 로그아웃"(`signOut scope:others`). 기기별 목록은 Phase 2(#191) | profile/backend | #189 |
 
