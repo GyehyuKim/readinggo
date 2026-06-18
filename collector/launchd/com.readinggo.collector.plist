@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ReadingGo 시드 수집기 데몬 (spec seed-collector.md §5) — 맥미니 상시 가동.
+  설치 전 __NODE__ 와 __COLLECTOR_DIR__ 를 실제 경로로 치환(README "launchd" 절 참조).
+    __NODE__          예: /opt/homebrew/bin/node
+    __COLLECTOR_DIR__ 예: /Users/gyehyuk/Desktop/Project_Hyu/ReadingGo/collector
+  설치:  cp 후 launchctl load -w ~/Library/LaunchAgents/com.readinggo.collector.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.readinggo.collector</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__COLLECTOR_DIR__/server.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__COLLECTOR_DIR__</string>
+
+  <!-- 상시 가동: 죽으면 재기동, 부팅 시 자동 시작 -->
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>__COLLECTOR_DIR__/logs/collector.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__COLLECTOR_DIR__/logs/collector.err.log</string>
+</dict>
+</plist>

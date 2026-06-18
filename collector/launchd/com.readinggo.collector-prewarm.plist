@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ReadingGo 시드 선충전 배치 (spec seed-collector.md §3.2) — 매일 새벽 04:00 KST.
+  인기책 N권 선충전 + TTL(#806) 만료분 재크롤. 느긋하게(딜레이) 돌려 차단 회피.
+  설치 전 __NODE__ 와 __COLLECTOR_DIR__ 치환(README 참조).
+  설치:  cp 후 launchctl load -w ~/Library/LaunchAgents/com.readinggo.collector-prewarm.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.readinggo.collector-prewarm</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__COLLECTOR_DIR__/prewarm.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__COLLECTOR_DIR__</string>
+
+  <!-- 매일 04:00(맥미니 로컬 시각 = KST). 데몬과 같은 브라우저 자원이라 새벽 분리. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>4</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>__COLLECTOR_DIR__/logs/prewarm.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__COLLECTOR_DIR__/logs/prewarm.err.log</string>
+</dict>
+</plist>
