@@ -652,6 +652,13 @@ function App() {
   // 이미 등록된 user_book 으로 활성 전환 (서재에서 — 재등록 없이 activeBook.set).
   const handleActivateUserBook = useCallback((item) => {
     if (!item || !item.id) return;
+    // #822: user_book 미존재(위시리스트·검색 등 ubId 없음) 책을 '활성'으로 바꾸면 등록 경로로 위임해
+    // '읽는 중' user_books 행을 실제로 생성한다. (종전: 로컬 화면만 바뀌고 DB 행 미생성 →
+    //  myBooks reading 캐러셀에 없어 다른 책으로 넘기면 그대로 사라짐.)
+    if (!item.ubId) {
+      handleSearchSelectBook({ isbn13: item.isbn, title: item.title, author: item.author, publisher: item.pub, total_pages: item.total, cover_url: item.cover }, 'reading');
+      return;
+    }
     setAppState(s => ({
       ...s,
       book: {
@@ -667,7 +674,7 @@ function App() {
       Promise.resolve(DataStore.activeBook.set(item.ubId)).catch(e => console.warn('[ReadingGo] 활성 전환 실패:', e));
     }
     if (window.rgTrack) window.rgTrack('book_opened', { book_id: item.id || '', entry_point: 'switch' }); // 퍼널 시작 — 서재 활성전환 (#736)
-  }, [switchTab]);
+  }, [switchTab, handleSearchSelectBook]);
   // 활성 책 전환을 전역 노출 — 둥지 캐러셀(#185)이 호출
   useEffect(() => { window.RG_activateBook = handleActivateUserBook; return () => { window.RG_activateBook = null; }; }, [handleActivateUserBook]);
 
