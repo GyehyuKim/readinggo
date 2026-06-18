@@ -95,20 +95,21 @@
 
 - 1·2를 MVP, 3은 후속. 모든 시드는 **출처(sourceName·sourceUrl) 보존**.
 
-### 5.4 서버 — `POST /api/seed` (영속·목표 10개, #774 갱신 2026-06-18)
+### 5.4 서버 — `POST /api/seed` (영속·목표 10개, #774 · TTL #806 갱신 2026-06-18)
 
 - **규칙 (계휴 결정)**: 책 한 권의 **문장(실 유저 + 시드)이 10개 미만**이면 시드를 채워 **10개까지** 만든다. 한 번 채우면 **영속**(다음부터 즉시·콜드스타트에도 유지) → "내가 픽한 책엔 글이 계속 있다".
 - **워커 중심 영속**: `/api/seed`가 **Supabase `seed_sentences`(§5.7)에 직접 read/write**(service role). 클라는 `/api/seed`만 호출(직접 DB 안 건드림).
 - 입력: `{ title, author, isbn, have }` — `have`=클라가 이미 가진 실 공개 문장 수(`byBook` 길이). `need = max(0, 10 - have - 저장된시드수)`.
 - 동작:
   1. `book_key`(= `isbn13` 있으면 그것, 없으면 정규화 제목) 로 `seed_sentences` 조회.
-  2. `have + 저장시드 ≥ 10` → 저장분 그대로 반환(재크롤 안 함).
+  2. `have + 저장시드 ≥ 10` → 저장분 그대로 반환(재크롤 안 함). **일반 요청(`/api/seed`)은 영구 고정** — TTL 재크롤은 cron만(아래 §TTL).
   3. 부족하면 `need`개만큼 네이버 블로그 검색(저자 폴백) → `callLLM` 정제(추출·한 문장·무관/광고 제거, 동명이작 제외) → **새 시드 `seed_sentences` insert**(중복 url 스킵) → 누적 반환.
 - 출력: `{ seeds: [{ text, sourceName, sourceUrl }] }` (저장분 + 신규, 최대 10−have).
 - 키(네이버·service role)는 **서버 secret**, 클라 노출 금지. 실패/0건 → 빈 배열(무중단).
 - 비용: 책당 1회 충전 후 영속 → 반복 호출은 DB read만(LLM·네이버 재호출 없음).
 - **전 책 백필(계휴 결정)**: 책 수가 적고 lazy 첫 호출이 느리므로, `docs/readinggo/supabase/seed_backfill.mjs`로 **카탈로그 전 책을 1회 선충전**(books 순회 → `/api/seed have=0` → seed_sentences 채움, 제한 동시성). idempotent(이미 채워진 책은 재호출 비용 0). **인기순(`sales_point` desc)으로 순회** — 베스트/스테디셀러부터.
 - **인기 우선 cron 선충전(#774)**: 워커 `scheduled()`(일 1회)에 `prewarmSeeds(env)` — `books`를 `sales_point` desc 상위 N권(기본 150) `seedFill`. idempotent라 사실상 **신규·미충전 인기 책만** 일함 → 수동 백필 없이도 자주 찾는 책이 미리 채워짐. 쿼터·비용 안전.
+- **시드 TTL — 트렌드 갱신(#806, cron 전용)**: 베스트셀러 리뷰는 시간에 따라 바뀐다. cron이 인기책을 돌 때 **가장 최신 시드(`seed_sentences.created_at`)가 `SEED_TTL_DAYS`(기본 30일) 경과**면 만료로 보고 **재크롤 → 기존 시드 삭제 후 새 시드로 교체**(`seedRefresh`). 재크롤이 0건이면 **기존 유지**(빈 화면 방지). **일일 재크롤 상한 `SEED_REFRESH_DAILY_CAP`(기본 20)** 로 만료 책이 한꺼번에 몰려도 쿼터·비용을 분산. **일반 `/api/seed` 요청에는 미적용**(영구 고정 유지) — TTL 갱신은 cron만 수행.
 - **쿼리 폴백**: `제목 저자 서평 → 서평 → 리뷰 → 독후감 → 책` 순으로 넓혀 0건율↓(네이버 AND 매칭 보완). 동명이작은 LLM 프롬프트로 제외.
 - ⚠️ **커버리지 한계**: 시드는 네이버가 실제 반환하는 양에 달림. 검증 환경에선 일부 인기 책도 0건 — 실제 네이버 도달/키 제한 여부는 네이버 콘솔 API 테스트로 확정 필요(추정 금지).
 

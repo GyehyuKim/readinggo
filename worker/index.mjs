@@ -455,6 +455,8 @@ async function naverBlogSearch(query, env) {
 }
 
 const SEED_TARGET = 10;   // 책당 목표 문장 수(실 유저 + 시드)
+const SEED_TTL_DAYS = 30;          // #806: 시드 신선도 — 가장 최신 시드가 이 일수 경과면 cron 재크롤(트렌드 갱신)
+const SEED_REFRESH_DAILY_CAP = 20; // #806: 일일 재크롤 상한 — 네이버·LLM 쿼터·비용 안전(만료 책이 한꺼번에 몰려도 분산)
 
 // 책 키 — isbn13 우선, 없으면 정규화 제목(소문자·공백 접기). Phase 0/1·데모 공통.
 function seedBookKey(title, isbn) {
@@ -486,6 +488,34 @@ async function seedWrite(env, bookKey, seeds) {
       body: JSON.stringify(seeds.map((s) => ({ book_key: bookKey, text: s.text, source_name: s.sourceName || null, source_url: s.sourceUrl || null }))),
     });
   } catch (e) { /* best-effort */ }
+}
+// 가장 최신 시드의 created_at (#806 TTL 판정용). 없으면 null. 경량 쿼리(limit 1).
+async function seedLatestAt(env, bookKey) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  try {
+    const u = `${env.SUPABASE_URL}/rest/v1/seed_sentences?book_key=eq.${encodeURIComponent(bookKey)}&select=created_at&order=created_at.desc&limit=1`;
+    const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return (rows && rows[0] && rows[0].created_at) || null;
+  } catch (e) { return null; }
+}
+// ISO 시각이 days 일 이상 지났나 (#806). 파싱 실패·없음이면 false(보수적 — 재크롤 안 함).
+function ttlExpired(iso, days) {
+  const t = Date.parse(iso);
+  if (isNaN(t)) return false;
+  return (Date.now() - t) > days * 86400000;
+}
+// 트렌드 갱신(#806) — 기존 시드 삭제 후 새 시드로 교체. fresh 있을 때만 호출(빈 결과로 비우지 않음).
+async function seedRefresh(env, bookKey, seeds) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !seeds.length) return;
+  try {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/seed_sentences?book_key=eq.${encodeURIComponent(bookKey)}`, {
+      method: 'DELETE',
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+    });
+  } catch (e) { /* best-effort — 삭제 실패해도 아래 write 로 신규 append */ }
+  await seedWrite(env, bookKey, seeds);
 }
 // 검색용 제목 정규화 (#805) — 부제·시리즈 권차·개정판 표기 제거로 베스트셀러 커버리지 회복.
 // DB 제목 전체("사피엔스 - 유인원에서…")가 네이버 AND 매칭에서 0건을 유발 → 앞 핵심 제목만 남긴다.
@@ -535,7 +565,8 @@ async function seedFetchFresh(title, author, want, env) {
 }
 
 // 시드 채움 코어 — seedProxy(요청)·prewarmSeeds(cron) 공용. seed_sentences read/write.
-async function seedFill(env, { title, author, isbn, have }) {
+// forceRefresh(#806): 이미 충전된 책이라도 재크롤해 트렌드 갱신(cron이 TTL 만료 시에만 true 전달).
+async function seedFill(env, { title, author, isbn, have, forceRefresh }) {
   const t = String(title || '').trim();
   if (!t) return [];
   const targetSeeds = Math.max(0, SEED_TARGET - Math.max(0, have || 0));
@@ -543,7 +574,13 @@ async function seedFill(env, { title, author, isbn, have }) {
   const bookKey = seedBookKey(t, isbn);
   // 1) 저장분 먼저(영속). 한 번 충전된 책은 네이버·LLM 재호출 0.
   const stored = await seedRead(env, bookKey);
-  if (stored.length > 0) return stored.slice(0, targetSeeds);
+  if (stored.length > 0 && !forceRefresh) return stored.slice(0, targetSeeds);
+  // 1-b) TTL 만료 재크롤(#806) — 새 시드를 얻으면 교체, 못 얻으면 기존 유지(빈 화면 방지).
+  if (stored.length > 0 && forceRefresh) {
+    const refreshed = await seedFetchFresh(t, String(author || '').trim(), SEED_TARGET, env);
+    if (refreshed.length) { await seedRefresh(env, bookKey, refreshed); return refreshed.slice(0, targetSeeds); }
+    return stored.slice(0, targetSeeds);
+  }
   // 2) 미충전 책만 1회 크롤 → 영속 저장.
   const fresh = await seedFetchFresh(t, String(author || '').trim(), targetSeeds, env);
   if (fresh.length) await seedWrite(env, bookKey, fresh);
@@ -571,8 +608,17 @@ async function prewarmSeeds(env, limit = 150) {
     const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
     if (r.ok) books = await r.json();
   } catch (e) { return; }
+  // #806: 만료(TTL 경과) 인기책은 재크롤로 트렌드 갱신. 일일 캡으로 쿼터·비용 안전.
+  let refreshedCount = 0;
   for (const b of (books || [])) {
-    try { await seedFill(env, { title: b.title, author: b.author, isbn: b.isbn13, have: 0 }); } catch (e) { /* 개별 실패 스킵 */ }
+    try {
+      let force = false;
+      if (refreshedCount < SEED_REFRESH_DAILY_CAP) {
+        const latest = await seedLatestAt(env, seedBookKey(b.title, b.isbn13));
+        if (latest && ttlExpired(latest, SEED_TTL_DAYS)) { force = true; refreshedCount++; }
+      }
+      await seedFill(env, { title: b.title, author: b.author, isbn: b.isbn13, have: 0, forceRefresh: force });
+    } catch (e) { /* 개별 실패 스킵 */ }
   }
 }
 
