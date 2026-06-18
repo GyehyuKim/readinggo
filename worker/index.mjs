@@ -418,7 +418,7 @@ function stripHtml(s) {
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ').trim();
 }
-const SEED_EXTRACT_SYSTEM = '너는 블로그·서점 리뷰 글 조각에서 "그 책을 읽은 독자가 직접 쓴 솔직한 감상 한 문장"을 원문 그대로 골라내는 선별기다. 절대 새로 쓰지 마라. [고른다] 독자 개인의 느낌·생각·경험이 담긴 1인칭 감상(예: "나는 이 부분에서 한참 멈췄다", "오래 곱씹게 되는 마음이 남는다"). [원문 그대로] 반드시 입력에 실제로 있는 문장을 글자 그대로 가져온다. 요약·재작성·다듬기·창작 금지. 긴 문장은 자연스러운 한 문장 경계에서 잘라내는 것만 허용. [버린다(건너뜀)] 출판사 책 소개·줄거리 요약·평론조 단정("~한 작품이다/명저다/소설이다"), 광고·홍보·구매 안내 문구, 별점·방문자수·해시태그·블로그 군더더기, 책과 무관한 글, 동명의 영화·드라마·음반 등. 쓸 만한 원문 감상이 없으면 그 항목은 건너뛴다(억지로 만들지 마라). [출력] JSON 배열만: [{"i":원본인덱스,"text":"입력에서 그대로 가져온 한 문장"}]. 결과가 하나여도 배열로 감싼다. 없으면 []. 설명·코드펜스 없이 JSON만.';
+const SEED_EXTRACT_SYSTEM = '입력은 한 책의 블로그 글에서 추출한 "인용 후보"들이다. 이 중 그 책의 본문을 그대로 옮긴 "책 원문 인용"만 골라라. [고른다] 책 본문 문장(작가가 책에 쓴 문장). [버린다] 소제목·목차 라벨("~에 대하여","탄생 배경","책 속의 한 문장"), 블로거의 감상·해설·생각, 책 소개·줄거리·작가 소개, "명언/명대사/배경화면" 같은 꼬리표나 메타 문구, 출처 표기 단독. [원문 그대로] 글자 수정·재작성 금지. 인용 뒤에 출처 꼬리표(예: "\'데미안\' 110p 헤르만 헤세 문학동네")가 붙어 있으면 그 꼬리표만 떼고 책 문장만 남겨라. 확신이 없으면(글쓴이 생각인지 책 원문인지 모호하면) 버려라. [출력] JSON 배열만: [{"i":원본인덱스,"text":"책 원문 인용"}]. 결과가 하나여도 배열로 감싼다. 없으면 []. 설명·코드펜스 없이 JSON만.';
 
 function parseSeedJson(s) {
   if (!s) return [];
@@ -526,65 +526,77 @@ function seedSearchTitle(title) {
   t = t.split(/\s+[-–—]\s+|[:(\[【「《]/)[0];
   return t.replace(/\s{2,}/g, ' ').trim();
 }
-// 알라딘 독자 리뷰 제목(마이리뷰·100자평 제목) — 독자가 직접 쓴 짧은 원문 한 줄(보조 소스, #774).
-// 알라딘 API는 리뷰 본문을 안 주므로 title 만 수집. 응답 구조 변동 대비 방어적 파싱.
-async function seedAladinReviews(isbn, env) {
-  const key = env.ALADIN_TTB_KEY;
-  const i = String(isbn || '').replace(/[^0-9Xx]/g, '');
-  if (!key || i.length < 10) return [];
+// HTML 엔티티 디코드(#774) — 블로그 인용문 내 &#x27;·&quot; 등 복원.
+function decodeSeedEntities(s) {
+  return String(s || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+}
+// 네이버 모바일 블로그 본문에서 책 인용 후보 추출(#774) — blockquote·스마트에디터 인용 블록.
+// 책 인용은 글쓴이 감상과 달리 인용 블록으로 표시되는 경우가 많음 → 블록만 골라 '글쓴이 생각' 혼입을 줄인다.
+const SEED_MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148';
+async function seedBlogQuotes(post) {
+  const m = String(post.link || '').match(/blog\.naver\.com\/([^/?]+)\/(\d+)/);
+  if (!m) return [];
+  let html;
   try {
-    const url = `${ALADIN}ItemLookUp.aspx?ttbkey=${key}&itemIdType=ISBN13&ItemId=${encodeURIComponent(i)}`
-      + `&output=js&Version=20131101&OptResult=reviewList`;
-    const items = await aladinFetch(url);
-    const it = (items && items[0]) || {};
-    const rl = (it.subInfo && it.subInfo.reviewList) || it.reviewList || [];
-    return (Array.isArray(rl) ? rl : []).map((r) => {
-      const rv = (r && r.review) || r || {};   // 구조 변동 대비
-      const title = stripHtml(String(rv.title || '')).trim();
-      return title.length >= 8 ? { snippet: title, url: rv.link || '', blog: stripHtml(String(rv.writer || '')).trim() || '알라딘 독자' } : null;
-    }).filter(Boolean);
+    const r = await fetch(`https://m.blog.naver.com/${m[1]}/${m[2]}`, { headers: { 'User-Agent': SEED_MOBILE_UA } });
+    if (!r.ok) return [];
+    html = await r.text();
   } catch (e) { return []; }
+  const clean = (s) => decodeSeedEntities(s.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+  const out = [];
+  for (const mm of html.matchAll(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/g)) {
+    const t = clean(mm[1]); if (t.length >= 10 && t.length <= 300) out.push({ snippet: t, url: post.link, blog: post.blog });
+  }
+  for (const mm of html.matchAll(/<div class="se-quote[^"]*"[\s\S]*?>([\s\S]*?)<\/div>\s*<\/div>/g)) {
+    const t = clean(mm[1]); if (t.length >= 10 && t.length <= 300) out.push({ snippet: t, url: post.link, blog: post.blog });
+  }
+  return out.slice(0, 8);
 }
 
-// 독자가 쓴 한 문장을 원문 그대로 발췌(#774 컨셉). LLM은 선별·필터만, 재작성 금지.
-// 소스: 네이버 블로그 독자 글(스니펫) + 알라딘 독자 리뷰 제목. 영속 저장은 호출부에서.
+// 블로그 글 속 '책 원문 인용'을 그대로 발췌(#774 컨셉). LLM은 인용 선별·노이즈 필터만, 재작성 금지.
+// 소스: 네이버 블로그 본문 인용 블록. (감상 추출·알라딘 리뷰는 폐기 — 글쓴이 생각/소개문 혼입·API 미제공.)
 async function seedFetchFresh(title, author, isbn, want, env) {
-  const a = author ? ' ' + author : '';
+  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return [];
   const st = seedSearchTitle(title);
   const baseTitles = (st && st !== title) ? [st, title] : [title];
-  // 개인 후기 유도어(읽고·독후감·후기·감상·한줄평). '책'·'서평'(광고·평론·소개 유입원)은 폐기 — #774 컨셉.
-  const queries = baseTitles.flatMap((t) => [t + a + ' 읽고', t + ' 독후감', t + a + ' 후기', t + ' 감상', t + ' 한줄평']);
-  let cands = [];
-  if (env.NAVER_CLIENT_ID && env.NAVER_CLIENT_SECRET) {
-    let items = [];
-    for (const q of queries) { items = await naverBlogSearch(q, env); if (items.length) break; }
-    cands = items.map((it) => ({ snippet: stripHtml(it.description), url: it.link, blog: stripHtml(it.bloggername) }))
-      .filter((c) => c.snippet && c.snippet.length >= 12).slice(0, 10);
+  // 책 인용이 담긴 글 유도 — '책속 문장/밑줄/인상깊은 구절'.
+  const queries = baseTitles.flatMap((t) => [t + ' 책속 문장', t + ' 밑줄', t + ' 인상깊은 구절']);
+  let posts = [];
+  for (const q of queries) {
+    const items = await naverBlogSearch(q, env);
+    posts = posts.concat((items || []).map((it) => ({ link: it.link, blog: stripHtml(it.bloggername) })));
+    if (posts.length >= 6) break;
   }
-  // 보조 소스: 알라딘 독자 리뷰 제목(원문 한 줄).
-  cands = cands.concat(await seedAladinReviews(isbn, env)).slice(0, 14);
+  posts = posts.slice(0, 6);
+  if (!posts.length) return [];
+  // 각 블로그 본문에서 인용 후보 추출(병렬).
+  const cands = (await Promise.all(posts.map((p) => seedBlogQuotes(p).catch(() => [])))).flat().slice(0, 24);
   if (!cands.length) return [];
-  // LLM 없으면 빈 배열 — raw 스니펫 저장 금지(가짜·군더더기 방지, #774).
+  // LLM 없으면 빈 배열 — 인용 선별 없이 raw 블록 저장 금지(소제목·감상 혼입 방지).
   if (!env.LLM_BASE_URL || !env.LLM_MODEL) return [];
   let parsed = [];
   try {
-    const listText = cands.map((c, i) => `[${i}] ${c.snippet.slice(0, 220)}`).join('\n');
+    const listText = cands.map((c, i) => `[${i}] ${c.snippet.slice(0, 240)}`).join('\n');
     const out = await callLLM({
       messages: [
         { role: 'system', content: SEED_EXTRACT_SYSTEM },
-        { role: 'user', content: `책: ${title}${author ? ' (저자: ' + author + ')' : ''}\n독자 글 조각(블로그·서점 리뷰):\n${listText}` },
-      ], env, maxTokens: 900, temperature: 0.2,
+        { role: 'user', content: `책: ${title}${author ? ' (저자: ' + author + ')' : ''}\n인용 후보:\n${listText}` },
+      ], env, maxTokens: 900, temperature: 0.1,
     });
     parsed = parseSeedJson(out);
   } catch (e) { return []; }
-  // 원문 발췌 검증(#774) — LLM이 재작성하지 않고 원문에서 그대로 뽑았는지. 공백 제거 후 앞부분 포함 확인.
+  // 원문 발췌 검증(#774) — LLM이 재작성하지 않고 후보 원문에서 그대로 뽑았는지. 공백 제거 후 앞부분 포함 확인.
   const norm = (s) => String(s || '').replace(/\s+/g, '');
   return parsed.map((p) => {
     const c = cands[p.i];
     if (!c || !p.text) return null;
     const t = norm(p.text), src = norm(c.snippet);
     if (t.length < 8) return null;
-    // 원문에 text 앞부분(8~12자)이 실제로 존재해야 발췌로 인정 — 없으면 재작성 의심 → 버림.
+    // 후보 원문에 text 앞부분(8~12자)이 실제로 존재해야 발췌로 인정 — 없으면 재작성 의심 → 버림.
     if (!src.includes(t.slice(0, 12)) && !src.includes(t.slice(0, 8))) return null;
     return { text: p.text, sourceName: c.blog || '블로그', sourceUrl: c.url };
   }).filter(Boolean).slice(0, want);
