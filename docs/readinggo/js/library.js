@@ -428,7 +428,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             <div style={{fontSize:24, marginBottom:8}}>📭</div>
             <div style={{fontSize:13, fontWeight:700}}>
               {activeSubtab === 'wishlist' && '찜한 책이 없어요'}
-              {activeSubtab === 'reading' && '읽는 책이 없어요'}
+              {activeSubtab === 'reading' && '읽고 있는 책이 없어요'}
               {activeSubtab === 'completed' && (ratingFilter.size ? '이 별점의 완독한 책이 없어요' : '완독한 책이 없어요')}
               {activeSubtab === 'aborted' && '중단한 책이 없어요'}
             </div>
@@ -510,7 +510,7 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
           if (window.shareService) window.shareService({ source: 'library', sentence: rep });
         }}
           style={{marginTop:20, width:'100%', padding:'12px', borderRadius:10, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
-          {window.rgIcon('share',15)} 친구에게 ReadingGo 권하기
+          {window.rgIcon('share',15)} 친구에게 ReadingGo 공유하기
         </button>
 
         {/* 데이터 내보내기 (#568 — 설정에서 서재로 이동, 내 책·한 문장 맥락과 직결) */}
