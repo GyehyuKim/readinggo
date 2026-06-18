@@ -418,7 +418,7 @@ function stripHtml(s) {
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ').trim();
 }
-const SEED_EXTRACT_SYSTEM = '너는 책 서평 블로그 스니펫에서 그 책(도서)에 대한 "독자의 한 문장 감상"만 뽑는 추출기다. 각 스니펫에서 책에 대한 인상·감상이 담긴 부분을 한 문장으로 자연스럽게 다듬어라(원문 의미 보존, 광고·방문자수·블로그 군더더기·해시태그 제거, 한 문장으로 압축). **동명의 영화·드라마·음반·동명이작 등 그 "책"이 아닌 것에 대한 글, 또는 감상이 없는 글은 반드시 건너뛴다.** 출력은 JSON 배열만: [{"i":원본인덱스,"text":"한 문장 감상"}]. 결과가 하나여도 반드시 배열로 감싸라. 없으면 빈 배열 []. 인용은 한 문장으로 제한하고 통째 전재하지 마라. 설명·코드펜스 없이 JSON 배열만.';
+const SEED_EXTRACT_SYSTEM = '너는 블로그·서점 리뷰 글 조각에서 "그 책을 읽은 독자가 직접 쓴 솔직한 감상 한 문장"을 원문 그대로 골라내는 선별기다. 절대 새로 쓰지 마라. [고른다] 독자 개인의 느낌·생각·경험이 담긴 1인칭 감상(예: "나는 이 부분에서 한참 멈췄다", "오래 곱씹게 되는 마음이 남는다"). [원문 그대로] 반드시 입력에 실제로 있는 문장을 글자 그대로 가져온다. 요약·재작성·다듬기·창작 금지. 긴 문장은 자연스러운 한 문장 경계에서 잘라내는 것만 허용. [버린다(건너뜀)] 출판사 책 소개·줄거리 요약·평론조 단정("~한 작품이다/명저다/소설이다"), 광고·홍보·구매 안내 문구, 별점·방문자수·해시태그·블로그 군더더기, 책과 무관한 글, 동명의 영화·드라마·음반 등. 쓸 만한 원문 감상이 없으면 그 항목은 건너뛴다(억지로 만들지 마라). [출력] JSON 배열만: [{"i":원본인덱스,"text":"입력에서 그대로 가져온 한 문장"}]. 결과가 하나여도 배열로 감싼다. 없으면 []. 설명·코드펜스 없이 JSON만.';
 
 function parseSeedJson(s) {
   if (!s) return [];
@@ -526,41 +526,67 @@ function seedSearchTitle(title) {
   t = t.split(/\s+[-–—]\s+|[:(\[【「《]/)[0];
   return t.replace(/\s{2,}/g, ' ').trim();
 }
-// 네이버+LLM 으로 신규 시드 추출(최대 want개). 영속 저장은 호출부에서.
-async function seedFetchFresh(title, author, want, env) {
-  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return [];
-  // 다중 쿼리 폴백 — '제목 저자 서평'(정밀) → 점차 넓힘. 첫 비공백에서 멈춤(불필요 호출↓).
-  // '서평'만으론 0건 잦음(AND 매칭) → 리뷰·독후감·제목 단독까지 넓혀 커버리지↑.
-  // #805: 부제 제거 핵심 제목(st) 우선, 정규화로 달라졌으면 원본 제목도 폴백에 포함.
+// 알라딘 독자 리뷰 제목(마이리뷰·100자평 제목) — 독자가 직접 쓴 짧은 원문 한 줄(보조 소스, #774).
+// 알라딘 API는 리뷰 본문을 안 주므로 title 만 수집. 응답 구조 변동 대비 방어적 파싱.
+async function seedAladinReviews(isbn, env) {
+  const key = env.ALADIN_TTB_KEY;
+  const i = String(isbn || '').replace(/[^0-9Xx]/g, '');
+  if (!key || i.length < 10) return [];
+  try {
+    const url = `${ALADIN}ItemLookUp.aspx?ttbkey=${key}&itemIdType=ISBN13&ItemId=${encodeURIComponent(i)}`
+      + `&output=js&Version=20131101&OptResult=reviewList`;
+    const items = await aladinFetch(url);
+    const it = (items && items[0]) || {};
+    const rl = (it.subInfo && it.subInfo.reviewList) || it.reviewList || [];
+    return (Array.isArray(rl) ? rl : []).map((r) => {
+      const rv = (r && r.review) || r || {};   // 구조 변동 대비
+      const title = stripHtml(String(rv.title || '')).trim();
+      return title.length >= 8 ? { snippet: title, url: rv.link || '', blog: stripHtml(String(rv.writer || '')).trim() || '알라딘 독자' } : null;
+    }).filter(Boolean);
+  } catch (e) { return []; }
+}
+
+// 독자가 쓴 한 문장을 원문 그대로 발췌(#774 컨셉). LLM은 선별·필터만, 재작성 금지.
+// 소스: 네이버 블로그 독자 글(스니펫) + 알라딘 독자 리뷰 제목. 영속 저장은 호출부에서.
+async function seedFetchFresh(title, author, isbn, want, env) {
   const a = author ? ' ' + author : '';
   const st = seedSearchTitle(title);
   const baseTitles = (st && st !== title) ? [st, title] : [title];
-  const queries = baseTitles.flatMap((t) => [t + a + ' 서평', t + ' 서평', t + a + ' 리뷰', t + ' 독후감', t + ' 책']);
-  let items = [];
-  for (const q of queries) {
-    items = await naverBlogSearch(q, env);
-    if (items.length) break;
+  // 개인 후기 유도어(읽고·독후감·후기·감상·한줄평). '책'·'서평'(광고·평론·소개 유입원)은 폐기 — #774 컨셉.
+  const queries = baseTitles.flatMap((t) => [t + a + ' 읽고', t + ' 독후감', t + a + ' 후기', t + ' 감상', t + ' 한줄평']);
+  let cands = [];
+  if (env.NAVER_CLIENT_ID && env.NAVER_CLIENT_SECRET) {
+    let items = [];
+    for (const q of queries) { items = await naverBlogSearch(q, env); if (items.length) break; }
+    cands = items.map((it) => ({ snippet: stripHtml(it.description), url: it.link, blog: stripHtml(it.bloggername) }))
+      .filter((c) => c.snippet && c.snippet.length >= 12).slice(0, 10);
   }
-  const cands = items.map((it) => ({ snippet: stripHtml(it.description), url: it.link, blog: stripHtml(it.bloggername) }))
-    .filter((c) => c.snippet && c.snippet.length >= 12).slice(0, 10);
+  // 보조 소스: 알라딘 독자 리뷰 제목(원문 한 줄).
+  cands = cands.concat(await seedAladinReviews(isbn, env)).slice(0, 14);
   if (!cands.length) return [];
-  if (!env.LLM_BASE_URL || !env.LLM_MODEL) {
-    return cands.slice(0, want).map((c) => ({ text: c.snippet.slice(0, 120), sourceName: c.blog || '블로그', sourceUrl: c.url }));
-  }
+  // LLM 없으면 빈 배열 — raw 스니펫 저장 금지(가짜·군더더기 방지, #774).
+  if (!env.LLM_BASE_URL || !env.LLM_MODEL) return [];
   let parsed = [];
   try {
     const listText = cands.map((c, i) => `[${i}] ${c.snippet.slice(0, 220)}`).join('\n');
     const out = await callLLM({
       messages: [
         { role: 'system', content: SEED_EXTRACT_SYSTEM },
-        { role: 'user', content: `책: ${title}${author ? ' (저자: ' + author + ')' : ''}\n블로그 서평 스니펫:\n${listText}` },
-      ], env, maxTokens: 900, temperature: 0.3,
+        { role: 'user', content: `책: ${title}${author ? ' (저자: ' + author + ')' : ''}\n독자 글 조각(블로그·서점 리뷰):\n${listText}` },
+      ], env, maxTokens: 900, temperature: 0.2,
     });
     parsed = parseSeedJson(out);
   } catch (e) { return []; }
+  // 원문 발췌 검증(#774) — LLM이 재작성하지 않고 원문에서 그대로 뽑았는지. 공백 제거 후 앞부분 포함 확인.
+  const norm = (s) => String(s || '').replace(/\s+/g, '');
   return parsed.map((p) => {
     const c = cands[p.i];
-    return c ? { text: p.text, sourceName: c.blog || '블로그', sourceUrl: c.url } : null;
+    if (!c || !p.text) return null;
+    const t = norm(p.text), src = norm(c.snippet);
+    if (t.length < 8) return null;
+    // 원문에 text 앞부분(8~12자)이 실제로 존재해야 발췌로 인정 — 없으면 재작성 의심 → 버림.
+    if (!src.includes(t.slice(0, 12)) && !src.includes(t.slice(0, 8))) return null;
+    return { text: p.text, sourceName: c.blog || '블로그', sourceUrl: c.url };
   }).filter(Boolean).slice(0, want);
 }
 
@@ -577,12 +603,12 @@ async function seedFill(env, { title, author, isbn, have, forceRefresh }) {
   if (stored.length > 0 && !forceRefresh) return stored.slice(0, targetSeeds);
   // 1-b) TTL 만료 재크롤(#806) — 새 시드를 얻으면 교체, 못 얻으면 기존 유지(빈 화면 방지).
   if (stored.length > 0 && forceRefresh) {
-    const refreshed = await seedFetchFresh(t, String(author || '').trim(), SEED_TARGET, env);
+    const refreshed = await seedFetchFresh(t, String(author || '').trim(), isbn, SEED_TARGET, env);
     if (refreshed.length) { await seedRefresh(env, bookKey, refreshed); return refreshed.slice(0, targetSeeds); }
     return stored.slice(0, targetSeeds);
   }
   // 2) 미충전 책만 1회 크롤 → 영속 저장.
-  const fresh = await seedFetchFresh(t, String(author || '').trim(), targetSeeds, env);
+  const fresh = await seedFetchFresh(t, String(author || '').trim(), isbn, targetSeeds, env);
   if (fresh.length) await seedWrite(env, bookKey, fresh);
   return fresh.slice(0, targetSeeds);
 }
