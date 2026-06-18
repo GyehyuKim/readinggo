@@ -15,7 +15,7 @@ function rgRelTime(iso) {
 
 function SocialView({ state }) {
   const { useState, useEffect } = React;
-  const [tab, setTab] = useState('recent');  // 'following' | 'recent' | 'recommend' (#8)
+  const [tab, setTab] = useState('recommend');  // 'following' | 'recommend' (#789: '최근' 탭 제거, 추천 메인화)
   const [items, setItems] = useState(null);  // null=로딩, []=빈
   const [findOpen, setFindOpen] = useState(false); // 친구 찾기 패널 (#250)
   const [fq, setFq] = useState('');
@@ -74,7 +74,7 @@ function SocialView({ state }) {
   useEffect(() => {
     let alive = true;
     setItems(null);
-    // 팔로우 / 최근(전체 공개) / 추천(같은 책) — 양 어댑터 정규화.
+    // 팔로우 / 추천(같은 책) — 양 어댑터 정규화. feed()는 메서드 부재 시 충전 폴백(#789 — '최근' 탭 제거됐으나 함수는 유지).
     const SS = DataStore.sentences || {};
     const src = (tab === 'following' && SS.feedFollowing) ? SS.feedFollowing({ limit: 50 })
       : (tab === 'recommend' && SS.feedRecommended) ? SS.feedRecommended({ limit: 50 })
@@ -192,9 +192,9 @@ function SocialView({ state }) {
           {fq.trim() && fres.length === 0 && <div style={{ padding: 12, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>검색 결과 없음</div>}
         </div>
       )}
-      {/* ③ 팔로우/최근/추천 탭 (#7) */}
+      {/* ③ 팔로우/추천 탭 (#789: '최근' 제거, 추천 메인) */}
       <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
-        {[['following', '팔로우'], ['recent', '최근'], ['recommend', '추천']].map(([id, label]) => (
+        {[['following', '팔로우'], ['recommend', '추천']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             style={{ padding: '6px 16px', borderRadius: 999, border: tab === id ? 'none' : '1px solid var(--line)', background: tab === id ? 'var(--ink)' : 'transparent', color: tab === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.2px' }}>
             {label}
@@ -208,9 +208,7 @@ function SocialView({ state }) {
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', lineHeight: 1.8, fontSize: 14 }}>
           {tab === 'following'
             ? (<>팔로우한 사람의 한 문장이 아직 없어요.<br />다른 독자 프로필에서 팔로우해보세요!</>)
-            : tab === 'recommend'
-            ? (<>추천할 한 문장이 아직 없어요.<br />책을 등록하면 같은 책 독자의 문장을 추천해드려요.</>)
-            : (<>아직 공개된 한 문장이 없어요.<br />둥지에서 첫 문장을 남겨보세요!</>)}
+            : (<>추천할 한 문장이 아직 없어요.<br />책을 등록하면 같은 책 독자의 문장을 추천해드려요.</>)}
         </div>
       ) : (
         <div style={{ padding: '0 16px' }}>{items.map((it, i) => (<SentenceCard key={it.id || i} item={it} bookId={it.bookId} />))}</div>
