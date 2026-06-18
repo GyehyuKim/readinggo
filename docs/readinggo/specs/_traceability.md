@@ -28,7 +28,7 @@
 ## feed.md (소셜)
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
-| §5.7 피드 3탭·틴더카드·짹·책갈피·본인비활성 | ✅ | social.js:27-29,60 · TinderCards · claps.toggle/isMine |
+| §5.7 피드 3탭·짹·책갈피·본인비활성 | ✅ | social.js:27-29,60 · claps.toggle/isMine |
 | §5.7.1 페이지 블라인드·visibility 3단계 | ✅ | components.js isSpoiler · library.js cycleVis |
 | §5.7 "이번 주 신규 시작러 Top3" | ✅ | #286 social_newcomers_weekly RPC · social.js 상단 스트립 |
 | **§5.7.1 친구 찾기 패널(NPC_SEARCH)** | ❌ | social UI에 친구찾기 패널 미발견(backend users.search는 있음) |

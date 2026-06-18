@@ -33,7 +33,7 @@ FEATURE_FILES = [
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
     "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js", "book-detail-modal.js",
     "companion.js", "ocr-crop-overlay.js", "ceremony.js", "nest-theatre.js", "follow-list-modal.js",
-    "user-profile-modal.js", "sentence-collection-modal.js", "tinder-cards.js",
+    "user-profile-modal.js", "sentence-collection-modal.js",
     "shelf-import.js",
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
@@ -195,8 +195,6 @@ INVARIANTS = [
         ["nest.js"], r"switchBook"),
     ("C", "present", "운영 대시보드 (profile.md §5.8.9, #161)",
         ["admin-dashboard.js"], r"AdminDashboardModal"),  # #761 모듈화: components.js → admin-dashboard.js
-    ("C", "present", "한 문장 틴더 카드 (feed.md, #186)",
-        ["tinder-cards.js"], r"TinderCards"),
     ("C", "present", "운영자 문의 (profile.md 설정, #문의)",
         ["datastore-supabase.js"], r"inquiries"),
     # 온보딩 — 정의 없는 Sparrow 컴포넌트 참조 금지 (#527). 🐦 이모지로 통일, 재도입 시 렌더 크래시.

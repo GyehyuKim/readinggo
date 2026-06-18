@@ -46,7 +46,7 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 |---|---|---|---|
 | `UserProfileModal` | ~218 | `user-profile-modal.js` | ✅ #780 |
 | `SentenceCollectionModal` | ~108 | `sentence-collection-modal.js` | ✅ #780 (SentenceActions 의존) |
-| `TinderCards` | ~90 | `tinder-cards.js` | ✅ #780 (#186 보류·보존 컴포넌트) |
+| ~~`TinderCards`~~ | ~90 | ~~`tinder-cards.js`~~ | #780 추출 후 **#782 완전 삭제** (#186 제품 범위 제외 확정) |
 | `ActivityHeatmap` | ~65 | (잔류) | core |
 | `ConsentBanner` | ~38 | (잔류) | core — `RG_consent`/`RG_applyConsent`와 동거 |
 | `StreakCalendarModal` | ~48 | (잔류) | core |
