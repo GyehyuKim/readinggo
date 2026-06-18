@@ -49,7 +49,7 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 | ~~`TinderCards`~~ | ~90 | ~~`tinder-cards.js`~~ | #780 추출 후 **#782 완전 삭제** (#186 제품 범위 제외 확정) |
 | `ActivityHeatmap` | ~65 | (잔류) | core |
 | `ConsentBanner` | ~38 | (잔류) | core — `RG_consent`/`RG_applyConsent`와 동거 |
-| `StreakCalendarModal` | ~48 | (잔류) | core |
+| ~~`StreakCalendarModal`~~ | ~48 | **삭제됨(#833)** | 미사용(렌더 호출 0)·`ActivityHeatmap`이 독서활동 시각화 대체 |
 | `Toast`·`BookCover`·`Confetti` | ~70 합 | (잔류) | 공유 프리미티브 |
 
 - 공유 컨텍스트·유틸(`SpoilerContext`·`isSentenceBlinded`·`showToast`·`rgTrack`·`decodeEntities`)·동의(`RG_consent`/`RG_applyConsent`)는 `components.js`에 **core 호스트로 잔류**(다수 파일이 window 전역으로 소비). 순수 이동: 훅만 재선언, `DataStore`는 bare(런타임 재할당).

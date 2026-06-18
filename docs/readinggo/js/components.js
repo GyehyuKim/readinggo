@@ -189,55 +189,6 @@ function decodeEntities(s) {
 }
 window.decodeEntities = decodeEntities; // sentence-card.js 등 추출 모듈이 사용 (#761)
 
-/* ── StreakCalendarModal: 🔥 탭 → 최근 5주 스트릭 캘린더(#173). 읽은 날 🔥 · 방패 지킨 날 🔵 ── */
-function StreakCalendarModal({ streak, onClose }) {
-  const [cal, setCal] = useState(undefined);
-  useEffect(() => {
-    let alive = true;
-    const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
-    Promise.resolve((DS.sessions && DS.sessions.calendar) ? DS.sessions.calendar(35) : { readDates: [], shieldDates: [] })
-      .then(c => { if (alive) setCal(c || { readDates: [], shieldDates: [] }); })
-      .catch(() => { if (alive) setCal({ readDates: [], shieldDates: [] }); });
-    return () => { alive = false; };
-  }, []);
-  const days = [];
-  const now = new Date();
-  for (let i = 34; i >= 0; i--) days.push(new Date(now.getTime() - i * 86400 * 1000).toISOString().slice(0, 10));
-  const readSet = new Set((cal && cal.readDates) || []);
-  const shieldSet = new Set((cal && cal.shieldDates) || []);
-  return (
-    <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="sheet" role="dialog" aria-label="스트릭 캘린더">
-        <div className="sheet-grip" />
-        <button onClick={onClose} aria-label="닫기" style={{ position: 'absolute', top: 10, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, fontSize: 16, cursor: 'pointer', color: 'var(--ink-2)', lineHeight: 1, zIndex: 2 }}>✕</button>
-        <div style={{ padding: '8px 20px 20px' }}>
-          <div style={{ textAlign: 'center', marginBottom: 14 }}>
-            <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--ink)' }}>🔥 {streak}일 연속</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>최근 5주 · 🔥 읽은 날 · 🔵 방패로 지킨 날</div>
-          </div>
-          {cal === undefined ? (
-            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20 }}>불러오는 중…</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
-              {days.map(ds => {
-                const read = readSet.has(ds), shielded = shieldSet.has(ds);
-                return (
-                  <div key={ds} title={ds} style={{ aspectRatio: '1', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, background: read ? '#FFF7EE' : (shielded ? '#E8F0FE' : 'var(--card)'), border: '1px solid var(--line)', color: 'var(--ink-3)' }}>
-                    <span style={{ fontSize: 13 }}>{read ? '🔥' : (shielded ? '🔵' : '·')}</span>
-                    <span>{ds.slice(8, 10)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-window.StreakCalendarModal = StreakCalendarModal;
-
-
 /* ── ActivityHeatmap: 독서 활동 잔디 (#195) ──
    최근 N일(기본 182=26주) 일별 읽은 쪽수를 GitHub식 히트맵으로. DataStore.sessions.heatmap. */
 function ActivityHeatmap({ days }) {
