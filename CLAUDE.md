@@ -39,7 +39,7 @@ Other agents (Cursor, Continue, Aider) should enter via [`AGENTS.md`](./AGENTS.m
 - **OCR (해제, v8 결정 2026-06-11)**: 읽기모드 책 사진 글귀 추출 = **웹 기반 OCR 허용**. 서버리스(Cloudflare Worker `/api/ocr`)에서 **Upstage Document OCR + solar-pro3 보정**, 키는 서버 보관(클라 노출 금지). 네이티브 불필요 → 위 보류 대상 아님. STT(음성)는 여전히 OS 키보드 마이크로 대체(Phase 3).
 - **빌드**: 현행 React 18 CDN + Babel 유지. Vite 전환은 **PWA 전환 시 재검토** (현재 보류).
 - **백엔드**: Phase 0 `localStorage` / Phase 1+ **Supabase** (Google OAuth). **DataStore 계약**으로 추상화 — 피처 코드는 저장소를 직접 호출하지 않음 (`docs/readinggo/specs/backend.md` §7.2).
-- **AI**: 도서 추천은 **Gemini Flash 무료 티어 + 서버리스 프록시** (Phase 1+). 클라이언트에 API 키 노출 금지.
+- **AI (v9 갱신 2026-06-20)**: **Gemini Flash 무료 티어 + 서버리스 프록시** — **텍스트·vision 모두 자유 사용**(도서 추천, 사진 밑줄/강조 추출 등 용도 추가에 별도 lock 결정 불필요). 클라이언트에 API 키 노출 금지(키는 서버 보관). OCR(글자 추출)은 Upstage Document OCR 유지, 이미지 의미 이해(vision)는 Gemini.
 - **데이터 (canonical 갱신, #490 결정 2026-06-15)**: 책 데이터의 canonical source는 **Phase 1 Supabase `books`**. `getBook(id)` 동기 API는 부팅 시 Supabase 전체 책을 메모리 캐시에 적재해 보존하고, 게스트 검색도 publishable key + RLS read 로 같은 카탈로그를 쓴다. `books.tsv`·인라인 `RG_BOOKS`는 **더 이상 주 데이터 소스가 아니다** — 시드 및 네트워크/부팅 실패용 최소 폴백으로만 남긴다(근거·범위는 PR에 명시). 단 **Phase 0 현재 구현은 여전히 `localStorage` + 정적 TSV** 이며, 위 전환(차집합 시드·코드·데이터 적용)은 #490 후속 코드 PR에서 한다. (이전 "TSV 포맷 유지 #90"을 본 결정으로 갱신.)
 - 변경 제안 시 해당 피처의 `docs/readinggo/specs/<feature>.md` spec PR 먼저, 코드 PR 나중 ([LF: Spec only PR](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)).
 
