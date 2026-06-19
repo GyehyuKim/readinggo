@@ -22,45 +22,54 @@
 
 > **PoC 검증 (2026-06-18)**: 헤드리스 크롬으로 예스24 모순 상품페이지 "책 속으로"에서 진짜 책 인용 6개 추출 확인("아버지의 삶은 아버지의 것이고 어머니의 삶은 어머니의 것이다…" 등). 블로그(책당 1개)와 비교 불가한 품질·수율.
 
-## 2. 아키텍처
+## 2. 아키텍처 (큐 폴링 + 멀티NPC)
+
+> **2026-06-19 개정**: 동기 호출·Cloudflare Tunnel 방식을 **큐 폴링**으로 단순화하고, 시드를 **여러 NPC 명의의 `sentences`**(byBook 피드)로 적재하도록 변경. 인바운드·터널·토큰 불필요(collector는 Supabase로 아웃바운드 폴링만).
 
 ```
-┌─ 맥미니 (collector 데몬, 상시) ─────────┐         ┌─ Cloudflare 워커 ─┐        ┌─ 앱 ─┐
-│ HTTP 서버 + 헤드리스 브라우저            │         │ /api/seed         │        │       │
-│  POST /collect {title,author,isbn}      │◀─호출── │  stored 있으면 반환 │◀─조회─ │ 책 열기│
-│  → 예스24 검색·책속으로 크롤            │         │  없으면 collector   │        │       │
-│  → seed_sentences 적재(service role)    │ ─seeds→ │  호출(온디맨드)     │ ─시드→ │ 표시  │
-│ launchd cron: 인기책 선충전·TTL 갱신    │         └───────────────────┘        └───────┘
-│ Cloudflare Tunnel 로 공개 노출(토큰)    │                  ▲
-└─────────────────────────────────────────┘                  │
-                    └──────────── seed_sentences (SSOT) ──────┘
+┌─ 맥미니 (collector poller, 상시) ───────┐      ┌─ Cloudflare 워커 ─┐        ┌─ 앱 ─┐
+│ Node + 헤드리스 브라우저(인바운드 0)     │      │ /api/seed          │◀─조회─ │ 책 열기│
+│  seed_queue 폴링(priority desc)         │─폴링→│  byBook 있으면 []   │        │       │
+│  → 예스24 검색·책속으로 크롤            │ seed │  없으면 seed_queue   │ ─[]→   │ "모으는│
+│  → book_id 해석(auto-upsert)           │_queue│  upsert(high) + []  │        │  중…" │
+│  → 여러 NPC 명의 sentences 적재         │◀─────│                     │        │ +폴링 │
+│  → seed_sentences 원장 + status='done' │      └────────────────────┘        └───┬───┘
+│ launchd: poller 상시 + 새벽 prewarm     │           byBook(sentences) 직접 조회 ──┘
+└─────────────────────────────────────────┘
 ```
 
-- **collector(맥미니)** = 소스를 채우는 크롤러. 헤드리스 브라우저 + 경량 HTTP 데몬.
-- **워커** = 실시간 서빙 + 온디맨드 트리거. 브라우저 없음.
-- **DB(`seed_sentences`)** = 단일 진실 공급원. collector가 write, 워커가 read.
-- 시드는 영속이라 **collector가 잠깐 죽어도 서비스는 멈추지 않고 갱신만 멈춘다**(안전).
+- **collector(맥미니)** = `seed_queue`를 폴링하는 크롤러. 헤드리스 브라우저, **인바운드 없음**(Supabase로 아웃바운드만).
+- **워커** = `/api/seed`로 큐잉 트리거(동기 대기 안 함). 브라우저 없음.
+- **`seed_queue`** = 작업 큐(pending→done). **`sentences`** = 표시(여러 NPC 명의, byBook 피드). **`seed_sentences`** = 출처·중복판정·takedown 원장.
+- 시드는 영속이라 **collector가 잠깐 죽어도 서비스는 멈추지 않고 큐 적체만 생긴다**(안전).
+- **Cloudflare Tunnel·공개 노출·토큰 불필요** — 이전 동기 방식 대비 핵심 단순화.
 
 ## 3. 동작 흐름
 
-### 3.1 온디맨드 (새 책 — 핵심 요구)
+### 3.1 큐 기반 비동기 온디맨드 (핵심 요구)
 
-사용자가 **새 책을 등록/열면 그 자리에서 채워 바로 보여준다.**
+사용자가 **빈 책을 열면 큐잉하고, 둘러보는 동안 채워 노출한다**(동기 대기·화면 멈춤 없음).
 
 1. 앱 → 워커 `POST /api/seed {title, author, isbn, have}`
-2. 워커: `seed_sentences` 조회 → **있으면 즉시 반환**(영속, 0 크롤)
-3. 없으면 → 워커가 **collector `POST /collect`** 호출(동기, 타임아웃 ~10s)
-4. collector: 예스24 검색 → "책 속으로" 크롤 → `seed_sentences` 적재 → 시드 반환
-5. 워커가 앱에 반환 → **즉시 표시**. 첫 1회만 크롤(3~5초, 앱은 로딩 표시), 이후 영속이라 0초.
-6. **폴백**: collector 타임아웃/실패/책속으로 없음 → 워커가 빈 배열 반환(또는 블로그 #819 폴백). 영속 미저장이라 다음 방문 시 재시도.
+2. 워커: 공개 문장이 이미 있으면(byBook>0) 큐잉 불필요. 없으면 → `seed_queue` upsert(`priority='high'`, book_key 중복 무시) → **빈 배열 반환**("모으는 중").
+3. collector(맥미니)가 `seed_queue` 폴링(priority desc, 5초 간격) → pending 책 픽업.
+4. collector: 예스24 검색 → "책 속으로" 크롤 → `book_id` 해석(없으면 `books` auto-upsert) → 발췌마다 **서로 다른 NPC 명의**로 `sentences`(kind='quote') 적재 + `seed_sentences` 원장 기록 → `status='done'`.
+5. 앱: 시드 0건이면 "🌱 이웃의 문장을 모으는 중…" placeholder + **byBook 짧은 폴링**(예 4초 × ~5회) → 채워지면 "이 책의 한 문장"에 이웃 아바타와 함께 노출.
+6. **실패**: not-found·no-excerpt(예스24 미커버)는 `status='failed'`(재시도 무의미). blocked·timeout은 attempts++ 후 재시도(≤3). 앱은 폴링 종료 시 placeholder 정리.
 
-> **UX 결정**: 첫 크롤 3~5초 대기를 책 등록 로딩에 흡수(스피너 "독자들의 문장을 모으는 중…"). 동기 대기가 길면(>8s) 비동기로 강등 — 일단 열고 collector 백그라운드 적재 → 다음 진입/실시간 갱신 반영. **기본은 동기**(요구: 바로 보여주기).
+> **UX 결정**: 동기 대기 폐기 — 큐잉 즉시 반환 + 폴링. 첫 크롤은 ~15~25초(헤드리스 브라우저)라 인기책 prewarm으로 즉시감을 얻고, 나머지는 폴링으로 흡수.
 
-### 3.2 주기 배치 (보조)
+### 3.2 누가 떠 보이나 (멀티NPC 귀속)
 
-- 맥미니 `launchd`(권장) 또는 cron이 **매일 새벽 인기책 N권 선충전 + TTL(#806) 갱신**.
-- 온디맨드 부하를 미리 분산(인기책은 첫 유저 전에 이미 채워둠).
-- **느긋하게**: 요청 간 딜레이(2~3초), 하루 처리량 상한 → 차단·민폐 회피. 상시 가동이라 서두를 이유 없음.
+- 크롤한 "책 속으로" 발췌(출판사 발췌)는 **여러 NPC**(졸린토끼·밤샘올빼미 … `is_npc=true`) 명의로 `sentences`에 분산 적재 → "같은 책 읽는 사람들"에 다양한 이웃으로 노출.
+- `kind='quote'`(인용)라 **"독자가 옮긴 책 문장"**으로 정직(NPC가 원작자인 척 아님). `page=null`(스포일러 블라인드 없음).
+- 발췌마다 distinct NPC 배정. 멱등: 그 책에 이미 있는 문장 텍스트는 건너뜀(재폴링·재크롤 누적 0).
+- 출처(예스24/상품 URL)는 `seed_sentences` 원장에만 보존(피드엔 NPC 명의로 노출 — §8 가드 참조).
+
+### 3.3 주기 배치 (보조)
+
+- 맥미니 `launchd`이 **매일 새벽 인기 카탈로그책을 `seed_queue`에 `priority='low'`로 큐잉**(워커 cron도 동일). 실제 크롤은 poller가 high(온디맨드) 처리 후 한가할 때 소진.
+- 인기책은 첫 유저 도착 전에 미리 채워 즉시감 확보. **느긋하게**: 책 사이 딜레이 2~3초, 동시성 1.
 
 ## 4. 크롤 파이프라인 (PoC 검증됨)
 
@@ -76,17 +85,17 @@
 
 ## 5. collector 서비스 사양 (맥미니 구현)
 
-- **런타임**: Node.js + 헤드리스 브라우저(Playwright/Puppeteer 또는 gstack browse 데몬 재사용).
-- **엔드포인트**: `POST /collect` body `{title, author, isbn}` + 헤더 `Authorization: Bearer <COLLECTOR_TOKEN>` → `{seeds, status}`.
-- **직렬화**: 브라우저 1개를 큐로 순차 처리(동시 크롤 금지 — 차단·자원). 요청 폭주 시 큐잉.
-- **중복 방지**: 워커가 stored 선조회 후에만 호출하므로 collector는 받은 것만 크롤. collector도 적재 전 한 번 더 stored 확인(레이스 가드).
-- **타임아웃**: 단일 책 크롤 상한(예 8s) — 초과 시 빈 반환.
+- **런타임**: Node.js + 헤드리스 브라우저(Playwright). 인바운드 HTTP 없음 — `seed_queue` 폴링 데몬(`poller.mjs`).
+- **폴링**: `seed_queue?status=pending&order=priority.desc,created_at.asc&limit=3`, 5초 간격. high(온디맨드) 먼저.
+- **직렬화**: 브라우저 1개로 순차 처리(동시 크롤 금지 — 차단·자원). 책 사이 딜레이 2~3초.
+- **적재**: 발췌 → `book_id` 해석(없으면 `books` auto-upsert) → distinct NPC 명의 `sentences`(kind='quote') + `seed_sentences` 원장. 멱등(그 책 기존 문장 텍스트 제외).
+- **상태전이**: ok→`done`. not-found/no-excerpt→`failed`(영구). blocked/timeout→attempts++ 후 재시도(≤3).
 
-## 6. 노출 / 연결 보안
+## 6. 노출 / 연결 보안 (단순화)
 
-- **Cloudflare Tunnel** 로 맥미니 로컬 데몬을 고정 URL(예 `https://collector.<domain>`)로 노출. (집/사무실 NAT 뒤라도 공개 가능, 포트포워딩 불필요.)
-- **토큰**: 워커 secret `COLLECTOR_URL`·`COLLECTOR_TOKEN`. collector가 `COLLECTOR_TOKEN` 검증 → **워커만 호출 허용**.
-- **service role key**: 맥미니 로컬 `.env`(collector가 DB 직접 적재). 본인 신뢰 기기라 무방. 워커엔 collector 호출용 토큰만, DB 키는 collector에만.
+- **인바운드·공개 노출·Cloudflare Tunnel 불필요.** collector는 Supabase로 **아웃바운드 폴링만** 한다(맥미니 NAT 뒤에서 그대로 동작).
+- **토큰 불필요**: 워커는 `seed_queue`에 쓰기만, collector는 읽고 처리만 — 둘 다 service role로 Supabase 접근. 워커↔collector 직접 통신 없음.
+- **service role key**: 맥미니 로컬 `collector/.env`. 본인 신뢰 기기. `seed_queue` RLS는 정책 없음(service role 전용).
 
 ## 7. 예의 / 레이트리밋 / 차단 대응
 
@@ -99,15 +108,15 @@
 
 "책 속으로"는 **출판사가 홍보용으로 공개한 발췌**다. 가드:
 
-- **출처 표기**(예스24/출판사 + 링크), **인용 범위 최소**(책당 시드 상한 — 권장 ≤6, 전문 전재 금지),
-- **비영리·교육/데모**, **권리자 요청 시 즉시 삭제**, robots/약관 best-effort.
+- **인용 범위 최소**(책당 ≤6, 전문 전재 금지), **비영리·교육/데모**, **권리자 요청 시 즉시 삭제**(`seed_sentences` 원장으로 book_key·text 일괄 삭제 → 연결 `sentences`도 정리), robots/약관 best-effort.
+- **⚠️ 멀티NPC 귀속의 정직성 한계**: 발췌가 NPC 명의로 뜨므로 **피드에 출처 링크가 노출되지 않는다**(원장에만 보존). `kind='quote'`로 "독자가 옮긴 인용"임은 드러나나, **상용화 전 출처 표기 방식 재검토 필수**.
 - **정식 상용화 전 재검토**(이 spec에 못박음). 스크래핑은 약관 회색지대 — 베타·비영리 한정.
 
 ## 9. 폴백 / 기존과의 관계
 
-- **#819 블로그 인용(현 `/api/seed` 워커 로직)**: 예스24 우선, **collector 실패·미커버 책만 블로그 폴백**으로 강등. (블로그는 워커에서 본문 fetch 부분 실패·글쓴이 생각 혼입 한계.)
-- **#806 TTL**: 예스24 재크롤로 신선도 갱신(collector 주기 배치가 수행).
-- **워커 `seedFetchFresh`**: 직접 크롤 대신 **collector 호출**로 대체(브라우저 필요분 이관). 네이버 블로그 직접 fetch는 폴백으로만 잔류 또는 제거.
+- **#819 블로그 인용**: 큐+예스24로 전환하며 워커에서 **비활성화**(함수는 잠재 폴백 대비 잔존, 호출 없음). 컨셉상 블로그는 품질 낮아 메인은 큐잉.
+- **`seed_sentences`**: 표시 SSOT에서 **원장(출처·중복판정·takedown)으로 역할 변경**. 표시는 `sentences`(NPC 명의, byBook).
+- **기존 데이터**: 구 블로그 시드(~400건)는 `seed_sentences` 원장에 잔존하나 표시엔 안 쓰임. 인기책부터 큐로 NPC 문장 점진 충전(#806 TTL은 추후).
 
 ## 10. 모니터링
 
@@ -116,11 +125,13 @@
 
 ## 11. 결정 필요 / 오픈 이슈
 
-- 동기 대기 상한·로딩 UX 카피(§3.1).
-- 책당 시드 개수 상한(인용 범위 §8) — 권장 6.
-- collector 다운 시 UX(빈 vs 블로그 폴백 vs "곧 채워져요").
+- ~~동기 대기 상한~~ → **해결**: 큐+폴링 비동기로 전환(§3.1).
+- ~~collector 다운 시 UX~~ → **해결**: 큐에 적체, "모으는 중" 유지. 영구실패는 placeholder 정리.
+- 책당 시드 개수 상한 — **≤6 확정**(§8).
+- 멀티NPC 귀속 시 **출처 표기 방식**(피드에 출처 안 보임 — §8 한계) — 상용화 전 재검토.
+- 인기책 prewarm 규모·빈도(즉시감 vs 차단 회피 균형).
 - 예스24 외 **교보 "책 속으로"** 2차 소스 추가 여부(커버리지 보강).
-- 예스24 책속으로 **미보유 책**(신간·비주류) 처리 — 블로그 폴백 or 빈.
+- 예스24 미보유 책(신간·비주류) 처리 — 현재 `failed`(빈). 폴백 재고 여부.
 
 ## 12. 구현 체크리스트 (맥미니, 후속 코드 PR)
 
