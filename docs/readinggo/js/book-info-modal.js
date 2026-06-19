@@ -18,7 +18,7 @@ function BookInfoModal({ bookId, onClose }) {
   const [descSource, setDescSource] = useState(''); // 소개 출처 (#642) — 'llm'이면 AI 작성 칩
   const [popular, setPopular] = useState([]); // 인기 한 문장 Top5 (#594) — 짹 많은 순, 게스트/빈 → []
   const [popularResolved, setPopularResolved] = useState(false); // byBook 응답 도착 여부 (시드 트리거 게이트, #774)
-  const [seeds, setSeeds] = useState([]); // 마중물 시드 (#774) — popular 비었을 때 '남이 읽은 한 문장'
+  const [seeding, setSeeding] = useState(false); // 마중물 시드 큐 처리 대기 (#774 큐 방식) — '모으는 중' placeholder 게이트
   const [mySents, setMySents] = useState([]); // 내 한 문장 (#610) — 이 책에 내가 남긴 것 (읽은 책)
   const [shelf, setShelf] = useState(null); // 서재 상태 (#644) — null=미상, 'reading'|'completed'|'aborted'|'wish'|'none'
   useEffect(() => {
@@ -61,17 +61,34 @@ function BookInfoModal({ bookId, onClose }) {
       .catch(() => { if (alive) { setPopular([]); setPopularResolved(true); } });
     return () => { alive = false; };
   }, [bookId]);
-  // 마중물 시드 (#774) — 인기 한 문장이 0건(빈 책)일 때만 '남이 읽은 한 문장'을 /api/seed 로 가져와 채운다.
-  // 진짜 공개 문장이 있으면(popular>0) 시드는 안 부른다 → 자연 소멸(integrated-shelf.md §5.6).
+  // 마중물 시드 (#774, 큐 방식) — 인기 한 문장이 0건(빈 책)이면 /api/seed 로 큐잉 트리거 후 byBook 을 짧게 폴링한다.
+  // collector(맥미니)가 예스24 발췌를 여러 NPC 명의로 sentences 에 적재하면 폴링이 잡아 popular 에 노출(동기 로딩 없음).
+  // 의존성은 popularResolved/bk 만 — 폴링이 setPopular 로 갱신하므로 popular 를 deps 에 넣으면 무한 재실행.
   useEffect(() => {
-    if (!bk || !bk.title || !popularResolved || popular.length >= 10) { setSeeds([]); return; }
+    if (!bk || !bk.title || !popularResolved || popular.length > 0) { setSeeding(false); return; }
     let alive = true;
-    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: bk.title, author: bk.author || '', isbn: bk.isbn13 || bk.isbn || '', have: popular.length }) })
-      .then(r => r.json())
-      .then(d => { if (alive) setSeeds((d && Array.isArray(d.seeds)) ? d.seeds : []); })
-      .catch(() => { if (alive) setSeeds([]); });
-    return () => { alive = false; };
-  }, [bk, popular, popularResolved]);
+    let timer = null;
+    const DS = window.DataStore || {};
+    setSeeding(true);
+    // 1) 큐잉 트리거(동기 대기 안 함). 워커가 seed_queue 에 high 우선순위로 upsert.
+    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: bk.title, author: bk.author || '', isbn: bk.isbn13 || bk.isbn || '', have: popular.length }) }).catch(() => {});
+    // 2) byBook 폴링(최대 5회 × 4초) — 채워지면 popular 갱신·중단, 아니면 '모으는 중' 유지.
+    const MAX = 5, DELAY = 4000;
+    let tries = 0;
+    const poll = () => {
+      if (!alive) return;
+      tries += 1;
+      Promise.resolve((DS.sentences && DS.sentences.byBook) ? DS.sentences.byBook(bookId, { limit: 5, sort: 'likes' }) : [])
+        .then(rows => {
+          if (!alive) return;
+          if (Array.isArray(rows) && rows.length) { setPopular(rows); setSeeding(false); return; }
+          if (tries < MAX) timer = setTimeout(poll, DELAY); else setSeeding(false);
+        })
+        .catch(() => { if (alive) { if (tries < MAX) timer = setTimeout(poll, DELAY); else setSeeding(false); } });
+    };
+    timer = setTimeout(poll, DELAY);
+    return () => { alive = false; if (timer) clearTimeout(timer); };
+  }, [bk, popularResolved]);
   // 내 한 문장 (#610) — 이 책에 내가 남긴 문장(byBook은 타인 전용이라 listMine 필터). 읽은 책이면 노출.
   useEffect(() => {
     let alive = true;
@@ -159,23 +176,14 @@ function BookInfoModal({ bookId, onClose }) {
                 })}
               </div>
             )}
-            {/* 마중물 시드 (#774) — 공개 문장이 없을 때만 '남이 읽은 한 문장'(네이버 블로그 서평 정제 + 출처).
-                🌱 라벨·출처 링크로 진짜 유저 문장과 구분(저작권·진정성, integrated-shelf.md §5). 읽기 전용. */}
-            {popular.length < 10 && seeds.length > 0 && (
+            {/* 마중물 시드 (#774, 큐 방식) — 공개 문장이 0건이면 collector 가 예스24 발췌를 여러 NPC 명의로
+                채우는 중. 채워지면 위 '이 책의 한 문장'(byBook)에 이웃 아바타와 함께 노출된다. 여기선 진행 표시만. */}
+            {popular.length === 0 && seeding && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
-                <SectionLabel icon="sentence">🌱 함께 읽은 이웃</SectionLabel>
-                <div style={{ fontSize: 10.5, color: 'var(--ink-3)', margin: '0 0 8px', lineHeight: 1.4 }}>웹 서평에서 모은 다른 독자의 한 문장이에요 · 출처를 눌러 원글로</div>
-                {seeds.map((s, i) => (
-                  <div key={i} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
-                    <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6 }}>"{decodeEntities(s.text || '')}"</div>
-                    {s.sourceUrl && (
-                      <a href={s.sourceUrl} target="_blank" rel="noopener noreferrer nofollow"
-                        style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, textDecoration: 'none' }}>
-                        🔗 {s.sourceName || '출처'} →
-                      </a>
-                    )}
-                  </div>
-                ))}
+                <SectionLabel icon="sentence">🌱 이웃의 문장</SectionLabel>
+                <div style={{ background: 'var(--card)', border: '1.5px dashed var(--line)', borderRadius: 8, padding: 14, fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+                  🌱 이웃의 문장을 모으는 중이에요… 둘러보는 동안 채워둘게요.
+                </div>
               </div>
             )}
             {/* 쪽수 메타 누락 시 수동 입력 — 진척률·읽기모드용 (#204) */}
