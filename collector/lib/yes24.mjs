@@ -27,7 +27,20 @@ const NEXT_SECTION_HEADERS = [
 
 const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 const onlyDigitsX = (s) => String(s || '').replace(/[^0-9Xx]/g, '');
-const buildQuery = (title, author) => norm(`${title || ''} ${author || ''}`);
+
+// 검색용 제목 정규화 — 부제·시리즈 권차·개정판 표기 컷(핵심 제목 = 앞부분).
+// 카탈로그 전체 제목("사피엔스 - 유인원에서…")으로 검색하면 yes24 결과 0건 → 앞 핵심 제목만 남긴다.
+// (book_key·적재엔 영향 없음. 검색 쿼리 빌드에만 사용. 옛 워커 seedSearchTitle 와 동일 취지.)
+function searchTitle(title) {
+  let t = String(title || '').trim();
+  t = t.split(/\s+[-–—]\s+|[:(\[【「《]/)[0];
+  return norm(t);
+}
+// 저자에서 역할 괄호 표기 제거: "소포클레스 (지은이), 천병희 (옮긴이)" → "소포클레스 천병희".
+function searchAuthor(author) {
+  return norm(String(author || '').replace(/\([^)]*\)/g, ' ').replace(/[,·]/g, ' '));
+}
+const buildQuery = (title, author) => norm(`${searchTitle(title)} ${searchAuthor(author)}`);
 
 // 출처/인용 메타 줄인가? (발췌 본문이 아니라 페이지·장 표기)
 function isCitationLine(line) {
