@@ -20,6 +20,9 @@ ARCHIVE_DAILY_CAP = "3000"
 # LLM 독서 파트너 (#287) — provider-agnostic. 키(UPSTAGE_API_KEY)는 secret, 아래 둘은 설정값.
 LLM_BASE_URL = "https://api.upstage.ai/v1"
 LLM_MODEL = "solar-pro3"
+# 배치 OCR 강조 추출 (#844) — Gemini Flash vision. 키(GEMINI_API_KEY)는 secret, 아래 둘은 설정값.
+VISION_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+VISION_MODEL = "gemini-2.5-flash"
 # LLM_REASONING_EFFORT = "low"   # 미설정=추론 최소. 질문이 밋밋하면 low|medium|high 로.
 
 # 일일 인기도서 아카이브 (#239) — UTC 18:00 = KST 03:00

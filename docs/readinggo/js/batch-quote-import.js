@@ -11,11 +11,13 @@ const _BQI_MAX = 200;   // sentences.text CHECK (1~200자, backend.md §sentence
 const _bqiPrimary = (on) => ({ flex: 1, padding: '13px 16px', borderRadius: 'var(--r-md)', border: 'none', background: on ? 'var(--brand)' : 'var(--brand-soft)', color: on ? '#fff' : 'var(--ink-3)', fontWeight: 800, fontSize: 15, cursor: on ? 'pointer' : 'default', letterSpacing: '-0.2px' });
 const _bqiTonal = { flex: '0 0 auto', padding: '13px 18px', borderRadius: 'var(--r-md)', border: '1px solid var(--brand-soft)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 15, cursor: 'pointer', letterSpacing: '-0.2px' };
 
-function BatchQuoteImport({ onCancel, onSave, busy }) {
+function BatchQuoteImport({ onCancel, onSave, busy, initialItems }) {
   const { useState: uS } = React;
-  const [step, setStep] = uS('input');   // 'input'(붙여넣기) → 'review'(검토)
+  // initialItems(#844 사진 추출 결과 등)가 있으면 입력 단계 건너뛰고 바로 검토.
+  const _hasInit = Array.isArray(initialItems) && initialItems.length > 0;
+  const [step, setStep] = uS(_hasInit ? 'review' : 'input');   // 'input'(붙여넣기) → 'review'(검토)
   const [raw, setRaw] = uS('');
-  const [items, setItems] = uS([]);
+  const [items, setItems] = uS(_hasInit ? initialItems.slice() : []);
 
   // 줄 단순 분리(§5.8 1차) — 줄바꿈 split + trim + 빈 줄 제거 + 중복 스킵. 마크다운 헤더기호(#)만 제거.
   const parse = () => {

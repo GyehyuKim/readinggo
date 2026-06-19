@@ -31,6 +31,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   const [addBusy, setAddBusy] = _useState(false);
   const [quotePasteOpen, setQuotePasteOpen] = _useState(false);  // #848 여러 문장 일괄 담기 모달
   const [batchBusy, setBatchBusy] = _useState(false);
+  const [ocrItems, setOcrItems] = _useState(null);   // #844 사진 추출 결과 → BatchQuoteImport(initialItems) 검토
+  const [ocrBusy, setOcrBusy] = _useState(false);
+  const [ocrProgress, setOcrProgress] = _useState({ done: 0, total: 0 });
+  const _ocrAlbumRef = React.useRef(null);
   const saveNewQuote = async () => {
     const t = (addText || '').trim();
     if (!t) { showToast('한 문장을 입력해주세요'); return; }
@@ -78,6 +82,28 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       if (window.rgTrack) window.rgTrack('text_import_saved', { book_id: book.id, saved });
     }
     return { saved };
+  };
+  // #844 배치 OCR — 앨범 N장 → 각 장 Gemini vision 강조 추출(순차+지연, 무료 10 RPM) → 추출 문장 → BatchQuoteImport(initialItems) 검토.
+  const runOcrBatch = async (files) => {
+    if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return; }
+    setOcrBusy(true); setOcrProgress({ done: 0, total: files.length });
+    const all = [];
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const fd = new FormData();
+        fd.append('document', files[i], files[i].name || ('p' + i + '.jpg'));
+        const r = await fetch('/api/extract-highlights', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d && Array.isArray(d.sentences)) all.push(...d.sentences);
+      } catch (e) { /* 실패 장 스킵 — 부분 완료 */ }
+      setOcrProgress({ done: i + 1, total: files.length });
+      if (i < files.length - 1) await new Promise((res) => setTimeout(res, 1200));
+    }
+    setOcrBusy(false);
+    const seen = new Set(), items = [];
+    all.forEach((t) => { const k = (t || '').trim(); if (k && !seen.has(k)) { seen.add(k); items.push(k); } });
+    if (!items.length) { showToast('강조된 문장을 찾지 못했어요 — 더 또렷한 사진으로'); return; }
+    setOcrItems(items);
   };
   // #610: 자체 삭제/좋아요/공개범위 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 한 문장 카드).
   const bookshelfEntry = (book.status === 'completed') ? { rating: book.rating, comment: book.comment } : null;
@@ -518,6 +544,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     <div style={{fontWeight:800, fontSize:14}}>📋 여러 문장 한 번에 담기</div>
                     <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>밑줄·메모·공유한 글을 <b>한 줄에 하나씩</b> 붙여넣으면 한꺼번에 담겨요</div>
                   </button>
+                  {/* #844 사진에서 여러 문장 담기 — 앨범 다중 → Gemini vision 강조 추출 */}
+                  <button onClick={() => _ocrAlbumRef.current && _ocrAlbumRef.current.click()}
+                    style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:8, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
+                    <div style={{fontWeight:800, fontSize:14}}>📷 사진에서 여러 문장 담기</div>
+                    <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>밑줄·형광펜 친 페이지를 <b>여러 장</b> 올리면 강조 문장만 골라 담아요</div>
+                  </button>
+                  <input ref={_ocrAlbumRef} type="file" accept="image/*" multiple style={{display:'none'}}
+                    onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; if (fs.length) runOcrBatch(fs); }} />
                 </>
               ) : (
                 <div style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:8, padding:12}}>
@@ -633,6 +667,30 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               const r = await saveBatchQuotes(quotes);
               if (r && r.error) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
               else { showToast('✨ ' + (r.saved || quotes.length) + '개 담았어요'); setQuotePasteOpen(false); }
+            } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
+            finally { setBatchBusy(false); }
+          }} />
+      )}
+
+      {/* #844 배치 OCR 진행률 */}
+      {ocrBusy && (
+        <div style={{position:'fixed', inset:0, height:'var(--app-h, 100dvh)', background:'rgba(0,0,0,0.62)', zIndex:1100, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, color:'#fff'}}>
+          <div style={{fontWeight:800, fontSize:16}}>📷 사진에서 강조 문장 읽는 중…</div>
+          <div style={{fontSize:14, opacity:0.85}}>{ocrProgress.done} / {ocrProgress.total}장</div>
+        </div>
+      )}
+
+      {/* #844 사진 추출 결과 검토 — BatchQuoteImport 재사용(initialItems로 바로 검토 단계) */}
+      {ocrItems && (
+        <BatchQuoteImport busy={batchBusy} initialItems={ocrItems}
+          onCancel={() => setOcrItems(null)}
+          onSave={async (quotes) => {
+            if (!quotes || !quotes.length) { setOcrItems(null); return; }
+            setBatchBusy(true);
+            try {
+              const r = await saveBatchQuotes(quotes);
+              if (r && r.error) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
+              else { showToast('✨ ' + (r.saved || quotes.length) + '개 담았어요'); setOcrItems(null); }
             } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
             finally { setBatchBusy(false); }
           }} />

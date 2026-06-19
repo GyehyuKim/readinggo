@@ -37,6 +37,12 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return ocrProxy(request, env);
     }
+    // 배치 OCR — 사진에서 강조(밑줄/형광펜) 문장 추출 (#844). Gemini Flash vision(이미지 이해). 키 서버만, 동일출처만.
+    if (p === '/api/extract-highlights') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      return extractHighlightsProxy(request, env);
+    }
     // 통합 서가 ① 스샷 서가 복원 (#772) — 구매내역/서재 캡쳐 → 비전 OCR → 책 목록 구조화 추출.
     // OCR 스택 재사용(Upstage + solar-pro3). 키는 서버에서만(클라 노출 금지). 동일출처만.
     if (p === '/api/shelf-import') {
@@ -342,6 +348,88 @@ async function ocrProxy(request, env) {
     } catch (e) { /* raw 폴백 */ }
   }
   return json({ text, raw }, 200);
+}
+
+/* ── 배치 OCR — 사진에서 강조(밑줄/형광펜) 문장 추출 (#844) ──────────────
+   Upstage Document OCR은 글자만 읽어 "밑줄 위치"를 모른다(Solar는 텍스트 전용).
+   → Gemini Flash vision(이미지 이해)으로 강조 표시된 문장만 추출. 원문 충실(환각 가드는 클라 검토 큐).
+   키/모델은 VISION_* env. OpenAI 호환 chat completions + image_url. 클라가 N장 순차 호출(rate limit). */
+const HIGHLIGHT_SYSTEM = '너는 책 페이지 사진에서 독자가 밑줄·형광펜·괄호·별표 등으로 강조 표시한 문장만 골라내는 추출기다. 강조된 문장을 원문 그대로 JSON 문자열 배열로 출력한다. 형식: ["문장1","문장2"]. 규칙: (1) 강조 표시가 있는 문장만 — 강조 안 된 본문·머리말·쪽번호·각주는 모두 제외. (2) 원문 그대로 — 단어 변경·교정·요약·번역·합치기·새 문장 생성 절대 금지. (3) 강조 표시가 전혀 없으면 빈 배열 []. (4) 설명·코드펜스 없이 JSON 배열만 출력.';
+
+// JSON 문자열 배열 견고 파싱 — 코드펜스·잡텍스트 제거, 공백·중복 제거, 200자 초과·상한 40 컷.
+function parseHighlights(s) {
+  if (!s) return [];
+  let t = String(s).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const a = t.indexOf('['), b = t.lastIndexOf(']');
+  if (a >= 0 && b > a) t = t.slice(a, b + 1);
+  let arr;
+  try { arr = JSON.parse(t); } catch { return []; }
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set(), out = [];
+  for (const it of arr) {
+    const text = String(typeof it === 'string' ? it : (it && it.text) || '').trim();
+    if (!text || text.length > 200) continue;
+    const key = text.replace(/\s+/g, '').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+// ArrayBuffer → base64 (청크 — 큰 배열에서 String.fromCharCode 스택 오버플로 방지).
+function bufToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin);
+}
+
+// Gemini Flash vision 호출 (OpenAI 호환). VISION_* env + GEMINI_API_KEY.
+async function callVision({ env, dataUrl, maxTokens }) {
+  const base = (env.VISION_BASE_URL || '').replace(/\/$/, '');
+  const model = env.VISION_MODEL, key = env.GEMINI_API_KEY;
+  if (!base || !model || !key) throw new Error('VISION env 미설정');
+  const r = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: HIGHLIGHT_SYSTEM },
+        { role: 'user', content: [
+          { type: 'text', text: '이 책 페이지에서 강조(밑줄/형광펜) 표시된 문장만 추출해.' },
+          { type: 'image_url', image_url: { url: dataUrl } },
+        ] },
+      ],
+      temperature: 0.1,
+      max_tokens: maxTokens || 800,
+    }),
+  });
+  if (!r.ok) throw new Error('VISION HTTP ' + r.status);
+  const d = await r.json();
+  return ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+}
+
+// 배치 OCR (#844) — 사진 1장 → 강조 문장 배열 { sentences }. 클라가 N장 순차 호출.
+async function extractHighlightsProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  if (!env.GEMINI_API_KEY || !env.VISION_BASE_URL || !env.VISION_MODEL) return json({ error: 'vision 미설정', demo: true }, 503);
+  let form;
+  try { form = await request.formData(); } catch { return json({ error: 'invalid form' }, 400); }
+  const file = form.get('document');
+  if (!file || typeof file === 'string') return json({ error: 'document(이미지) 필요' }, 422);
+  if (file.size && file.size > OCR_MAX_BYTES) return json({ error: '이미지가 너무 큽니다(최대 8MB)' }, 413);
+  try {
+    const buf = await file.arrayBuffer();
+    const dataUrl = `data:${file.type || 'image/jpeg'};base64,${bufToBase64(buf)}`;
+    const sentences = parseHighlights(await callVision({ env, dataUrl }));
+    return json({ sentences }, 200);
+  } catch (e) {
+    return json({ error: 'vision 호출 실패: ' + String((e && e.message) || e) }, 502);
+  }
 }
 
 // 통합 서가 ① (#772) — 구매내역/서재 캡쳐 OCR 텍스트에서 책 목록만 구조화 추출.
