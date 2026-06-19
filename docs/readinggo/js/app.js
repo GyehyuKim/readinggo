@@ -330,8 +330,10 @@ function App() {
     Promise.resolve(DS.books.startedThisWeek(8)).then((rows) => {
       if (!alive) return;
       const popular = (rows || []).filter(x => x && x.bookId).map(x => ({ book_id: x.bookId, title: x.title, author: x.author, cover_url: x.cover_url }));
-      const seen = new Set(popular.map(b => b.book_id));
-      for (const b of fb) { if (popular.length >= 8) break; if (!seen.has(b.book_id)) { popular.push(b); seen.add(b.book_id); } }
+      // 중복 제거는 제목 정규화 기준(#835 후속) — startedThisWeek(isbn13 book_id)와 ALL_BOOKS(RG_BOOKS id) 체계가 달라 book_id로는 같은 책을 못 거른다(데미안 중복).
+      const _nt = (t) => String(t || '').replace(/\s+/g, '').toLowerCase();
+      const seen = new Set(popular.map(b => _nt(b.title)));
+      for (const b of fb) { if (popular.length >= 8) break; if (!seen.has(_nt(b.title))) { popular.push(b); seen.add(_nt(b.title)); } }
       setPopularBooks(popular.length ? popular : fb);
     }).catch(() => { if (alive) setPopularBooks(fb); });
     return () => { alive = false; };
