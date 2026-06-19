@@ -442,6 +442,9 @@ function parseSeedJson(s) {
 }
 
 
+// ── [비활성 레거시] 네이버 블로그 시드 크롤(#819) ───────────────────────────────
+// 시드 소스를 예스24 "책 속으로"(맥미니 collector, 멀티NPC)로 전환하며 이 경로는 비활성화됨
+// (spec seed-collector.md 큐 방식). 함수는 잠재 폴백 대비 잔존 — 현재 호출 없음. 재활성화 시 seedProxy 에서 연결.
 // 네이버 블로그 검색 1회 — items[] 반환(실패·비ok → []).
 async function naverBlogSearch(query, env) {
   try {
@@ -602,69 +605,43 @@ async function seedFetchFresh(title, author, isbn, want, env) {
   }).filter(Boolean).slice(0, want);
 }
 
-// 맥미니 collector 호출(spec: seed-collector.md §3.1·§9) — 예스24 "책 속으로" 우선 소스.
-// 워커는 브라우저를 못 돌리므로 헤드리스 크롤은 collector(맥미니)로 이관. collector 가 seed_sentences 적재까지 수행.
-//   반환: 시드 배열(성공) | null(미구성·타임아웃·실패·미커버 → 호출부가 블로그 폴백).
-const COLLECTOR_TIMEOUT_MS = 12000;  // spec §3.1: 동기 대기 상한(앱 로딩 흡수). 초과 시 폴백.
-async function seedCollectorFetch(title, author, isbn, env, forceRefresh) {
-  if (!env.COLLECTOR_URL || !env.COLLECTOR_TOKEN) return null;  // 미구성 → 폴백
-  try {
-    const base = String(env.COLLECTOR_URL).replace(/\/$/, '');
-    const r = await fetch(`${base}/collect`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.COLLECTOR_TOKEN}` },
-      body: JSON.stringify({ title, author, isbn, forceRefresh: !!forceRefresh }),
-      signal: AbortSignal.timeout(COLLECTOR_TIMEOUT_MS),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    const seeds = (d && Array.isArray(d.seeds)) ? d.seeds : [];
-    // 빈 결과(예스24 미커버)도 null 로 — 호출부가 블로그(#819) 폴백 시도.
-    if (!seeds.length) return null;
-    return seeds.map((s) => ({ text: s.text, sourceName: s.sourceName || '예스24 책속으로', sourceUrl: s.sourceUrl || '' }));
-  } catch (e) { return null; }  // 타임아웃·네트워크 실패 → 폴백
-}
-
-// 시드 채움 코어 — seedProxy(요청)·prewarmSeeds(cron) 공용. seed_sentences read/write.
-// forceRefresh(#806): 이미 충전된 책이라도 재크롤해 트렌드 갱신(cron이 TTL 만료 시에만 true 전달).
-async function seedFill(env, { title, author, isbn, have, forceRefresh }) {
+// 마중물 시드 큐잉 (spec seed-collector.md 큐 방식) — 워커는 seed_queue 에 책을 넣기만 한다.
+// 맥미니 collector(poller)가 큐를 폴링해 예스24 크롤 → 멀티NPC sentences 적재(byBook 노출).
+// 인바운드·Tunnel·토큰 불필요(collector 는 Supabase 로 아웃바운드 폴링만).
+//   book_key UNIQUE + ignore-duplicates → 중복 큐잉/이미 done 인 책은 재처리 안 됨(멱등).
+async function seedEnqueue(env, { title, author, isbn, priority = 'high' }) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
   const t = String(title || '').trim();
-  if (!t) return [];
-  const targetSeeds = Math.max(0, SEED_TARGET - Math.max(0, have || 0));
-  if (!targetSeeds) return [];
+  if (!t) return;
   const bookKey = seedBookKey(t, isbn);
-  // 1) 저장분 먼저(영속). 한 번 충전된 책은 네이버·LLM 재호출 0.
-  const stored = await seedRead(env, bookKey);
-  if (stored.length > 0 && !forceRefresh) return stored.slice(0, targetSeeds);
-  // 1-b) TTL 만료 재크롤(#806) — 예스24 collector 우선(자체 교체 적재), 실패 시 블로그 폴백, 그래도 없으면 기존 유지.
-  if (stored.length > 0 && forceRefresh) {
-    const viaCollector = await seedCollectorFetch(t, String(author || '').trim(), isbn, env, true);
-    if (viaCollector) return viaCollector.slice(0, targetSeeds);  // collector 가 seed_sentences 교체 완료
-    const refreshed = await seedFetchFresh(t, String(author || '').trim(), isbn, SEED_TARGET, env);
-    if (refreshed.length) { await seedRefresh(env, bookKey, refreshed); return refreshed.slice(0, targetSeeds); }
-    return stored.slice(0, targetSeeds);
-  }
-  // 2) 미충전 책 — 예스24 collector 우선(브라우저 필요분 이관, 자체 적재). 실패·미커버 시 블로그(#819) 폴백.
-  const viaCollector = await seedCollectorFetch(t, String(author || '').trim(), isbn, env, false);
-  if (viaCollector) return viaCollector.slice(0, targetSeeds);  // collector 가 seed_sentences 적재 완료
-  const fresh = await seedFetchFresh(t, String(author || '').trim(), isbn, targetSeeds, env);
-  if (fresh.length) await seedWrite(env, bookKey, fresh);
-  return fresh.slice(0, targetSeeds);
+  try {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/seed_queue?on_conflict=book_key`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates',
+      },
+      body: JSON.stringify({ book_key: bookKey, title: t, author: String(author || '').trim() || null, isbn: isbn || null, priority }),
+    });
+  } catch (e) { /* best-effort — 큐잉 실패해도 다음 진입 때 재시도 */ }
 }
 
+// /api/seed — 큐 기반 비동기 온디맨드(spec §3.1). 동기 대기 안 함.
+//   빈 책(공개 문장<목표)일 때만 high 우선순위로 큐잉 + 빈 배열 반환.
+//   시드 표시는 클라가 byBook(sentences) 을 직접 조회 — collector 가 NPC 명의로 채우면 폴링으로 노출.
 async function seedProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
-  const seeds = await seedFill(env, {
-    title: body && body.title, author: body && body.author,
-    isbn: body && body.isbn, have: parseInt((body && body.have), 10) || 0,
-  });
-  return json({ seeds }, 200, 3600);
+  const have = parseInt((body && body.have), 10) || 0;
+  if (have < SEED_TARGET) {
+    await seedEnqueue(env, { title: body && body.title, author: body && body.author, isbn: body && body.isbn, priority: 'high' });
+  }
+  return json({ seeds: [], status: 'queued' }, 200, 0);
 }
 
-// 인기 우선 선충전 (#774) — 일일 cron. books 를 sales_point desc 로 상위 N권 미리 채워둔다.
-// idempotent(이미 채워진 책은 DB read만) → 사실상 신규·미충전 인기 책만 일함(쿼터·비용 안전).
+// 인기 우선 선충전 (#774, spec §3.2) — 일일 cron. 인기 카탈로그책을 seed_queue 에 low 우선순위로 큐잉.
+// 실제 크롤은 맥미니 collector(poller)가 한가할 때(high=온디맨드 처리 후) 소진. 워커는 큐잉만(브라우저 없음).
 async function prewarmSeeds(env, limit = 150) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
   let books = [];
@@ -673,17 +650,9 @@ async function prewarmSeeds(env, limit = 150) {
     const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
     if (r.ok) books = await r.json();
   } catch (e) { return; }
-  // #806: 만료(TTL 경과) 인기책은 재크롤로 트렌드 갱신. 일일 캡으로 쿼터·비용 안전.
-  let refreshedCount = 0;
   for (const b of (books || [])) {
-    try {
-      let force = false;
-      if (refreshedCount < SEED_REFRESH_DAILY_CAP) {
-        const latest = await seedLatestAt(env, seedBookKey(b.title, b.isbn13));
-        if (latest && ttlExpired(latest, SEED_TTL_DAYS)) { force = true; refreshedCount++; }
-      }
-      await seedFill(env, { title: b.title, author: b.author, isbn: b.isbn13, have: 0, forceRefresh: force });
-    } catch (e) { /* 개별 실패 스킵 */ }
+    try { await seedEnqueue(env, { title: b.title, author: b.author, isbn: b.isbn13, priority: 'low' }); }
+    catch (e) { /* 개별 실패 스킵 */ }
   }
 }
 

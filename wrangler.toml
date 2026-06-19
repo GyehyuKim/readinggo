@@ -3,8 +3,7 @@
 # 시크릿(1회): npx wrangler secret put ALADIN_TTB_KEY
 #              npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 #              npx wrangler secret put UPSTAGE_API_KEY   (LLM 독서 파트너 #287)
-#              npx wrangler secret put COLLECTOR_URL      (맥미니 시드 수집기 URL, 예 https://collector.<도메인>)
-#              npx wrangler secret put COLLECTOR_TOKEN    (collector 인증 토큰 — spec seed-collector.md §6)
+# 마중물 시드는 큐 방식(seed_queue) — 맥미니 collector 가 Supabase 폴링. COLLECTOR_URL/TOKEN 불필요(제거됨).
 name = "readinggo"
 main = "worker/index.mjs"
 compatibility_date = "2026-06-01"
