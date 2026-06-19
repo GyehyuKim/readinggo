@@ -6,7 +6,7 @@
   "description": "ReadingGo 마중물 시드 수집기 — 맥미니 상시 크롤러(예스24 책 속으로). spec: docs/readinggo/specs/seed-collector.md",
   "engines": { "node": ">=20" },
   "scripts": {
-    "start": "node server.mjs",
+    "start": "node poller.mjs",
     "prewarm": "node prewarm.mjs",
     "crawl": "node crawl-once.mjs",
     "postinstall": "playwright install chromium"

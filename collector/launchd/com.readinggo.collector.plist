@@ -14,7 +14,7 @@
   <key>ProgramArguments</key>
   <array>
     <string>__NODE__</string>
-    <string>__COLLECTOR_DIR__/server.mjs</string>
+    <string>__COLLECTOR_DIR__/poller.mjs</string>
   </array>
 
   <key>WorkingDirectory</key>

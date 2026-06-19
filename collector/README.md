@@ -1,110 +1,81 @@
-# ReadingGo 시드 수집기 (Seed Collector)
+# ReadingGo 시드 수집기 (Seed Collector) — 큐 폴링 방식
 
-마중물 시드(#774)의 **예스24 "책 속으로"** 크롤러. 맥미니에 상시 가동하는 Node + Playwright(헤드리스 크롬) 데몬이다.
-워커는 브라우저를 못 돌리므로(Cloudflare) 헤드리스 크롤을 이 데몬으로 이관한다.
+마중물 시드(#774)의 **예스24 "책 속으로"** 크롤러. 맥미니에 상시 가동하는 Node + Playwright(헤드리스 크롬) **폴링 데몬**이다.
 
-> **단일 진실(SSOT)**: 설계·정책은 [`docs/readinggo/specs/seed-collector.md`](../docs/readinggo/specs/seed-collector.md). 막히면 spec 을 다시 읽어라.
+> **큐 기반 비동기 온디맨드**: 워커는 책을 `seed_queue`에 넣기만 하고(인바운드 없음), collector가 큐를 폴링해 크롤·적재한다. Cloudflare Tunnel·공개 노출·토큰 **불필요** — collector는 Supabase로 **아웃바운드 폴링만** 한다.
+>
+> 단일 진실(SSOT): [`docs/readinggo/specs/seed-collector.md`](../docs/readinggo/specs/seed-collector.md).
 
 ```
-앱 ──/api/seed──▶ 워커 ──stored 없으면 /collect──▶ collector(맥미니) ──예스24 크롤──▶ seed_sentences
-                   └ stored 있으면 즉시 반환(영속)        └ 토큰 검증·큐(직렬)·적재(service role)
+앱 ──/api/seed──▶ 워커 ──byBook 있으면 즉시 반환
+                  └ 없으면 seed_queue upsert(high) + [] 반환("모으는 중")
+collector(맥미니 상시) ──seed_queue 폴링(priority desc)──▶ 예스24 크롤
+                  └ book_id 해석(auto-upsert) → 발췌마다 다른 NPC 명의 sentences 적재
+                  └ seed_sentences 원장 기록(출처·중복판정·takedown) → status='done'
+앱 ──byBook 폴링──▶ NPC 아바타와 함께 "같은 책 읽는 사람들"에 노출
 ```
 
 ## 구성
 
 | 파일 | 역할 |
 |---|---|
-| `server.mjs` | HTTP 데몬. `POST /collect`(토큰), `GET /health`. 브라우저 1개 직렬 큐(spec §5) |
-| `prewarm.mjs` | 주기 배치(spec §3.2) — 인기책 선충전 + TTL(#806) 재크롤 |
-| `crawl-once.mjs` | 단발 크롤 검증 도구(DB 적재 없이 파이프라인만, 시크릿 불필요) |
+| `poller.mjs` | **메인 데몬**. `seed_queue` 폴링 → 크롤 → 적재 → 상태전이. 브라우저 1개 순차 |
+| `prewarm.mjs` | 배치(spec §3.2) — 인기 카탈로그책을 `seed_queue`에 low 우선순위로 큐잉(크롤은 poller가) |
+| `crawl-once.mjs` | 단발 크롤 검증 도구(DB 적재 없이 파이프라인만) |
+| `lib/queue.mjs` | `seed_queue` 픽업/상태전이/큐잉 |
+| `lib/npc.mjs` | 발췌 → **여러 NPC 명의** `sentences` 적재(book_id auto-upsert, distinct NPC, kind='quote') + 원장 |
+| `lib/yes24.mjs` | 예스24 검색·매칭·발췌 추출 |
 | `lib/browser.mjs` | 헤드리스 크롬 관리 + 봇 탐지 완화 + 홈 워밍업 |
-| `lib/yes24.mjs` | 예스24 검색·매칭·발췌 추출(spec §4) |
-| `lib/db.mjs` | `seed_sentences` 적재/조회(service role, 워커와 동일 계약) |
-| `lib/collect.mjs` | 수집 오케스트레이션(stored 가드 → 크롤 → 적재) |
-| `launchd/*.plist` | 데몬·배치 launchd 등록 템플릿 |
+| `lib/db.mjs` | `seed_sentences` 원장 + 인기책 조회(service role) |
+| `launchd/*.plist` | 데몬(poller)·배치(prewarm) launchd 템플릿 |
 
 ## 1. 설치 (맥미니)
 
 ```bash
 cd collector
-npm install          # playwright + chromium 자동 설치(postinstall)
+npm install          # playwright + chromium 자동 설치
 ```
 
 ## 2. 환경변수
 
-`collector/.env.example` 를 복사해 `collector/.env` 작성. **랩탑 repo `.env` 값을 AirDrop/scp 로 옮긴다(평문 메일 금지).**
+`collector/.env.example` → `collector/.env`. **랩탑 `.env` 값을 AirDrop/scp 로 옮긴다(평문 메일 금지).**
 
 ```bash
 cp .env.example .env
-# 편집: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (랩탑에서 복사)
-#       COLLECTOR_TOKEN  (새로 생성: openssl rand -hex 32)
+# SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (필수 — 큐 폴링·적재)
+# SUPABASE_ACCESS_TOKEN (선택 — 마이그레이션 적용용 PAT)
 ```
 
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — `seed_sentences` 직접 적재(본인 신뢰 기기).
-- `COLLECTOR_TOKEN` — 워커↔collector 인증. **같은 값을 워커 secret 으로도 등록**(아래 5단계).
-- `.env` 는 루트 `.gitignore` 가 차단 — 절대 커밋 금지.
+`.env` 는 루트 `.gitignore` 가 차단 — 절대 커밋 금지. **토큰·Tunnel 불필요**(인바운드 없음).
 
-## 3. 동작 확인 (시크릿 불필요)
+## 3. DB 마이그레이션 적용 (1회)
+
+`seed_queue` 테이블 생성(CONTRIBUTING §8.5 — 수동):
 
 ```bash
-# 파이프라인만(DB 적재 없음) — 진짜 책 인용이 나오는지
+# 대시보드 SQL Editor 에 docs/readinggo/supabase/31_seed_queue.sql 붙여넣기 Run
+# 또는 PAT 있으면:
+node ../docs/readinggo/supabase/admin-cli.mjs sql 31_seed_queue.sql
+```
+
+## 4. 동작 확인
+
+```bash
+# 파이프라인만(DB 적재 없음)
 node crawl-once.mjs "모순" "양귀자" "9788998441012"
-#  → ✓ 6 excerpts: "아버지의 삶은 아버지의 것이고…" 등
 
-# 데몬 기동 + 헬스
-npm start &
-curl -s localhost:8787/health        # {"ok":true,...}
-curl -s -X POST localhost:8787/collect \
-  -H "Authorization: Bearer $(grep COLLECTOR_TOKEN .env | cut -d= -f2)" \
-  -H "Content-Type: application/json" \
-  -d '{"title":"모순","author":"양귀자","isbn":"9788998441012"}'
+# 폴러 가동(큐 소진). 큐가 비어있으면 5초마다 폴링.
+npm start
+# 인기책 배치 큐잉(low) — 한가할 때 채워짐
+npm run prewarm 150
 ```
 
-`.env` 에 Supabase 키가 있으면 `/collect` 가 `seed_sentences` 에도 적재한다(`GET /health` 의 `configured:true`).
-소량(10~20권) 적재 후 Supabase `seed_sentences` 를 조회해 품질을 확인하라.
+큐에 책을 넣는 건 보통 워커(/api/seed)다. 수동 큐잉은 `lib/queue.mjs`의 `enqueue()` 사용.
 
-## 4. Cloudflare Tunnel (고정 URL 노출)
-
-맥미니 로컬 데몬(127.0.0.1:8787)을 `https://collector.<도메인>` 으로 공개한다(포트포워딩 불필요). 워커만 토큰으로 호출.
-
-```bash
-brew install cloudflared
-cloudflared tunnel login                              # 브라우저 로그인(대화형)
-cloudflared tunnel create readinggo-collector
-cloudflared tunnel route dns readinggo-collector collector.<도메인>
-
-# ~/.cloudflared/config.yml 예:
-#   tunnel: <TUNNEL_ID>
-#   credentials-file: /Users/<you>/.cloudflared/<TUNNEL_ID>.json
-#   ingress:
-#     - hostname: collector.<도메인>
-#       service: http://127.0.0.1:8787
-#     - service: http_status:404
-
-cloudflared tunnel run readinggo-collector            # 상시: launchd 로 등록 권장
-# (또는)  sudo cloudflared service install
-```
-
-> `cloudflared tunnel login` 등은 **대화형 로그인**이라 직접 실행해야 한다. 이 세션에서 돌리려면 프롬프트에 `! cloudflared tunnel login` 처럼 입력하면 출력이 대화에 들어온다.
-
-## 5. 워커 secret 등록
-
-워커가 collector 를 호출하도록(코드는 `gyehyu/seed-collector-worker` PR):
-
-```bash
-npx wrangler secret put COLLECTOR_URL      # 예: https://collector.<도메인>
-npx wrangler secret put COLLECTOR_TOKEN    # collector/.env 와 동일 값
-npx wrangler deploy
-```
-
-워커는 `seed_sentences` 에 stored 가 없을 때만 `/collect` 를 호출하고(동기, ~12s 타임아웃),
-실패·타임아웃·미커버 시 블로그(#819) 폴백 또는 빈 반환한다(spec §3.1·§9).
-
-## 6. launchd (상시 가동 + 새벽 배치)
+## 5. launchd (상시 가동 + 새벽 배치)
 
 ```bash
 mkdir -p logs ~/Library/LaunchAgents
-# 템플릿의 __NODE__ / __COLLECTOR_DIR__ 치환 후 설치:
 NODE=$(which node); DIR=$(pwd)
 for f in collector collector-prewarm; do
   sed -e "s#__NODE__#$NODE#g" -e "s#__COLLECTOR_DIR__#$DIR#g" \
@@ -114,18 +85,15 @@ done
 launchctl list | grep readinggo
 ```
 
-- `com.readinggo.collector` — 데몬 상시(KeepAlive, 부팅 시 시작).
-- `com.readinggo.collector-prewarm` — 매일 04:00 인기책 선충전 + TTL 재크롤.
+- `com.readinggo.collector` — **poller** 상시(KeepAlive, 부팅 시 시작).
+- `com.readinggo.collector-prewarm` — 매일 04:00 인기책 큐잉.
 - 로그: `collector/logs/*.log`.
 
-## 7. 예의 / 차단 대응 (spec §7)
+## 6. 적재 규칙 / 예의 / 저작권
 
-- 요청 간 딜레이 2~3초, **동시성 1**(브라우저 1개 직렬 큐).
-- 식별 가능한 UA, robots best-effort. 새벽 소량 배치.
-- 차단 감지: 검색이 홈으로 리다이렉트되면 재워밍업 1회 재시도 → 실패 시 `status:'blocked'` 로그 + 백오프.
-
-## 8. 저작권 / 약관 가드 (spec §8)
-
-- 출처 표기(예스24/출판사 + 링크), **책당 인용 ≤6**, 비영리·교육/데모 한정.
-- 권리자 요청 시 즉시 삭제(`seed_sentences` 에서 SQL/콘솔 삭제). robots/약관 best-effort.
-- **정식 상용화 전 재검토**(spec 에 못박음).
+- **멀티NPC**: 발췌마다 서로 다른 NPC 명의로 `sentences`(kind='quote') 적재 → byBook 피드에 아바타와 노출. `page=null`(스포일러 블라인드 없음).
+- **멱등**: 이 책에 이미 있는 문장 텍스트는 건너뜀(재폴링·재크롤 누적 0).
+- **off-catalog**: 카탈로그에 없는 책은 `books`에 auto-upsert 후 적재.
+- 예의(spec §7): 책 사이 딜레이 2~3초, 동시성 1, 식별 UA, 차단(홈 리다이렉트) 시 워밍업 재시도+백오프.
+- 저작권(spec §8): 책당 ≤6, 비영리·교육/데모, `seed_sentences` 원장으로 권리자 요청 시 일괄 삭제. 상용화 전 재검토.
+  - ⚠️ NPC 명의 표시라 피드에 출처 링크는 노출되지 않음(원장에만 보존). 상용화 전 출처 표기 방식 재검토 필요.
