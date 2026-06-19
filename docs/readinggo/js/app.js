@@ -319,6 +319,23 @@ function App() {
   const [shelfImportOpen, setShelfImportOpen] = useState(false);
   useEffect(() => { window.RG_openShelfImport = () => setShelfImportOpen(true); return () => { window.RG_openShelfImport = null; }; }, []);
   const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE }));
+  const [popularBooks, setPopularBooks] = useState(null);  // #835: 검색 추천 인기 도서(우리 사이트) — startedThisWeek + ALL_BOOKS 폴백
+
+  // 검색 추천 '인기 도서' (#835) — 우리 사이트 인기(최근 등록 상위, social과 동일 RPC) 우선, 부족분은 카탈로그 폴백.
+  useEffect(() => {
+    let alive = true;
+    const fb = (typeof ALL_BOOKS !== 'undefined' ? ALL_BOOKS : (window.ALL_BOOKS || [])).slice(0, 8);
+    const DS = window.DataStore;
+    if (!(DS && DS.books && DS.books.startedThisWeek)) { setPopularBooks(fb); return; }
+    Promise.resolve(DS.books.startedThisWeek(8)).then((rows) => {
+      if (!alive) return;
+      const popular = (rows || []).filter(x => x && x.bookId).map(x => ({ book_id: x.bookId, title: x.title, author: x.author, cover_url: x.cover_url }));
+      const seen = new Set(popular.map(b => b.book_id));
+      for (const b of fb) { if (popular.length >= 8) break; if (!seen.has(b.book_id)) { popular.push(b); seen.add(b.book_id); } }
+      setPopularBooks(popular.length ? popular : fb);
+    }).catch(() => { if (alive) setPopularBooks(fb); });
+    return () => { alive = false; };
+  }, []);
 
   // XP 적립 이벤트 버스 — 방문·반응 XP(grantXp → 'rg:xp')를 상단바 appState.xp 에 반영.
   useEffect(() => {
@@ -830,7 +847,7 @@ function App() {
           onClose={() => setIsSearchOpen(false)}
           books={ALL_BOOKS}
           onSelectBook={handleSearchSelectBook}
-          topRecommendations={ALL_BOOKS.slice(0, 8)}
+          topRecommendations={popularBooks || ALL_BOOKS.slice(0, 8)}
         />
 
         {/* 타인 프로필 모달 (§5.8.2) — @핸들 탭으로 열림 */}
