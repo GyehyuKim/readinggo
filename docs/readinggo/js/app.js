@@ -534,6 +534,47 @@ function App() {
     })();
   }, []);
 
+  // #848 여러 문장 일괄 저장 (spec nest.md §5.8) — handleCheckin 저장 경로를 재사용하되
+  // 세리머니·스트릭 N회 폭주 없이: sentences.add 반복 + xp.add 합산 1회 + DB 정합 1회.
+  // XP는 일일미션 한 줄 기록과 동급 +20 1회(문장 수 무관, 단순화 — systems.md §6.3). page는 미상=null.
+  const handleBatchSave = useCallback(async (quotes, book) => {
+    const list = (quotes || []).map(t => (t || '').trim()).filter(t => t && t.length <= 200);
+    if (!list.length) return { saved: 0 };
+    try {
+      // ubId 해소 — handleCheckin(#565)과 동일: 화면 책 기준(active 폴백 아님)
+      let ubId = book && book.ubId;
+      if (!ubId && book && book.id) {
+        const myb = await Promise.resolve(DataStore.myBooks.list()).catch(() => []);
+        const found = (myb || []).find(u => (u.book_id === book.id) || (u.book && u.book.id === book.id));
+        ubId = found && found.id;
+      }
+      if (!ubId) { surfaceWriteError(new Error('user_book 미해소'), '책을 찾지 못해 저장하지 못했어요'); return { error: true, saved: 0 }; }
+      await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: (book && book.cur) || 0 })).catch(() => {});
+      let saved = 0;
+      for (const text of list) {
+        try { await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: null, text, kind: 'quote' })); saved++; }
+        catch (e) { /* 개별 실패 스킵 — 200자 초과 등 */ }
+      }
+      if (saved > 0) await Promise.resolve(DataStore.xp.add(20, 'batch')).catch(() => {});
+      // DB 권위값으로 XP·스트릭·내 한 문장 정합 (handleCheckin과 동일)
+      const [stDb, xpDb, mineDb] = await Promise.all([
+        Promise.resolve(DataStore.streak.get()).catch(() => null),
+        Promise.resolve(DataStore.xp.get()).catch(() => null),
+        Promise.resolve(DataStore.sentences.listMine()).catch(() => null),
+      ]);
+      setAppState(s => ({
+        ...s,
+        streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
+        xp: (typeof xpDb === 'number') ? xpDb : s.xp,
+        myQuotes: Array.isArray(mineDb)
+          ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', isPrivate: !!x.is_private, notePrivate: !!x.note_private }))
+          : s.myQuotes,
+      }));
+      window.dispatchEvent(new CustomEvent('rg:today-checked'));
+      return { saved };
+    } catch (e) { surfaceWriteError(e, '기록을 저장하지 못했어요 — 다시 시도해주세요'); return { error: true, saved: 0 }; }
+  }, []);
+
   // 읽기모드 한 문장 저장 → appState.myQuotes 즉시 반영 (#358).
   // 종전엔 NestView 내부 상태만 갱신 → ✕ 나가기(체크인 미경유) 시 책상세·프로필에서 문장 누락.
   const handleArchive = useCallback((q) => {
@@ -769,6 +810,7 @@ function App() {
               key="nest"
               state={appState}
               onCheckin={handleCheckin}
+              onBatchSave={handleBatchSave}
               onSimSkip={handleSimSkip}
               onGoLibrary={() => switchTab('profile')}
               onOpenSearch={() => setIsSearchOpen(true)}

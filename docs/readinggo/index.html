@@ -1447,6 +1447,7 @@ async function loadBabel(src) {
     await loadBabel('js/share-card.js');  // #650 A: 한 문장 외부 공유 (window.shareSentence)
     await loadBabel('js/search.js');
     await loadBabel('js/ocr-crop-overlay.js');  // #761 모듈화 — OcrCropOverlay(nest 이전 — NestView가 <OcrCropOverlay> 소비)
+    await loadBabel('js/batch-quote-import.js');  // #848 — BatchQuoteImport(nest 이전 — NestView가 <BatchQuoteImport> 소비)
     await loadBabel('js/ceremony.js');  // #761 모듈화 — Ceremony(nest 이전 — NestView가 <Ceremony> 소비)
     await loadBabel('js/nest.js');
     await loadBabel('js/companion.js');  // #761 모듈화 — CompanionModal+헬퍼(nest 이후, app 이전 — app이 <CompanionModal> 소비)

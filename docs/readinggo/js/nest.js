@@ -81,11 +81,13 @@ function BookEditModal({ book, onClose, onSaved }) {
     </div>, document.body);
 }
 
-function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onArchive }) {
+function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onArchive, onBatchSave }) {
   const [modalOpen, setModalOpen] = _useState(false);
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
   const [quickText, setQuickText] = _useState('');
+  const [quotePasteOpen, setQuotePasteOpen] = _useState(false);  // #848 여러 문장 일괄 입력 모달
+  const [batchBusy, setBatchBusy] = _useState(false);
   const [quickSentPage, setQuickSentPage] = _useState('');
   const [sentFlip, setSentFlip] = _useState(false); // 문장 저장 시 일기장 넘기기 효과
   // 빠른입력 OCR (#498) — 책 사진 → quickText 프리필
@@ -465,6 +467,11 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 10, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
           </button>
+          {/* #848 여러 문장 한 번에 붙여넣기 — 동일 일괄 저장(onBatchSave) 경로 */}
+          <button onClick={() => setQuotePasteOpen(true)} title="여러 문장 붙여넣기" aria-label="여러 문장 붙여넣기"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 10, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: 'pointer', padding: 0 }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+          </button>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>p</span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <button onClick={() => _stepPage(setQuickSentPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtnSm}>−</button>
@@ -488,6 +495,22 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       {/* 크롭 오버레이 */}
       {quickOcrFile && (
         <OcrCropOverlay file={quickOcrFile} onCancel={() => setQuickOcrFile(null)} onCrop={(blob) => { setQuickOcrFile(null); runOcrQuick(blob); }} />
+      )}
+
+      {/* #848 여러 문장 일괄 입력 — 줄 분리 → 검토 → onBatchSave(일괄 저장 + XP 합산 1회) */}
+      {quotePasteOpen && (
+        <BatchQuoteImport busy={batchBusy}
+          onCancel={() => setQuotePasteOpen(false)}
+          onSave={async (quotes) => {
+            if (!quotes || !quotes.length) { setQuotePasteOpen(false); return; }
+            setBatchBusy(true);
+            try {
+              const r = (onBatchSave && await onBatchSave(quotes, nestState.book)) || {};
+              if (r.error) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
+              else { showToast('✨ ' + (r.saved || quotes.length) + '개 담았어요'); setQuotePasteOpen(false); }
+            } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
+            finally { setBatchBusy(false); }
+          }} />
       )}
 
       {/* '오늘 기록 완료 · N일 연속' nudge 제거 (#481) */}
