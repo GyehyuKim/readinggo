@@ -90,9 +90,10 @@ function SocialView({ state }) {
           page: s.page,
           q: s.text,
           nick: u.handle ? ('@' + u.handle) : '@익명',
-          avatar: (u.display_name && u.display_name[0]) || <window.SparrowMark size={18} />,
-          claps: 0,
-          time: rgRelTime(s.created_at),
+          // NPC 더미(#854)는 이모지 아바타·박수수·상대시간 문자열을 row 에 직접 싣는다 → 우선 사용, 실데이터는 폴백.
+          avatar: s.avatar || (u.display_name && u.display_name[0]) || <window.SparrowMark size={18} />,
+          claps: s.claps || 0,
+          time: s.time || rgRelTime(s.created_at),
           bookTitle: bk.title || '',
           bookId: bk.id || s.book_id || '',   // 로컬 문장은 user_book embed 없음 → s.book_id 폴백(사피엔스 오표시 방지)
           bookCover: bk.cover_url || '',

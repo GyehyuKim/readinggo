@@ -216,6 +216,40 @@ function _findSentence(s, sentenceId) {
   return _allSentences(s).find(se => se.id === sentenceId) || null;
 }
 
+// Phase 0 데모 피드 보충 (#854) — data.js NPC_QUOTES 를 피드 row(§7.2 shape)로 변환.
+// 미로그인/localStorage 상태에선 타 사용자 문장이 없어 피드가 항상 빈 화면이라,
+// NPC 더미를 섞어 소셜 탭 첫인상의 "빈 공간"감을 없앤다.
+// row 에 id 를 부여하지 않아 SentenceCard.canReact=false → 좋아요 버튼 자동 비활성(합성 row 토글 불가).
+// Phase 1(Supabase 어댑터)에선 이 localStorage feed 가 호출되지 않아 자동으로 실데이터로 대체된다(별도 분기 불필요).
+function _npcFeedRows() {
+  const src = window.NPC_QUOTES;
+  if (!src) return [];
+  const rows = [];
+  Object.keys(src).forEach(bookId => {
+    const bk = (typeof window.getBook === 'function') ? window.getBook(bookId) : null;
+    // getBook 미스 시 사피엔스(RG_BOOKS[0]) 폴백이라 id 일치할 때만 책 정보 사용(오표시 방지).
+    const book = (bk && bk.id === bookId)
+      ? { id: bk.id, title: bk.title, author: bk.author, cover_url: bk.cover }
+      : { id: bookId };
+    (src[bookId] || []).forEach(it => {
+      rows.push({
+        // id 미부여 — SentenceCard.canReact=!!item.id 가 false → 좋아요 버튼 자동 비활성(합성 row 토글 불가).
+        text: it.q,
+        page: it.page,
+        user_id: null,
+        user: { handle: (it.nick || '').replace(/^@/, '') },
+        user_book: { book_id: bookId, book },
+        created_at: null,
+        avatar: it.avatar,   // 이모지 아바타 — surrogate-safe 하게 매핑에서 직접 사용
+        claps: it.claps,     // 더미 박수 수(표시용, 합성 row 라 토글 불가)
+        time: it.time,       // "2시간 전" 등 상대시간 문자열(created_at 없음 → 폴백 대체)
+        _isNpc: true,
+      });
+    });
+  });
+  return rows;
+}
+
 /* ── DataStore 계약 (§7.2) ───────────────────────────────
    localStorageAdapter 백킹의 실제 동작 구현 (스텁 아님). */
 const DataStore = {
@@ -405,16 +439,18 @@ const DataStore = {
       return localStorageAdapter.mutate(s => _allSentences(s).slice());
     },
     feed() {
-      // 전체 공개 피드 — 최신순 (§social). Phase 0 은 내 문장만 보유.
-      return localStorageAdapter.mutate(s =>
+      // 전체 공개 피드 — 최신순 (§social). Phase 0 은 내 문장 상단 + NPC 더미 하단(#854).
+      const mine = localStorageAdapter.mutate(s =>
         _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
       );
+      return [...mine, ..._npcFeedRows()];
     },
-    // 추천 (#787) — Phase 0 은 타 사용자 없음 → feed()와 동형(내 문장 최신순). 표면 일치(§7.2).
+    // 추천 (#787) — Phase 0 은 타 사용자 없음 → feed()와 동형(내 문장 최신순 + NPC 더미, #854). 표면 일치(§7.2).
     feedRecommended() {
-      return localStorageAdapter.mutate(s =>
+      const mine = localStorageAdapter.mutate(s =>
         _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
       );
+      return [...mine, ..._npcFeedRows()];
     },
     // 사후 감상 추가·편집 (§5.8.4) — Supabase 어댑터와 표면 일치(§7.2)
     setNote(sentenceId, my_note) {
