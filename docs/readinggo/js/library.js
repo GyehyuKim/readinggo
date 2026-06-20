@@ -308,8 +308,17 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
 
       {/* 내 서재 섹션 */}
       <div style={{padding:'0 16px', marginBottom:20}}>
-        <div style={{fontSize:16, fontWeight:900, color:'var(--ink)', letterSpacing:'-0.3px', marginBottom:12}}>내 서재</div>
-        
+        {/* #832: '스샷으로 복원' 상시 진입점 — 빈 서가(아래 CTA)뿐 아니라 책장이 차 있어도 접근 가능.
+            DESIGN 3차(텍스트·아이콘) 버튼 위계. 빈 서가 큰 CTA(아래)는 유지. */}
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
+          <div style={{fontSize:16, fontWeight:900, color:'var(--ink)', letterSpacing:'-0.3px'}}>내 서재</div>
+          <button onClick={() => window.RG_openShelfImport && window.RG_openShelfImport()}
+            title="책장 스크린샷으로 읽은 책 한 번에 복원"
+            style={{display:'inline-flex', alignItems:'center', gap:4, background:'transparent', border:'none', color:'var(--brand-3)', fontSize:12, fontWeight:800, cursor:'pointer', padding:'4px 2px', whiteSpace:'nowrap'}}>
+            📸 스샷으로 복원
+          </button>
+        </div>
+
         {/* 탭 버튼들 */}
         <div style={{display:'flex', gap:8, marginBottom:16, overflowX:'auto', paddingBottom:8, scrollBehavior:'smooth'}}>
           {tabsData.map(tab => (
