@@ -216,6 +216,23 @@ function _findSentence(s, sentenceId) {
   return _allSentences(s).find(se => se.id === sentenceId) || null;
 }
 
+// 정적 카탈로그 row(getBook/loadBooks: {id,isbn,title,author,pub,total,cover,description})를
+// Supabase books 표면({id,isbn13,title,author,publisher,total_pages,cover_url})으로 정규화 (#856).
+// BookInfoModal·search.js 가 Supabase 필드명을 기대하므로 어댑터 간 표면을 맞춘다.
+function _catalogRow(b) {
+  if (!b) return null;
+  return {
+    id: b.id,
+    isbn13: b.isbn || b.isbn13 || '',
+    title: b.title,
+    author: b.author,
+    publisher: b.pub || b.publisher || '',
+    total_pages: b.total || b.total_pages || 0,
+    cover_url: b.cover || b.cover_url || '',
+    description: b.description || '',
+  };
+}
+
 // Phase 0 데모 피드 보충 (#854) — data.js NPC_QUOTES 를 피드 row(§7.2 shape)로 변환.
 // 미로그인/localStorage 상태에선 타 사용자 문장이 없어 피드가 항상 빈 화면이라,
 // NPC 더미를 섞어 소셜 탭 첫인상의 "빈 공간"감을 없앤다.
@@ -598,6 +615,28 @@ const DataStore = {
      books.complete → status='completed' + completed_at (완독 상태·별점·소감, 성 직접 지급 없음).
      castles.list → floor(totalXp / 1600) 파생 (#520/#521). 완독 권수와 분리. */
   books: {
+    // 책 카탈로그 단건 조회 (§7.2 Supabase 어댑터 getById 표면 일치) — Phase 0/게스트는 정적 카탈로그(getBook).
+    // 누락돼 있어 BookInfoModal 의 `DS.books.getById` 가 undefined → 게스트(미로그인) 책 상세가
+    // 전부 "책 정보를 찾을 수 없어요"로 깨졌다(#856). loadBooks() 를 먼저 await 해 인라인 12권 밖
+    // (TSV/Supabase) 책도 BOOK_BY_ID 에 색인된 뒤 getBook 으로 조회한다.
+    getById(id) {
+      if (!id) return null;
+      return Promise.resolve(window.loadBooks ? window.loadBooks() : null).then(() => {
+        const b = (typeof window.getBook === 'function') ? window.getBook(id) : null;
+        // getBook 미스 시 사피엔스(RG_BOOKS[0]) 폴백 → id 불일치면 없음 처리(오표시 방지).
+        return (b && b.id === id) ? _catalogRow(b) : null;
+      });
+    },
+    // 단건 조회 별칭 (Supabase get 표면 일치).
+    get(bookId) { return this.getById(bookId); },
+    // 우리 DB 책 검색 (Supabase ilike 표면 일치) — Phase 0/게스트는 정적 카탈로그 퍼지 검색.
+    search(query) {
+      const q = (query || '').trim();
+      if (!q || !window.loadBooks) return Promise.resolve([]);
+      return window.loadBooks().then(list =>
+        (window.fuzzySearch ? window.fuzzySearch(list, q) : []).slice(0, 20).map(_catalogRow)
+      );
+    },
     complete(userBookId, opts) {
       opts = opts || {};
       return localStorageAdapter.mutate(s => {
