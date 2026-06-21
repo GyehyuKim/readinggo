@@ -23,7 +23,7 @@ function Ceremony({ data, onClose, onComplete }) {
     // 한 문장 등록: "1개 문장 등록 +N XP" (#685)
     leadText = `1개 문장 등록 +${xpGain} XP`;
   } else if (!isNewDay && !wasReset) {
-    leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료 🐦`;
+    leadText = `+${pagesAdded}쪽 추가 기록 · 오늘은 이미 짹 완료`;
   } else {
     // 페이지만 저장: "책읽기 완료 +N XP" — 거짓 '문장 등록' 표기 금지 (#685)
     leadText = `책읽기 완료 +${xpGain} XP`;
