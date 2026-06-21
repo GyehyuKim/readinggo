@@ -29,19 +29,23 @@ function isSentenceBlinded(bookId, page) {
 let _toastTimer = null;
 let _setToastFn = null;
 
-function showToast(msg) {
+// showToast(msg, opts) — opts.sparrow=true 면 메시지 앞에 SparrowMark SVG(브랜드 마크) 표시.
+// (토스트는 문자열이라 메시지에 SVG를 못 넣음 → 아이콘은 옵션 플래그로 Toast 컴포넌트가 렌더. 🐦 이모지 대체.)
+function showToast(msg, opts) {
   if (_setToastFn) {
-    _setToastFn(msg);
+    _setToastFn({ msg, sparrow: !!(opts && opts.sparrow) });
     clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => _setToastFn(''), 2200);
+    _toastTimer = setTimeout(() => _setToastFn({ msg: '', sparrow: false }), 2200);
   }
 }
 
 function Toast() {
-  const [msg, setMsg] = useState('');
-  _setToastFn = setMsg;
+  const [t, setT] = useState({ msg: '', sparrow: false });
+  _setToastFn = setT;
   return (
-    <div className={'toast' + (msg ? ' show' : '')}>{msg}</div>
+    <div className={'toast' + (t.msg ? ' show' : '')}>
+      {t.sparrow && t.msg ? <><window.SparrowInline size={14} />{' '}</> : null}{t.msg}
+    </div>
   );
 }
 

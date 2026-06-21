@@ -68,7 +68,7 @@ function SocialView({ state }) {
   const doFollow = (u) => {
     if (!(DataStore.friends && DataStore.friends.follow)) return;
     setFollowed(m => ({ ...m, [u.id]: true }));
-    Promise.resolve(DataStore.friends.follow(u.id)).then(() => showToast('팔로우했어요')).catch(() => {});
+    Promise.resolve(DataStore.friends.follow(u.id)).then(() => showToast('팔로우했어요', { sparrow: true })).catch(() => {});
   };
 
   useEffect(() => {
