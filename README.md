@@ -1,7 +1,7 @@
 # ReadingGo — 하루 한 페이지, 한 문장에서 시작하는 독서 습관 앱
 
 > KAIST IT경영 특수논제(AI 기반 비즈니스 진화·전략·실습) 학기 프로젝트.
-> 레포명 `glocalx` — 초기 아이디어 탐색([`old/`](./old/))을 거쳐 **ReadingGo**로 수렴했다.
+> 레포명 `readinggo` (구 `glocalx` — 초기 아이디어 탐색([`old/`](./old/))을 거쳐 **ReadingGo**로 수렴, 2026-06 리네임).
 
 **🔗 라이브 데모 → <https://readinggo.hyuniverse.workers.dev>**
 

@@ -4,7 +4,7 @@
 진입점이다. Claude Code는 `CLAUDE.md`를 우선 로드하지만, 동일 규범을 참조하도록 이 파일도
 동기화되어 있다.
 
-> repo 이름은 역사적 이유로 `GyehyuKim/glocalx` (이전 프로젝트 GlocalX에서 피벗). **현재 프로젝트는 ReadingGo.**
+> repo: `GyehyuKim/readinggo` (구 `glocalx` — 이전 프로젝트 GlocalX에서 피벗 후 2026-06 리네임). **프로젝트명 = ReadingGo.**
 
 ---
 
