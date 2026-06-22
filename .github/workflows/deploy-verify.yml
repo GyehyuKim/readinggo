@@ -1,8 +1,9 @@
-# 자동배포(Cloudflare Workers Build) 반영 검증 (#693, 복구 #898)
-# main 푸시 후 라이브 사이트가 머지본 빌드의 해시 자산(Vite content-hash)을 서빙할 때까지 폴링.
-# Workers Build 가 멈추면(쿼터·레이트리밋 등) 미스매치로 fail → 수동 `npx wrangler deploy` 신호.
-# 직접 배포는 하지 않음(CF 시크릿 불요) — HTTP 폴링으로 "감지"만 한다.
-# (#880 Vite 전환으로 _RG_V 캐시버전이 사라져 구버전 폴링이 8/8 실패 → 해시 자산 매칭으로 교체.)
+# 자동배포(Cloudflare Workers Build) 반영 검증 + 배포 후 안전 (#693, 복구 #898, P2 #900)
+#  1) main 푸시 후 라이브가 머지본 해시 자산(Vite content-hash)을 서빙할 때까지 폴링(배포 반영 확인).
+#  2) (P2 #900) 반영되면 production URL 에서 render-smoke 를 ×3 재시도 → **3회 연속 실패**면 런타임
+#     회귀로 보고 `wrangler rollback --yes` 로 직전 버전 자가복구 + auto-rollback 이슈 생성.
+#     #885 류 수동 핫픽스(~1h)를 1분 자가복구로. 재시도는 일시 네트워크/엣지 전파 오류의 오롤백 방어.
+#  Workers Build 가 멈추면(쿼터·레이트리밋) 미반영 → 폴링 fail → 수동 `npx wrangler deploy` 신호.
 name: deploy-verify
 
 on:
@@ -14,9 +15,13 @@ concurrency:
   group: deploy-verify
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  issues: write   # P2 auto-rollback 이슈 생성
+
 jobs:
   verify-deploy:
-    name: verify-deploy (자동배포 반영 확인)
+    name: verify-deploy (반영 확인 + live smoke + 자동롤백)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,4 +52,54 @@ jobs:
           done
           echo "::error::자동배포(Workers Build) 미반영 — 라이브에 $EXPECTED 없음."
           echo "::error::복구: 로컬에서 'npx wrangler deploy' 직접 업로드(Builds 쿼터 무관). 런북: docs/readinggo/RUNBOOK-DEPLOY.md (#693)"
+          exit 1
+
+      # ── P2 (#900): 배포 반영 후 production live render-smoke + 실패 시 자동 롤백 ──
+      - name: Install Playwright chromium
+        run: cd docs/readinggo && npm ci && npx playwright install --with-deps chromium
+
+      - name: Production live smoke (재시도 ×3 — 일시 오류 오롤백 방어)
+        id: smoke
+        continue-on-error: true   # 실패해도 다음 롤백 스텝이 돌도록(여기서 job 중단 금지)
+        env:
+          SMOKE_URL: https://readinggo.hyuniverse.workers.dev/
+        run: |
+          cd docs/readinggo
+          for attempt in 1 2 3; do
+            echo "── production live smoke 시도 $attempt/3 ──"
+            if SMOKE_URL="$SMOKE_URL" npm run smoke; then
+              echo "✅ live smoke 통과 (시도 $attempt)"; exit 0
+            fi
+            echo "시도 $attempt 실패 — 20s 후 재시도(일시 네트워크/엣지 전파 배제)"
+            sleep 20
+          done
+          echo "::error::production live smoke 3회 연속 실패 — 배포본 런타임 회귀 의심."
+          exit 1
+
+      - name: Auto-rollback + 이슈 (smoke 3회 실패 시)
+        if: steps.smoke.outcome == 'failure'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          SHORT="${SHA:0:7}"
+          echo "live smoke 실패 → production 직전 버전으로 롤백"
+          if npx --yes wrangler@4 rollback --yes --message "auto: post-deploy smoke 실패 $SHORT" 2>&1 | tee /tmp/rb.log; then
+            RB="✅ 롤백 성공 (직전 버전 승격)"
+          else
+            RB="⚠️ 롤백 명령 실패 — 수동 개입 필요 (RUNBOOK-DEPLOY §3: npx wrangler deploy 또는 대시보드 rollback)"
+          fi
+          gh label create auto-rollback --color B60205 --description "배포 후 live smoke 실패 자동 롤백" 2>/dev/null || true
+          gh issue create \
+            --title "🔴 auto-rollback: 배포 $SHORT live smoke 실패로 롤백" \
+            --label auto-rollback \
+            --body "$(printf 'main 배포 `%s` 가 production live render-smoke **3회 연속 실패** → 자동 롤백 수행.\n\n- 롤백 결과: %s\n- 커밋: %s\n- 워크플로우 run: %s/actions/runs/%s\n\n## 다음 조치\n1. 이 커밋의 런타임 회귀 원인 조사 — preview-smoke(#899)는 통과했는데 production 에서만 실패면 **env/시크릿 차이**(preview 와 production 의 vars·secret 불일치)를 먼저 의심.\n2. 원인 수정 후 재배포. 롤백 로그는 위 run 의 Auto-rollback 스텝 참조.\n\nRefs #900' "$SHORT" "$RB" "$SHA" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")" \
+            || echo "이슈 생성 실패(권한·라벨) — 롤백 상태: $RB"
+
+      - name: smoke 실패면 job 실패 처리
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          echo "::error::post-deploy live smoke 3회 실패 → 자동 롤백 수행. auto-rollback 이슈 참조."
           exit 1
