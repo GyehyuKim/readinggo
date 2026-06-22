@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
 <title>ReadingGo — 하루 한 문장, 책장이 자란다</title>
 <!-- 참새 앱 아이콘 (#785) — SVG 벡터 파비콘(모든 DPI 선명) -->
 <link rel="icon" type="image/svg+xml" href="assets/sparrow.svg" />
@@ -180,7 +180,7 @@ input,textarea{font-family:inherit;}
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
-  padding: 8px 14px;
+  padding: calc(env(safe-area-inset-top) + 8px) 14px 8px;
 }
 .topbar-row{ display:flex; align-items:center; gap: 8px; }
 .brand-mark{
