@@ -1,9 +1,9 @@
 # ReadingGo iOS + Android 출시 계획
 
-> ## ⛔ 보류 동결 (v7, 2026-06-01)
-> **이 문서 전체는 보류 상태다.** v7에서 **web-first** 결정으로 **Capacitor·앱스토어 출시를 Phase 3으로 보류**했다.
-> 아래 내용(Capacitor 셸·App Store·Play Store·OCR·STT·위젯·개발자 계정 결제)은 **현재 실행하지 않는다.**
-> **개발자 계정($99 + $25)은 결제하지 않는다.** Capacitor 재도입을 결정하는 Phase 3에서 본 계획을 재활성화·갱신한다.
+> ## ✅ 활성 (런칭 결정, 2026-06)
+> **동결 해제.** web-first 보류를 풀고 **Capacitor로 iOS+Android 정식 출시**를 진행한다(`CLAUDE.md` Stack Lock 갱신 반영).
+> **선행 1순위 = Vite 전환**(아래 Phase 0 S1). 이후 Capacitor 셸 → 개발자 계정($99+$25) → 스토어 제출 순.
+> 실행은 GitHub **Launch v1 마일스톤**의 추적 이슈로 관리한다. 업데이트 전략(OTA Live Updates + 릴리스 브랜치)은 아래 §업데이트 전략 참조.
 > 현행 스택은 `CLAUDE.md` Stack Lock + [`specs/README.md` §3](./specs/README.md) 참조.
 >
 > ---
@@ -168,9 +168,28 @@
 
 > **핵심**: Vite + Capacitor 셸링 후에는 *기존 데모 작업 방식 그대로 유지*. 윤지·승원은 브라우저로 작업 계속 가능. iOS/Android 빌드만 계휴 전담.
 
+## 10.5 업데이트 전략 (런칭 후) — OTA + 릴리스 브랜치
+
+웹은 CF Worker로 수시 배포되지만 앱은 스토어 심사(iOS 1~3일)가 있어 같은 속도가 안 난다. **레이어를 분리**해 웹의 빠른 속도를 앱에서도 최대한 유지한다.
+
+| 변경 유형 | 경로 | 심사 | 속도 |
+|---|---|---|---|
+| JS/HTML/CSS(웹 레이어) | **OTA Live Updates**(`@capacitor/live-updates`/Appflow 또는 오픈소스 Capgo) | 없음(스토어 약관 허용) | 즉시 |
+| 네이티브(플러그인·권한·SDK·아이콘) | **스토어 바이너리 릴리스** | 있음 | 주기적(예: 월 1회) |
+
+**브랜치/릴리스 규칙**
+- `main` = 연속 통합. 머지되면 (1) 웹 CF 배포 (2) 앱 OTA `production` 채널 갱신.
+- **스토어 바이너리** = `main`에서 `release/x.y.z` 태그/브랜치 컷 → 버전 범프 → iOS(App Store Connect)·Android(Play) 제출. 네이티브 버전은 *네이티브 변경 시에만* 올림.
+- **SemVer**: `major.minor.patch`. patch·웹 핫픽스는 OTA, 네이티브 추가는 minor 바이너리 릴리스.
+- **단계적 출시**(Play staged rollout 10%→50%→100%, App Store phased release)로 회귀 방어. OTA도 채널(`staging`→`production`)로 단계 배포.
+- **롤백**: OTA는 이전 번들로 즉시 롤백, 네이티브는 스토어 이전 빌드 복귀(느림) → 네이티브 변경은 보수적으로.
+
+> 효과: 일상 업데이트(카피·버그·UI)는 OTA로 *지금처럼 수시 배포*, 스토어 제출은 네이티브가 바뀔 때만 → 심사 병목 최소화.
+
 ## 11. 변경 이력
 
 | 날짜 | 변경 |
 |---|---|
 | 2026-05-21 | DRAFT 작성. 스택=Capacitor, 양수겸장, 1주 압축 목표 |
 | 2026-05-23 | **v5.1 모델로 재작성**. 1주 압축 폐기 → Capacitor 처음부터 점진 모델. OCR/바코드/위젯이 Phase 2에 자연 편입 |
+| 2026-06 | **동결 해제 — 런칭 결정**. Vite 선행 + Capacitor 출시 활성화. §10.5 업데이트 전략(OTA+릴리스 브랜치) 추가. Launch v1 마일스톤으로 관리 |
