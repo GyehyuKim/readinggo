@@ -29,5 +29,6 @@ npx wrangler deploy
 - **한도 확인**: CF 대시보드에서 Builds 월 한도·리셋 주기 점검(필요 시 플랜 검토). *(계휴/대시보드 권한 필요)*
 - **감지**: `deploy-verify` 워크플로우가 미반영을 자동 감지(라이브 `_RG_V` 폴링, 최대 10분).
 - **(선택) Actions 폴백 배포 job**: `wrangler deploy` 를 Actions 에서 직접 실행하면 Builds 쿼터와 무관하게 배포 가능. 단 `CLOUDFLARE_API_TOKEN` 시크릿 필요 + Workers Build 와의 **이중 배포** 주의 → 도입 시 `workflow_dispatch`(수동 트리거)로 한정 권장. *(미도입, 계휴 결정)*
+- **자동 롤백 (P2 #900, 도입됨)**: 배포 반영 후 `deploy-verify` 가 production live render-smoke 를 **3회 재시도** → 연속 실패 시 `wrangler rollback --yes` 로 직전 버전 자가복구 + `auto-rollback` 라벨 이슈 생성. `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`(P1 #899 에서 등록) 사용, 3회 재시도로 일시 오류 오롤백 방어. **auto-rollback 이슈를 받으면** 그 커밋의 런타임 회귀부터 조사 — preview-smoke(#899)는 통과했는데 production 만 실패면 preview↔production 의 env·시크릿 차이를 먼저 의심.
 
 [cicd-auto-deploy]: 메모리 — main 머지 시 CI/CD 자동 배포가 기본. 이 런북은 그 예외(자동배포 실패) 전용.
