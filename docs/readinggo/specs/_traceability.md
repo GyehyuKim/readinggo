@@ -94,8 +94,7 @@
 
 **v7.4.1 갱신 (2026-06-10, post-merge)**: 외서 검색 5+5 ✅(#302/#343), export 책 소개 ✅(#316/#344), 공개전환 체크리스트 ✅(#178/#344), 참새 완독 회고 ✅(#259/#345). spec-align: nest.py v7.2 현실로 갱신(getNestStage·NestView=function 선언형, ActiveBookSheet→캐러셀 #185, MissionModal→CheckinModal) → 10/10. backend.md Netlify→Cloudflare Worker 잔재 정정.
 
-**남은 이슈 후보 (2026-06 감사 #877)**: ❌ **inquiry-sync.md(#701)** 문의→GitHub 이슈 동기화 — spec만, 코드 0(scheduled은 archive+prewarm만) · ❌ **companion-reading-end.md(#347)** 읽기종료 참새 — spec만, 코드 0 · ⏳ AI 다음책 추천·추출(stub, Phase1) · ⏳ companion 질문품질(#371-375) · 🗑️ **onboarding.js**(OnboardingFlow) 데드코드 — main.js 미import, app.js가 자체 로그인 구현 → 삭제 권장.
-> seed-collector(✅ 구현됨 — `collector/` + worker 시드 파이프라인)는 매트릭스 미등재 — 가시성 위해 추후 행 추가.
+**남은 이슈 후보 (2026-06 감사 #877, 갱신)**: ✅ **inquiry-sync.md(#701)** — #890 구현(worker 크론 */10 + 32_*.sql, GITHUB_TOKEN 필요) · ✅ **companion-reading-end.md(#347)** — 이미 구현(nest.js handleCheckin→companion #438, 감사 오판 정정) · ✅ **seed-collector** — `collector/` poller + 멀티NPC(#841 등) · ⏳ AI 다음책 추천·추출(stub, Phase1) · ⏳ companion 질문품질(#371-375) · ✅ onboarding.js 데드코드 삭제(#888).
 > 해소됨: companion_sessions 실행·실증 ✅ · spec-drift CI ✅(#351, drift.py PASS) · 스포일러 spec 문구(#177).
 
 ---
@@ -103,4 +102,4 @@
 
 **신규 백로그 (실사용·분석 발견, 2026-06-11)**: #370 해자 데이터 누수(게스트 대화 미보존) · #371 질문 평가👍👎 · #372 질문 재생성🔄 · #373 질문 품질(반복·책맥락·난이도) · #375 질문 방향성 프리셋 · #374 책 오표시(OPEN PR).
 
-**owner 윤지 (코드는 머지, spec PR 대기)**: #346 되감기(코드 #364 머지) · #347 읽기 종료 시 참새(미착수).
+**owner 윤지 (코드는 머지, spec PR 대기)**: #346 되감기(코드 #364 머지) · #347 읽기 종료 시 참새(✅ 구현 — nest.js handleCheckin→companion #438).
