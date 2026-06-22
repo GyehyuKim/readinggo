@@ -61,6 +61,24 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
       Promise.resolve(window.RG_SB.signOut()).finally(() => window.location.reload());
     }
   };
+  // 계정 삭제 (#875, Apple 심사 필수) — 2단계 확인 후 워커 /api/delete-account 호출.
+  const [delConfirm, setDelConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteAccount = async () => {
+    const token = (window.RG_SB && window.RG_SB.accessToken) ? await window.RG_SB.accessToken() : null;
+    if (!token) { showToast('로그인 상태가 아니에요'); setDelConfirm(false); return; }
+    setDeleting(true);
+    try {
+      const r = await fetch('/api/delete-account', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) throw new Error('실패');
+      try { await window.RG_SB.signOut(); } catch (e) { /* 이미 삭제됨 */ }
+      try { localStorage.clear(); } catch (e) { /* noop */ }
+      window.location.reload();
+    } catch (e) {
+      setDeleting(false);
+      showToast('계정 삭제 실패 — 잠시 후 다시 시도해주세요');
+    }
+  };
   const groupLabel = (text) => (
     <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 20, marginBottom: 6, paddingLeft: 2 }}>{text}</div>
   );
@@ -127,6 +145,25 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <span style={{ position: 'absolute', top: 3, left: (isSupabase && wishPublic) ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
+          {/* 계정 삭제 (#875, Apple 심사 필수) — 로그인(Supabase) 상태에서만. 2단계 확인 후 영구 삭제. */}
+          {isSupabase && (
+            <div style={{ marginTop: 8 }}>
+              {!delConfirm ? (
+                <button onClick={() => setDelConfirm(true)}
+                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--danger, #E5484D)', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
+              ) : (
+                <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--danger, #E5484D)', background: 'var(--danger-tint, rgba(229,72,77,0.06))' }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 기록(한 문장·서재·둥지·대화)이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={deleteAccount} disabled={deleting}
+                      style={{ flex: 1, padding: '11px', borderRadius: 10, border: 'none', background: 'var(--danger, #E5484D)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}>{deleting ? '삭제 중…' : '삭제 확정'}</button>
+                    <button onClick={() => setDelConfirm(false)} disabled={deleting}
+                      style={{ flex: 1, padding: '11px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ③ 읽기 환경 */}
           {groupLabel('읽기 환경')}

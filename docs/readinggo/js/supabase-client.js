@@ -77,6 +77,15 @@
       return (data && data.session && data.session.user) || null;
     },
 
+    // 현재 세션 access token (#875 계정 삭제 — 워커에 본인 인증용). 미로그인이면 null.
+    async accessToken() {
+      const c = client();
+      if (!c) return null;
+      const { data, error } = await c.auth.getSession();
+      if (error) return null;
+      return (data && data.session && data.session.access_token) || null;
+    },
+
     // 내 공개 프로필(public.users 행). 트리거가 가입 시 생성.
     async myProfile() {
       const c = client();

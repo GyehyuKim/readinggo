@@ -30,6 +30,13 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return companionProxy(request, env);
     }
+    // 계정 삭제 (#875, Apple 심사 필수) — 호출자 토큰으로 본인 확인 후 service_role 로 admin 삭제.
+    // public.users → auth.users(id) on delete cascade 라 전 데이터(서재·문장·둥지) 일괄 삭제. 동일출처만.
+    if (p === '/api/delete-account') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      return deleteAccountProxy(request, env);
+    }
     // 읽기모드 OCR — 책 사진 → 한 문장 추출(#382). Upstage Document OCR + solar-pro3 보정.
     // 키는 서버에서만(클라 노출 금지). 동일출처만.
     if (p === '/api/ocr') {
@@ -190,6 +197,37 @@ const PRESET_TONE = {
   critical: '문장에 동의하거나 반박해 보게 하는, 다른 관점에서 따져보는 비판적 질문으로.',
   context: '작가의 삶·시대·작품 맥락과 연결 짓는 질문으로.',
 };
+
+// 계정 삭제 (#875) — 호출자 access token 으로 본인 uid 확인 → service_role 로 admin 삭제.
+//   auth.users 삭제 → public.users(on delete cascade) → 서재·문장·둥지 등 전 데이터 일괄 삭제.
+//   본인 토큰만 받으므로 타인 계정 삭제 불가(uid 는 토큰에서 도출).
+async function deleteAccountProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'not configured' }, 500);
+  const auth = request.headers.get('Authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!token) return json({ error: 'unauthorized' }, 401);
+  // 1) 토큰 → 본인 uid (GoTrue /user; apikey 는 아무 프로젝트 키나, Authorization 이 사용자 식별).
+  let uid = '';
+  try {
+    const r = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return json({ error: 'invalid session' }, 401);
+    const u = await r.json();
+    uid = u && u.id;
+  } catch (e) { return json({ error: 'auth check failed' }, 401); }
+  if (!uid) return json({ error: 'no user' }, 401);
+  // 2) admin 삭제(service_role) → cascade.
+  try {
+    const r = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
+      method: 'DELETE',
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+    });
+    if (!r.ok) { const t = await r.text(); return json({ error: 'delete failed', detail: String(t).slice(0, 200) }, 502); }
+  } catch (e) { return json({ error: 'delete failed' }, 502); }
+  return json({ ok: true }, 200, 0);
+}
 
 async function companionProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
