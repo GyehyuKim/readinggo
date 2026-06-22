@@ -59,6 +59,24 @@ jobs:
       - name: Boot smoke (dist 검증)
         run: node tests/boot-smoke.mjs
 
+  render-smoke:
+    name: render-smoke (탭 런타임 렌더)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # #886 — boot-smoke 가 못 잡는 런타임 렌더 회귀(#884 책장 크래시류)를 헤드리스로 전 탭 클릭해 차단.
+      - name: Build + headless browser
+        run: cd docs/readinggo && npm ci && npm run build && npx playwright install --with-deps chromium
+      - name: Render smoke (전 탭)
+        run: |
+          cd docs/readinggo
+          npm run preview &
+          for i in $(seq 1 30); do curl -sf http://localhost:4173/ >/dev/null && break; sleep 1; done
+          SMOKE_URL=http://localhost:4173/ npm run smoke
+
   lint:
     name: lint (biome)
     runs-on: ubuntu-latest
