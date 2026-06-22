@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate docs/readinggo/data/books.tsv against expected schema.
+"""Validate docs/readinggo/public/data/books.tsv against expected schema.
 
 Exit 0 on success, 1 on any violation. Prints human-readable report.
 Empty author/cover_url emit WARN (not fail) so partial data can land.
@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-TSV = Path(__file__).resolve().parents[2] / "docs" / "readinggo" / "data" / "books.tsv"
+TSV = Path(__file__).resolve().parents[2] / "docs" / "readinggo" / "public" / "data" / "books.tsv"
 EXPECTED_HEADER = ["book_id", "isbn", "title", "author", "publisher", "total_pages", "cover_url"]
 ID_PATTERN = re.compile(r"^b\d{3,}$")
 

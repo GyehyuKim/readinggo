@@ -35,7 +35,7 @@ const results = fuzzySearch(books, query).slice(0, 20);
 
 ### 새 책 추가가 필요하다면
 
-`data/books.tsv`에 행 추가 (탭 구분). 코드 수정 불필요.
+`public/data/books.tsv`에 행 추가 (탭 구분). 코드 수정 불필요.
 
 ## 파일 구조
 
