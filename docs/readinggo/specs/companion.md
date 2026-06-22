@@ -82,7 +82,6 @@
 - **키 보호**: 키는 **서버(Worker secret)에서만**. `wrangler secret put UPSTAGE_API_KEY`. 클라 번들·React CDN 노출 금지. `LLM_BASE_URL`·`LLM_MODEL`은 `wrangler.toml [vars]`.
 - **graceful fallback**: 키 없음/호출 실패 시 **목 질문으로 폴백**(서버·클라 양쪽). 데모·피치 무중단.
 - 클라(`nest.js`): 저장 직후 `genCompanionQuestion()`이 `/api/companion` 호출(로딩→질문, 실패 시 목).
-- 레거시 `workers/companion-proxy.js`(Anthropic)는 참조용 — 실제 경로는 `worker/index.mjs`.
 
 ### 4.1 완독 회고 모드 (#259, 구현 완료)
 

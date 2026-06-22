@@ -3,6 +3,9 @@ desktop.ini
 Thumbs.db
 ehthumbs.db
 
+# macOS system files
+.DS_Store
+
 # Google Drive
 .tmp.drivedownload/
 .tmp.driveupload/
@@ -37,9 +40,6 @@ docs/readinggo/supabase/package-lock.json
 
 # Claude Code local memory
 .claude/
-
-# Netlify CLI cache
-.netlify/
 
 # ReadingGo 로컬 테스트 전용 (CDN 오프라인 대체 — 커밋 금지)
 # 디렉토리 자체가 아닌 내용물(*)을 무시해야 아래 negation 예외가 작동한다 (부모 dir 제외 시 재포함 불가).

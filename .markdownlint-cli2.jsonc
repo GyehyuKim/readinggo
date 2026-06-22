@@ -36,11 +36,8 @@
   ],
   "ignores": [
     "node_modules/**",
-    "old/**",
     "docs/2. specifications/**",
     "docs/1. research_and_lectures/**",
-    "docs/4. user_interviews/**",
-    "docs/3. peer_feedback_analysis/**",
     "docs/0. pitch_and_concept/**"
   ]
 }
