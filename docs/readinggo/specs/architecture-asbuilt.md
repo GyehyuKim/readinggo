@@ -11,7 +11,7 @@
 
 | 층 | 무엇 | 핵심 |
 |---|---|---|
-| **프론트엔드** | React 18 (CDN) + 인브라우저 Babel | **빌드 도구 없음**. JSX를 브라우저가 즉석 변환. 모듈 27개 |
+| **프론트엔드** | React 18 + **Vite**(빌드타임 JSX, #871) | esbuild가 `.js`의 JSX를 classic 변환. `main.js` 진입. 모듈 27개 |
 | **모듈 공유** | `window.X` 전역 | import/export 없음. 로드 순서가 계약 |
 | **상태/데이터** | DataStore 계약 | 미로그인=localStorage / 로그인=Supabase (부팅 스왑) |
 | **백엔드** | Cloudflare Worker (`worker/index.mjs`) | 정적 서빙 + 8개 API 프록시 + cron |
@@ -22,12 +22,13 @@
 
 ---
 
-## 2. 프론트엔드 — 무빌드 React
+## 2. 프론트엔드 — Vite 빌드 (#871)
 
-- **진입점**: `docs/readinggo/index.html` (약 1,470줄). 대부분이 **인라인 CSS**(`<style>`, 디자인 토큰)이고, `<body>`엔 `<div id="root">`(부팅 placeholder 🐦)뿐.
+- **진입점**: `docs/readinggo/index.html`(HTML 셸 — 인라인 CSS·디자인 토큰 + `<div id="root">` 부팅 placeholder) → `<script type="module" src="./main.js">`.
 - **렌더**: `app.js`가 `ReactDOM.createRoot(#root)`로 전체 앱을 그린다. 화면 내용은 전부 React 컴포넌트.
-- **JSX 변환**: 빌드 단계 없음. `loadBabel(src)`가 각 `js/*.js`를 `fetch` → `Babel.transform(...presets:[['react',{runtime:'classic'}]])` → `eval`. (Babel은 자체 호스팅 `vendor/babel.min.js@7.29.7`, #687/#691)
-- **캐시버스트**: 전역 `_RG_V`(현재 `'96'`). 모든 `js/X.js?v=_RG_V`. 배포마다 bump(스큐·#687 방지).
+- **JSX 변환**: **Vite 빌드타임**(esbuild, `.js`를 JSX loader·classic 런타임). `main.js`가 `setup-globals`(React 등 window 노출) → `js/*.js`를 기존 순서대로 ES import → Supabase 스왑 후 `app.js` 동적 import 마운트. (런타임 Babel/`loadBabel`/`vendor/babel` 폐기 #871)
+- **캐시버스트**: Vite 해시 파일명(`assets/index-<hash>.js`) — 수동 `_RG_V` 폐기.
+- **암묵적 전역 주의(#884)**: 파일 간 공유 심볼은 반드시 정의 파일에서 `window.X = X` 노출(ES 모듈 스코프라 옛 eval-전역 누수 없음). render-smoke CI(#886)가 탭 렌더 회귀 차단.
 
 ### 2.1 부팅 로드 순서 (index.html, 의존 먼저)
 
