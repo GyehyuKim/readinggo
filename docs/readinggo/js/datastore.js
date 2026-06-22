@@ -205,6 +205,8 @@ function _applyBookOverrides(ub) {
     },
   };
 }
+// #871 Vite 회귀 픽스 — datastore-supabase.js 가 cross-file 로 호출(옛 loadBabel 전역). 모듈 스코프라 전역 노출 필요.
+window._today = _today; window._dayDiff = _dayDiff; window._applyBookOverrides = _applyBookOverrides;
 function _allSentences(s) {
   const out = [];
   s.user_books.forEach(ub => {
