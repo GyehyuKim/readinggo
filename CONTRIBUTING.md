@@ -113,6 +113,26 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 
 > 피처 spec 상세는 [`specs/README.md` 파일 소유권](./docs/readinggo/specs/README.md). 이 표는 *governance·공용 파일* 까지 포함한 상위 기준.
 
+### 3.6 worktree 병렬 개발 (멀티 세션)
+
+여러 Claude Code 세션을 동시에 돌릴 때 git worktree를 쓴다. 근거·정책 배경은 #895.
+
+**repo 위치 (필수)**: repo는 **Google Drive/Desktop 밖**(예: `~/dev/readinggo`)에 둔다. Drive 안에 두면 `.git`이 `desktop.ini`로 오염되고(§8), 형제 디렉터리가 TCC로 차단돼 다른 세션이 "Operation not permitted"로 막힌다. worktree는 repo 하위 `.claude/worktrees/`에 생기며 `.gitignore`(`.claude/`)로 자동 무시된다.
+
+**분할 축 = 작업 흐름** (플랫폼 ❌): 기능 / 문서·스펙 / 디자인 / 핫픽스. **iOS·Android별 worktree는 금지** — Capacitor 웹앱은 `js/*.js` 한 벌을 공유하므로 플랫폼 worktree는 같은 파일을 고쳐 충돌만 만든다. iOS·Android는 worktree가 아니라 안정된 main에서 `cap sync` 후 빌드하는 *배포 단계*다.
+
+**명령**:
+```bash
+claude --worktree <name>      # worktree 생성 + 진입 + 세션 시작 (한 방)
+claude -c                     # 이 worktree 의 최근 세션 재개 (다시 cd 불필요)
+claude --resume <name>        # 이름으로 재개 (다른 worktree 에서도)
+```
+시크릿은 `.worktreeinclude`로 새 worktree에 자동 복사된다. `node_modules`는 복사 대상이 아니니 worktree마다 `npm ci` 한 번 (`docs/readinggo`).
+
+**수명**: worktree는 **일회용**. PR이 머지되면 **그날** `git worktree remove <path>` 로 제거한다(미제거 시 죽은 worktree 누적 — #895의 원인). 상시 worktree는 **3개 이하**로.
+
+**크로스 디바이스 (윈도우 ↔ 맥미니)**: repo를 Drive로 동기화하지 **않는다**. 각 기기에 따로 `git clone` 하고 **GitHub push/pull로** 오간다(git이 설계된 방식). 역할: **맥미니 = 메인 허브**(iOS+Android+웹 전부 빌드, 24/7), **윈도우 = 보조**(웹·문서·Android; iOS는 맥 전용). 시크릿은 git에 안 올리므로 기기별로 따로 둔다(앱 시크릿은 대부분 Cloudflare Worker secret이라 로컬 의존 적음).
+
 ---
 
 ## 4. PR 단위

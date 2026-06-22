@@ -1,0 +1,12 @@
+# .worktreeinclude
+# `claude --worktree <name>` 로 새 worktree를 만들 때 여기 적힌 gitignored 파일을
+# 새 worktree로 자동 복사한다 (.gitignore 문법; gitignore된 파일만 복사 대상).
+#
+# node_modules 는 용량이 커서 일부러 제외 — worktree 마다 `npm ci` 로 설치한다.
+# (Vite 안정화 후 pnpm 전환 시 content-addressable store 로 이 부담도 사라짐 — 별도 spec PR.)
+
+# Cloudflare Worker 로컬 시크릿 (있을 때만)
+.dev.vars
+
+# 시드 콜렉터 로컬 시크릿 (맥미니 전용; 윈도우 worktree 엔 불필요)
+collector/.env
