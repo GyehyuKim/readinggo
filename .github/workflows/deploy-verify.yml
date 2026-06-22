@@ -1,7 +1,8 @@
-# 자동배포(Cloudflare Workers Build) 반영 검증 (#693)
-# main 푸시 후 라이브 사이트의 _RG_V(배포마다 bump)가 머지본과 일치할 때까지 폴링.
-# Workers Build 가 멈추면(쿼터·레이트리밋 등) 미스매치로 fail → 수동 `npx wrangler deploy` 필요 신호.
+# 자동배포(Cloudflare Workers Build) 반영 검증 (#693, 복구 #898)
+# main 푸시 후 라이브 사이트가 머지본 빌드의 해시 자산(Vite content-hash)을 서빙할 때까지 폴링.
+# Workers Build 가 멈추면(쿼터·레이트리밋 등) 미스매치로 fail → 수동 `npx wrangler deploy` 신호.
 # 직접 배포는 하지 않음(CF 시크릿 불요) — HTTP 폴링으로 "감지"만 한다.
+# (#880 Vite 전환으로 _RG_V 캐시버전이 사라져 구버전 폴링이 8/8 실패 → 해시 자산 매칭으로 교체.)
 name: deploy-verify
 
 on:
@@ -19,27 +20,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: 기대 _RG_V 추출 (머지본)
+      - name: 머지본 빌드 → 기대 해시 자산 추출
         id: ver
         run: |
-          EXPECTED=$(grep -oE "_RG_V *= *'[0-9]+'" docs/readinggo/index.html | grep -oE "[0-9]+" | head -1)
-          if [ -z "$EXPECTED" ]; then echo "::error::index.html 에서 _RG_V 를 못 찾음"; exit 1; fi
+          cd docs/readinggo && npm ci && npm run build
+          EXPECTED=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/index.html | head -1)
+          if [ -z "$EXPECTED" ]; then echo "::error::dist/index.html 에서 해시 자산을 못 찾음 (빌드 산출물 형식 변경?)"; exit 1; fi
           echo "expected=$EXPECTED" >> "$GITHUB_OUTPUT"
-          echo "기대 _RG_V=$EXPECTED"
+          echo "기대 해시 자산=$EXPECTED"
 
-      - name: 라이브 _RG_V 폴링 (최대 10분)
+      - name: 라이브 반영 폴링 (최대 10분)
         env:
           EXPECTED: ${{ steps.ver.outputs.expected }}
           SITE: https://readinggo.hyuniverse.workers.dev
         run: |
-          LIVE=""
           for i in $(seq 1 20); do
-            LIVE=$(curl -fsS "$SITE/?cb=$(date +%s)$RANDOM" 2>/dev/null | grep -oE "_RG_V *= *'[0-9]+'" | grep -oE "[0-9]+" | head -1 || true)
-            echo "시도 $i/20: 라이브=$LIVE 기대=$EXPECTED"
-            if [ "$LIVE" = "$EXPECTED" ]; then echo "✅ 자동배포 반영됨 (_RG_V=$LIVE)"; exit 0; fi
+            if curl -fsS "$SITE/?cb=$(date +%s)$RANDOM" 2>/dev/null | grep -qF "$EXPECTED"; then
+              echo "✅ 자동배포 반영됨 ($EXPECTED)"; exit 0
+            fi
+            echo "시도 $i/20: 미반영 (기대 $EXPECTED)"
             sleep 30
           done
-          echo "::error::자동배포(Workers Build) 미반영 — 라이브 _RG_V=$LIVE, 기대=$EXPECTED."
+          echo "::error::자동배포(Workers Build) 미반영 — 라이브에 $EXPECTED 없음."
           echo "::error::복구: 로컬에서 'npx wrangler deploy' 직접 업로드(Builds 쿼터 무관). 런북: docs/readinggo/RUNBOOK-DEPLOY.md (#693)"
           exit 1

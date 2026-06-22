@@ -6,7 +6,7 @@
 const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _useMemo } = React;
 
 // 안전 래퍼 — data.js 전역(nestXpProgress) 미준비/캐시 스큐 시에도 nest 탭 전체 크래시 방지.
-// 정상 시 동일 동작, 미정의·예외 시 0(=진행 0%). 근본 원인은 _RG_V 캐시버전으로 차단.
+// 정상 시 동일 동작, 미정의·예외 시 0(=진행 0%). 근본 원인은 Vite 빌드(해시 자산)로 차단.
 function _xpProg(xp) {
   try { return (typeof nestXpProgress === 'function') ? nestXpProgress(xp) : (window.nestXpProgress ? window.nestXpProgress(xp) : 0); }
   catch (e) { return 0; }
