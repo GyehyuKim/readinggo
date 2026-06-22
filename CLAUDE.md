@@ -28,10 +28,9 @@ Other agents (Cursor, Continue, Aider) should enter via [`AGENTS.md`](./AGENTS.m
 
 ## Active Workspace Boundaries
 
-- `docs/` — MANIFESTO, whytree, pitch, Netlify 데모
-- `old/` — 이전 아이디어 아카이브 (기프타로, GosiOps, 트렌드 패치노트, 찍먹). 읽기 전용.
+- `docs/` — MANIFESTO, whytree, pitch, Cloudflare 데모 (`docs/readinggo/`)
 
-새 작업은 `docs/` 에만 한다. `old/` 는 레퍼런스 용도로만 열람.
+새 작업은 `docs/readinggo/` 에 한다.
 
 ## Stack Lock
 
