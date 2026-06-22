@@ -29,7 +29,7 @@ JS_DIR = ROOT / "docs" / "readinggo" / "js"
 # Feature files: v6 residue and direct localStorage are forbidden here.
 FEATURE_FILES = [
     "app.js", "components.js", "nest.js", "social.js",
-    "library.js", "search.js", "onboarding.js",
+    "library.js", "search.js",
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
     "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js", "book-detail-modal.js",
     "companion.js", "ocr-crop-overlay.js", "ceremony.js", "nest-theatre.js", "follow-list-modal.js",
@@ -197,9 +197,7 @@ INVARIANTS = [
         ["admin-dashboard.js"], r"AdminDashboardModal"),  # #761 모듈화: components.js → admin-dashboard.js
     ("C", "present", "운영자 문의 (profile.md 설정, #문의)",
         ["datastore-supabase.js"], r"inquiries"),
-    # 온보딩 — 정의 없는 Sparrow 컴포넌트 참조 금지 (#527). 🐦 이모지로 통일, 재도입 시 렌더 크래시.
-    ("C", "absent", "미정의 Sparrow 컴포넌트 참조 (#527)",
-        ["onboarding.js"], r"<Sparrow"),
+    # (#527 onboarding.js <Sparrow 금지 invariant 제거 — onboarding.js 데드코드 삭제, #877 감사)
     # ── 한 문장 액션 계약 (#610) — 표면별 버튼 드리프트 자동 락 ──
     ("C", "present", "공용 SentenceCard 에 좋아요(claps) 토글 (한 문장 액션 계약 #610·#641)",
         ["sentence-card.js"], r"const toggleLike"),
