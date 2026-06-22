@@ -31,5 +31,6 @@ VISION_MODEL = "gemini-2.5-flash"
 # LLM_REASONING_EFFORT = "low"   # 미설정=추론 최소. 질문이 밋밋하면 low|medium|high 로.
 
 # 일일 인기도서 아카이브 (#239) — UTC 18:00 = KST 03:00
+# */10 = 문의→GitHub 이슈 동기화 (#701, GITHUB_TOKEN 시크릿 필요. 미설정 시 no-op)
 [triggers]
-crons = ["0 18 * * *"]
+crons = ["0 18 * * *", "*/10 * * * *"]

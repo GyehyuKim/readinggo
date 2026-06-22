@@ -84,10 +84,62 @@ export default {
 
   // ── Cron: 인기도서 사전 아카이브 (#239) ──────────────────
   async scheduled(event, env, ctx) {
+    // 크론 분기 — */10 은 문의 동기화(빈번), 0 18 은 일일 아카이브+시드 선충전.
+    if (event && event.cron === '*/10 * * * *') {
+      ctx.waitUntil(syncInquiries(env, ctx));
+      return;
+    }
     ctx.waitUntil(archive(env));
     ctx.waitUntil(prewarmSeeds(env));   // #774 인기 우선 시드 선충전(sales_point 상위 N권, idempotent)
   },
 };
+
+// 문의 → GitHub 이슈 동기화 (#701, inquiry-sync.md) — 크론 */10. GITHUB_TOKEN 없으면 no-op.
+//   github_issue_number IS NULL 인 문의를 PII 마스킹해 GitHub 이슈로. 성공 시 번호 기록(멱등).
+const GH_REPO = 'GyehyuKim/readinggo';
+const INQ_EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
+async function syncInquiries(env, ctx) {
+  if (!env.GITHUB_TOKEN || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return; // 미구성 → no-op
+  const sb = (path, init) => fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, ...(init && init.headers) },
+  });
+  let rows = [];
+  try {
+    const r = await sb('inquiries?select=id,message,app_version,created_at&github_issue_number=is.null&order=created_at.asc&limit=20');
+    if (!r.ok) return;
+    rows = await r.json();
+  } catch (e) { return; }
+  const seen = new Set();
+  for (const q of (rows || [])) {
+    const raw = String(q.message || '').trim();
+    if (raw.length < 5) continue;                 // 노이즈 스킵(게이트 유지 — 다음 런으로)
+    const masked = raw.replace(INQ_EMAIL_RE, '[이메일 가림]');
+    const key = masked.slice(0, 120);
+    if (seen.has(key)) continue;                  // 배치 내 중복 — 하나만
+    seen.add(key);
+    const title = (masked.length > 50 ? masked.slice(0, 50) + '…' : masked).replace(/\s+/g, ' ');
+    const body = `> 오픈베타 사용자 문의 자동 등록 (PII 마스킹됨)\n\n**문의 내용**\n${masked}\n\n---\n- app_version: \`${q.app_version || '-'}\`\n- 접수: \`${q.created_at}\`\n- inquiry: \`${q.id}\``;
+    try {
+      const gh = await fetch(`https://api.github.com/repos/${GH_REPO}/issues`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json', 'User-Agent': 'readinggo-worker',
+        },
+        body: JSON.stringify({ title, body, labels: ['source:beta-inquiry', 'type:feedback'] }),
+      });
+      if (gh.status !== 201) continue;            // 실패 → 컬럼 유지, 다음 런 재시도
+      const issue = await gh.json();
+      const upd = () => sb(`inquiries?id=eq.${q.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ github_issue_number: issue.number }),
+      });
+      const ok = await upd().then((r) => r.ok).catch(() => false);
+      if (!ok && ctx && ctx.waitUntil) ctx.waitUntil(upd().catch(() => {})); // §4.3 재시도 1회
+    } catch (e) { /* 개별 실패 스킵 */ }
+  }
+}
 
 /* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
    provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
