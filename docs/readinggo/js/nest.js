@@ -33,6 +33,8 @@ function _absPct(xp, sp) {
   if (!sp || sp.isMax || !sp.next || !sp.next.minXp) return 100;
   return Math.max(0, Math.min(100, Math.round(_cycleXp(xp) / sp.next.minXp * 100)));
 }
+// #871 Vite 회귀 픽스 — ceremony.js·nest-theatre.js 가 cross-file 로 호출(옛 loadBabel 전역). 모듈 스코프라 전역 노출 필요.
+window._stageProg = _stageProg; window._cycleXp = _cycleXp; window._absPct = _absPct;
 
 // 한 문장 종류 휴리스틱(estimateSentenceKind, #420) 제거 — '내 생각'(thought) 폐기 (#596). 호출부 없던 죽은 코드.
 
