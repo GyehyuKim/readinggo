@@ -7,7 +7,7 @@
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
 | §5.1 상단바·진화배너·둥지자람·캐러셀 | ✅ | app.js topbar · nest.js NestTheatre/twigs/switchBook |
-| §5.2 **둥지=1,600 XP 주기(v8.1)** · 경계 성 획득·리셋 | 🚩 | #520 spec. 현재 구현은 전체 누적 XP 단계 + 완독 성 파생 — #521 구현 필요 |
+| §5.2 **둥지=1,600 XP 주기(v8.1)** · 경계 성 획득·리셋 | ✅ | nest.js `_cycleXp(xp)=xp%1600`·`nestCastleCount=floor(totalXp/1600)`·1600경계 성획득+리셋(#520/#521). 2026-06 정합(구 🚩는 오표기 — 구현 완료) |
 | §5.1 CTA·§5.4 일일미션 = 읽기모드 대체 | ✅ | #252 — nest.md §5.5 반영(읽기모드가 체크인 대체). CheckinModal 폐기 |
 | §5.4 별점0.5·완독세리머니(읽기모드 위임) · §5.5 읽기모드(나가기✕) | ✅ | #300 finish→handleCheckin · ReadingMode |
 
@@ -31,7 +31,7 @@
 | §5.7 피드 3탭·짹·책갈피·본인비활성 | ✅ | social.js:27-29,60 · claps.toggle/isMine |
 | §5.7.1 페이지 블라인드·visibility 3단계 | ✅ | components.js isSpoiler · library.js cycleVis |
 | §5.7 "이번 주 신규 시작러 Top3" | ✅ | #286 social_newcomers_weekly RPC · social.js 상단 스트립 |
-| **§5.7.1 친구 찾기 패널(NPC_SEARCH)** | ❌ | social UI에 친구찾기 패널 미발견(backend users.search는 있음) |
+| **§5.7.1 친구 찾기 패널(NPC_SEARCH)** | ✅ | social.js `findOpen` 패널(#250) + users.search(양 어댑터). 2026-06 정합(구 ❌는 오표기 — 구현 완료) |
 | §5.7.1 전역 스포일러 토글 🔓 | 🔧 | #3 토글 설정(⚙️) 이전 완료 · #177 검토완료(spec 문구 후속) |
 
 ## profile.md (프로필) — owner 계휴
@@ -94,7 +94,8 @@
 
 **v7.4.1 갱신 (2026-06-10, post-merge)**: 외서 검색 5+5 ✅(#302/#343), export 책 소개 ✅(#316/#344), 공개전환 체크리스트 ✅(#178/#344), 참새 완독 회고 ✅(#259/#345). spec-align: nest.py v7.2 현실로 갱신(getNestStage·NestView=function 선언형, ActiveBookSheet→캐러셀 #185, MissionModal→CheckinModal) → 10/10. backend.md Netlify→Cloudflare Worker 잔재 정정.
 
-**남은 이슈 후보**: ❌ social 친구찾기 패널 / ⏳ AI 다음책 추천·추출(stub, Phase1) · 북커버 수동 큐레이션(#315C, parking-lot).
+**남은 이슈 후보 (2026-06 감사 #877)**: ❌ **inquiry-sync.md(#701)** 문의→GitHub 이슈 동기화 — spec만, 코드 0(scheduled은 archive+prewarm만) · ❌ **companion-reading-end.md(#347)** 읽기종료 참새 — spec만, 코드 0 · ⏳ AI 다음책 추천·추출(stub, Phase1) · ⏳ companion 질문품질(#371-375) · 🗑️ **onboarding.js**(OnboardingFlow) 데드코드 — main.js 미import, app.js가 자체 로그인 구현 → 삭제 권장.
+> seed-collector(✅ 구현됨 — `collector/` + worker 시드 파이프라인)는 매트릭스 미등재 — 가시성 위해 추후 행 추가.
 > 해소됨: companion_sessions 실행·실증 ✅ · spec-drift CI ✅(#351, drift.py PASS) · 스포일러 spec 문구(#177).
 
 ---
