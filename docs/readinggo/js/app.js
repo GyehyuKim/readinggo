@@ -587,8 +587,10 @@ function App() {
   }, [switchTab]);
 
   // 검색 책 선택 → 책장 분기 (#409): 'wish'(찜) | 'reading'(읽는중, 기본) | 'completed'(완독).
-  const handleSearchSelectBook = useCallback((book, shelf) => {
+  // opts.firstSentence (#939): 사진으로 시작(OCR)에서 추출·편집한 첫 문장. reading 등록 시 첫 기록으로 함께 저장.
+  const handleSearchSelectBook = useCallback((book, shelf, opts) => {
     shelf = shelf || 'reading';
+    const firstSentence = (opts && opts.firstSentence ? String(opts.firstSentence).slice(0, 200).trim() : '');
     setIsSearchOpen(false);
     if (!(DataStore.myBooks && DataStore.myBooks.add)) return;
     const isbn13 = book.isbn13 || book.isbn || '';
@@ -650,8 +652,30 @@ function App() {
             cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
           },
         }));
+        // 사진으로 시작 — 추출·편집한 첫 문장을 첫 기록으로 저장(#939). 타이핑 없이 첫 한 문장 완성.
+        // (1) 게스트(로그아웃 + Supabase 모드)면 pending 에 포착 → 로그인 시 §7.7 syncPendingToSupabase 흡수.
+        // (2) 활성 DataStore 에 영속(localStorage/Supabase 공통). (3) 홈 '오늘의 한 문장'에 즉시 반영.
+        if (firstSentence) {
+          const sentPage = ub.current_page || 0;
+          if (_supa && window.SupabaseDataStore && window.DataStore !== window.SupabaseDataStore) {
+            try {
+              window.localStorageAdapter.mutate(s => {
+                s.pending = s.pending || {};
+                s.pending.book = { isbn13: isbn13 || '', title: book.title || '', author: book.author || '', total_pages: totalPages || 0, current_page: sentPage, cover_url: book.cover_url || '' };
+                s.pending.sentence = { text: firstSentence, page: sentPage };
+                return s;
+              });
+            } catch (e) {}
+          }
+          try {
+            const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ub.id, page: sentPage, text: firstSentence, kind: 'quote' }));
+            const rid = (row && row.id) || ('se_' + Date.now());
+            setAppState(s => ({ ...s, myQuotes: [{ id: rid, text: firstSentence, bookId: ub.book_id || '', bookTitle: book.title || '', page: sentPage, when: '방금', createdAt: new Date().toISOString(), note: '', kind: 'quote', isPrivate: false, notePrivate: false }, ...s.myQuotes] }));
+          } catch (e) { surfaceWriteError(e, '첫 문장을 저장하지 못했어요 — 홈에서 다시 적어보세요'); }
+          if (window.rgTrack) window.rgTrack('onboarding_ocr_first_sentence', { book_id: ub.book_id || ub.id || '', chars: firstSentence.length });
+        }
         window.dispatchEvent(new CustomEvent('rg:wish-changed')); // #822: 서재 '읽고 있는 책' 즉시 갱신
-        showToast(`📖 ${book.title} 등록 완료`);
+        showToast(firstSentence ? `📖 ${book.title} — 첫 문장까지 기록했어요` : `📖 ${book.title} 등록 완료`);
       } catch (e) { surfaceWriteError(e, '책을 저장하지 못했어요 — 다시 시도해주세요'); }
     })();
   }, [switchTab]);
