@@ -8,9 +8,17 @@ import { createPortal } from 'react-dom';
 import Fuse from 'fuse.js';
 import * as htmlToImage from 'html-to-image';
 import { createClient } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { Browser as CapBrowser } from '@capacitor/browser';
 
 window.React = React;
 window.ReactDOM = { createRoot, createPortal };
 window.Fuse = Fuse;
 window.htmlToImage = htmlToImage;        // htmlToImage.toBlob 사용
 window.supabase = { createClient };      // supabase.createClient 사용
+// Capacitor(네이티브 셸) — 웹에선 isNativePlatform()=false 라 분기만 무력화, 임포트는 안전.
+// 네이티브 OAuth 딥링크(#968): CapBrowser=인앱 브라우저, CapApp=appUrlOpen 복귀 이벤트.
+window.Capacitor = Capacitor;
+window.CapApp = CapApp;
+window.CapBrowser = CapBrowser;

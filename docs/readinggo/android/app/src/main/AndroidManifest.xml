@@ -22,6 +22,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- 네이티브 OAuth 딥링크 복귀(#968): com.readinggo.app://login-callback 를 앱으로 받는다.
+                 singleTask + appUrlOpen 으로 기존 인스턴스에 전달 → 구글 로그인 후 앱 복귀. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.readinggo.app" />
+            </intent-filter>
+
         </activity>
 
         <provider
