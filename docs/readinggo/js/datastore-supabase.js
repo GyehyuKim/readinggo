@@ -460,6 +460,27 @@
       markToday() { try { localStorage.setItem('rg_resurface_last', _today()); } catch (e) {} },
     },
 
+    /* 마일스톤 회고 노출 게이트 (#938, A2) — localStorage 어댑터와 표면 일치. 기기 로컬 빈도 가드(서버 저장 불필요).
+       ① 같은 key 1회만 ② 하루 1회. rg_milestone_seen(JSON) + rg_milestone_last(YYYY-MM-DD). */
+    milestone: {
+      _seen() { try { return JSON.parse(localStorage.getItem('rg_milestone_seen') || '{}') || {}; } catch (e) { return {}; } },
+      shouldShow(key) {
+        if (!key) return false;
+        try {
+          if (this._seen()[key]) return false;
+          if (localStorage.getItem('rg_milestone_last') === _today()) return false;
+          return true;
+        } catch (e) { return false; }
+      },
+      markShown(key) {
+        try {
+          const seen = this._seen(); if (key) seen[key] = _today();
+          localStorage.setItem('rg_milestone_seen', JSON.stringify(seen));
+          localStorage.setItem('rg_milestone_last', _today());
+        } catch (e) {}
+      },
+    },
+
     /* 스트릭 (클라 날짜 로직) / XP */
     streak: {
       async get() {
@@ -477,6 +498,33 @@
         const longest = Math.max(st.longest || 0, cur);
         return unwrap(await sb().from('streak').update({ current: cur, longest, last_check_in_date: today })
           .eq('user_id', id).select().single());
+      },
+      // 스트릭 복구 가능 여부 (#938) — localStorage 어댑터와 표면 일치. 정책은 _streakRepairStatus SSOT(datastore.js, 런타임 로드됨) 재사용.
+      async repairStatus() {
+        const st = await A.streak.get();
+        const today = _today();
+        const fn = (typeof window !== 'undefined') && window._streakRepairStatus;
+        if (fn) return fn(st, today);
+        // 폴백(헬퍼 미로드) — 보수적으로 불가 처리.
+        return { canRepair: false, lostStreak: (st && st.current) || 0, brokenDays: 0, cooldownDays: 0, reason: 'no_helper' };
+      },
+      // '하루 만회' (#938, systems.md §6.1) — 깨진 스트릭을 끊김 직전 값으로 되살리고 last_check_in_date 를 '어제'로,
+      // last_repair_date 에 오늘을 기록(주 1회 쿨다운). 35_streak_repair.sql 로 last_repair_date 컬럼 추가.
+      async repair() {
+        const id = await uid();
+        const today = _today();
+        const st = await A.streak.get();
+        const fn = (typeof window !== 'undefined') && window._streakRepairStatus;
+        const status = fn ? fn(st, today) : { canRepair: false, reason: 'no_helper' };
+        if (!status.canRepair) return { ok: false, reason: status.reason, cooldownDays: status.cooldownDays || 0, streak: st };
+        const cur = Math.max(1, status.lostStreak);
+        const longest = Math.max((st && st.longest) || 0, cur);
+        const yest = (typeof window !== 'undefined' && window._todayMinus) ? window._todayMinus(1)
+          : new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const out = unwrap(await sb().from('streak')
+          .update({ current: cur, longest, last_check_in_date: yest, last_repair_date: today })
+          .eq('user_id', id).select().single());
+        return { ok: true, reason: 'repaired', lostStreak: cur, streak: out };
       },
     },
     xp: {
