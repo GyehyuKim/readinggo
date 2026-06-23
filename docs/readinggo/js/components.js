@@ -31,7 +31,7 @@ let _toastTimer = null;
 let _setToastFn = null;
 
 // showToast(msg, opts) — opts.sparrow=true 면 메시지 앞에 SparrowMark SVG(브랜드 마크) 표시.
-// (토스트는 문자열이라 메시지에 SVG를 못 넣음 → 아이콘은 옵션 플래그로 Toast 컴포넌트가 렌더. 🐦 이모지 대체.)
+// (토스트는 문자열이라 메시지에 SVG를 못 넣음 → 아이콘은 옵션 플래그로 Toast 컴포넌트가 렌더. 참새 머리 이모지 대체, #864.)
 function showToast(msg, opts) {
   if (_setToastFn) {
     _setToastFn({ msg, sparrow: !!(opts && opts.sparrow) });

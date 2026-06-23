@@ -93,7 +93,7 @@ window.NEST_ART = NEST_ART;
 window.nestArt = nestArt;
 
 /* ── SparrowMark (#785): ReadingGo 참새 브랜드 마크 — 부트·로딩·에러 화면 공용 인라인 SVG.
-   favicon(assets/sparrow.svg)과 동일 실루엣(배경 칩만 제외). 이모지 🐦 대체(모든 DPI 선명).
+   favicon(assets/sparrow.svg)과 동일 실루엣(배경 칩만 제외). 참새 머리 이모지 대체(모든 DPI 선명, #864).
    size=픽셀(기본 40). 빌드 도구 없음 → 인라인 SVG(Stack Lock). ── */
 function SparrowMark({ size = 40, style }) {
   const s = size || 40;
@@ -113,7 +113,7 @@ function SparrowMark({ size = 40, style }) {
 window.SparrowMark = SparrowMark;
 
 /* ── SparrowInline (#823): 텍스트 흐름 안에 들어가는 작은 참새 마크. 라벨·버튼 prefix·문구 끝의
-   이모지 🐦 대체. baseline 정렬(verticalAlign)만 SparrowMark 위에 얹은 래퍼. ── */
+   참새 머리 이모지 대체(#864). baseline 정렬(verticalAlign)만 SparrowMark 위에 얹은 래퍼. ── */
 function SparrowInline({ size = 14 }) {
   return <SparrowMark size={size} style={{ display: 'inline-block', verticalAlign: '-0.15em' }} />;
 }
