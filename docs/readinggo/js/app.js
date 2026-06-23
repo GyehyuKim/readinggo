@@ -303,9 +303,30 @@ function App() {
   useEffect(() => { window.RG_openSettings = () => setSettingsOpen(true); return () => { window.RG_openSettings = null; }; }, []);
   // 로그인 화면 열기(저장 시점 트리거) — 설정/프로필/배너에서 호출.
   useEffect(() => { window.RG_login = () => setShowLogin(true); return () => { window.RG_login = null; }; }, []);
-  // 책 정보 모달(#11) — 한 문장의 책 제목 탭으로 열림.
-  const [bookDetailId, setBookDetailId] = useState(null);
-  useEffect(() => { window.RG_openBook = (id) => setBookDetailId(id); return () => { window.RG_openBook = null; }; }, []);
+  // 책 상세 통일(#11, 통일성) — 어디서 누르든 같은 책=같은 화면. 탭이 아니라 '소유'로 라우팅:
+  // 소유 책이면 풀 BookDetailModal(진척·별점·내문장·관련·export, 책장과 동일), 미소유면 BookInfoModal(정보+등록).
+  const [bookDetailId, setBookDetailId] = useState(null);        // 미소유 책 → BookInfoModal(canonical book id)
+  const [bookDetailItem, setBookDetailItem] = useState(null);    // 소유 책 → BookDetailModal(리치 user_book 아이템)
+  useEffect(() => {
+    window.RG_openBook = (id) => {
+      const DS = window.DataStore || {};
+      // 소유 여부를 먼저 확인한 뒤 알맞은 모달을 연다(정보→상세 깜빡임 방지). 실패 시 정보 모달 폴백.
+      Promise.resolve((DS.myBooks && DS.myBooks.list) ? DS.myBooks.list() : [])
+        .then((rows) => {
+          const ub = (Array.isArray(rows) ? rows : []).find((u) => u.book_id === id || (u.book && u.book.id === id));
+          if (ub) {
+            const b = ub.book || {};
+            // library.js allItems 와 동일한 리치 아이템 매핑(단일 소스 일치 — BookDetailModal 계약).
+            setBookDetailItem({ ubId: ub.id, id: ub.book_id || id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, recap: ub.companion_recap || '', description: (b.description || '').trim(), source: b.source || '' });
+            setBookDetailId(null);
+          } else {
+            setBookDetailId(id); setBookDetailItem(null);
+          }
+        })
+        .catch(() => { setBookDetailId(id); setBookDetailItem(null); });
+    };
+    return () => { window.RG_openBook = null; };
+  }, []);
   // 검색 모달 전역 오픈 (#403) — 서재 위시리스트 '+찜하기' 등에서 호출.
   useEffect(() => { window.RG_openSearch = () => setIsSearchOpen(true); return () => { window.RG_openSearch = null; }; }, []);
   // 한 문장 대화 모달 (#326) — 내 한 문장 탭으로 열림.
@@ -879,7 +900,12 @@ function App() {
           <CompanionModal sentence={companionSentence} onClose={() => setCompanionSentence(null)} />
         )}
 
-        {bookDetailId && ReactDOM.createPortal(
+        {bookDetailItem && ReactDOM.createPortal(
+          <window.BookDetailModal book={bookDetailItem} allQuotes={appState.myQuotes}
+            onClose={() => setBookDetailItem(null)} onActivate={handleActivateUserBook} />,
+          document.body
+        )}
+        {bookDetailId && !bookDetailItem && ReactDOM.createPortal(
           <BookInfoModal bookId={bookDetailId} onClose={() => setBookDetailId(null)} />,
           document.body
         )}
