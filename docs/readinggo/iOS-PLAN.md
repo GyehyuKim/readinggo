@@ -31,7 +31,7 @@
 | 빌드 도구 | **Vite** (현재 React+Babel CDN 폐기) |
 | 백엔드 | Supabase (Phase 1+) |
 | 푸시 | iOS APNs + Android FCM (Capacitor Push Notifications) |
-| 빌드 환경 | macmini M3 16GB (계휴, iOS) + Windows (Android Studio) |
+| 빌드 환경 | macmini M3 16GB (계휴) — **iOS(Xcode) + Android(CLI: JDK21 + Android SDK cmdline-tools, 빌드 검증 2026-06-24)**. Windows+Android Studio도 가능(원안) |
 | 호스팅 | Netlify (Vite `dist/` 산출물) |
 | 배포 | App Store + Play Store 정식 트랙 |
 | 개발자 계정 | Apple Developer Individual ($99/yr) + Google Play Console ($25) |
@@ -66,7 +66,7 @@
 | **S2** | 2~3h | Vite 빌드 산출물(`dist/`) Netlify 배포 검증. 기존 배포와 동등 | Netlify 그대로 동작 |
 | **S3** ✅ | 4~6h | Capacitor init + 플랫폼 추가. **iOS(#893)·Android(`cap add android`, 2026-06-24) 모두 추가됨** | `npx cap sync` 통과 |
 | **S4** ✅ | 3~4h | iOS 시뮬레이터 첫 빌드 (#893 완료). Safe Area · Keyboard · WebView 호환 검증 | iOS 시뮬 동등 동작 |
-| **S5** ⏳ **다음** | 3~4h | Android 첫 빌드 — `android/` 셸 추가됨, **빌드 도구(JDK+Android SDK / Android Studio) 있는 환경에서** `./gradlew assembleDebug` 또는 Android Studio. 현 Mac 미설치 → Windows(계획) 또는 Mac에 Android Studio 설치 후 진행 | Android 에뮬·실기기 동작 |
+| **S5** ✅ | 3~4h | Android 첫 빌드 **성공** (2026-06-24, Mac CLI 헤드리스). 툴체인: `brew install openjdk@21` + `brew install --cask android-commandlinetools` → `sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'` + 라이선스 수락, `JAVA_HOME`/`ANDROID_HOME` export + `android/local.properties`(`sdk.dir`, gitignore). `npm run build && npx cap sync android && ./gradlew assembleDebug` → **`app-debug.apk` 6MB** (BUILD SUCCESSFUL 1m6s). 실기기/에뮬 실행(AVD or `adb install`)은 남음 | APK ✅ · 실행 검증 다음 |
 | **S6** | 2~3h | 아이콘·스플래시 (`@capacitor/assets` 자동 생성). 머니그라피 폰트 네이티브 번들 | 스토어 메타 일부 |
 
 **Phase 0 총 시간 ≈ 18~26h (3~4일 압축, 또는 1~2주 분산)**. 이후 Phase 1·2 작업은 같은 코드베이스 위에서 *점진* 추가.
