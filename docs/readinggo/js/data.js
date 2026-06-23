@@ -478,8 +478,7 @@ async function recommendRelated(book, limit = 6) {
 }
 
 /* 공유 OCR 헬퍼 (#939) — 책 사진 한 장 → worker /api/ocr(Upstage Document OCR + solar-pro3 보정)
-   → 한 문장 텍스트. 읽기모드 빠른입력(#498 nest.js runOcrQuick)과 온보딩 '사진으로 시작'(SearchModal)이
-   같은 호출을 쓰도록 단일화(중복 구현 금지). 게스트도 호출 가능 — ocrProxy 는 동일출처만 요구, 인증 없음.
+   → 한 문장 텍스트. 읽기모드 빠른입력(#498 nest.js runOcrQuick)이 이 호출을 쓴다(인라인 중복 구현 금지).
    반환: { text, empty, error } (배타). 호출측이 토스트·busy·tracking 을 담당. 키 미설정/네트워크 실패는 error. */
 const OCR_MAX_BYTES = 8 * 1024 * 1024;   // 8MB — ocrProxy OCR_MAX_BYTES 와 동일
 function ocrExtractSentence(file) {

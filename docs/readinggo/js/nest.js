@@ -314,7 +314,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   // 빠른 기록 (#462) — 홈 상시 입력 폼에서 페이지/한 문장을 한 번에 체크인.
   // handleCheckin 단일 경로 재사용 → 스트릭·XP·세리머니·문장 영속(app onCheckin)·companion(#438) 보존.
   // 빠른입력 OCR (#498) — Upstage OCR + solar-pro3 → quickText 프리필(원하는 부분만 남기고 저장).
-  // #939: 공유 헬퍼 window.ocrExtractSentence 로 호출 단일화(온보딩 '사진으로 시작'과 동일 경로). 토스트·busy·tracking 은 여기서.
+  // 공유 헬퍼 window.ocrExtractSentence(data.js) 로 OCR 호출(#939). 토스트·busy·tracking 은 여기서.
   const runOcrQuick = (file) => {
     if (!file || quickOcrBusy) return;
     if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
