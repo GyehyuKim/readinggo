@@ -109,3 +109,11 @@
 - **출시 반영** ✅: 작가 시선 preset(#936) · 스트릭 복구 + 마일스톤 회고(#940 A1/A2) · 콜드스타트 OCR 제거(#944 — 본문 사진→책 식별 불가, 사진→책은 바코드 #943로 대체 검토).
 - **nav 라벨 드리프트 정합** 🔧: 실제 하단 탭 = **홈(`nest`) / 피드(`social`) / 책장(`profile`)** + 설정(`settings`, 바텀시트 액션 #567). 구 '소셜'→'피드'(#639, feed.md 기존 문서화) · '프로필'→'책장'(미문서 → 본 PR 정합). onboarding.md·README.md·feed.md §5.7·profile.md 동기화.
 - **#877 감사 결과**: 둥지 1,600 XP(#520/#521) ✅ · 친구찾기 NPC_SEARCH(#250) ✅ · companion 평가👍👎/재생성🔄/프리셋 ✅, **질문 품질필터(#373 반복방지·책맥락) ✅ PR #378**(worker `avoid`+`getBookBrief` — 감사 subagent가 클라만 보고 worker 놓친 오판, 본 노트로 정정) · **AI 다음책 추천/추출 ⏳빈 stub**(datastore-supabase.js:1001, UI 미연결 — #946) · parking-lot 3건(#126/#191/#208) 재개조건 미충족(정상 보류).
+
+---
+**v8.5 갱신 (2026-06-23, spec 드리프트 catch-up #951/#953 + spec-first 신규)**:
+- **계기**: 요며칠 ship 모드로 코드 42 커밋 중 spec 동반 ~1/3 — spec-first 마찰(2-PR)·CI 미강제·폴리시/기능 경계 모호로 드리프트. 키워드 grep은 커버리지 과대평가, 실제는 *stale spec*(코드와 모순)이 핵심.
+- **#951 정정** 🔧: `nest.md §5.1`·`feed.md`가 책 상세 진입 = `BookInfoModal` 단정하던 걸 **소유 라우팅**(보유→`BookDetailModal`/미보유→`BookInfoModal`)으로 정정. 코드는 이미 ship됨, spec이 stale했음.
+- **#953 문서화** ✅: 한 문장 카드 렌더 = 공용 `QuoteCard` SSOT(nest.md §5.1, 책장과 단일 컴포넌트).
+- **신규 spec-first**: '이 책의 다른 한 문장'(콜드스타트 사회적 증거, 내 문장 <3일 때 타인 좋아요순 ~6–8) — nest.md §5.1에 코드 전 spec 기재(미구현).
+- **남은 델타-audit 후보**(키워드 spec은 있으나 as-shipped 일치 미검증): 배치OCR #844·일괄입력 #848·계정삭제 #875·export #929·시드UI #828·인기랭킹 #835 — #877식 심층 대조는 별도. (본 PR은 *확인된* stale/zero만 처리.)

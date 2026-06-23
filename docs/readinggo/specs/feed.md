@@ -7,7 +7,7 @@
 > **v7.1 갱신 (2026-06-04, QA 2차)**: 피드 **팔로우/최근/추천 3탭**, `is_private` 재도입 + 감상 `note_private`. [decisions §8.1](./meta/decisions.md).
 > **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, Instagram 모델 — §5.7.1). [decisions §8.3](./meta/decisions.md).
 > **v8.2 갱신 (2026-06-15, #558)**: **위시리스트(관심 책) 공개 토글** 신설 — `users.wishlist_public` 컬럼 + RLS 확장 + 설정 토글 + 타인 프로필 섹션 (§5.7.2).
-> **v8.3 갱신 (2026-06-15, #578)**: 랭킹 섹션 라벨 → **'🔥 지금 인기 있는 책'**. 랭킹 책 탭 → 책 상세(`BookInfoModal`, `window.RG_openBook`) 진입으로 통일. 시작자 카운트 1명 노출 완화(2명 이상만 표시). 렌더 순서 변경: 인기 책 섹션 상단, 한 문장 피드(헤더+탭+카드) 하단.
+> **v8.3 갱신 (2026-06-15, #578)**: 랭킹 섹션 라벨 → **'🔥 지금 인기 있는 책'**. 랭킹 책 탭 → 책 상세(`window.RG_openBook`) 진입으로 통일(이후 #951에서 **소유 라우팅**으로 정제 — 미보유 `BookInfoModal`/보유 `BookDetailModal`). 시작자 카운트 1명 노출 완화(2명 이상만 표시). 렌더 순서 변경: 인기 책 섹션 상단, 한 문장 피드(헤더+탭+카드) 하단.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 준수.
 
 ### 5.7 피드 탭 (구 소셜 — #639 개명, 내부 키 `social` 유지)
@@ -34,7 +34,7 @@
 | 섹션 라벨 | **🔥 지금 인기 있는 책** (구 '이번 주 새로 시작한 책' / '최근 새로 시작한 책' 폐기) |
 | 집계 | **최근 7일** 신규 `user_books`(`started_at >= now() - interval '7 days'`) 책별 distinct 시작자 상위 5권. RPC `social_newcomers_weekly(lim)` (SECURITY DEFINER, anon/authenticated grant) |
 | 표시 | 순위 + 표지 + 책 제목·저자 + "N명 시작"(내 책장에 있으면 상태 강조). **starters ≥ 2명일 때만 "N명 시작" 표시; 1명이면 카운트 미노출** |
-| 탭 동작 | **책 상세(`BookInfoModal`) 진입** — `window.RG_openBook(b.bookId)` 호출. 피드 카드 책 제목 탭과 동일 경로. (구 책장 선택 바텀시트 폐기) |
+| 탭 동작 | **책 상세 진입** — `window.RG_openBook(b.bookId)` → **소유 라우팅**(미보유 `BookInfoModal` / 보유 `BookDetailModal`, #951 — [nest.md 책 상세 진입](./nest.md)). 피드 카드 책 제목 탭과 동일 경로. (구 책장 선택 바텀시트 폐기) |
 | 책 상세 내용 (#578) | `BookInfoModal` 에 **📚 책 소개**(DB `books.description` 우선·알라딘 폴백·`decodeEntities`) + **찜 동선 복구**: `❤️ 읽고 싶어요`(`RG_addBookToShelf(bk,'wish')`) / `📖 이 책 읽기`(`RG_registerBook`) 2버튼. "왜 읽는지"를 보여 찜·읽기 전환 유도. 책 상세는 공용(피드·홈·인기책 공통) |
 | 책 상세 높이·인기 한 문장 (#594) | `BookInfoModal` 시트는 **`max-height: 90vh` 내 스크롤**(정보가 길어도 충분히 노출). 하단에 **🔖 이 책의 한 문장 Top5** 섹션 — 그 책의 **공개 한 문장 중 좋아요 많은 순 최대 5개**. 데이터 `sentences.byBook(bookId, {limit:5, sort:'likes'})` ([backend.md](./backend.md)). 카드: 작성자(핸들/이름)·문장·페이지·**좋아요 수(읽기 전용 — 타인 문장이라 좋아요 토글·대화 버튼 없음)**. 본인 문장 제외(`neq user_id`). **Phase 0 게스트·비UUID 책 id·빈 결과 → 섹션 생략**(빈 노이즈 방지). "왜 읽는지"의 사회적 맥락 제공 |
 | 렌더 순서 | **소셜 뷰 최상단**에 위치. 그 아래 한 문장 피드(헤더+탭+카드 목록) |
