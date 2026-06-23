@@ -542,53 +542,11 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
             <div style={{fontSize:16, fontWeight:900, marginBottom:12, color:'var(--ink)'}}>💬 이 책들의 문장·감상</div>
             {tabQuotes.length > 0 ? (
               <div style={{display:'flex', flexDirection:'column', gap:10}}>
-                {tabQuotes.map((q, i) => {
-                  const getB = window.getBook;
-                  const _bk = typeof getB === 'function' ? getB(q.bookId) : null;
-                  const bkTitle = q.bookTitle || (_bk && (_bk.id === q.bookId || _bk.book_id === q.bookId) ? _bk.title : '') || '책';
-                  const typeText = q.kind === 'thought' ? '💭내생각' : '📖책속';
-                  const pageText = q.page ? `${q.page}p` : '';
-                  const _rawDate = q.when || q.createdAt || '';
-                  const dateText = (() => {
-                    if (!_rawDate) return '';
-                    const s = String(_rawDate);
-                    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-                    const n = Number(s);
-                    if (!isNaN(n) && n > 0) {
-                      const ms = n < 1e10 ? n * 1000 : n;
-                      const d = new Date(ms);
-                      if (!isNaN(d)) return d.toISOString().slice(0, 10);
-                    }
-                    try { const d = new Date(s); if (!isNaN(d)) return d.toISOString().slice(0, 10); } catch(e){}
-                    return '';
-                  })();
-
-                  return (
-                    <div key={i} className="my-q-card" onClick={() => setSelectedBookId(q.bookId)} style={{cursor:'pointer'}}>
-                      <div className="meta">
-                        <span className="kind">{typeText}</span>
-                        <span className="dot">·</span>
-                        <span className="bk" style={{whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:120}}>{bkTitle}</span>
-                        {pageText ? <span className="dot">·</span> : null}
-                        {pageText ? <span>{pageText}</span> : null}
-                        {dateText ? <span className="dot">·</span> : null}
-                        {dateText ? <span>{dateText}</span> : null}
-                      </div>
-                      <div className="quote" style={{
-                        fontStyle: q.kind === 'thought' ? 'normal' : 'italic',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxHeight: '4.65em',
-                        lineHeight: '1.55'
-                      }}>
-                        {q.kind === 'thought' ? `💭 ${q.text}` : `"${q.text}"`}
-                      </div>
-                    </div>
-                  );
-                })}
+                {tabQuotes.map((q, i) => (
+                  // 공용 QuoteCard(통일) — 메타(칩·책·페이지·날짜)·인용(이탤릭·3줄 줄임)·생각아이콘을 홈과 동일 렌더.
+                  // library 변종: 카드 탭 → 책 상세(setSelectedBookId). 액션 footer 없음(브라우즈용).
+                  <window.QuoteCard key={i} q={q} variant="library" onOpenBook={setSelectedBookId} />
+                ))}
               </div>
             ) : (
               <div style={{textAlign:'center', padding:'24px 16px', background:'var(--card)', border:'1.5px dashed var(--line)', borderRadius:'var(--r-md)', color:'var(--ink-3)', fontSize:13, fontWeight:700}}>

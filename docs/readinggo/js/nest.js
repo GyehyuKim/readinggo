@@ -659,66 +659,32 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
         </div>
       ) : (
         bookQuotes.slice(0, 10).map((q, i) => {
-          // getBook 은 미스 시 RG_BOOKS[0](=사피엔스)로 폴백하므로, id가 실제 일치할 때만 그 제목을 씀(사피엔스버그).
+          // 메타·인용·날짜·생각아이콘은 공용 QuoteCard 가 통일 렌더(홈·책장 동일). 여기선 footer(액션·재키)만.
+          // getBook 미스 폴백 가드(사피엔스버그) — footer 의 sentence/companion 에 쓸 bkTitle.
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
-          const dateText = _isTodayQuote(q) ? '오늘' : (q.createdAt ? (() => {
-            const v = q.createdAt;
-            let d;
-            if (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(String(v).trim()))) {
-              const n = typeof v === 'number' ? v : Number(v);
-              const ms = n > 1e13 ? n / 1000 : n > 1e10 ? n : n * 1000; // µs→ms, ms, s→ms
-              d = new Date(ms);
-            } else {
-              d = new Date(v);
-            }
-            if (isNaN(d.getTime())) return q.when || '';
-            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-          })() : (q.when || ''));
+          // 재키 대화 턴 수 (#654) — my_note의 Q. 블록 수. 축적 신호(분수 표기 안 함), 0이면 숨김.
+          const turns = q.note ? q.note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
           return (
-            <div key={q.id || i} className="my-q-card">
-              <div className="meta">
-                <span className="bk">{bkTitle}</span>
-                <span className="dot">·</span>
-                <span>{q.page}p</span>
-                {dateText ? <span className="dot">·</span> : null}
-                {dateText ? <span>{dateText}</span> : null}
-              </div>
-              <div className="quote" style={q.kind === 'thought' ? { fontStyle: 'normal' } : null}>
-                {q.kind === 'thought' ? (
-                  <><span style={{display:'inline-flex',alignItems:'center',verticalAlign:'middle',marginRight:5}}>
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <ellipse cx="6.5" cy="5.5" rx="5.5" ry="4" fill="none" stroke="var(--ink-2)" strokeWidth="1.2"/>
-                      <circle cx="4" cy="10.5" r="1" fill="var(--ink-2)"/>
-                      <circle cx="2" cy="12.5" r="0.6" fill="var(--ink-3)"/>
-                    </svg>
-                  </span>{q.text}</>
-                ) : `"${q.text}"`}
-              </div>
-              {/* 한 문장 액션 계약 (#610) — 자체 렌더 대신 공용 SentenceActions(공개범위+좋아요+수정+삭제) 경유.
-                  삭제는 rg:sentence-removed 이벤트로 myQuotes 자동 갱신(기존 리스너). */}
+            <window.QuoteCard key={q.id || i} q={q} variant="home">
+              {/* 한 문장 액션 계약 (#610) — 공용 SentenceActions(공개범위+좋아요+수정+삭제). 삭제는 rg:sentence-removed 이벤트로 자동 갱신. */}
               {q.id && window.SentenceActions && (
                 <SentenceActions sentence={{ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }} mine fav={favIds.has(q.id)} />
               )}
-              {q.id && (() => {
-                // 재키 대화 턴 수 (#654) — my_note의 Q. 블록 수. 책 상세(library.js)와 동일 계산·어휘.
-                // 축적 신호이지 할당량이 아님 → 분수(3/3) 표기 안 함. 0이면 숨김.
-                const turns = q.note ? q.note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
-                return (
-                  <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
-                      <ellipse cx="7" cy="9" rx="5" ry="4" fill="currentColor" opacity="0.55"/>
-                      <circle cx="9.5" cy="5" r="3" fill="currentColor" opacity="0.75"/>
-                      <circle cx="11" cy="4" r="1" fill="currentColor"/>
-                      <path d="M12.5 5.5l2 .4-1.5 1.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M4.5 11.5l-2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
-                      <path d="M7 12.5l-1 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
-                    </svg>
-                    {turns ? `재키와 대화 (${turns})` : '재키와 대화하기'}
-                  </button>
-                );
-              })()}
-            </div>
+              {q.id && (
+                <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+                    <ellipse cx="7" cy="9" rx="5" ry="4" fill="currentColor" opacity="0.55"/>
+                    <circle cx="9.5" cy="5" r="3" fill="currentColor" opacity="0.75"/>
+                    <circle cx="11" cy="4" r="1" fill="currentColor"/>
+                    <path d="M12.5 5.5l2 .4-1.5 1.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M4.5 11.5l-2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
+                    <path d="M7 12.5l-1 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
+                  </svg>
+                  {turns ? `재키와 대화 (${turns})` : '재키와 대화하기'}
+                </button>
+              )}
+            </window.QuoteCard>
           );
         })
       )}

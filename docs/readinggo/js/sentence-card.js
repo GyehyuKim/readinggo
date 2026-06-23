@@ -221,5 +221,61 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved, onUpdated })
   );
 }
 
+/* ── QuoteCard (통일): '내 한 문장' 카드 단일 렌더. 홈(nest)·책장(library) 공용 —
+   생각(말풍선 SVG)·날짜('오늘'/YYYY-MM-DD)·메타·인용(이탤릭) 렌더를 한 곳으로(불일치 제거).
+   variant 로 동작만 분기: 'home'=인라인 액션(SentenceActions)+전체 텍스트, 'library'=카드 탭→책상세+3줄 줄임. ── */
+function _rgQuoteDate(q) {
+  if (q && q.when === '방금') return '오늘';
+  const v = (q && (q.createdAt || q.when)) || '';
+  if (!v) return '';
+  const s = String(v).trim();
+  let d;
+  if (/^\d+$/.test(s)) { const n = Number(s); d = new Date(n > 1e13 ? n / 1000 : n > 1e10 ? n : n * 1000); } // µs→ms·ms·s→ms
+  else { d = new Date(s); }
+  if (isNaN(d.getTime())) return (q && q.when) || '';
+  const t = new Date();
+  if (d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate()) return '오늘';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+const _RG_THOUGHT_ICO = (
+  <span style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', marginRight: 5 }}>
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="6.5" cy="5.5" rx="5.5" ry="4" fill="none" stroke="var(--ink-2)" strokeWidth="1.2" />
+      <circle cx="4" cy="10.5" r="1" fill="var(--ink-2)" />
+      <circle cx="2" cy="12.5" r="0.6" fill="var(--ink-3)" />
+    </svg>
+  </span>
+);
+function QuoteCard({ q, variant, onOpenBook, children }) {
+  const isThought = q.kind === 'thought';
+  const isLib = variant === 'library';
+  const getB = window.getBook;
+  const _bk = typeof getB === 'function' ? getB(q.bookId) : null;
+  // getBook 은 미스 시 폴백 책을 주므로 id 가 실제 일치할 때만 그 제목 사용(사피엔스버그 가드).
+  const bkTitle = q.bookTitle || (_bk && (_bk.id === q.bookId || _bk.book_id === q.bookId) ? _bk.title : '') || '책';
+  const dateText = _rgQuoteDate(q);
+  const hasPage = typeof q.page === 'number' && q.page > 0;
+  const quoteStyle = {
+    fontStyle: isThought ? 'normal' : 'italic',
+    ...(isLib ? { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', maxHeight: '4.65em' } : null),
+  };
+  const clickable = isLib && typeof onOpenBook === 'function';
+  return (
+    <div className="my-q-card" onClick={clickable ? () => onOpenBook(q.bookId) : undefined} style={clickable ? { cursor: 'pointer' } : undefined}>
+      <div className="meta">
+        {isLib && (<><span className="kind">{isThought ? '💭내생각' : '📖책속'}</span><span className="dot">·</span></>)}
+        <span className="bk" style={isLib ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 } : undefined}>{bkTitle}</span>
+        {hasPage && (<><span className="dot">·</span><span>{q.page}p</span></>)}
+        {dateText && (<><span className="dot">·</span><span>{dateText}</span></>)}
+      </div>
+      <div className="quote" style={quoteStyle}>
+        {isThought ? <>{_RG_THOUGHT_ICO}{q.text}</> : `"${q.text}"`}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 window.SentenceCard = SentenceCard;
 window.SentenceActions = SentenceActions;
+window.QuoteCard = QuoteCard;
