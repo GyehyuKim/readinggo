@@ -34,6 +34,23 @@ function _dayDiff(fromDate, toDate) {
   const b = new Date(toDate + 'T00:00:00');
   return Math.round((b - a) / 86400000);
 }
+/* 스트릭 규칙 SSOT (systems.md §6.1) — bumpOnCheckIn 과 체크인 세리머니/XP 가 같은 값을 쓰도록
+   순수 함수로 추출(#927). 입력일자(today) 기준으로 다음 current 값을 계산한다.
+   - 같은 날 재기록  → 그대로(하루 1회만 증가)
+   - 정확히 1일 차   → +1 (연속)
+   - 그 외(공백/최초) → 1 (끊겼다 다시 시작) */
+function _nextStreak(prevCurrent, lastDate, today) {
+  const cur = Math.max(0, prevCurrent || 0);
+  if (lastDate === today) return cur;            // 오늘 이미 기록 — 불변
+  if (lastDate && _dayDiff(lastDate, today) === 1) return cur + 1;
+  return 1;                                       // 공백 ≥1일 또는 최초
+}
+/* 표시용: 마지막 기록 이후 하루를 건너뛰었으면 스트릭은 이미 끊긴 것(방패 미적용 Phase 0).
+   bumpOnCheckIn 은 다음 체크인 때만 리셋하므로, 부팅/표시에선 이 함수로 정상화한다(#927). */
+function _isStreakBroken(lastDate, today) {
+  if (!lastDate) return false;                    // 기록 없음 — 끊김 판정 안 함
+  return _dayDiff(lastDate, today) > 1;           // 어제·오늘이면 유효, 그보다 오래면 끊김
+}
 function _todayMinus(n) {
   // n일 전 날짜 (YYYY-MM-DD). 캘린더 since 계산용 (#367).
   const d = new Date(Date.now() - (n || 0) * 86400000);
@@ -135,7 +152,10 @@ const localStorageAdapter = (function () {
       streak: {
         current: (window.INITIAL_STATE && window.INITIAL_STATE.streak) || 0,
         longest: (window.INITIAL_STATE && window.INITIAL_STATE.streak) || 0,
-        last_check_in_date: null,
+        // 데모 시드: 마지막 기록 = 어제. 종전 null 은 스트릭 규칙 정상화(#927) 후 첫 체크인 시
+        // current 를 1 로 떨어뜨려(기록 이력 없음 판정) 데모의 '12일 연속'이 깨졌다. 어제로 시드하면
+        // 부팅 표시(12) 유지 + 오늘 체크인 시 연속 13 으로 자연스럽게 이어진다.
+        last_check_in_date: _todayMinus(1),
       },
       xp: (window.INITIAL_STATE && window.INITIAL_STATE.xp) || 0,
       claps: {},      // sentenceId -> true
@@ -207,6 +227,7 @@ function _applyBookOverrides(ub) {
 }
 // #871 Vite 회귀 픽스 — datastore-supabase.js 가 cross-file 로 호출(옛 loadBabel 전역). 모듈 스코프라 전역 노출 필요.
 window._today = _today; window._dayDiff = _dayDiff; window._applyBookOverrides = _applyBookOverrides;
+window._nextStreak = _nextStreak; window._isStreakBroken = _isStreakBroken; // 체크인 세리머니/XP 가 스트릭 규칙 공유(#927)
 function _allSentences(s) {
   const out = [];
   s.user_books.forEach(ub => {
@@ -581,18 +602,21 @@ const DataStore = {
   /* 스트릭 ──────────────────────────────────────── */
   streak: {
     get() {
-      return localStorageAdapter.mutate(s => ({ ...s.streak }));
+      // 표시 정상화(#927): 마지막 기록이 하루 넘게 지났으면 끊긴 스트릭이다. bumpOnCheckIn 은
+      // 다음 체크인 때만 0으로 내리므로, 부팅/표시 시점에 죽은 스트릭을 살아있는 것처럼 보이지
+      // 않게 current=0 으로 정상화해 돌려준다(저장값은 다음 체크인 때 갱신, Phase 0 방패 미적용).
+      return localStorageAdapter.mutate(s => {
+        const st = { ...s.streak };
+        if (_isStreakBroken(st.last_check_in_date, _today())) st.current = 0;
+        return st;
+      });
     },
     bumpOnCheckIn() {
       const today = _today();
       return localStorageAdapter.mutate(s => {
         const st = s.streak;
         if (st.last_check_in_date === today) return { ...st }; // 하루 1회만 증가
-        if (st.last_check_in_date && _dayDiff(st.last_check_in_date, today) === 1) {
-          st.current = (st.current || 0) + 1;
-        } else {
-          st.current = 1; // 끊겼거나 첫 체크인
-        }
+        st.current = _nextStreak(st.current, st.last_check_in_date, today); // 규칙 SSOT(#927)
         if (st.current > (st.longest || 0)) st.longest = st.current;
         st.last_check_in_date = today;
         return { ...st };

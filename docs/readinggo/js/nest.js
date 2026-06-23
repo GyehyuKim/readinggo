@@ -191,15 +191,26 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
-    const wasReset = ns.streak === 0;
+    // 스트릭은 실제 마지막 기록일 기준으로 계산(#927). 종전 `ns.streak += 1`(맹목 증가)은
+    // 며칠 건너뛴 뒤에도 +1 해 세리머니에 부풀린 값을 띄우고, 그 값으로 7/30일 스트릭 XP를
+    // 잘못 지급·영속했다. DataStore.streak 규칙(systems.md §6.1, bumpOnCheckIn)과 동일한
+    // 순수 함수 _nextStreak 로 같은 값을 미리 계산해 세리머니·XP가 영속값과 일치하게 한다.
+    let prevStreak = ns.streak || 0, lastCheckIn = null;
+    try {
+      const st = (window.DataStore && DataStore.streak && DataStore.streak.get) ? DataStore.streak.get() : null;
+      if (st && typeof st.current === 'number') prevStreak = st.current; // get()이 끊긴 스트릭은 0으로 정상화
+      if (st && st.last_check_in_date) lastCheckIn = st.last_check_in_date;
+    } catch (e) {}
+    const today = (window._today ? _today() : new Date().toISOString().slice(0, 10));
+    const newStreak = (window._nextStreak ? _nextStreak(prevStreak, lastCheckIn, today) : prevStreak + 1);
+    const wasReset = newStreak === 1 && prevStreak !== 0; // 공백으로 1로 떨어진 진짜 리셋(첫 기록 제외)
     const prevPct = _pctOf(ns.book);            // 책 진척(완독 판정용)
     const prevXp = ns.xp;
     const prevLv = getNestStageByXp(prevXp).lv; // 둥지 단계 = 현재 주기 XP (#520)
     const prevCastles = nestCastleCount(prevXp); // 성 개수 = floor(totalXp/1600) (#520/#521)
 
     ns.book = { ...ns.book, cur: page };
-    if (wasReset) ns.streak = 1;
-    else ns.streak += 1;
+    ns.streak = newStreak;
     ns.skipStreakRisk = false;
 
     const newPct = _pctOf(ns.book);
