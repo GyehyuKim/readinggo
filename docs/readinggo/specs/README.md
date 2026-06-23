@@ -20,6 +20,7 @@
 | **백엔드** | [`backend.md`](./backend.md) | [§7](./backend.md) |
 | **운영: 문의 동기화** | [`inquiry-sync.md`](./inquiry-sync.md) | 신설 (#701) — inquiries → GitHub 이슈 |
 | **운영: 운영자 대시보드** | [`admin-dashboard.md`](./admin-dashboard.md) | 신설 (#744) — 풀페이지 하이브리드 대시보드 |
+| **운영: 배포 안전** | [`ops.md`](./ops.md) | 신설 (#960·#901) — 피처 플래그/킬 스위치 · 카나리(점진 배포) |
 | **법무: 개인정보처리방침** | [`privacy-policy.md`](./privacy-policy.md) | 신설 (#757) — 처리방침 정본·국외이전·게시 |
 | **리팩토링: 모듈화** | [`refactor-modularize.md`](./refactor-modularize.md) | 신설 (#761) — monolith 분할 맵·prod-안전 플로우 |
 | **디자인** | [`design.md`](./design.md) | [§11](./design.md) + [§12](./design.md) |

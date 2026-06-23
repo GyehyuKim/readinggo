@@ -10,6 +10,31 @@ window.RG_CONFIG = {
   // 추천 피드 점수 (#787) — 신선도 반감기(일)·좋아요 가중·후보 풀 크기.
   // 데이터가 적으면 좋아요=0 → log항=0 → 신선도(최신순)로 수렴하므로 빈 단계에서도 안전.
   FEED_RECOMMEND: { halfLifeDays: 10, clapWeight: 1.2, poolSize: 120 },
+
+  // 피처 플래그 / 킬 스위치 (#960, decisions.md §8.13 채택 2 · specs/ops.md §1).
+  // 위험·신규 기능을 boolean 뒤에 둔다 → 카나리(#901)가 놓친 회귀가 100%까지 가도
+  //   배포·롤백 없이 그 기능만 즉시 끈다(작은 config 배포로 토글; Phase 0 최소안).
+  //   값은 클라 공개 안전(민감정보 아님). 조회는 window.RG_flag(name) — 없으면 false(안전 기본).
+  // 끄면 그 기능의 UI/네트워크 호출이 노출 안 되도록 graceful-skip(빈 섹션·placeholder도 생략).
+  // 저장 위치 fork(아래 'seedCollectorTrigger'를 worker [vars]/원격 설정에 둘지)는 검토 대상이나,
+  //   3인·Phase 0 규모에선 config.js 단일이 최소·추적 용이 → 채택(대안은 ops.md §1.3 한 줄).
+  FLAGS: {
+    // 같은 책 타인 한 문장 — 콜드스타트 사회적 증거(nest.md §5, #926 in-flight).
+    //   neighbor seed(/api/seed) 트리거를 동반하는 신규 기능 → 출시 시 이 플래그 뒤에 둔다(예시 주석).
+    socialProofSentences: true,
+    // 마중물 시드 트리거 (#774) — 빈 책에서 collector(맥미니) /api/seed 큐잉+폴링.
+    //   백엔드(collector) 장애·과부하 시 클라발 호출을 즉시 끈다(킬 스위치 실배선처 = book-info-modal.js).
+    seedCollectorTrigger: true,
+  },
+};
+
+// 피처 플래그 조회 (#960) — 단순·안전. 미정의/오타/FLAGS 부재 → false(기능 미노출이 안전 기본).
+// 사용: if (window.RG_flag('seedCollectorTrigger')) { …위험 호출… }  ·  off면 그 분기를 graceful-skip.
+window.RG_flag = function (name) {
+  try {
+    var f = window.RG_CONFIG && window.RG_CONFIG.FLAGS;
+    return !!(f && f[name] === true);
+  } catch (e) { return false; }
 };
 
 // 재키 질문 방향성 프리셋 (#375, companion.md §4.4) — 사람마다 선호하는 질문 결이 달라

@@ -64,7 +64,11 @@ function BookInfoModal({ bookId, onClose }) {
   // 마중물 시드 (#774, 큐 방식) — 인기 한 문장이 0건(빈 책)이면 /api/seed 로 큐잉 트리거 후 byBook 을 짧게 폴링한다.
   // collector(맥미니)가 예스24 발췌를 여러 NPC 명의로 sentences 에 적재하면 폴링이 잡아 popular 에 노출(동기 로딩 없음).
   // 의존성은 popularResolved/bk 만 — 폴링이 setPopular 로 갱신하므로 popular 를 deps 에 넣으면 무한 재실행.
+  // 킬 스위치 (#960, config.js FLAGS.seedCollectorTrigger) — collector(백엔드) 장애·과부하 시
+  //   배포·롤백 없이 클라발 /api/seed 호출을 즉시 끈다. off면 트리거·폴링 미실행 + seeding=false →
+  //   '이웃의 문장 모으는 중' placeholder 도 graceful-skip(빈 섹션 금지). 인기 문장(byBook 읽기)은 별개로 유지.
   useEffect(() => {
+    if (!(window.RG_flag && window.RG_flag('seedCollectorTrigger'))) { setSeeding(false); return; }
     if (!bk || !bk.title || !popularResolved || popular.length > 0) { setSeeding(false); return; }
     let alive = true;
     let timer = null;
