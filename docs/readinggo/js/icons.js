@@ -92,21 +92,23 @@ function nestArt(lv, size) {
 window.NEST_ART = NEST_ART;
 window.nestArt = nestArt;
 
-/* ── SparrowMark (#785): ReadingGo 참새 브랜드 마크 — 부트·로딩·에러 화면 공용 인라인 SVG.
+/* ── SparrowMark (#785 · #924 귀여움 개선): ReadingGo 참새 브랜드 마크 — 부트·로딩·에러 화면 공용 인라인 SVG.
    favicon(assets/sparrow.svg)과 동일 실루엣(배경 칩만 제외). 참새 머리 이모지 대체(모든 DPI 선명, #864).
+   #924: DESIGN.md 톤(Warm Editorial·토이 과잉 후퇴) 유지하며 절제된 baby-schema — 눈 확대·중앙↑·
+   캐치라이트 강화 + 부리 짧고 부드럽게 + 몸통 살짝 둥글게. 컬러 토큰·실루엣·장식은 불변(과한 변형 금지).
    size=픽셀(기본 40). 빌드 도구 없음 → 인라인 SVG(Stack Lock). ── */
 function SparrowMark({ size = 40, style }) {
   const s = size || 40;
   return (
     <svg width={s} height={s} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ReadingGo 참새" style={{ display: 'block', flexShrink: 0, ...(style || {}) }}>
-      <path d="M50 30 L62 25 L60 36 L50 37 Z" fill="#1F8E4D" />
-      <ellipse cx="34" cy="37" rx="17" ry="15" fill="#3FD17F" />
-      <circle cx="24" cy="26" r="12" fill="#3FD17F" />
-      <path d="M21 41 Q31 51 45 45 Q40 51 30 51 Q22 49 19 43 Z" fill="#DFF6EA" />
-      <path d="M31 31 Q42 30 49 39 Q40 43 32 40 Q27 35 31 31 Z" fill="#2EB867" />
-      <path d="M11 25 L23 21 L23 30 Z" fill="#FF8A3D" />
-      <circle cx="21" cy="24" r="2.5" fill="#2A2D33" />
-      <circle cx="21.9" cy="23.1" r="0.85" fill="#FFFFFF" />
+      <path d="M50 31 L61 26.5 L59.5 36 L50 37 Z" fill="#1F8E4D" />
+      <ellipse cx="34" cy="38" rx="17" ry="15.5" fill="#3FD17F" />
+      <circle cx="23.5" cy="25.5" r="12.5" fill="#3FD17F" />
+      <path d="M21 42 Q31 51.5 45 45.5 Q40 51 30 51 Q22 49 19 43.5 Z" fill="#DFF6EA" />
+      <path d="M31 31.5 Q42 30.5 49 39.5 Q40 43.5 32 40.5 Q27 35.5 31 31.5 Z" fill="#2EB867" />
+      <path d="M12.5 24 L22 21.5 L22 28.5 Z" fill="#FF8A3D" />
+      <circle cx="20.5" cy="24" r="3.4" fill="#2A2D33" />
+      <circle cx="21.7" cy="22.8" r="1.15" fill="#FFFFFF" />
     </svg>
   );
 }
