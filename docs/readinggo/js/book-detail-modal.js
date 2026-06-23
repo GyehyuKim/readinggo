@@ -132,6 +132,29 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .catch(() => { if (alive) setRelated([]); });
     return () => { alive = false; };
   }, [book.id]);
+  // 완독 후 AI 카드 (§5.8.6, #946) — ① 다음 책 추천 ② 추출 책. 완독(bookshelfEntry)일 때만 로드.
+  // Phase 0 하드코딩 시뮬(DataStore.ai → data.js 헬퍼). 다음 책은 책 단위, 추출은 내 한 문장 기반.
+  const completed = (book.status === 'completed');
+  const [aiNextBooks, setAiNextBooks] = _useState([]);
+  const [aiExtract, setAiExtract] = _useState(null);
+  _useEffect(() => {
+    if (!completed) { setAiNextBooks([]); setAiExtract(null); return; }
+    let alive = true;
+    Promise.resolve((DataStore.ai && DataStore.ai.recommendBooks) ? DataStore.ai.recommendBooks(book) : [])
+      .then(list => { if (alive) setAiNextBooks(list || []); })
+      .catch(() => { if (alive) setAiNextBooks([]); });
+    return () => { alive = false; };
+  }, [book.id, completed]);
+  // 추출 책은 이 책의 한 문장(bookQuotes) 의존 — 한 문장 추가/삭제 시 즉시 갱신.
+  _useEffect(() => {
+    if (!completed) { setAiExtract(null); return; }
+    let alive = true;
+    const qs = (bookQuotes || []).map(q => ({ text: q.text, page: (typeof q.page === 'number') ? q.page : null }));
+    Promise.resolve((DataStore.ai && DataStore.ai.extractBook) ? DataStore.ai.extractBook(book, qs) : null)
+      .then(r => { if (alive) setAiExtract(r || null); })
+      .catch(() => { if (alive) setAiExtract(null); });
+    return () => { alive = false; };
+  }, [book.id, completed, bookQuotes.length]);
   const addWish = (rb) => {
     if (!rb || !rb.id || wished[rb.id]) return;
     Promise.resolve(DataStore.wishBooks.add(rb.id))
@@ -427,6 +450,56 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   </button>
                 </>
               )}
+            </div>
+          )}
+
+          {/* ── 완독 후 AI 카드 (§5.8.6, #946) — Phase 0 하드코딩 시뮬 ────────────── */}
+          {/* ① AI 도서 추천 — 다음 책 (나↔책 fit, 친구 매칭 아님). CTA = 교보문고에서 보기 */}
+          {bookshelfEntry && aiNextBooks.length > 0 && (
+            <div style={{marginBottom:14}}>
+              <SectionLabel icon="related" mb={3}>AI 추천 — 다음에 읽을 책</SectionLabel>
+              <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:10}}>이 책을 완독한 당신에게 어울리는 다음 책이에요</div>
+              {aiNextBooks.map(rb => (
+                <div key={rb.id} style={{display:'flex', gap:12, alignItems:'flex-start', background:'var(--paper-2)', borderRadius:8, padding:'10px 12px', marginBottom:8}}>
+                  <BookCover className="book-cover" title={rb.title} author={rb.author} cover={rb.cover}
+                    radius={6} style={{width:48, height:68, flex:'0 0 auto'}} />
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:13, fontWeight:800, color:'var(--ink)', lineHeight:1.3}}>{rb.title}</div>
+                    <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginTop:1}}>{rb.author}</div>
+                    <div style={{fontSize:12, color:'var(--ink-2)', fontWeight:600, lineHeight:1.45, marginTop:5}}>{rb.reason}</div>
+                    <a href={`https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(rb.isbn || rb.title)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{display:'inline-block', marginTop:6, fontSize:11, fontWeight:800, color:'var(--brand-3)', textDecoration:'none'}}>
+                      교보문고에서 보기 →
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ② AI 추출 책 — 나만의 추출 책 (내 한 문장 기반). Phase 0 = 한 문장 나열 + 고정 카피 */}
+          {bookshelfEntry && aiExtract && (
+            <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:8, padding:'12px 14px', marginBottom:14}}>
+              <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:8}}>✨ 나만의 추출 책</div>
+              {/* 반응한 주제 TOP 3 */}
+              <div style={{display:'flex', flexWrap:'wrap', gap:6, marginBottom:10}}>
+                {aiExtract.topics.map((t, i) => (
+                  <span key={i} style={{fontSize:11, fontWeight:800, color:'var(--brand-3)', background:'var(--card)', border:'1px solid var(--brand-soft)', borderRadius:12, padding:'3px 10px'}}>#{t}</span>
+                ))}
+              </div>
+              {/* 가장 인상 깊었던 한 문장 */}
+              {aiExtract.topQuote && aiExtract.topQuote.text && (
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:800, marginBottom:4}}>가장 인상 깊었던 한 문장</div>
+                  <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, fontStyle:'italic', lineHeight:1.55, padding:'8px 10px', background:'var(--card)', borderRadius:8}}>
+                    "{aiExtract.topQuote.text}"
+                    {typeof aiExtract.topQuote.page === 'number' && <span style={{fontStyle:'normal', fontSize:11, color:'var(--ink-3)', fontWeight:700, marginLeft:6}}>p.{aiExtract.topQuote.page}</span>}
+                  </div>
+                </div>
+              )}
+              {/* 흐름 요약 (고정 카피) */}
+              <div style={{fontSize:12, color:'var(--ink-2)', fontWeight:600, lineHeight:1.55}}>{aiExtract.summary}</div>
             </div>
           )}
 

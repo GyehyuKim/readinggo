@@ -477,6 +477,74 @@ async function recommendRelated(book, limit = 6) {
   return out;
 }
 
+// ── 완독 후 AI: 다음 책 추천 + 추출 책 (§5.8.6, #946) ───────────────
+// Phase 0 = 하드코딩 시뮬(실 LLM 호출 없음 — Gemini 는 별도 스코프). 저장소 무관 로직이라
+// 두 어댑터(datastore.js / datastore-supabase.js)가 이 헬퍼에 위임해 표면(shape)을 일치시킨다.
+// Phase 1+ 는 backend.md §7.9 의 Gemini Flash 프록시로 교체 예정(빈 매칭 시 폴백 자리 동일).
+
+// "카테고리별 하드코딩 추천 3권" — 책 정보(제목·표지·ISBN)는 하드코딩하지 않고(CLAUDE.md 룰)
+// 시드 books DB 의 **id 리스트만** 큐레이션하고, 실 책 객체는 getBook(id) 으로 해소한다.
+// 키 = 완독 책 id, 값 = 다음 추천 id 3개 + 한 줄 이유(나↔책 fit, 친구 매칭 아님 §5.8.6).
+const NEXT_BOOK_PICKS = {
+  // 교양·과학 — 사피엔스 / 코스모스
+  b001: [['b002', '인류사 다음은 우주의 스케일로 — 같은 ‘큰 그림’ 독서'], ['b010', '문명을 통찰했다면 그 그림자(전체주의)도'], ['b008', '거대 서사 뒤, 한 개인의 자아 찾기로 호흡 전환']],
+  b002: [['b001', '우주를 봤다면 그 안의 인류사로 — 스케일 잇기'], ['b010', '과학적 사고 다음, 과학이 통제로 쓰일 때'], ['b337', '광활함 뒤의 단단한 의지 한 편']],
+  // 고전소설 — 데미안 / 이방인 / 위대한 개츠비 / 호밀밭
+  b008: [['b325', '자아를 찾았다면 부조리 앞의 실존으로'], ['b037', '성장통의 또 다른 목소리 — 방황하는 청춘'], ['b093', '내면 성장 다음, 욕망과 환멸의 미국']],
+  b325: [['b008', '부조리 다음, 알을 깨는 자기 탐구로'], ['b103', '실존의 질문을 비극의 언어로'], ['b337', '무의미 속에서도 끝까지 — 의지의 드라마']],
+  b093: [['b037', '환멸의 미국, 그 청춘의 시선으로 이어 읽기'], ['b008', '욕망을 봤다면 자아의 성장으로'], ['b325', '아메리칸드림의 균열을 부조리로 확장']],
+  b037: [['b008', '방황하는 청춘 다음, 자아를 깨는 성장담'], ['b093', '환멸의 정서를 미국 재즈시대로'], ['b325', '소외감을 실존의 부조리로 밀어붙이기']],
+  // 디스토피아·정치 — 1984 / 동물농장
+  b010: [['b105', '전체주의를 우화로 다시 — 권력의 부패'], ['b001', '감시사회 너머, 인류는 어떻게 여기 왔나'], ['b325', '체제에 짓눌린 개인의 실존']],
+  b105: [['b010', '우화 다음, 감시국가의 정면 묘사'], ['b001', '권력의 메커니즘을 인류사의 스케일로'], ['b103', '배신과 권력욕을 비극의 무대로']],
+};
+// 기본 폴백 — 매핑에 없는 책(또는 시드 외 임포트 책)이면 보편 명작 3권.
+const NEXT_BOOK_DEFAULT = [
+  ['b008', '내면의 성장을 그린 헤세의 대표작'],
+  ['b001', '세상을 보는 눈을 넓히는 인류사 교양서'],
+  ['b093', '욕망과 환멸을 그린 20세기 고전'],
+];
+// 다음 책 추천 (§5.8.6 ①). 반환 shape: [{ id, title, author, cover, isbn, reason }] (최대 3).
+// 자기 자신은 제외하고, getBook 으로 실 책을 해소(없으면 스킵). Promise 로 어댑터 표면(async) 일치.
+function recommendNextBooks(book) {
+  const selfId = (book && book.id) || '';
+  const picks = (NEXT_BOOK_PICKS[selfId] || NEXT_BOOK_DEFAULT).filter(([id]) => id !== selfId);
+  const get = (typeof window !== 'undefined' && window.getBook) ? window.getBook : null;
+  const out = [];
+  const seen = new Set();
+  for (const [id, reason] of picks) {
+    if (seen.has(id)) continue;
+    const b = get ? get(id) : null;
+    if (!b || !b.id || b.id === selfId) continue;   // getBook 폴백(RG_BOOKS[0]) 자기참조 가드
+    seen.add(id);
+    out.push({ id: b.id, title: b.title, author: b.author, cover: b.cover, isbn: b.isbn, reason });
+    if (out.length >= 3) break;
+  }
+  return Promise.resolve(out);
+}
+
+// 추출 책 (§5.8.6 ②) — Phase 0 = '한 문장 나열 + 고정 카피 시뮬'.
+// 입력: 그 책에서 내가 남긴 한 문장 배열([{text, page}]). 출력 shape:
+//   { topics:[s1,s2,s3], topQuote:{text,page}, summary, quotes:[{text,page}] }
+// 한 문장이 하나도 없으면 null(카드 미노출). 실 LLM 분석은 Phase 1+(§7.9).
+const EXTRACT_TOPICS = ['기억에 남은 장면', '곱씹게 되는 문장', '나에게 남긴 질문'];
+function extractBookSummary(book, quotes) {
+  const list = (quotes || [])
+    .map((q) => ({ text: (q && q.text ? String(q.text) : '').trim(), page: (q && typeof q.page === 'number') ? q.page : null }))
+    .filter((q) => q.text);
+  if (!list.length) return Promise.resolve(null);
+  // '가장 인상 깊었던 한 문장' — Phase 0 휴리스틱: 가장 긴 문장(없으면 첫 문장).
+  const topQuote = list.reduce((a, b) => (b.text.length > a.text.length ? b : a), list[0]);
+  const title = (book && book.title) || '이 책';
+  const summary = `${title}을(를) 읽으며 ${list.length}개의 문장을 남겼어요. 그 문장들이 모여 나만의 추출 책이 됩니다.`;
+  return Promise.resolve({
+    topics: EXTRACT_TOPICS.slice(),
+    topQuote: { text: topQuote.text, page: topQuote.page },
+    summary,
+    quotes: list,
+  });
+}
+
 /* 공유 OCR 헬퍼 (#939) — 책 사진 한 장 → worker /api/ocr(Upstage Document OCR + solar-pro3 보정)
    → 한 문장 텍스트. 읽기모드 빠른입력(#498 nest.js runOcrQuick)이 이 호출을 쓴다(인라인 중복 구현 금지).
    반환: { text, empty, error } (배타). 호출측이 토스트·busy·tracking 을 담당. 키 미설정/네트워크 실패는 error. */
@@ -511,5 +579,6 @@ window.ALL_BOOKS=ALL_BOOKS;
 window.NEST_TWIGS=NEST_TWIGS; window.NEST_GEO=NEST_GEO;
 window.twigsForProgress=twigsForProgress; window.nestInfo=nestInfo; window.drawNest=drawNest;
 window.loadBooks=loadBooks; window.fuzzySearch=fuzzySearch; window.recommendRelated=recommendRelated;
+window.recommendNextBooks=recommendNextBooks; window.extractBookSummary=extractBookSummary;
 window.ocrExtractSentence=ocrExtractSentence;
 window.normalizeIsbn13=normalizeIsbn13; window.filterRelatedCandidates=filterRelatedCandidates;

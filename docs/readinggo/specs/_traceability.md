@@ -42,7 +42,7 @@
 | §5.8.4 쪽수 폴백·책갈피·회상 · export 상세화(v7.4) | ✅ | #204 · bookmarks/random · #315 export(메타·완독·날짜) · #316 책 소개(알라딘 description) |
 | §5.8.1.1 성 컬렉션 책장 상세(최근10+그리드/검색/정렬/필터, v7.4) | ✅ | #312 ArchiveShelfModal |
 | 공용 BookCover + 표지 placeholder(v7.4) | ✅ | #316 components.js BookCover · 외서 5+5(#302/#343, 알라딘5+Google5) · export 책소개(#316/#344) |
-| §5.8.6 AI 카드 — 참새의 완독 회고(v7.4) | ✅ | #259/#345 회고 + #352 영속화. 다음책 추천/추출(`ai.recommendBooks`·`extractBook`)은 **빈 stub·UI 미연결 ⏳**(datastore-supabase.js:1001 — #877 감사) |
+| §5.8.6 AI 카드 — 참새의 완독 회고(v7.4) | ✅ | #259/#345 회고 + #352 영속화. 다음책 추천/추출(`ai.recommendBooks`·`extractBook`)은 **Phase 0 하드코딩 시뮬 구현 ✅**(#946 — data.js `recommendNextBooks`·`extractBookSummary` + 양 어댑터 위임 + BookDetailModal 완독 카드). 실 Gemini 호출은 Phase 1+(§7.9) |
 | 한 문장 삭제 (책상세·둥지 상세) | ✅ | #358 sentences.remove(양 어댑터)·책상세 🗑 · CompanionModal 🗑(rg:sentence-removed 이벤트) |
 | 한 문장 책 제목 오표시(getBook 폴백) 수정 | ✅ | PR #374 — onArchive bookTitle 전달 + 둥지 카드 폴백 가드 |
 

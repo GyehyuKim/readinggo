@@ -996,10 +996,17 @@
       },
     },
 
-    /* AI (Phase 1+ Gemini 프록시 §7.9) — 프록시 붙기 전 stub */
+    /* AI 완독 후 카드 (§5.8.6) — Phase 0 하드코딩 시뮬(실 LLM 없음). data.js 헬퍼에 위임해
+       localStorage 어댑터와 표면 일치. Phase 1+ 는 §7.9 Gemini Flash 프록시로 교체. */
     ai: {
-      async recommendBooks() { return []; },
-      async extractBook() { return null; },
+      // 다음 책 추천 — [{ id, title, author, cover, isbn, reason }] (최대 3).
+      recommendBooks(book) {
+        return window.recommendNextBooks ? window.recommendNextBooks(book) : Promise.resolve([]);
+      },
+      // 추출 책 — { topics, topQuote, summary, quotes } | null(한 문장 없음).
+      extractBook(book, quotes) {
+        return window.extractBookSummary ? window.extractBookSummary(book, quotes) : Promise.resolve(null);
+      },
     },
 
     /* 가입 전 임시 (localStorage; OAuth 후 동기화 §7.7) */

@@ -896,6 +896,17 @@ const DataStore = {
     add() { return null; },
     countMine() { return 0; },   // 로컬/게스트는 서버 세션 없음 (#394 backfill 가드)
   },
+
+  /* AI 완독 후 카드 (§5.8.6, #946) — Phase 0 하드코딩 시뮬. Supabase 어댑터와 표면 일치
+     (둘 다 data.js 헬퍼에 위임 — 저장소 무관 로직). Phase 1+ 는 §7.9 Gemini 프록시. */
+  ai: {
+    recommendBooks(book) {
+      return window.recommendNextBooks ? window.recommendNextBooks(book) : Promise.resolve([]);
+    },
+    extractBook(book, quotes) {
+      return window.extractBookSummary ? window.extractBookSummary(book, quotes) : Promise.resolve(null);
+    },
+  },
 };
 
 window.DataStore = DataStore;
