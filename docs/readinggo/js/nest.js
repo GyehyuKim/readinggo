@@ -36,6 +36,18 @@ function _absPct(xp, sp) {
 // #871 Vite 회귀 픽스 — ceremony.js·nest-theatre.js 가 cross-file 로 호출(옛 loadBabel 전역). 모듈 스코프라 전역 노출 필요.
 window._stageProg = _stageProg; window._cycleXp = _cycleXp; window._absPct = _absPct;
 
+// 마일스톤 회고 선택 (#938, A2) — 이번 체크인이 어떤 마일스톤에 닿았는지 1개만 고른다(절제).
+// 우선순위: 완독 > 둥지 성(주기 완료) > 연속 30일 > 연속 7일. value/ubId/bookTitle 은 회고 헤더·타임라인 소스.
+// 실제 노출 여부(마일스톤별 1회 + 하루 1회)는 DataStore.milestone.shouldShow 가 결정 — 여기서는 후보 descriptor 만 만든다.
+function _pickMilestone({ isComplete, castleGained, newCastles, newStreak, book }) {
+  const bk = book || {};
+  if (isComplete) return { type: 'complete', ubId: bk.ubId || null, bookId: bk.id || null, bookTitle: bk.title || '', key: 'complete:' + (bk.ubId || bk.id || bk.title || '?') };
+  if (castleGained) return { type: 'castle', value: newCastles, key: 'castle:' + newCastles };
+  if (newStreak === 30) return { type: 'streak', value: 30, key: 'streak:30' };
+  if (newStreak === 7) return { type: 'streak', value: 7, key: 'streak:7' };
+  return null;
+}
+
 // 한 문장 종류 휴리스틱(estimateSentenceKind, #420) 제거 — '내 생각'(thought) 폐기 (#596). 호출부 없던 죽은 코드.
 
 /* ── NestView ─────────────────────────────────────────── */
@@ -111,6 +123,8 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   });
   // 직전 진척률 가지 수 — 새 가지 stack 애니메이션 기준.
   const prevTwigsRef = _useRef(twigsForProgress(_xpProg(state.xp)));
+  // 마일스톤 회고 대기 (#938, A2) — 세리머니가 닫힌 뒤 띄울 마일스톤(겹침 방지). 게이트(빈도)는 DataStore.milestone.
+  const pendingMilestoneRef = _useRef(null);
   // 한 문장 삭제(#1)·종류변경(#381) 이벤트 → 둥지 '내 한 문장' 목록 즉시 반영.
   _useEffect(() => {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
@@ -186,6 +200,47 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
+  // 스트릭 복구·유예 (#938, A1) — 둥지 진입 시 깨진 스트릭이 복구 가능하면 '하루 만회' 카드를 1회 노출.
+  // 좌절 이탈 방지(코어 감정 '고양감' 보호). 점수·미션 추가 아님 — 기존 스트릭 관용. 주 1회 제한은 datastore SSOT(_streakRepairStatus).
+  const [repairCard, setRepairCard] = _useState(null); // { lostStreak, brokenDays }
+  _useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (!(DataStore.streak && DataStore.streak.repairStatus)) return;
+        const st = await Promise.resolve(DataStore.streak.repairStatus());
+        if (!alive || !st || !st.canRepair) return;
+        setRepairCard({ lostStreak: st.lostStreak, brokenDays: st.brokenDays });
+        rgTrack('streak_repair_shown', { lost: st.lostStreak, broken_days: st.brokenDays });
+      } catch (e) { /* 복구 넛지 실패는 조용히 */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  const doRepairStreak = async () => {
+    if (!repairCard) return;
+    try {
+      const res = await Promise.resolve(DataStore.streak.repair());
+      if (res && res.ok) {
+        const restored = res.lostStreak || repairCard.lostStreak || 0;
+        // 낙관적 표시 갱신 + 상위(app)·캘린더 정합 신호. 오늘 한 줄 기록하면 +1 로 자연스럽게 이어진다.
+        setNestState((ns) => ({ ...ns, streak: restored }));
+        try { window.dispatchEvent(new CustomEvent('rg:streak-repaired', { detail: { streak: restored } })); } catch (e) {}
+        rgTrack('streak_repaired', { restored });
+        showToast(`🔥 ${restored}일 연속을 되살렸어요 — 오늘 한 줄로 이어가요`);
+      } else {
+        const days = (res && res.cooldownDays) || 0;
+        showToast(days > 0 ? `이번 주 만회는 이미 썼어요 — ${days}일 뒤 다시 가능해요` : '지금은 만회할 수 없어요');
+      }
+    } catch (e) {
+      showToast('만회에 실패했어요 — 잠시 후 다시 시도해요');
+    }
+    setRepairCard(null);
+  };
+  const dismissRepair = () => {
+    if (repairCard) rgTrack('streak_repair_skipped', { lost: repairCard.lostStreak });
+    setRepairCard(null); // 이번 진입 동안만 숨김 — 다음 진입 때 아직 복구 가능하면 다시 권유(주 1회는 datastore가 강제)
+  };
+
   const handleCheckin = ({ page, sentence, kind }) => {
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
@@ -244,6 +299,10 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       const copy = getEvolutionCopy(prevLv, newLv);
       if (copy) showToast(`${getNestStageByXp(ns.xp).short} ${copy}`);
     }
+
+    // 마일스톤 회고 (#938, A2) — 완독·연속 7/30일·둥지 성에서만, 절제해서. 세리머니가 닫힌 뒤 1개만 띄운다(겹침 방지).
+    // 빈도 게이트(마일스톤별 1회 + 하루 1회)는 DataStore.milestone 이 강제. 점수·미션 아님 — 기존 한 문장 자산으로 서사 증폭.
+    pendingMilestoneRef.current = _pickMilestone({ isComplete, castleGained, newCastles, newStreak: ns.streak, book: ns.book });
 
     // 이 책에서 모은 한 문장 수 (#549) — 세리머니가 거짓 '저장됨' 대신 정직한 누적/독려 표시.
     const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
@@ -334,6 +393,22 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       }
     })();
     showToast('🏰 성 컬렉션에 기록이 남았어요!');
+  };
+
+  // 세리머니 닫힘 → 대기 중 마일스톤 회고를 게이트 통과 시 1개 띄움 (#938, A2).
+  // 세리머니와 겹치지 않게 닫은 뒤 약간의 텀을 두고 연다. 게이트(마일스톤별 1회·하루 1회)는 DataStore.milestone.
+  const closeCeremony = () => {
+    setCeremony(null);
+    const m = pendingMilestoneRef.current;
+    pendingMilestoneRef.current = null;
+    if (!m || !m.key) return;
+    try {
+      const gate = window.DataStore && DataStore.milestone;
+      if (!gate || !gate.shouldShow || !gate.shouldShow(m.key)) return; // 빈도 절제 — 이미 봤거나 오늘 이미 1회
+      gate.markShown(m.key);
+      rgTrack('milestone_recap_shown', { type: m.type, value: m.value || 0 });
+      setTimeout(() => { if (window.RG_openMilestoneRecap) window.RG_openMilestoneRecap(m); }, 280);
+    } catch (e) { /* 회고는 부가 연출 — 실패해도 본 흐름 무중단 */ }
   };
 
   // 이 책 한 문장 (#499) — 현재 책의 전체 기간 최신순(오늘만 아님). 오늘 작성분은 '오늘' 라벨.
@@ -430,6 +505,31 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       {/* 둥지 시어터(NestTheatre)는 프로필 상단으로 이동 (#428) — 홈은 책읽기 중심 */}
 
       {/* 데모 '하루 거르기' 제거 (#481) */}
+
+      {/* 스트릭 복구·유예 — '하루 만회' (#938, A1). 깨진 스트릭이 복구 가능할 때만. 좌절 이탈 방지(고양감 보호).
+          버튼 위계(DESIGN.md): 1차 솔리드(만회) 1개 + 3차 텍스트(괜찮아요). 점수·미션 아님 — 기존 스트릭 관용. */}
+      {repairCard && (
+        <div style={{ marginTop: 10, background: 'var(--brand-tint)', border: '1.5px solid var(--brand-soft)', borderRadius: 'var(--r-md)', padding: '16px 16px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 22, lineHeight: 1 }}>🔥</span>
+            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)' }}>
+              {repairCard.lostStreak}일 연속이 끊길 뻔했어요
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55, marginBottom: 12 }}>
+            {repairCard.brokenDays >= 2 ? `${repairCard.brokenDays}일 쉬어갔지만 ` : '하루 놓쳤지만 '}
+            괜찮아요. 한 번 만회해서 그동안 쌓은 흐름을 이어가요. <span style={{ color: 'var(--ink-3)' }}>(주 1회)</span>
+          </div>
+          <button className="checkin-cta" onClick={doRepairStreak}
+            style={{ width: '100%', marginBottom: 6 }}>
+            🔥 하루 만회하고 이어가기
+          </button>
+          <button onClick={dismissRepair}
+            style={{ display: 'block', width: '100%', padding: '8px 0', background: 'none', border: 'none', color: 'var(--ink-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+            괜찮아요, 새로 시작할게요
+          </button>
+        </div>
+      )}
 
       {/* 진도 섹션 */}
       <div style={{ marginTop: 10, background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 'var(--r-md)', padding: '14px 16px' }}>
@@ -628,7 +728,7 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
       {ceremony && ReactDOM.createPortal(
         <Ceremony
           data={ceremony}
-          onClose={() => setCeremony(null)}
+          onClose={closeCeremony}
           onComplete={handleComplete}
         />,
         document.body

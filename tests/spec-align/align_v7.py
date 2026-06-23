@@ -35,6 +35,7 @@ FEATURE_FILES = [
     "companion.js", "ocr-crop-overlay.js", "ceremony.js", "nest-theatre.js", "follow-list-modal.js",
     "user-profile-modal.js", "sentence-collection-modal.js",
     "shelf-import.js",
+    "milestone-recap.js",  # #938 A2 — 마일스톤 회고 모달(직접 localStorage 금지 범위 포함)
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -221,6 +222,29 @@ INVARIANTS = [
         ["app.js"], r"RG_consent\.get\(\) === 'yes'[\s\S]{0,80}posthog\.identify"),
     ("C", "present", "LLM 대화 backfill은 선택 동의('yes')만 (#394·#752)",
         ["app.js"], r"RG_consent[\s\S]{0,40}=== 'yes'[\s\S]{0,200}backfill|backfillCompanionSessions[\s\S]{0,260}RG_consent[\s\S]{0,40}=== 'yes'"),
+
+    # ── D: 고양감 결 강화 (#938) — 스트릭 복구(A1) + 마일스톤 회고(A2). 점수·경쟁 추가 금지 ──
+    # A1 정책 SSOT — 양 어댑터가 _streakRepairStatus 한 함수로 복구 규칙(주 1회·하루치)을 공유.
+    ("D", "present", "스트릭 복구 정책 SSOT — _streakRepairStatus (#938 A1)",
+        ["datastore.js"], r"_streakRepairStatus"),
+    ("D", "present", "스트릭 복구 계약 — streak.repair/repairStatus (localStorage 어댑터, #938 A1)",
+        ["datastore.js"], r"repairStatus\(\)[\s\S]*repair\(\)|repair\(\)[\s\S]*repairStatus\(\)"),
+    ("D", "present", "스트릭 복구 계약 — supabase 어댑터 대칭 (#938 A1)",
+        ["datastore-supabase.js"], r"async repair\(\)[\s\S]*last_repair_date|last_repair_date[\s\S]*async repair\(\)"),
+    ("D", "present", "홈 '하루 만회' 복구 카드 — repairStatus 게이트 + 만회 액션 (#938 A1)",
+        ["nest.js"], r"repairStatus[\s\S]*doRepairStreak|doRepairStreak[\s\S]*streak\.repair"),
+    # A2 — 마일스톤 회고: 빈도 게이트 + 회고 모달 + nest 트리거.
+    ("D", "present", "마일스톤 회고 빈도 게이트 — milestone.shouldShow/markShown (#938 A2)",
+        ["datastore.js"], r"shouldShow\(key\)[\s\S]*markShown|markShown[\s\S]*shouldShow\(key\)"),
+    ("D", "present", "마일스톤 회고 모달 — MilestoneRecap + RG_openMilestoneRecap (#938 A2)",
+        ["milestone-recap.js"], r"function MilestoneRecap[\s\S]*RG_openMilestoneRecap"),
+    ("D", "present", "마일스톤 회고는 기존 한 문장 자산 재사용 — listByBook/listMine (#938 A2)",
+        ["milestone-recap.js"], r"listByBook[\s\S]*listMine|listMine[\s\S]*listByBook"),
+    ("D", "present", "홈 마일스톤 트리거 — 세리머니 닫힘 시 게이트 통과분 1개 (#938 A2)",
+        ["nest.js"], r"_pickMilestone[\s\S]*RG_openMilestoneRecap|RG_openMilestoneRecap[\s\S]*_pickMilestone"),
+    # 가드: 새 점수·랭킹·데일리미션 시스템을 더하지 않았는지(#911 외적 보상 배제). 새 모듈에 점수/랭킹 변수 금지.
+    ("D", "absent", "외적 보상 신설 금지 — 점수/포인트/랭킹/리더보드 변수 잔재 (#938 가드)",
+        ["milestone-recap.js"], r"leaderboard|ranking|\bpoints\b|\bscore\b"),
 ]
 
 

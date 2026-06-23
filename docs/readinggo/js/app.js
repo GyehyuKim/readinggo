@@ -349,6 +349,16 @@ function App() {
     return () => window.removeEventListener('rg:xp', onXp);
   }, []);
 
+  // 스트릭 '하루 만회'(#938, A1) — nest 복구 카드가 streak 을 되살리면 상단 표시·state.streak 정합.
+  useEffect(() => {
+    const onRepair = (e) => {
+      const v = e && e.detail ? e.detail.streak : null;
+      if (typeof v === 'number') setAppState(s => ({ ...s, streak: v }));
+    };
+    window.addEventListener('rg:streak-repaired', onRepair);
+    return () => window.removeEventListener('rg:streak-repaired', onRepair);
+  }, []);
+
   // 한 문장 삭제(#1)·종류변경(#381) — CompanionModal 등에서 변경 시 appState.myQuotes 즉시 반영.
   useEffect(() => {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).filter(q => q.id !== id) })); };

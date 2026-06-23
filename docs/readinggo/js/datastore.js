@@ -51,6 +51,29 @@ function _isStreakBroken(lastDate, today) {
   if (!lastDate) return false;                    // 기록 없음 — 끊김 판정 안 함
   return _dayDiff(lastDate, today) > 1;           // 어제·오늘이면 유효, 그보다 오래면 끊김
 }
+/* 스트릭 복구('하루 만회') 정책 SSOT (#938, systems.md §6.1) — 깨진 스트릭의 복구를 양 어댑터가 같은 규칙으로 쓰도록 순수 함수로 추출.
+   관용은 좌절 이탈을 막지만 과다하면 스트릭 의미가 퇴색하므로 **주 1회·조건 없음(광고/결제 X)·하루치 유예**로 제한한다.
+   복구 = 끊기기 직전 current 값을 보존하고 last_check_in_date 를 '어제'로 세팅 → 오늘 체크인하면 끊김 없이 +1 로 이어진다.
+   입력: streak 행({current, last_check_in_date, last_repair_date?}), today(YYYY-MM-DD).
+   반환: { canRepair, lostStreak(복구 시 살아날 값), brokenDays(공백 일수), cooldownDays(다음 만회까지 남은 일), reason } */
+const STREAK_REPAIR_COOLDOWN_DAYS = 7; // 주 1회 (관용 상한 — 의미 퇴색 방지)
+function _streakRepairStatus(st, today) {
+  const cur = Math.max(0, (st && st.current) || 0);
+  const last = st && st.last_check_in_date;
+  // 끊기지 않았으면(어제/오늘 기록) 복구 불필요. 기록이 아예 없으면 살릴 스트릭도 없음.
+  if (!_isStreakBroken(last, today)) return { canRepair: false, lostStreak: cur, brokenDays: 0, cooldownDays: 0, reason: 'not_broken' };
+  // 저장된 current(끊긴 시점 값, get()의 0 정상화 전)가 1 미만이면 살릴 것이 없음.
+  if (cur < 1) return { canRepair: false, lostStreak: 0, brokenDays: _dayDiff(last, today), cooldownDays: 0, reason: 'nothing_to_save' };
+  // 주 1회 제한 — 마지막 만회로부터 7일 안이면 쿨다운.
+  const lr = st && st.last_repair_date;
+  if (lr) {
+    const since = _dayDiff(lr, today);
+    if (since < STREAK_REPAIR_COOLDOWN_DAYS) {
+      return { canRepair: false, lostStreak: cur, brokenDays: _dayDiff(last, today), cooldownDays: STREAK_REPAIR_COOLDOWN_DAYS - since, reason: 'cooldown' };
+    }
+  }
+  return { canRepair: true, lostStreak: cur, brokenDays: _dayDiff(last, today), cooldownDays: 0, reason: 'ok' };
+}
 function _todayMinus(n) {
   // n일 전 날짜 (YYYY-MM-DD). 캘린더 since 계산용 (#367).
   const d = new Date(Date.now() - (n || 0) * 86400000);
@@ -228,6 +251,7 @@ function _applyBookOverrides(ub) {
 // #871 Vite 회귀 픽스 — datastore-supabase.js 가 cross-file 로 호출(옛 loadBabel 전역). 모듈 스코프라 전역 노출 필요.
 window._today = _today; window._dayDiff = _dayDiff; window._applyBookOverrides = _applyBookOverrides;
 window._nextStreak = _nextStreak; window._isStreakBroken = _isStreakBroken; // 체크인 세리머니/XP 가 스트릭 규칙 공유(#927)
+window._streakRepairStatus = _streakRepairStatus; window._todayMinus = _todayMinus; // 스트릭 복구 정책 SSOT(#938) — 양 어댑터 공유
 function _allSentences(s) {
   const out = [];
   s.user_books.forEach(ub => {
@@ -599,6 +623,30 @@ const DataStore = {
     markToday() { try { localStorage.setItem('rg_resurface_last', _today()); } catch (e) {} },
   },
 
+  /* 마일스톤 회고 노출 게이트 (#938, A2, nest.md §5.4) — 기기 로컬 빈도 가드(서버 저장 불필요, 양 어댑터 동일).
+     절제 규칙(피로 방지): ① 같은 마일스톤 key 는 1회만 ② 하루 최대 1회(여러 마일스톤이 한 세션에 겹쳐도 1개만).
+     key 예: 'complete:<ubId>', 'streak:7', 'streak:30', 'castle:2'. rg_milestone_seen(JSON map) + rg_milestone_last(YYYY-MM-DD). */
+  milestone: {
+    _seen() { try { return JSON.parse(localStorage.getItem('rg_milestone_seen') || '{}') || {}; } catch (e) { return {}; } },
+    // 이 마일스톤을 지금 회고로 띄워도 되는가 — 미열람 key + 오늘 아직 미노출.
+    shouldShow(key) {
+      if (!key) return false;
+      try {
+        if (this._seen()[key]) return false;                       // 이미 본 마일스톤
+        if (localStorage.getItem('rg_milestone_last') === _today()) return false; // 오늘 이미 1회 노출
+        return true;
+      } catch (e) { return false; }
+    },
+    // 노출 확정 — key 영구 마킹 + 오늘 날짜 기록(하루 1회 캡).
+    markShown(key) {
+      try {
+        const seen = this._seen(); if (key) seen[key] = _today();
+        localStorage.setItem('rg_milestone_seen', JSON.stringify(seen));
+        localStorage.setItem('rg_milestone_last', _today());
+      } catch (e) {}
+    },
+  },
+
   /* 스트릭 ──────────────────────────────────────── */
   streak: {
     get() {
@@ -620,6 +668,27 @@ const DataStore = {
         if (st.current > (st.longest || 0)) st.longest = st.current;
         st.last_check_in_date = today;
         return { ...st };
+      });
+    },
+    // 스트릭 복구 가능 여부 (#938, systems.md §6.1) — UI가 복구 카드 노출/문구를 결정. 저장값(raw current) 기준.
+    repairStatus() {
+      return localStorageAdapter.mutate(s => _streakRepairStatus(s.streak, _today()));
+    },
+    // '하루 만회' 실행 (#938) — 깨진 스트릭을 끊김 직전 값으로 되살리고 last_check_in_date 를 '어제'로.
+    // 주 1회·조건 없음(_streakRepairStatus 게이트). 오늘 체크인하면 +1 로 자연스럽게 이어진다.
+    // 반환: { ok, streak(복구 후 행), lostStreak, reason }. 불가 시 ok:false + 사유.
+    repair() {
+      const today = _today();
+      return localStorageAdapter.mutate(s => {
+        const status = _streakRepairStatus(s.streak, today);
+        if (!status.canRepair) return { ok: false, reason: status.reason, cooldownDays: status.cooldownDays, streak: { ...s.streak } };
+        const st = s.streak;
+        // 끊김 직전 값 보존 + 어제로 세팅(오늘 체크인 시 _nextStreak 가 +1). longest 도 안전하게 유지.
+        st.current = Math.max(1, status.lostStreak);
+        if (st.current > (st.longest || 0)) st.longest = st.current;
+        st.last_check_in_date = _todayMinus(1);
+        st.last_repair_date = today;   // 주 1회 쿨다운 기준
+        return { ok: true, reason: 'repaired', lostStreak: st.current, streak: { ...st } };
       });
     },
   },

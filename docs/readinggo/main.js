@@ -22,6 +22,7 @@ import './js/search.js';
 import './js/ocr-crop-overlay.js';
 import './js/batch-quote-import.js';
 import './js/ceremony.js';
+import './js/milestone-recap.js';
 import './js/nest.js';
 import './js/companion.js';
 import './js/social.js';
