@@ -340,21 +340,14 @@ const SearchResultItem = ({ book, onClick }) => {
         (e.currentTarget.style.background = 'transparent')
       }
     >
-      {/* 책 표지 */}
-      <img
-        src={book.cover_url}
-        alt={book.title}
-        style={{
-          width: 48,
-          height: 64,
-          objectFit: 'cover',
-          borderRadius: 4,
-          flexShrink: 0,
-        }}
-        onError={(e) => {
-          e.currentTarget.style.background = 'var(--line)';
-          e.currentTarget.src = '';
-        }}
+      {/* 책 표지 — 공용 BookCover: 로드 실패 시 제목·저자 타이포 placeholder(raw img 깨진 회색박스 폴백 정리, 표지 렌더 통일) */}
+      <window.BookCover
+        title={book.title}
+        author={book.author}
+        cover={book.cover_url}
+        fb={book.fb}
+        radius={4}
+        style={{ width: 48, height: 64, flexShrink: 0 }}
       />
 
       {/* 정보 */}

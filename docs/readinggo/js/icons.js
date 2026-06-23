@@ -108,7 +108,7 @@ function SparrowMark({ size = 40, style }) {
       <circle cx="23.5" cy="25.5" r="12.5" fill="#3FD17F" />
       <path d="M21 42 Q31 51.5 45 45.5 Q40 51 30 51 Q22 49 19 43.5 Z" fill="#DFF6EA" />
       <path d="M31 31.5 Q42 30.5 49 39.5 Q40 43.5 32 40.5 Q27 35.5 31 31.5 Z" fill="#2EB867" />
-      <path d="M12.5 24 L22 21.5 L22 28.5 Z" fill="#FF8A3D" />
+      <path d="M7 25 L17 22 L17 28 Z" fill="#FF8A3D" />
       <circle cx="20.5" cy="24" r="3.4" fill="#2A2D33" />
       <circle cx="21.7" cy="22.8" r="1.15" fill="#FFFFFF" />
     </svg>
