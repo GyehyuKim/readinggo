@@ -2,22 +2,42 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=resizes-content" />
 <title>ReadingGo — 하루 한 문장, 책장이 자란다</title>
 <!-- 참새 앱 아이콘 (#785) — SVG 벡터 파비콘(모든 DPI 선명) -->
 <link rel="icon" type="image/svg+xml" href="assets/sparrow.svg" />
 <link rel="apple-touch-icon" href="assets/sparrow.svg" />
 <script>
-    /* 모바일 실측 뷰포트 높이(#739) — iOS Safari 등에서 100dvh 가 주소창 표시/전환 중
-       실제 보이는 높이(visual viewport)와 어긋나 .app/.stage 가 화면을 넘고 하단 탭/콘텐츠가
-       잘리던 문제. window.innerHeight 를 CSS 변수 --app-h 로 직접 주입(폴백은 dvh). */
+    /* 모바일 실측 뷰포트 높이(#739) + 키보드 시 헤더 고정(#917)
+       — iOS Safari 등에서 100dvh 가 주소창 표시/전환 중 실제 보이는 높이(visual viewport)와
+         어긋나 .app/.stage 가 화면을 넘고 하단 탭/콘텐츠가 잘리던 문제(#739).
+       — 추가로(#917): 모바일에서 입력창 포커스로 가상 키보드가 올라오면, 브라우저가 레이아웃
+         뷰포트(문서) 자체를 위로 스크롤해 포커스를 노출하면서 상단 헤더(.topbar)가 화면 밖으로
+         밀려 사라졌다. 베타 피드백(조기원님): "입력할 때 헤더가 고정됐으면".
+       대응:
+         1) --app-h 를 visualViewport.height(키보드 제외 실측) 우선으로 주입 → .app 이 가시영역에
+            맞춰 줄고, 내부 .main 만 스크롤되어 입력창이 키보드 위로 노출된다.
+         2) <body> 자체를 position:fixed 로 스크롤 불가로 잠그고, visualViewport.offsetTop 만큼
+            .stage 를 역보정(translateY) → 브라우저가 문서를 밀어 올려도 셸(헤더 포함)이 가시영역 상단에 고정.
+       interactive-widget=resizes-content(viewport meta)와 함께 Android/iOS 양쪽 거동을 맞춘다. */
     (function () {
       var d = document.documentElement;
-      function setH() { d.style.setProperty('--app-h', window.innerHeight + 'px'); }
-      setH();
-      window.addEventListener('resize', setH, { passive: true });
-      window.addEventListener('orientationchange', setH);
-      if (window.visualViewport) window.visualViewport.addEventListener('resize', setH, { passive: true });
+      var vv = window.visualViewport;
+      function apply() {
+        var h = (vv && vv.height) ? vv.height : window.innerHeight;
+        d.style.setProperty('--app-h', h + 'px');
+        /* 키보드가 레이아웃 뷰포트를 밀어 올린 만큼(offsetTop) 셸을 역보정해 상단에 다시 고정.
+           키보드 없을 땐 offsetTop=0 → 보정 없음. */
+        var off = (vv && vv.offsetTop) ? vv.offsetTop : 0;
+        d.style.setProperty('--vv-offset', off + 'px');
+      }
+      apply();
+      window.addEventListener('resize', apply, { passive: true });
+      window.addEventListener('orientationchange', apply);
+      if (vv) {
+        vv.addEventListener('resize', apply, { passive: true });
+        vv.addEventListener('scroll', apply, { passive: true });
+      }
     })();
 </script>
 <script>
@@ -92,6 +112,10 @@
 
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
+/* 키보드 시 헤더 고정(#917) — 문서(레이아웃 뷰포트) 자체를 스크롤 불가로 잠근다.
+   body 를 가시영역 전체에 고정하면, 가상 키보드가 올라와도 브라우저가 문서를 밀어 올려
+   상단 헤더(.topbar)를 화면 밖으로 보낼 여지가 없다. 스크롤은 .main(overflow:auto)만 담당. */
+html{ overflow: hidden; }
 body{
   font-family: 'Moneygraphy Rounded','Noto Sans KR',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   color: var(--ink);
@@ -99,6 +123,9 @@ body{
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.2px;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
 }
 button{font-family:inherit;cursor:pointer;}
 input,textarea{font-family:inherit;}
@@ -140,6 +167,9 @@ input,textarea{font-family:inherit;}
   background:
     radial-gradient(900px 480px at 50% -200px, #DDF6E7 0%, transparent 60%),
     var(--paper);
+  /* 키보드가 문서를 밀어 올린 만큼 역보정해 헤더를 가시영역 상단에 다시 고정(#917).
+     키보드 없을 땐 --vv-offset=0 → translate 0(영향 없음). */
+  transform: translateY(calc(-1 * var(--vv-offset, 0px)));
 }
 .app{
   width: 100%;
