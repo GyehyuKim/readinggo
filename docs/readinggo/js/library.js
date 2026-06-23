@@ -549,8 +549,8 @@ function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
                 ))}
               </div>
             ) : (
-              <div style={{textAlign:'center', padding:'24px 16px', background:'var(--card)', border:'1.5px dashed var(--line)', borderRadius:'var(--r-md)', color:'var(--ink-3)', fontSize:13, fontWeight:700}}>
-                저장된 문장·감상이 없습니다.
+              <div style={{textAlign:'center', padding:'24px 16px', background:'var(--card)', border:'1.5px dashed var(--line)', borderRadius:'var(--r-md)', color:'var(--ink-3)', fontSize:13, fontWeight:700, lineHeight:1.6}}>
+                아직 남긴 문장·감상이 없어요.<br />읽으며 만난 한 줄을 남겨보세요.
               </div>
             )}
           </div>
