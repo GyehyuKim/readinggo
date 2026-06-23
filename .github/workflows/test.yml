@@ -105,6 +105,35 @@ jobs:
             exit 1
           fi
 
+  spec-coverage:
+    name: spec-coverage (코드 변경 ↔ spec 동반 강제)
+    if: github.event_name == 'pull_request'   # PR 에만 적용
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # docs/readinggo/js/** 를 바꿨으면 spec(docs/readinggo/specs/**) 변경 또는 PR 본문 "no-spec: <사유>"
+      # 가 있어야 통과. spec-first mandate 의 자동 탐지 — honor-system 을 끝내고 spec 스킵을 의식적·가시적
+      # 행위로 만든다(silent 드리프트 방지). 순수 시각·카피·CI 폴리시는 "no-spec: <사유>"로 명시 면제.
+      - name: Require spec change or no-spec rationale
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          JS=$(printf '%s\n' "$CHANGED" | grep -E '^docs/readinggo/js/.*\.(js|mjs)$' || true)
+          SPEC=$(printf '%s\n' "$CHANGED" | grep -E '^docs/readinggo/specs/.*\.md$' || true)
+          if [ -z "$JS" ]; then echo "✅ docs/readinggo/js 변경 없음 — spec 불필요"; exit 0; fi
+          if [ -n "$SPEC" ]; then echo "✅ 코드 변경에 spec 동반"; exit 0; fi
+          if printf '%s' "$PR_BODY" | grep -qiE 'no-spec:[[:space:]]*[^[:space:]]'; then
+            echo "✅ no-spec 사유 명시(폴리시/CI 등 spec 불필요)"; exit 0
+          fi
+          echo "::error::docs/readinggo/js 를 바꿨는데 spec(docs/readinggo/specs)도 'no-spec: <사유>'도 없습니다. 동작 변경이면 해당 spec(.md)을 같이 갱신하고, 순수 시각·카피·CI 폴리시면 PR 본문에 'no-spec: <사유>'를 넣어주세요 (CONTRIBUTING §4.1 — spec-first)."
+          echo "--- spec 없이 바뀐 js ---"; printf '%s\n' "$JS"
+          exit 1
+
   migrations:
     name: migrations (Supabase 마이그레이션 적용 검증)
     runs-on: ubuntu-latest
