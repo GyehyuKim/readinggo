@@ -9,6 +9,13 @@
   const cfg = window.RG_CONFIG || {};
   let _client = null;
 
+  // 네이티브 OAuth 딥링크(#968). 네이티브 WebView 안에서 redirectTo=origin 은 https://localhost 라
+  // 구글 콜백이 앱으로 못 돌아오고 외부 브라우저에 멈춘다. 네이티브일 때만 커스텀 스킴으로 복귀.
+  const NATIVE_REDIRECT = 'com.readinggo.app://login-callback';
+  function isNative() {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  }
+
   function client() {
     if (_client) return _client;
     if (!window.supabase || !cfg.SUPABASE_URL || !cfg.SUPABASE_PUBLISHABLE_KEY) {
@@ -16,7 +23,9 @@
       return null;
     }
     _client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      // flowType: 'pkce' — 네이티브 딥링크 복귀 시 ?code= 를 exchangeCodeForSession 으로 교환(#968).
+      // 웹은 detectSessionInUrl 가 같은 ?code= 를 페이지 로드 때 자동 처리(기존 동작 유지).
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
     });
     return _client;
   }
@@ -32,6 +41,21 @@
     async signInWithGoogle() {
       const c = client();
       if (!c) throw new Error('Supabase 미설정');
+      // 네이티브(#968): 커스텀 스킴으로 복귀 + 인앱 브라우저(Custom Tab)로 열기. skipBrowserRedirect 로
+      // supabase-js 의 자동 location 이동을 막고, 받은 url 을 CapBrowser 가 연다. 복귀는 appUrlOpen 리스너.
+      if (isNative()) {
+        const { data, error } = await c.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: NATIVE_REDIRECT,
+            skipBrowserRedirect: true,
+            queryParams: { prompt: 'select_account' },
+          },
+        });
+        if (error) throw error;
+        if (data && data.url && window.CapBrowser) await window.CapBrowser.open({ url: data.url });
+        return data;
+      }
       return c.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -104,4 +128,31 @@
       return () => { try { data.subscription.unsubscribe(); } catch (e) {} };
     },
   };
+
+  // 네이티브 OAuth 복귀(#968): 인앱 브라우저가 com.readinggo.app://login-callback?code=... 로 돌아오면
+  // appUrlOpen 이벤트로 받아 code 를 세션으로 교환하고 브라우저를 닫는다. 교환 성공 시 onAuthStateChange
+  // 가 자동 발화 → 앱이 로그인 상태로 갱신(별도 네비게이션 불필요). 웹/비네이티브에선 no-op.
+  function initNativeAuth() {
+    if (!isNative() || !window.CapApp) return;
+    window.CapApp.addListener('appUrlOpen', async (event) => {
+      const url = (event && event.url) || '';
+      if (url.indexOf('login-callback') === -1) return;
+      const c = client();
+      try {
+        const m = url.match(/[?&]code=([^&]+)/);
+        const code = m ? decodeURIComponent(m[1]) : null;
+        if (code && c) {
+          const { error } = await c.auth.exchangeCodeForSession(code);
+          if (error) console.warn('[RG_SB] exchangeCodeForSession 실패:', error.message);
+        } else {
+          console.warn('[RG_SB] login-callback 에 code 없음:', url);
+        }
+      } catch (e) {
+        console.warn('[RG_SB] 네이티브 OAuth 복귀 처리 실패:', e);
+      } finally {
+        try { if (window.CapBrowser) await window.CapBrowser.close(); } catch (e) {}
+      }
+    });
+  }
+  initNativeAuth();
 })();
