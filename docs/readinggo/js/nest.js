@@ -255,15 +255,13 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   // 빠른 기록 (#462) — 홈 상시 입력 폼에서 페이지/한 문장을 한 번에 체크인.
   // handleCheckin 단일 경로 재사용 → 스트릭·XP·세리머니·문장 영속(app onCheckin)·companion(#438) 보존.
   // 빠른입력 OCR (#498) — Upstage OCR + solar-pro3 → quickText 프리필(원하는 부분만 남기고 저장).
+  // #939: 공유 헬퍼 window.ocrExtractSentence 로 호출 단일화(온보딩 '사진으로 시작'과 동일 경로). 토스트·busy·tracking 은 여기서.
   const runOcrQuick = (file) => {
     if (!file || quickOcrBusy) return;
     if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
     setQuickOcrBusy(true);
     showToast('📷 사진에서 글자를 읽는 중…');
-    const fd = new FormData();
-    fd.append('document', file, file.name || 'page.jpg');
-    fetch('/api/ocr', { method: 'POST', body: fd })
-      .then((r) => r.json())
+    Promise.resolve((window.ocrExtractSentence ? window.ocrExtractSentence(file) : Promise.resolve({ text: '', error: 'unavailable' })))
       .then((d) => {
         if (d && d.text) {
           setQuickText((cur) => (cur && cur.trim() ? cur.trim() + '\n' + d.text : d.text).slice(0, 1000));
@@ -271,11 +269,12 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
           rgTrack('ocr_extracted', { book_id: nestState.book.id, chars: d.text.length });
         } else if (d && d.empty) {
           showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
+        } else if (d && d.error === 'network') {
+          showToast('추출 실패 — 네트워크를 확인해요');
         } else {
           showToast('추출 실패 — 잠시 후 다시 시도해요');
         }
       })
-      .catch(() => showToast('추출 실패 — 네트워크를 확인해요'))
       .finally(() => setQuickOcrBusy(false));
   };
 
