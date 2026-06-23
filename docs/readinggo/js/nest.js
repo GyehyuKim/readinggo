@@ -442,6 +442,49 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   // #610: 자체 좋아요/삭제 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 '이 책 한 문장' 카드).
   //   favIds 는 SentenceActions fav 초기값 시드용으로만 유지(claps.list 로 로드).
 
+  // 이 책의 다른 한 문장 (#926, 콜드스타트 사회적 증거) — 내 문장 < 3개일 때만 타인 공개 문장을
+  //   좋아요순으로 노출(읽기전용). 책 정보 모달(book-info-modal.js)의 '이 책의 한 문장' 섹션을 미러:
+  //   byBook(타인 전용·비UUID/게스트→[]) + SentenceCard(noBlind, 짹·대화 없음). 내 문장이 쌓이면(≥3)
+  //   자동 소멸 → 콜드스타트 홈 밀도 보호. 0건+시드 미충전이면 섹션 통째 생략(빈 섹션 금지).
+  const _coldStart = bookQuotes.length < 3;
+  const [othersQuotes, setOthersQuotes] = _useState([]); // 타인 공개 문장(좋아요순 ~8건), 게스트/빈 → []
+  const [othersResolved, setOthersResolved] = _useState(false); // byBook 응답 도착 여부(시드 트리거 게이트, #774)
+  const [othersSeeding, setOthersSeeding] = _useState(false); // 마중물 시드 큐 처리 대기(#774) — '모으는 중' placeholder 게이트
+  _useEffect(() => {
+    if (!_coldStart) { setOthersQuotes([]); setOthersResolved(false); setOthersSeeding(false); return; }
+    let alive = true;
+    setOthersResolved(false);
+    Promise.resolve((DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(nestState.book.id, { limit: 8, sort: 'likes' }) : [])
+      .then((rows) => { if (alive) { setOthersQuotes(Array.isArray(rows) ? rows : []); setOthersResolved(true); } })
+      .catch(() => { if (alive) { setOthersQuotes([]); setOthersResolved(true); } });
+    return () => { alive = false; };
+  }, [nestState.book.id, _coldStart]);
+  // 마중물 시드 (#774, 큐 방식) — 타인 문장이 0건(빈 책)이면 /api/seed 로 큐잉 트리거 후 byBook 을 짧게 폴링.
+  //   collector(맥미니)가 예스24 발췌를 여러 NPC 명의로 적재하면 폴링이 잡아 노출(book-info-modal.js 동일 패턴).
+  //   deps 는 othersResolved/_coldStart 만 — 폴링이 setOthersQuotes 로 갱신하므로 결과를 deps 에 넣으면 무한 재실행.
+  _useEffect(() => {
+    if (!_coldStart || !othersResolved || othersQuotes.length > 0 || !nestState.book.title) { setOthersSeeding(false); return; }
+    let alive = true;
+    let timer = null;
+    setOthersSeeding(true);
+    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: nestState.book.title, author: nestState.book.author || '', isbn: nestState.book.isbn || '', have: 0 }) }).catch(() => {});
+    const MAX = 5, DELAY = 4000;
+    let tries = 0;
+    const poll = () => {
+      if (!alive) return;
+      tries += 1;
+      Promise.resolve((DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(nestState.book.id, { limit: 8, sort: 'likes' }) : [])
+        .then((rows) => {
+          if (!alive) return;
+          if (Array.isArray(rows) && rows.length) { setOthersQuotes(rows); setOthersSeeding(false); return; }
+          if (tries < MAX) timer = setTimeout(poll, DELAY); else setOthersSeeding(false);
+        })
+        .catch(() => { if (alive) { if (tries < MAX) timer = setTimeout(poll, DELAY); else setOthersSeeding(false); } });
+    };
+    timer = setTimeout(poll, DELAY);
+    return () => { alive = false; if (timer) clearTimeout(timer); };
+  }, [nestState.book.id, _coldStart, othersResolved]);
+
   // 활성 책 없음(신규/미등록): 데모책 대신 '책 등록' 온보딩 — 유령 책 체크인(영속 실패) 방지.
   if (!nestState.book || !nestState.book.id) {
     return (
@@ -687,6 +730,42 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
             </window.QuoteCard>
           );
         })
+      )}
+
+      {/* 이 책의 다른 한 문장 (#926, 콜드스타트 사회적 증거) — 내 문장 < 3개일 때만 노출(_coldStart).
+          타인 공개 문장 좋아요순 ~8건, 읽기전용. book-info-modal.js '이 책의 한 문장' 섹션 미러
+          (SentenceCard noBlind, 짹·대화 없음). 0건+시드 미충전이면 섹션 통째 생략(빈 섹션 금지).
+          내 문장이 쌓이면(≥3) 자동 소멸 → 콜드스타트 홈 밀도 보호. */}
+      {_coldStart && othersQuotes.length > 0 && window.SentenceCard && (
+        <div>
+          <div className="section-head">
+            <h3>이 책의 다른 한 문장</h3>
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5, marginBottom: 10 }}>
+            다른 사람들은 이 책에서 이런 문장을 남겼어요.
+          </div>
+          {othersQuotes.map((s) => {
+            const u = s.user || {};
+            const _dec = window.decodeEntities || ((x) => x); // nest.js 스코프엔 alias 없음 → window 참조(미정의 폴백)
+            return (
+              <window.SentenceCard key={s.id} bookId={nestState.book.id} noBlind
+                item={{ id: s.id, q: _dec(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: <window.SparrowMark size={20} />,
+                        page: s.page, time: '', claps: s.clapCount || 0, bookId: nestState.book.id, bookTitle: '', isMine: false }} />
+            );
+          })}
+        </div>
+      )}
+      {/* 마중물 시드 (#774, 큐 방식) — 타인 문장이 0건이면 collector 가 예스24 발췌를 여러 NPC 명의로
+          채우는 중. 채워지면 위 섹션에 노출된다. 여기선 진행 표시만(채우는 동안만, 빈 섹션 금지). */}
+      {_coldStart && othersQuotes.length === 0 && othersSeeding && (
+        <div>
+          <div className="section-head">
+            <h3>🌱 이웃의 문장</h3>
+          </div>
+          <div style={{ background: 'var(--card)', border: '1.5px dashed var(--line)', borderRadius: 'var(--r-md)', padding: 14, fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+            🌱 이웃의 문장을 모으는 중이에요… 둘러보는 동안 채워둘게요.
+          </div>
+        </div>
       )}
 
 
