@@ -16,6 +16,7 @@
     "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.4.1",
     "@capacitor/ios": "^8.4.1",
+    "@capgo/capacitor-updater": "^8.49.7",
     "@supabase/supabase-js": "^2.45.0",
     "fuse.js": "^7.0.0",
     "html-to-image": "^1.11.11",

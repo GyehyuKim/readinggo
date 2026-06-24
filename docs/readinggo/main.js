@@ -52,6 +52,15 @@ async function boot() {
   }
   try {
     await import('./js/app.js');   // 최상위 App + createRoot 마운트
+
+    // OTA (#876): 부팅 성공 알림 — 미호출 시 Capgo 가 번들을 깨진 걸로 보고 자동 롤백. 네이티브에서만.
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor?.isNativePlatform?.()) {
+        const { CapacitorUpdater } = await import('@capgo/capacitor-updater');
+        await CapacitorUpdater.notifyAppReady();
+      }
+    } catch (e) { console.warn('[OTA] notifyAppReady 실패', e); }
   } catch (err) {
     console.error('[ReadingGo] 로드 실패:', err);
     const root = document.getElementById('root');
