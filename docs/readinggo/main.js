@@ -26,6 +26,7 @@ import './js/ceremony.js';
 import './js/milestone-recap.js';
 import './js/nest.js';
 import './js/companion.js';
+import './js/co-reading.js';
 import './js/social.js';
 import './js/admin-dashboard.js';
 import './js/book-detail-modal.js';

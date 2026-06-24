@@ -1,6 +1,9 @@
 /* =========================================================
    ReadingGo — social.js
-   소셜 탭: 인기 책 + 전체 공개 한 문장 피드 (Supabase 실데이터, §5.7)
+   '함께' 탭 (내부 키 social — 코드 호환 유지, co-reading.md §2.1):
+     ① 발견 = 인기 책 + 전체 공개 한 문장 피드 + 유저 찾기 (§5.7 / feed.md)  ← 입구
+     ② 방   = 같이읽기 룸 (RoomsView, co-reading.js)                        ← 목적지
+   상단 세그먼트로 두 레이어 전환. 기본 = 발견(신규/게스트는 입구가 먼저).
    ========================================================= */
 
 function rgRelTime(iso) {
@@ -13,7 +16,31 @@ function rgRelTime(iso) {
   return Math.floor(sec / 86400) + '일 전';
 }
 
+// '함께' 탭 셸 — ① 발견 / ② 방 세그먼트 (co-reading.md §4.1). 기본=발견.
 function SocialView({ state }) {
+  const { useState } = React;
+  const [layer, setLayer] = useState('discover'); // 'discover' | 'rooms'
+  return (
+    <section className="view active">
+      <div className="rg-together-seg" style={{ display: 'flex', gap: 6, padding: '12px 16px 10px' }}>
+        {[['discover', '① 발견'], ['rooms', '② 방']].map(([id, label]) => (
+          <button key={id} onClick={() => setLayer(id)}
+            style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: layer === id ? 'none' : '1px solid var(--line)',
+              background: layer === id ? 'var(--ink)' : 'transparent', color: layer === id ? '#fff' : 'var(--ink-2)',
+              fontSize: 13.5, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.2px' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {layer === 'rooms'
+        ? (window.RoomsView ? <window.RoomsView /> : null)
+        : <DiscoverLayer state={state} />}
+    </section>
+  );
+}
+
+// ① 발견 레이어 = 기존 피드 화면 그대로 (인기 책·한 문장 피드·유저 찾기, feed.md §5.7 보존).
+function DiscoverLayer({ state }) {
   const { useState, useEffect } = React;
   const [tab, setTab] = useState('recommend');  // 'following' | 'recommend' (#789: '최근' 탭 제거, 추천 메인화)
   const [items, setItems] = useState(null);  // null=로딩, []=빈
@@ -128,7 +155,7 @@ function SocialView({ state }) {
   );
 
   return (
-    <section className="view active">
+    <React.Fragment>
       {/* ① 지금 인기 있는 책 Top5 (§5.7, #525, #578) — 상단 배치. 탭 → 책 상세(BookInfoModal). 비어있으면 미표시 */}
       {top3.length > 0 && (
         <div style={{ padding: '0 16px 4px' }}>
@@ -214,7 +241,7 @@ function SocialView({ state }) {
       ) : (
         <div style={{ padding: '0 16px' }}>{items.map((it, i) => (<SentenceCard key={it.id || i} item={it} bookId={it.bookId} />))}</div>
       )}
-    </section>
+    </React.Fragment>
   );
 }
 

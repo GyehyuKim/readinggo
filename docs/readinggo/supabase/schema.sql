@@ -161,14 +161,20 @@ create table if not exists public.sentence_bookmarks (   -- DEPRECATED (#641): c
   unique (user_id, sentence_id)
 );
 
--- 마을(village) — 스키마 owner=backend(계휴), 기능 UI=윤지(#140)
+-- 마을(village)/방(room, co-reading) — 스키마 owner=backend(계휴). 같은 책 그룹.
+-- capacity/status 는 16_village_board.sql, password/invite_token 은 34_co_reading_rooms.sql 에서 추가됨
+-- (이 정의는 신규 프로젝트용 통합 참조 — 마이그레이션 파일이 적용 진실원천).
 create table if not exists public.villages (
   id            uuid primary key default gen_random_uuid(),
   book_id       uuid not null references public.books(id),
   name          text not null,
   description   text,
   visibility    text not null default 'public',     -- 'public' | 'private'
-  invite_code   text unique,
+  invite_code   text unique,                         -- 6자리 사람용 코드
+  invite_token  text unique,                         -- 토큰 URL 입장 (co-reading §5.2)
+  password      text,                                -- 비공개 방 선택적 비밀번호 (co-reading §5.2)
+  capacity      int,                                 -- 정원(선택, 최소 2)
+  status        text not null default 'active',
   created_by    uuid not null references public.users(id) on delete cascade,
   created_at    timestamptz not null default now()
 );
