@@ -69,7 +69,10 @@
     /* 인증 — supabase-client.js(RG_SB) 위임 */
     auth: {
       currentUser() { return window.RG_SB.currentUser(); },
+      signInWithOAuth(provider) { return window.RG_SB.signInWithOAuth(provider); }, // #937 provider 일반화
       signInWithGoogle() { return window.RG_SB.signInWithGoogle(); },
+      signInWithKakao() { return window.RG_SB.signInWithKakao(); },   // #937
+      signInWithApple() { return window.RG_SB.signInWithApple(); },   // #937
       signOut() { return window.RG_SB.signOut(); },
     },
 

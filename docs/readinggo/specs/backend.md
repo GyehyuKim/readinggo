@@ -5,6 +5,7 @@
 > **v7.1 갱신 (2026-06-04, QA 2차)**: `is_private` 재도입 + `note_private`, **DB CHECK 제약**(`04_constraints.sql`), 닉네임 규칙 `{2,20}`, 이메일 **autoconfirm**(베타 한정). [decisions §8.1](./meta/decisions.md).
 > **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, `06_privacy_v2.sql`), `admin.stats()`·`claps.isMine`·`friends.unfollow/isFollowing`·`users.public*`·`sessions.calendar` 계약 추가, 마을 Supabase 연동·이메일 브랜딩. [decisions §8.2/§8.3](./meta/decisions.md).
 > **v8 갱신 (2026-06-24, #968)**: **네이티브 OAuth 딥링크**. Capacitor 채택(§7.1 모바일/네이티브 갱신)으로 네이티브 앱 구글 로그인이 외부 브라우저(`https://localhost` 복귀)에 멈추던 문제 해결 — 네이티브일 때 `redirectTo=com.readinggo.app://login-callback`(커스텀 스킴) + PKCE + `appUrlOpen` 복귀. 웹 분기 무변경.
+> **v9 갱신 (2026-06-24, #937)**: **카카오 소셜 로그인 추가** + **애플**(iOS·웹만 노출, Android 제외) + **네이버 보류**. `signInWithGoogle`을 `signInWithOAuth(provider)`로 일반화 — 같은 네이티브 딥링크 경로(#968)를 모든 provider 가 공유. provider 등록(Supabase 대시보드 + Kakao Developers + Apple Developer)은 §7.1 모바일/네이티브 끝의 체크리스트 참조.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -16,7 +17,7 @@
 | 항목 | Phase 0 (정적 웹 데모) | Phase 1+ (Supabase) |
 |---|---|---|
 | 데이터 저장 | `localStorage` (키 `rg_v41`) + Supabase `books` 카탈로그 (#490; 구 정적 TSV 제거 #972) | PostgreSQL + RLS |
-| 인증 | 없음 (가짜 세션 localStorage) | Supabase Auth (Google OAuth) |
+| 인증 | 없음 (가짜 세션 localStorage) | Supabase Auth (Google · Kakao · Apple OAuth — #937. 네이버 보류) |
 | 배치 | 없음 (날짜 시뮬레이터로 대체, §발표용) | pg_cron (UTC 15:00 일일, 월 00:00 주간) |
 | AI 도서 추천 | 하드코딩 추천 시뮬 | **Gemini Flash 무료 티어** + 서버리스 프록시 (§7.9) |
 | 표지 이미지 | 알라딘 CDN URL (`books.cover_url`) | 동일 + Storage 옵션 |
@@ -26,7 +27,12 @@
 
 - **빌드**: 현행 React 18 CDN + Babel standalone 유지 (빌드 도구 없음). Vite 전환은 **PWA 전환 시 재검토** (현재 보류).
 - **배포**: **Cloudflare Workers** — Worker `readinggo`, `https://readinggo.hyuniverse.workers.dev`. (Netlify → Cloudflare 이전 완료, GitHub Pages 폐기.) 재배포: `npx wrangler deploy`.
-- **모바일/네이티브 (v8 갱신)**: **Capacitor 채택** — iOS·Android 앱스토어 셸([iOS-PLAN](../iOS-PLAN.md), Stack Lock). 네이티브 앱 **구글 로그인은 OAuth 딥링크로 복귀**한다(#968): 네이티브 WebView 의 web-origin(`https://localhost`) 복귀는 외부 브라우저에 멈추므로, `isNative()` 일 때 `redirectTo=com.readinggo.app://login-callback`(AndroidManifest 커스텀 스킴 intent-filter) + **PKCE** + 인앱 브라우저(`@capacitor/browser`)로 열고, 복귀는 `@capacitor/app` 의 `appUrlOpen` → `exchangeCodeForSession` → `onAuthStateChange` 자동 발화. **전제: Supabase 대시보드 Auth→URL Configuration→Redirect URLs 에 그 스킴 등록.** 웹 플로우는 `redirectTo=origin` 그대로(분기). 이메일 매직링크 네이티브 복귀는 후속(현재 네이티브는 구글 로그인/게스트 권장). 네이티브 변경이라 OTA 불가 — 새 빌드 필요.
+- **모바일/네이티브 (v8 갱신)**: **Capacitor 채택** — iOS·Android 앱스토어 셸([iOS-PLAN](../iOS-PLAN.md), Stack Lock). 네이티브 앱 **소셜 로그인은 OAuth 딥링크로 복귀**한다(#968, v9 #937 로 provider 일반화): 네이티브 WebView 의 web-origin(`https://localhost`) 복귀는 외부 브라우저에 멈추므로, `isNative()` 일 때 `redirectTo=com.readinggo.app://login-callback`(AndroidManifest 커스텀 스킴 intent-filter) + **PKCE** + 인앱 브라우저(`@capacitor/browser`)로 열고, 복귀는 `@capacitor/app` 의 `appUrlOpen` → `exchangeCodeForSession` → `onAuthStateChange` 자동 발화. **전제: Supabase 대시보드 Auth→URL Configuration→Redirect URLs 에 그 스킴 등록.** 웹 플로우는 `redirectTo=origin` 그대로(분기). 이 경로는 provider 무관(google·kakao·apple 공통). 이메일 매직링크 네이티브 복귀는 후속(현재 네이티브는 소셜 로그인/게스트 권장). 네이티브 변경이라 OTA 불가 — 새 빌드 필요.
+- **소셜 로그인 provider (v9, #937)**: 지원 = **Google · Kakao · Apple**. **네이버는 보류**(Supabase 가 기본 provider 로 미지원 — generic OIDC/커스텀 토큰 교환이 필요해 별도 작업, 지금은 안 만든다). **애플 버튼은 iOS·웹에서만 노출**하고 Android 에선 숨긴다(`Capacitor.getPlatform() !== 'android'`): Google Play 는 "제3자 로그인 제공 시 Apple 로그인도 제공" 의무가 없어 굳이 안 띄운다([iOS-PLAN](../iOS-PLAN.md) Android-first 메모). 반대로 **iOS App Store 가이드라인 4.8** 은 타사 소셜 로그인을 쓰면 Apple 로그인 동등 제공을 요구 → iOS 출시 시 애플 버튼 필수(그래서 코드에 이미 포함, iOS·웹 노출). UI 는 각 provider **브랜드 가이드 색**을 따른다(카카오 `#FEE500`/검정 글씨·말풍선, 애플 검정 버튼/흰 로고) — DESIGN.md 그린 버튼 위계의 명시적 예외(OAuth 버튼은 제공자 규정 우선, 기존 Google 흰색 버튼과 동일 형태로 정렬).
+  - **provider 등록 체크리스트 (코드 외 — 사람이 콘솔에서 1회 설정)**:
+    - **Kakao**: [Kakao Developers](https://developers.kakao.com) 앱 생성 → REST API 키 발급 → 카카오 로그인 활성화 + 동의항목(이메일 등) → **Redirect URI** 에 Supabase 콜백(`https://<project>.supabase.co/auth/v1/callback`) 등록 → Supabase 대시보드 Auth→Providers→**Kakao** enable + REST API 키/Client Secret 입력.
+    - **Apple**: [Apple Developer](https://developer.apple.com)(유료 $99/yr) → App ID + **Services ID** 생성, Sign in with Apple 활성화 → **Return URL** 에 Supabase 콜백 등록 → Sign in with Apple **Key(.p8)** 발급 → Supabase 대시보드 Auth→Providers→**Apple** enable + Services ID·Team ID·Key ID·.p8 입력. (Apple Dev 결제·활성화 대기는 iOS 출시 트랙 — [iOS-PLAN §8](../iOS-PLAN.md).)
+    - **공통**: Supabase Auth→URL Configuration→**Redirect URLs** 에 웹 origin + 네이티브 스킴(`com.readinggo.app://login-callback`) 둘 다 등록(#968).
 - **푸시 알림**: Phase 2 **PWA 전환(웹푸시)** 이후로 후순위. Phase 0/1 은 알림 없음(인앱 토스트 시뮬).
 
 ### 7.2 DataStore 계약 (Phase 0 ↔ Phase 1 이음매) — v7 신설
@@ -48,7 +54,8 @@
 ```
 // 인증 / 프로필 / 설정
 auth.currentUser()                         → User | null     // #646: 클라 인증 판정은 getSession()(로컬 스토리지, 무네트워크). getUser()(매 호출 서버 토큰검증)는 모바일 네트워크 불안정 시 null로 떨어져 로그인 유저가 조용히 게스트(localStorage) 고착 → my_note(대화) 등 데이터 안 보임. uid()도 동일.
-auth.signInWithGoogle()                    → User           // Phase 0: 가짜 세션. #721: signInWithOAuth 에 queryParams `prompt=select_account` 강제 — 미지정 시 브라우저 잔류 Google 세션을 자동 선택해 로그아웃 후 다른 계정 재로그인 불가(signOut 은 Supabase 세션만 정리, accounts.google.com 쿠키 잔류). 매번 계정 선택 화면 노출. #968: 네이티브는 커스텀 스킴 딥링크(`com.readinggo.app://login-callback`)+PKCE+`appUrlOpen` 복귀, 웹은 origin 복귀(§7.1 모바일/네이티브).
+auth.signInWithOAuth(provider)             → User           // v9 #937: 소셜 로그인 일반화. provider ∈ {'google','kakao','apple'}(미지원 값은 throw). 네이티브/웹 분기·딥링크 복귀는 provider 무관 공통(#968). Google 만 queryParams `prompt=select_account`(#721) 부착, kakao/apple 은 미부착.
+auth.signInWithGoogle() / signInWithKakao() / signInWithApple() → User  // 위 signInWithOAuth 의 provider별 얇은 래퍼(기존 호출부 회귀 방지). #721 prompt=select_account 는 Google 한정. #968: 네이티브는 커스텀 스킴 딥링크(`com.readinggo.app://login-callback`)+PKCE+`appUrlOpen` 복귀, 웹은 origin 복귀(§7.1 모바일/네이티브). 애플 버튼 노출은 iOS·웹만(Android 제외, §7.1).
 //   ↳ #822 쓰기 실패·세션 만료 계약: 위 getSession() 로컬 판정 때문에 access_token 만료/무효(서버 401)여도 "로그인됨"으로 표시될 수 있다. 그 상태의 쓰기(myBooks.add·sessions.addToday·sentences.add·activeBook.set 등)는 user_books 행이 안 생기고 read도 빈 결과 → 서재 비고 체크인 'user_book 미해소'. **쓰기 실패는 silent 금지**: `surfaceWriteError()`(app.js)가 ① getUser()(네트워크 토큰검증) → ② refreshSession() 시도 → ③ 그래도 무효면 '세션 만료' 토스트 + 재로그인 화면(RG_login). 세션 유효한 일시 오류는 재시도 안내만.
 //   ↳ #822 체크인 귀속 계약: 등록·활성화로 화면 책을 세팅하는 경로(handleSearchSelectBook·handleActivateUserBook, 그리고 buildStateFromSupabase)는 `appState.book.ubId`(=user_books.id)를 함께 채운다. 체크인은 1순위로 ns.book.ubId 로 user_book 을 해소(없으면 book_id 폴백) → 잘못된 귀속/저장 누락 방지.
 profile.get(userId?)                       → User

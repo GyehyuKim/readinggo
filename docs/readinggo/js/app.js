@@ -214,11 +214,43 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// 소셜 로그인 버튼 (#937) — provider 브랜드 가이드 색을 따른다(DESIGN.md 그린 위계의 예외:
+// OAuth 버튼은 각 제공자 브랜드 규정 우선, 기존 Google 버튼과 동일한 형태·라운딩·폭으로 정렬).
+const SOCIAL_BTN_BASE = {
+  width: '100%', padding: '13px 18px', borderRadius: 14, fontSize: 15, fontWeight: 800,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+};
+const GoogleGlyph = () => (
+  <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+  </svg>
+);
+// 카카오 말풍선 심볼 (단색, 카카오 브랜드 검정 #191919).
+const KakaoGlyph = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path fill="#191919" d="M12 3C6.477 3 2 6.463 2 10.733c0 2.74 1.85 5.146 4.633 6.508-.153.534-.985 3.4-1.018 3.625 0 0-.02.17.09.235.11.065.24.014.24.014.31-.043 3.59-2.345 4.16-2.74.61.086 1.24.131 1.895.131 5.523 0 10-3.463 10-7.733S17.523 3 12 3z"/>
+  </svg>
+);
+// 애플 로고 (단색, 흰색 — 검정 버튼 위).
+const AppleGlyph = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path fill="#fff" d="M17.05 12.04c-.03-2.74 2.24-4.06 2.34-4.12-1.28-1.87-3.27-2.13-3.98-2.16-1.69-.17-3.3.99-4.16.99-.85 0-2.18-.97-3.59-.94-1.85.03-3.55 1.07-4.5 2.72-1.92 3.33-.49 8.26 1.38 10.96.91 1.32 2 2.81 3.42 2.76 1.37-.06 1.89-.89 3.55-.89 1.65 0 2.12.89 3.57.86 1.47-.03 2.41-1.35 3.31-2.68 1.04-1.54 1.47-3.03 1.49-3.1-.03-.02-2.86-1.1-2.89-4.36zM14.4 4.07c.76-.92 1.27-2.2 1.13-3.47-1.09.04-2.41.73-3.19 1.64-.7.81-1.31 2.1-1.15 3.34 1.21.09 2.45-.62 3.21-1.51z"/>
+  </svg>
+);
+
 function LoginScreen({ onLogin, onBack }) {
   const { useState } = React;
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 애플 로그인 노출 게이팅 (#937): iOS 또는 웹에서만. Android(Play)는 '제3자 로그인 시 Apple 의무'
+  // 규칙이 없어 굳이 안 띄운다(iOS-PLAN Android-first 메모). Capacitor 미로드 시엔 웹으로 간주.
+  const platform = (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || 'web';
+  const showApple = platform !== 'android';
+  const social = (provider) => { try { onLogin(provider); } catch (e) { alert('로그인 실패: ' + ((e && e.message) || e)); } };
   const sendLink = async () => {
     const addr = email.trim();
     if (!addr || busy) return;
@@ -239,14 +271,22 @@ function LoginScreen({ onLogin, onBack }) {
         <window.SparrowMark size={54} />
         <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)' }}>Reading<span style={{ color: 'var(--brand)' }}>Go</span></div>
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>지금까지 남긴 기록을<br />계정에 안전하게 간직해요.</div>
-        <button onClick={onLogin} style={{ marginTop: 8, padding: '14px 22px', borderRadius: 14, border: '1.5px solid var(--line)', background: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-          <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-            <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-            <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-            <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
-          </svg> Google로 시작하기
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 300, marginTop: 8 }}>
+          <button onClick={() => social('google')} aria-label="Google로 시작하기"
+            style={{ ...SOCIAL_BTN_BASE, border: '1.5px solid var(--line)', background: '#fff', color: 'var(--ink)', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+            <GoogleGlyph /> Google로 시작하기
+          </button>
+          <button onClick={() => social('kakao')} aria-label="카카오로 시작하기"
+            style={{ ...SOCIAL_BTN_BASE, border: 'none', background: '#FEE500', color: '#191919', cursor: 'pointer' }}>
+            <KakaoGlyph /> 카카오로 시작하기
+          </button>
+          {showApple && (
+            <button onClick={() => social('apple')} aria-label="Apple로 시작하기"
+              style={{ ...SOCIAL_BTN_BASE, border: 'none', background: '#000', color: '#fff', cursor: 'pointer' }}>
+              <AppleGlyph /> Apple로 시작하기
+            </button>
+          )}
+        </div>
         {sent ? (
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.6, background: 'rgba(0,0,0,0.04)', borderRadius: 12, padding: '12px 16px', maxWidth: 300 }}>
             📬 <b>{email.trim()}</b>로 로그인 링크를 보냈어요.<br />메일함에서 링크를 눌러 로그인하세요.
@@ -698,7 +738,7 @@ function App() {
 
   // Phase 1 인증 — 게스트 우선(onboarding.md §4). 로그인은 '저장' 시점에만 요구.
   if (_supa && authUser === undefined) return (<BootSplash text="확인 중..." />);
-  if (showLogin) return (<LoginScreen onLogin={() => window.RG_SB.signInWithGoogle()} onBack={() => setShowLogin(false)} />);
+  if (showLogin) return (<LoginScreen onLogin={(provider) => window.RG_SB.signInWithOAuth(provider || 'google')} onBack={() => setShowLogin(false)} />);
   // 로그인 사용자만 Supabase 데이터 로드 대기. 게스트(authUser===null)는 localStorage 로 즉시 진입.
   if (_supa && authUser && authUser !== 'local' && !dataReady) return (<BootSplash text="불러오는 중..." />);
 

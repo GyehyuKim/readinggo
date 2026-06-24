@@ -30,26 +30,34 @@
     return _client;
   }
 
+  // 지원 OAuth provider (#937 카카오·애플 추가). 네이버는 보류(Supabase 미지원 provider — 별도 처리 필요).
+  const OAUTH_PROVIDERS = { google: 1, kakao: 1, apple: 1 };
+  // prompt=select_account 는 Google 전용 queryParam (#721). 다른 provider 엔 안 보냄(무의미·일부는 거부).
+  function oauthQueryParams(provider) {
+    return provider === 'google' ? { prompt: 'select_account' } : undefined;
+  }
+
   window.RG_SB = {
     client,
     isConfigured() { return !!client(); },
 
-    // 구글 로그인 — OAuth 리디렉트(같은 출처로 복귀). Supabase Auth→Providers→Google + URL Config 필요.
-    // prompt=select_account (#721): 미지정 시 브라우저 잔류 Google 세션을 자동 선택 → 로그아웃 후
-    // 다른 계정 재로그인 불가(signOut 은 Supabase 세션만 정리, accounts.google.com 쿠키 잔류).
-    // 매번 계정 선택 화면을 띄워 계정 전환·추가를 보장.
-    async signInWithGoogle() {
+    // 소셜 로그인 (provider 일반화, #937) — OAuth 리디렉트. Supabase Auth→Providers→<provider> + URL Config 필요.
+    // 네이티브(#968): 커스텀 스킴으로 복귀 + 인앱 브라우저(Custom Tab)로 열기. skipBrowserRedirect 로
+    //   supabase-js 의 자동 location 이동을 막고, 받은 url 을 CapBrowser 가 연다. 복귀는 appUrlOpen 리스너.
+    // 웹: redirectTo=origin, detectSessionInUrl 가 ?code= 자동 처리(기존 동작 유지).
+    // Google: prompt=select_account (#721) — 미지정 시 브라우저 잔류 세션 자동 선택 → 로그아웃 후 계정 전환 불가.
+    async signInWithOAuth(provider) {
       const c = client();
       if (!c) throw new Error('Supabase 미설정');
-      // 네이티브(#968): 커스텀 스킴으로 복귀 + 인앱 브라우저(Custom Tab)로 열기. skipBrowserRedirect 로
-      // supabase-js 의 자동 location 이동을 막고, 받은 url 을 CapBrowser 가 연다. 복귀는 appUrlOpen 리스너.
+      if (!OAUTH_PROVIDERS[provider]) throw new Error('지원하지 않는 로그인 제공자: ' + provider);
+      const qp = oauthQueryParams(provider);
       if (isNative()) {
         const { data, error } = await c.auth.signInWithOAuth({
-          provider: 'google',
+          provider,
           options: {
             redirectTo: NATIVE_REDIRECT,
             skipBrowserRedirect: true,
-            queryParams: { prompt: 'select_account' },
+            ...(qp ? { queryParams: qp } : {}),
           },
         });
         if (error) throw error;
@@ -57,13 +65,18 @@
         return data;
       }
       return c.auth.signInWithOAuth({
-        provider: 'google',
+        provider,
         options: {
           redirectTo: window.location.origin,
-          queryParams: { prompt: 'select_account' },
+          ...(qp ? { queryParams: qp } : {}),
         },
       });
     },
+
+    // provider별 얇은 래퍼 — 기존 호출부(signInWithGoogle) 회귀 방지 + 가독성.
+    signInWithGoogle() { return this.signInWithOAuth('google'); },
+    signInWithKakao() { return this.signInWithOAuth('kakao'); },
+    signInWithApple() { return this.signInWithOAuth('apple'); },
 
     // 이메일 매직링크 — 비밀번호 없이 메일 링크로 로그인. 메일 소유 검증이 곧 confirm
     // 이라 mailer_autoconfirm 무관하게 안전 (#159).
