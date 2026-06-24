@@ -81,10 +81,23 @@
 | §7.2 DataStore 계약 전반 | ✅ | datastore-supabase.js 메서드 표면 일치 |
 | RLS 17테이블·SECURITY DEFINER(search_path+is_admin) | ✅ | /cso 검증 |
 | §7 알라딘(검색≠쪽수, ISBN 보강) | ✅ | aladin.js·worker (#233) |
-| ai.* Gemini · inquiries 자동응답 | ⏳ | stub / 컬럼만(#208) |
+| ai.recommendBooks·extractBook (다음책 추천/추출) | ✅ | Phase 0 하드코딩 시뮬(#946) — data.js `recommendNextBooks`/`extractBookSummary`(L482-555) + 양 어댑터 위임 + book-detail-modal.js L139-149 UI 연결. 실 Gemini는 Phase 1+(§7.9). 구 "⏳ stub"는 #946 머지로 해소 |
+| inquiries 자동 응답(LLM) | ⏳보류 | parking-lot §3(#208) — 컬럼만. 코어 아님, 재개조건 미충족 |
 
 ## design.md — owner 승원
 | 디자인 토큰·컴포넌트 | ⏳ 미심층 | owner 승원 — 토큰(index.html `:root`) vs design.md 대조는 승원이 |
+
+## 신규 스펙 7종 (main 적재, 매트릭스 누락 → 본 PR 추가·실측) — owner 계휴(승원: nest 영역)
+> v8.5 이후 main 에 머지됐으나 매트릭스에 미등록이던 스펙. js/** + worker/index.mjs grep 실측.
+| 스펙 | 상태 | 근거/갭 |
+|---|---|---|
+| **share.md** (한 문장 외부 카드, #651) | ✅ | share-card.js `renderSentenceCardBlob`(htmlToImage)·`shareSentence`(navigator.share→클립보드 폴백)·sentence-card.js 진입. 구현 #670, QA #674/#677 머지 |
+| **barcode-scan.md** (ISBN 스캔 등록, #943) | ✅ | barcode-scan.js `BarcodeScanModal`·`barcodeScanSupported`(BarcodeDetector)·`resolveBookByIsbn`(normalizeIsbn13→books/알라딘 정확매칭)·미지원 폴백(수동검색). search.js 연동 |
+| **integrated-shelf.md** (빈 서가 박멸, #772·#774) | ✅ | ① 능동복원: shelf-import.js→`/api/shelf-import`(worker L559 비전OCR)·library.js 상시 진입점(#832). ② 수동시드: book-info-modal.js L64-96 마중물 큐→`/api/seed`(worker L817)+cron `prewarmSeeds`(L797). align_v7 invariant 락(L156) |
+| **ota.md** (웹 번들 OTA, #876) | ✅코드/⏳번들호스팅 | **스펙·이슈는 "코드 후속"이라 적었으나 이미 구현됨**: main.js L60 `@capgo/capacitor-updater`·package.json·capacitor.config.json + worker `/api/ota`=`otaCheck`(L1204, KV 매니페스트·minNative 게이트) + wrangler.toml `OTA_KV`(L28). 남은 건 R2 번들 호스팅+매니페스트 발행 도구(Phase C, #979 OPEN). ota.md 헤더·#876/#979 트래커가 코드보다 뒤처진 **역드리프트**(스펙 헤더 정합은 owner 후속) |
+| **referral.md** (서비스 외부 공유·referral, #650-B) | ⏳부분 | 보상없는 코드만 동선 ✅(#727 — share-card.js `shareService`, library.js L560). **referral 코드·`?ref=` 귀속·랜딩(§5)·보상(§4.2)은 미구현 — CEO 보상 검토 의존(정상 보류, 신규 이슈 생성 안 함)** |
+| **co-reading.md** (같이읽기 방, #987) | ❌미구현 | 코드 없음(villages/village_members 스키마는 #440 마을 폐기 후 잔존, 재사용 예정). 활성 OPEN 이슈 **#987(P1)·#988(P2)** 가 추적 — 신규 이슈 불필요. byBook '함께 읽은 사람들' 집계는 Phase 1(#496) |
+| **resurface.md** (시간차 되감기, #639) | ✅코어/🅿️확장 | 코어 되감기 ✅(#346/#364 — datastore-supabase.js `resurfaceCandidate` L334·`markResurfaced` L364·1일 게이트 L456). resurface.md 자체는 🅿️보류(확장은 Phase later, 정상) |
 
 ## meta/decisions.md
 결정 이력(§8.0~8.8) — 매칭 기준 컨텍스트. 자체 구현 대상 아님.
@@ -117,3 +130,12 @@
 - **#953 문서화** ✅: 한 문장 카드 렌더 = 공용 `QuoteCard` SSOT(nest.md §5.1, 책장과 단일 컴포넌트).
 - **신규 spec-first**: '이 책의 다른 한 문장'(콜드스타트 사회적 증거, 내 문장 <3일 때 타인 좋아요순 ~6–8) — nest.md §5.1에 코드 전 spec 기재(미구현).
 - **남은 델타-audit 후보**(키워드 spec은 있으나 as-shipped 일치 미검증): 배치OCR #844·일괄입력 #848·계정삭제 #875·export #929·시드UI #828·인기랭킹 #835 — #877식 심층 대조는 별도. (본 PR은 *확인된* stale/zero만 처리.)
+
+---
+**v8.6 갱신 (2026-06-24, #877 심층 재감사 — 신규 스펙 7종 등록 + 델타 후보 전수 검증)**:
+- **계기**: open 이슈가 적어 진행 가시성 낮음(#877 본문). 매트릭스가 v8.5 이후 main 적재 스펙 7종(share·barcode-scan·integrated-shelf·ota·referral·co-reading·resurface)을 **통째로 누락** → 본 PR로 섹션 추가하고 `js/**`+`worker/index.mjs` grep 실측으로 상태 확정(위 "신규 스펙 7종" 표).
+- **#877 본문 알려진 갭 = 전부 구현 확인** ✅: 둥지 1,600 XP 주기(#520/#521, nest.js L23-37·265-282) · 친구찾기 NPC_SEARCH(#250, social.js L20-71·179) · companion 질문품질/평가👍👎/재생성🔄/프리셋(#371/#372/#373/#375 — companion.js + worker `avoid`/`getBookBrief`/`PRESET_TONE` L304-331) · AI 다음책 추천·추출(#946 — Phase 0 시뮬, data.js L482-555 + UI 연결). **이 갭들엔 신규 이슈 불필요(이미 구현)**.
+- **v8.5 델타-audit 후보 6종 전수 검증 = 전부 ✅ shipped**(closed 이슈 + 코드/worker 엔드포인트 대조): 배치OCR #844(`/api/extract-highlights`+book-detail-modal.js L86) · 일괄입력 #848(batch-quote-import.js) · 계정삭제 #875(`/api/delete-account` worker L35) · export #423/#929(profile export) · 시드UI #828(book-info-modal.js+collector) · 인기랭킹 #835(social 랭킹). → 델타 후보 줄 **해소**.
+- **v8.4 stale 정정** 🔧: 구 "AI 다음책 추천/추출 ⏳빈 stub(datastore-supabase.js:1001, UI 미연결 #946)"는 **#946 머지로 해소** — 이제 ✅(시뮬 구현 + book-detail-modal.js UI 연결). backend.md 표의 "ai.* ⏳ stub" 행도 ✅로 분리·정정.
+- **역드리프트 발견(코드가 트래커보다 앞섬)** ⚠️: **OTA(#876)** 가 ota.md 헤더·#876/#979 이슈에선 "코드 후속/미구현"으로 표기되나 **이미 동작 코드 적재**(main.js capgo 플러그인 + worker `otaCheck` + `OTA_KV` 바인딩). 남은 건 R2 번들 호스팅(#979 OPEN). 스펙 헤더 정합은 owner(계휴) 후속.
+- **신규 갭 이슈 = 0건(의도)**: 묻힌 *미추적* 진짜 갭이 없음 — 미구현분은 전부 활성 OPEN 이슈가 이미 추적(#876/#979 OTA · #987/#988 co-reading · #897 배포안전 epic) 하거나 의도적 보류(resurface 확장 #639 · referral 보상 CEO검토 · parking-lot 3건 #126/#191/#208 재개조건 미충족). 추측으로 이슈를 만들지 않음(#877 지침 "확실한 것만").
