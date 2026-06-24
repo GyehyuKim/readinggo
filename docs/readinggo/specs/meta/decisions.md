@@ -331,6 +331,22 @@
 
 ---
 
+### 8.15 결정 (2026-06-24, OTA Live Updates — Capgo 자가호스팅 + beta→prod 수동 승격. 충돌 시 §8.14 위에 **우선**)
+
+> 설치 앱은 빌드 시점 웹 번들을 박제 → 웹 배포가 설치 앱에 미반영. 웹 레이어(JS/HTML/CSS)를 스토어 우회로 갱신하는 OTA 채택. 설계 정본: [`ota.md`](../ota.md), iOS-PLAN [§10.5](../../iOS-PLAN.md).
+
+| 항목 | 결정 |
+|---|---|
+| 메커니즘 | **`@capgo/capacitor-updater` 자가호스팅** (CF Worker `/api/ota` + R2 번들 + KV 매니페스트). Capgo 클라우드·Appflow(2026 종료) 비채택 — 비용 0·데이터 보유·기존 워커 재사용 |
+| 릴리스 전략 ⭐ | **채널 beta·production 2개. main 머지 → beta 자동 publish, beta→production 수동 승격**(`workflow_dispatch`) = 앱판 카나리. 근거: 배포안전(#897) 카나리를 앱 레이어에 적용 |
+| 기각 | iOS-PLAN §10.5 원안 `main→production 자동 + staged %`. prod 자동 노출이 출시 초기엔 위험 → 수동 승격 채택. staged %는 Phase 2 |
+| 범위 경계 | OTA = 웹 번들만. 네이티브(플러그인·매니페스트·코드)는 스토어 빌드. **`minNativeVersion` 게이트**로 구 셸에 신 API 번들 적용 차단(크래시 방지) |
+| 동작 | 백그라운드 다운로드 → 다음 시작 시 적용. checksum 검증. `notifyAppReady()` 미호출 시 **자동 롤백**(Capgo 내장) |
+| Stack Lock | `@capgo/capacitor-updater` = Capacitor 1차 생태계·오픈소스 → **단일 lock 내**. 코드 PR에서 추가 |
+| 상태 | **결정 + spec only(`ota.md`)**. 코드·인프라(플러그인·Worker·R2/KV·GH Action)는 후속 코드 PR |
+
+---
+
 ### v5/v6 결정 이력 (참고 — 충돌 시 §8.0 우선)
 
 | 이슈 | 결정 |
