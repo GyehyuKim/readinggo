@@ -37,9 +37,9 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 ```
 
 - **플러그인**: `@capgo/capacitor-updater` — 오픈소스, **자가호스팅**(Capgo 클라우드 미사용 → 비용 0·데이터 보유·우리 스택 일관). Appflow(`@capacitor/live-updates`)는 2026 종료 예정이라 배제.
-- **번들 저장**: Cloudflare **R2** (`bundles/<version>.zip`).
-- **매니페스트**: Workers **KV** (`channel:beta` / `channel:production` → `{version,url,checksum,minNative}`).
-- **엔드포인트**: 기존 `readinggo` 워커에 **`/api/ota`** 추가.
+- **번들 저장**: 매니페스트 `url` 에 **위임** — 워커는 매니페스트만 보유하고 번들을 직접 서빙하지 않는다(호스팅 source-agnostic). 후보: Cloudflare **R2** 또는 **GitHub Releases**(무료·무설정). ⚠️ R2 는 계정 활성화 필요(2026-06-24 미활성 확인) → **번들 호스팅은 페이즈 C(릴리스 자동화)에서 결정**.
+- **매니페스트**: Workers **KV** `ota:<platform>:<channel>` → `{version, url, checksum, minNative}` (구현 #979 페이즈 A).
+- **엔드포인트**: 기존 `readinggo` 워커에 **`POST /api/ota`** 추가(구현 #979) — Capgo 규약(`platform·version_name·version_code·custom_id`) 수신 → 매니페스트 비교 → `{version,url,checksum}` 또는 `{}`(no-update). 동일출처 게이트 없음(네이티브 클라).
 
 ## 3. 의사결정
 

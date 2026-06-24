@@ -78,6 +78,9 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return imgProxy(url.searchParams);
     }
+    // OTA Live Updates (#876) — 설치 앱(Capgo capacitor-updater)이 POST. 동일출처 게이트 없음
+    // (네이티브 HTTP 클라이언트라 브라우저 Origin 없음). 채널 매니페스트(KV) 비교 → 업데이트/no-update.
+    if (p === '/api/ota') return otaCheck(request, env);
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.
     return env.ASSETS.fetch(request);
   },
@@ -1190,6 +1193,30 @@ async function upsertBook(SB, SRK, book) {
     },
     body: JSON.stringify(row),
   });
+}
+
+// ── OTA Live Updates (#876) ───────────────────────────────
+// 설치 앱(Capgo @capgo/capacitor-updater)이 POST 로 현재 상태를 보내면 채널 매니페스트(KV)와 비교해
+// 업데이트면 {version,url,checksum}, 없으면 {} 반환(Capgo 규약: url 생략 = no update).
+// custom_id 로 채널(beta|production) 선택. version_code(셸 versionCode)로 minNative 게이트 —
+// 구 셸에 새 네이티브 API 쓰는 번들이 내려가 크래시하는 것 방지(spec ota.md §1·§5).
+// 번들 바이너리 호스팅은 매니페스트 url 에 위임(R2/GitHub Releases, 페이즈 C). 워커는 매니페스트만 본다.
+async function otaCheck(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  let b = {};
+  try { b = await request.json(); } catch (e) {}
+  const platform = (b.platform === 'ios' || b.platform === 'electron') ? b.platform : 'android';
+  const channel = b.custom_id === 'beta' ? 'beta' : 'production';
+  const cur = b.version_name || 'builtin';                       // 현재 깔린 번들 버전
+  const nativeCode = parseInt(b.version_code || b.version_build || '0', 10) || 0; // 네이티브 versionCode
+  if (!env.OTA_KV) return json({});                              // KV 미바인딩 → no update
+  const raw = await env.OTA_KV.get(`ota:${platform}:${channel}`);
+  if (!raw) return json({});                                     // 채널 비어있음 → no update
+  let m; try { m = JSON.parse(raw); } catch (e) { return json({}); }
+  if (!m || !m.version || !m.url) return json({});
+  if (m.version === cur) return json({});                        // 이미 최신
+  if ((m.minNative || 0) > nativeCode) return json({ message: `min native ${m.minNative} > ${nativeCode}` }); // 구 셸 → 스킵(스토어 업데이트 유도)
+  return json({ version: m.version, url: m.url, checksum: m.checksum || '' });
 }
 
 function json(obj, status, maxAge) {

@@ -23,6 +23,12 @@ command = "cd docs/readinggo && npm ci && npm run build"
 directory = "docs/readinggo/dist"
 binding = "ASSETS"
 
+# OTA Live Updates (#876) — 채널별 번들 매니페스트(version·url·checksum·minNative).
+# 번들 바이너리는 매니페스트 url 에 위임(R2/GitHub Releases — 페이즈 C에서 결정). 워커는 manifest 만 보유.
+[[kv_namespaces]]
+binding = "OTA_KV"
+id = "e22049c87f9d44139242316c3c445bf9"
+
 # 비밀 아님(클라에도 공개). service_role·UPSTAGE 키만 `wrangler secret put` 로.
 [vars]
 SUPABASE_URL = "https://cttllwwkaddghqttyhkg.supabase.co"
