@@ -1,5 +1,13 @@
 {
   "appId": "com.readinggo.app",
   "appName": "ReadingGo",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorUpdater": {
+      "updateUrl": "https://readinggo.hyuniverse.workers.dev/api/ota",
+      "autoUpdate": true,
+      "directUpdate": false,
+      "resetWhenUpdate": true
+    }
+  }
 }
