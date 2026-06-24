@@ -110,10 +110,6 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
   const revealAll = React.useContext(SpoilerContext);
   const [revealed, setRevealed] = _useState({});
-  // 사후 감상(§5.8.4): 문장별 my_note 추가·편집. setNote 는 Supabase 어댑터에 존재.
-  const [noteEdits, setNoteEdits] = _useState({});   // sentenceId -> 저장된 감상(override)
-  const [editingId, setEditingId] = _useState(null);
-  const [draft, setDraft] = _useState('');
   // 완독 별점·소감 수정 (QA #3) — 이미 완독한 책의 rating/review 편집.
   const [editMeta, setEditMeta] = _useState(false);
   const [rt, setRt] = _useState(book.rating || 0);
@@ -240,13 +236,6 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .then(() => { showToast('📖 다시 읽기 시작 — 읽는 중으로 옮겼어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
       .catch(() => showToast('다시 읽기 실패 — 다시 시도'));
   };
-  const saveNote = (q) => {
-    if (!q.id || !(DataStore.sentences && DataStore.sentences.setNote)) { setEditingId(null); return; }
-    Promise.resolve(DataStore.sentences.setNote(q.id, draft))
-      .then(() => setNoteEdits(m => ({ ...m, [q.id]: draft })))
-      .catch(() => {});
-    setEditingId(null);
-  };
   // 내 한 문장 좋아요(즐겨찾기) — claps 단일(#641: 자기 문장 좋아요=저장 통일), 토글 (#11)
   const [bmarks, setBmarks] = _useState(null); // Set<sentenceId>
   _useEffect(() => {
@@ -258,15 +247,6 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   }, []);
   // #610: 좋아요·공개범위(3단계) 토글은 공용 SentenceActions 가 담당 → 자체 핸들러/상태 제거.
   //   bmarks 는 SentenceActions fav 초기값 시드용으로만 유지.
-  // note_private 별도 유지 (감상만 비공개)
-  const [priv, setPriv] = _useState({});
-  const isPrivNote = (q) => { const o = priv[q.id]; return (o && o.note_private !== undefined) ? o.note_private : !!q.notePrivate; };
-  const togglePrivNote = (q) => {
-    if (!q.id || !(DataStore.sentences && DataStore.sentences.setVisibility)) return;
-    const next = !isPrivNote(q);
-    setPriv(m => ({ ...m, [q.id]: { ...(m[q.id] || {}), note_private: next } }));
-    Promise.resolve(DataStore.sentences.setVisibility(q.id, { note_private: next })).catch(() => {});
-  };
 
   // 교보 상세는 ISBN 이 아닌 교보 고유번호(S…)를 써서 ISBN 직링크가 깨짐 → 검색결과로(QA #1-B).
   const kyoboUrl = `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(book.isbn || book.title)}`;
@@ -321,7 +301,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       const date = fmtDate(q.createdAt || q.when);
       lines.push(`### p.${q.page ?? '?'}${date ? ` · ${date}` : ''}`);
       lines.push(`> ${q.text || ''}`);
-      const note = noteEdits[q.id] !== undefined ? noteEdits[q.id] : (q.note || '');
+      const note = q.note || '';
       if (note) { lines.push(''); lines.push(note); }
       lines.push('');
     });

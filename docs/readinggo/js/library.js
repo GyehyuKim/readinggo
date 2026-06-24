@@ -11,7 +11,7 @@ function _mapWish(w) {
   return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish' };
 }
 
-function LibraryView({ state, onSetActiveBook, onActivateUserBook }) {
+function LibraryView({ state, onActivateUserBook }) {
   const [selectedBookId, setSelectedBookId] = _useState(null);
   const [activeSubtab, setActiveSubtab] = _useState('reading'); // 'wishlist' | 'reading' | 'completed'
   // 읽은 책 정렬 (#513 → #649 3단 토글). key=정렬축('recent'|'rating'|'title'), dir=방향(1=1차/내림·ㄱ→ㅎ, -1=2차/오름·ㅎ→ㄱ). key=null → 정렬 해제(원본 순서).
