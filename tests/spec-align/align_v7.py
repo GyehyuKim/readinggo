@@ -42,7 +42,11 @@ ADAPTER_FILES = ["data.js", "datastore.js"]
 
 
 def load(names):
-    """Return {filename: text} for existing js files in `names` (None = all)."""
+    """Return {filename: text} for existing js files in `names` (None = all).
+
+    `names` may also list non-js siblings in docs/readinggo/ (e.g. index.html) —
+    needed because some token/CSS rules live in index.html, not js/* (#984).
+    """
     out = {}
     for p in sorted(JS_DIR.glob("*.js")):
         if names is None or p.name in names:
@@ -50,6 +54,15 @@ def load(names):
                 out[p.name] = p.read_text(encoding="utf-8")
             except OSError:
                 pass
+    if names:
+        for name in names:
+            if name.endswith((".html", ".css")) and name not in out:
+                p = JS_DIR.parent / name
+                if p.is_file():
+                    try:
+                        out[name] = p.read_text(encoding="utf-8")
+                    except OSError:
+                        pass
     return out
 
 
@@ -245,6 +258,23 @@ INVARIANTS = [
     # 가드: 새 점수·랭킹·데일리미션 시스템을 더하지 않았는지(#911 외적 보상 배제). 새 모듈에 점수/랭킹 변수 금지.
     ("D", "absent", "외적 보상 신설 금지 — 점수/포인트/랭킹/리더보드 변수 잔재 (#938 가드)",
         ["milestone-recap.js"], r"leaderboard|ranking|\bpoints\b|\bscore\b"),
+
+    # ── E: 빈 별점(☆) 가시성 — 디바이더 토큰 오용 영구 가드 (#984) ──
+    # 근본원인: 빈 별 색이 --line-2(#F2EDE2, 거의 크림) → 크림 배경(--paper #FAF6F0)에 묻혀 안 보임.
+    # --line-2 는 '구분선' 토큰이라 아이콘색으로 재유입되기 쉬움. 별점 트랙은 반드시 전용 --star-empty.
+    # absent: 인라인 별 색(color:'var(--…)') 이 --line-2/--paper 를 다시 쓰면 FAIL.
+    ("E", "absent", "별점 인라인 색에 --line-2/--paper 재유입 금지 (#984)",
+        ["book-detail-modal.js"], r"color:\s*'var\(--(?:line-2|paper)\b"),
+    # present: 전용 --star-empty 토큰이 별점 인라인 색으로 배선돼 있어야 함.
+    ("E", "present", "빈 별점 인라인 색 = var(--star-empty) (#984)",
+        ["book-detail-modal.js"], r"color:\s*'var\(--star-empty\)'"),
+    # index.html: 토큰 정의 + 세리머니/완독 별 CSS(.rating-star-empty)도 --star-empty 사용.
+    ("E", "present", "--star-empty 토큰 정의 (index.html :root, #984)",
+        ["index.html"], r"--star-empty\s*:"),
+    ("E", "absent", ".rating-star-empty CSS 색에 --line-2/--paper 금지 (index.html, #984)",
+        ["index.html"], r"\.rating-star-empty\s*\{[^}]*color:\s*var\(--(?:line-2|paper)\b"),
+    ("E", "present", ".rating-star-empty CSS 색 = var(--star-empty) (index.html, #984)",
+        ["index.html"], r"\.rating-star-empty\s*\{[^}]*color:\s*var\(--star-empty\)"),
 ]
 
 

@@ -81,6 +81,9 @@
   --ink-4:        #C7CCD3;
   --line:         #ECE6DA;
   --line-2:       #F2EDE2;
+  /* 빈 별점(☆) 전용 회색 — 크림(--paper)에 또렷이 보이는 라이트 그레이.
+     디바이더 토큰 --line-2(거의 크림)를 아이콘색으로 오용하면 별이 안 보임(#984). 별점 트랙은 항상 이 토큰. */
+  --star-empty:   #C7CCD3;
   --brand:        #3FD17F;
   --brand-2:      #2EB867;
   --brand-3:      #1F8E4D;
@@ -1329,7 +1332,7 @@ input,textarea{font-family:inherit;}
   width: 44px; height: 44px;
   font-size: 34px; line-height: 44px;
 }
-.complete-review .rating-star-empty{ color: #7A808A; }
+.complete-review .rating-star-empty{ color: var(--star-empty); }
 .complete-review .rating-star-fill{
   position: absolute; left: 0; top: 0;
   overflow: hidden; color: var(--gold);

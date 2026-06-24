@@ -351,7 +351,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                       const fillPct = Math.max(0, Math.min(1, rt - (n - 1))) * 100;
                       return (
                         <span key={n} style={{position:'relative', display:'inline-block', width:26, height:26, fontSize:24, lineHeight:'26px'}}>
-                          <span style={{color:'var(--line-2, #d0d4da)'}}>★</span>
+                          <span style={{color:'var(--star-empty)'}}>★</span>
                           <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'#f5b301'}}>★</span>
                           <button type="button" aria-label={`${n-0.5}점`} onClick={() => setRt(rt === n-0.5 ? 0 : n-0.5)} style={{position:'absolute', left:0, top:0, width:'50%', height:'100%', background:'none', border:'none', cursor:'pointer', padding:0}} />
                           <button type="button" aria-label={`${n}점`} onClick={() => setRt(rt === n ? 0 : n)} style={{position:'absolute', right:0, top:0, width:'50%', height:'100%', background:'none', border:'none', cursor:'pointer', padding:0}} />
@@ -379,7 +379,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                           <button key={n} type="button" aria-label={`${n}점 — 탭하여 별점 수정`}
                             onClick={() => { setRt(bookshelfEntry.rating); setRv(book.comment || ''); setEditMeta(true); }}
                             style={{position:'relative', display:'inline-block', width:26, height:26, fontSize:24, lineHeight:'26px', background:'none', border:'none', cursor:'pointer', padding:0}}>
-                            <span style={{color:'var(--line-2, #d0d4da)'}}>★</span>
+                            <span style={{color:'var(--star-empty)'}}>★</span>
                             <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'#f5b301'}}>★</span>
                           </button>
                         );
@@ -392,7 +392,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                       {[1,2,3,4,5].map(n => (
                         <button key={n} type="button" aria-label={`${n}점 주기`}
                           onClick={() => { setRt(n); setRv(book.comment || ''); setEditMeta(true); }}
-                          style={{background:'none', border:'none', cursor:'pointer', padding:0, fontSize:24, lineHeight:'26px', color:'var(--line-2, #d0d4da)'}}>★</button>
+                          style={{background:'none', border:'none', cursor:'pointer', padding:0, fontSize:24, lineHeight:'26px', color:'var(--star-empty)'}}>★</button>
                       ))}
                       <span style={{marginLeft:6, fontSize:12, color:'var(--ink-3)', fontWeight:700}}>별점 주기</span>
                     </div>
