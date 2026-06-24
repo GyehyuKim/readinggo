@@ -58,7 +58,7 @@ function SentenceCard({ item, bookId, noBlind }) {
           {cardTitle ? (
             <span onClick={() => { if (item.bookId && window.RG_openBook) window.RG_openBook(item.bookId); }}
               style={{ cursor: (item.bookId && window.RG_openBook) ? 'pointer' : 'default', textDecoration: (item.bookId && window.RG_openBook) ? 'underline' : 'none' }}>{cardTitle}</span>
-          ) : null}{cardTitle ? ' · ' : ''}{item.page}p · {item.time}
+          ) : null}{cardTitle ? ' · ' : ''}{item.page ? `${item.page}p · ` : ''}{item.time}
         </div>
       </div>
       {blinded ? (

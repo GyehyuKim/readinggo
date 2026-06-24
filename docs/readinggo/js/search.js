@@ -431,7 +431,7 @@ const SearchResultItem = ({ book, onClick }) => {
             whiteSpace: 'nowrap',
           }}
         >
-          {book.publisher} · {book.total_pages}p
+          {[book.publisher, book.total_pages ? `${book.total_pages}p` : null].filter(Boolean).join(' · ')}
         </div>
       </div>
     </button>

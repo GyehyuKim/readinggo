@@ -354,11 +354,27 @@ function App() {
     Promise.resolve(DS.books.startedThisWeek(8)).then((rows) => {
       if (!alive) return;
       const popular = (rows || []).filter(x => x && x.bookId).map(x => ({ book_id: x.bookId, title: x.title, author: x.author, cover_url: x.cover_url }));
-      // 중복 제거는 제목 정규화 기준(#835 후속) — startedThisWeek(isbn13 book_id)와 ALL_BOOKS(RG_BOOKS id) 체계가 달라 book_id로는 같은 책을 못 거른다(데미안 중복).
-      const _nt = (t) => String(t || '').replace(/\s+/g, '').toLowerCase();
-      const seen = new Set(popular.map(b => _nt(b.title)));
-      for (const b of fb) { if (popular.length >= 8) break; if (!seen.has(_nt(b.title))) { popular.push(b); seen.add(_nt(b.title)); } }
-      setPopularBooks(popular.length ? popular : fb);
+      // 중복 제거는 제목 정규화 기준(#835 후속, #970) — startedThisWeek(isbn13 book_id)와 ALL_BOOKS(RG_BOOKS id)
+      // 체계가 달라 book_id로는 같은 책을 못 거른다(데미안 중복). 부제(' - …수상작')·괄호를 절단해 정규화하고,
+      // RPC 결과 *내부* 중복까지 통합 dedup(이전엔 fb만 비교) — 같은 책의 부제본+깔끔본이 둘 다 노출되던 문제.
+      const _nt = (t) => String(t || '').split(/\s[-–—]\s/)[0].replace(/\([^)]*\)/g, '').replace(/\s+/g, '').toLowerCase();
+      const merged = new Map();
+      for (const b of [...popular, ...fb]) {
+        const k = _nt(b.title);
+        if (!k) continue;
+        const cur = merged.get(k);
+        if (!cur) { merged.set(k, b); continue; }
+        // 같은 책: 짧은(=부제 없는 깔끔한) 제목 + 있는 표지/메타 채택
+        merged.set(k, {
+          ...cur,
+          title: String(b.title).length < String(cur.title).length ? b.title : cur.title,
+          cover_url: cur.cover_url || b.cover_url,
+          total_pages: cur.total_pages || b.total_pages,
+          publisher: cur.publisher || b.publisher,
+        });
+      }
+      const deduped = [...merged.values()].slice(0, 8);
+      setPopularBooks(deduped.length ? deduped : fb);
     }).catch(() => { if (alive) setPopularBooks(fb); });
     return () => { alive = false; };
   }, []);
