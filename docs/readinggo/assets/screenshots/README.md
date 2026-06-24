@@ -31,6 +31,6 @@ xcrun simctl io booted screenshot 01-home.png
 ## TODO (후속)
 
 - 게스트 배너 제거 / 로그인 상태 캡처 (마케팅 폴리시)
-- 마케팅 프레임·카피 오버레이 (#874 store-listing.md 카피 활용)
+- 마케팅 프레임·카피 오버레이 (#874 `store/listing-ko.md` 카피 활용)
 - Android Play Store 사이즈(계휴 Windows 빌드 후)
 - iPad 6.5"/12.9" (선택)
