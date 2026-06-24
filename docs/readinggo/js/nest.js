@@ -95,7 +95,7 @@ function BookEditModal({ book, onClose, onSaved }) {
     </div>, document.body);
 }
 
-function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onArchive }) {
+function NestView({ state, onCheckin, onOpenSearch }) {
   const [modalOpen, setModalOpen] = _useState(false);
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
@@ -378,8 +378,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   const _stepBtn = { width: 30, height: 30, flexShrink: 0, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-2)', fontSize: 20, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
   const _stepBtnSm = { width: 24, height: 24, flexShrink: 0, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--ink-2)', fontSize: 15, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
 
-  // 데모 '하루 거르기' 핸들러 폐기 (#481) — onSimSkip prop은 하위호환 위해 시그니처에 유지(미사용).
-
   // 완독 세리머니에서 받은 별점/소감을 영속 (§5.8.3).
   // 활성 책의 user_book 을 status='completed' + rating/review_text 로 마감.
   const handleComplete = ({ rating, review_text }) => {
@@ -412,12 +410,6 @@ function NestView({ state, onCheckin, onSimSkip, onGoLibrary, onOpenSearch, onAr
   };
 
   // 이 책 한 문장 (#499) — 현재 책의 전체 기간 최신순(오늘만 아님). 오늘 작성분은 '오늘' 라벨.
-  const _todayStr = new Date().toDateString();
-  const _isTodayQuote = (q) => {
-    if (q.when === '방금') return true;
-    if (!q.createdAt) return false;
-    try { return new Date(q.createdAt).toDateString() === _todayStr; } catch (e) { return false; }
-  };
   const bookQuotes = (nestState.myQuotes || [])
     .filter((q) => q.bookId === nestState.book.id)   // 현재 선택한 책만
     .slice()

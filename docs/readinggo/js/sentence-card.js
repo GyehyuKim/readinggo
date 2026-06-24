@@ -108,7 +108,7 @@ const _SA_VIS_ICON = {
   private: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5.5" width="8" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
 };
 const _SA_VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '나만 보기' };
-function SentenceActions({ sentence, mine, fav: favInit, onRemoved, onUpdated }) {
+function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const id = sentence && sentence.id;
   const [vis, setVis] = useState(sentence.visibility || (sentence.isPrivate ? 'private' : 'public'));
   const [liked, setLiked] = useState(!!favInit);
@@ -152,7 +152,6 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved, onUpdated })
     Promise.all(ops).then(() => {
       sentence.text = text; sentence.page = page;   // 카드 즉시 정합
       setEditing(false); setSaving(false);
-      if (onUpdated) onUpdated({ id, text, page });
       window.dispatchEvent(new CustomEvent('rg:sentence-updated', { detail: { id, text, page } }));
       showToast('✏️ 한 문장을 수정했어요');
     }).catch(() => { setSaving(false); showToast('수정 실패 — 잠시 후 다시'); });

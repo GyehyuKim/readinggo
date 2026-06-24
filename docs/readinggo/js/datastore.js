@@ -855,20 +855,6 @@ const DataStore = {
     },
   },
 
-  /* 마을 패치 — 멤버·게시판·마일스톤 변경사항 로컬 영속 ──────
-     app.js 가 localStorage 를 직접 호출하지 않도록 어댑터로 위임. */
-  villages: {
-    _KEY: 'rg_town_patches_v1',
-    patches: {
-      load() {
-        try { return JSON.parse(localStorage.getItem('rg_town_patches_v1') || '{}'); } catch(e) { return {}; }
-      },
-      save(p) {
-        try { localStorage.setItem('rg_town_patches_v1', JSON.stringify(p)); } catch(e) {}
-      },
-    },
-  },
-
   /* 가입 전 임시 (pending) ─────────────────────────
      onboarding 의 rg_pending_sentence 등을 흡수 (§7.7). */
   pending: {

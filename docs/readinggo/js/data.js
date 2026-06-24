@@ -103,7 +103,6 @@ const XP_RULES = {
   streak30:        500,
 };
 function calcLevel(xp){ return Math.floor(Math.sqrt(Math.max(0, xp || 0) / 100)) + 1; }
-function xpForLevel(level){ const l = Math.max(1, level); return Math.pow(l - 1, 2) * 100; }
 function computeCheckinXp({ isNewDay, isComplete, newStreak }){
   const parts = [];
   if (isNewDay) parts.push({ key:'daily', label:'읽고 한 줄', xp: XP_RULES.dailyMission, ico:'📖' });
@@ -545,7 +544,7 @@ window.getNestStageByXp=getNestStageByXp; window.nestXpProgress=nestXpProgress;
 window.nestCycleXp=nestCycleXp; window.nestCastleCount=nestCastleCount;
 window.nestStageProgress=nestStageProgress;
 window.NEST_STAGE_TRANSITIONS=NEST_STAGE_TRANSITIONS; window.getEvolutionCopy=getEvolutionCopy;
-window.XP_RULES=XP_RULES; window.calcLevel=calcLevel; window.xpForLevel=xpForLevel; window.computeCheckinXp=computeCheckinXp;
+window.XP_RULES=XP_RULES; window.calcLevel=calcLevel; window.computeCheckinXp=computeCheckinXp;
 window.reactionXpFor=reactionXpFor; window.grantXp=grantXp;
 window.NPC_QUOTES=NPC_QUOTES; window.INITIAL_STATE=INITIAL_STATE;
 window.INITIAL_BOOKSHELF=INITIAL_BOOKSHELF; window.WISHLIST=WISHLIST;

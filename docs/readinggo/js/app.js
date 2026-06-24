@@ -585,57 +585,6 @@ function App() {
   }, []);
 
   // 읽기모드 한 문장 저장 → appState.myQuotes 즉시 반영 (#358).
-  // 종전엔 NestView 내부 상태만 갱신 → ✕ 나가기(체크인 미경유) 시 책상세·프로필에서 문장 누락.
-  const handleArchive = useCallback((q) => {
-    setAppState(s => ({ ...s, myQuotes: [q, ...s.myQuotes] }));
-  }, []);
-
-  // 하루 거르기: 둥지·XP·성은 존속, 스트릭만 영향 (§5.4).
-  const handleSimSkip = useCallback((ns) => {
-    setAppState(s => ({
-      ...s,
-      streak: ns.streak,
-    }));
-  }, []);
-
-  const handleSetActiveBook = useCallback((bookId) => {
-    const bk = getBook(bookId);
-    if (!bk) return;
-    setAppState(s => {
-      // 현재 책 진도 저장
-      INITIAL_PROGRESS[s.book.id] = { cur: s.book.cur, days: s.book.days };
-      const prog = INITIAL_PROGRESS[bookId] || { cur: 1, days: 1 };
-      // 둥지는 책과 무관 — 책 전환 시 유지 (#313). nest 재계산 안 함.
-      return {
-        ...s,
-        book: {
-          id: bk.id, title: bk.title, author: bk.author, pub: bk.pub,
-          cur: prog.cur, total: bk.total, days: prog.days,
-          cover: bk.cover, fb: bk.fb, toc: bk.toc,
-        },
-      };
-    });
-    showToast(`📖 ${bk.title} — 활성 책으로 설정`);
-    switchTab('nest');
-    // Phase 1: 로그인(Supabase 모드)이면 책을 백엔드에 등록 + 활성화. myBooks 없는
-    // localStorage 폴백에선 skip(데모 시드 사용) — 양 어댑터 안전.
-    if (DataStore.myBooks && DataStore.myBooks.add) {
-      (async () => {
-        try {
-          const mine = await Promise.resolve(DataStore.myBooks.list());
-          let ub = (mine || []).find(u => u.book && (u.book.isbn13 === bk.isbn || u.book.title === bk.title));
-          if (!ub) {
-            ub = await Promise.resolve(DataStore.myBooks.add({
-              book: { isbn13: bk.isbn, title: bk.title, author: bk.author, publisher: bk.pub, total_pages: bk.total, cover_url: bk.cover },
-              current_page: (window.INITIAL_PROGRESS && window.INITIAL_PROGRESS[bookId] && window.INITIAL_PROGRESS[bookId].cur) || 0,
-            }));
-          }
-          if (ub && ub.id) { await Promise.resolve(DataStore.activeBook.set(ub.id)); console.log('[ReadingGo] ✅ 책 등록 완료:', bk.title, '(ub=' + ub.id + ')'); }
-        } catch (e) { console.warn('[ReadingGo] 활성책 등록 실패:', e); }
-      })();
-    }
-  }, [switchTab]);
-
   // 검색 책 선택 → 책장 분기 (#409): 'wish'(찜) | 'reading'(읽는중, 기본) | 'completed'(완독).
   const handleSearchSelectBook = useCallback((book, shelf) => {
     shelf = shelf || 'reading';
@@ -819,10 +768,7 @@ function App() {
               key="nest"
               state={appState}
               onCheckin={handleCheckin}
-              onSimSkip={handleSimSkip}
-              onGoLibrary={() => switchTab('profile')}
               onOpenSearch={() => setIsSearchOpen(true)}
-              onArchive={handleArchive}
             />
           )}
           {activeTab === 'social' && (
@@ -835,7 +781,6 @@ function App() {
             <LibraryView
               key="library"
               state={appState}
-              onSetActiveBook={handleSetActiveBook}
               onActivateUserBook={handleActivateUserBook}
             />
           )}
