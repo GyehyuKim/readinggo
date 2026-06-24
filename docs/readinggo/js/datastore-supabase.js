@@ -1197,6 +1197,13 @@
       set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
     },
 
+    /* 같이읽기 기본 모드 (co-reading.md §7.5, P2) — 클라 측 플래그(디바이스 설정, consent 선례).
+       'together'(기본=같이+공개) | 'solo'(혼자). 책 등록 시 자동합류 여부를 가른다. */
+    coReadMode: {
+      get() { try { return localStorage.getItem('rg_coread_mode') === 'solo' ? 'solo' : 'together'; } catch (e) { return 'together'; } },
+      set(v) { const m = v === 'solo' ? 'solo' : 'together'; try { localStorage.setItem('rg_coread_mode', m); } catch (e) {} return m; },
+    },
+
     /* 독서 파트너 대화 아카이브 (#295, 18_companion_sessions.sql) — 동의 유저의 Q/A를 익명 집계용 저장. */
     companionSessions: {
       async add({ bookId, sentence, comment, lens, question, answer, isResurface } = {}) {

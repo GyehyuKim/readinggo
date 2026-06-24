@@ -2,7 +2,7 @@
    ReadingGo — social.js
    '함께' 탭 (내부 키 social — 코드 호환 유지, co-reading.md §2.1):
      ① 발견 = 인기 책 + 전체 공개 한 문장 피드 + 유저 찾기 (§5.7 / feed.md)  ← 입구
-     ② 방   = 같이읽기 룸 (RoomsView, co-reading.js)                        ← 목적지
+     ② 숲   = 같이읽기 룸 (RoomsView, co-reading.js)                        ← 목적지
    상단 세그먼트로 두 레이어 전환. 기본 = 발견(신규/게스트는 입구가 먼저).
    ========================================================= */
 
@@ -16,14 +16,14 @@ function rgRelTime(iso) {
   return Math.floor(sec / 86400) + '일 전';
 }
 
-// '함께' 탭 셸 — ① 발견 / ② 방 세그먼트 (co-reading.md §4.1). 기본=발견.
+// '함께' 탭 셸 — ① 발견 / ② 숲 세그먼트 (co-reading.md §4.1). 기본=발견.
 function SocialView({ state }) {
   const { useState } = React;
   const [layer, setLayer] = useState('discover'); // 'discover' | 'rooms'
   return (
     <section className="view active">
       <div className="rg-together-seg" style={{ display: 'flex', gap: 6, padding: '12px 16px 10px' }}>
-        {[['discover', '① 발견'], ['rooms', '② 방']].map(([id, label]) => (
+        {[['discover', '① 발견'], ['rooms', '② 숲']].map(([id, label]) => (
           <button key={id} onClick={() => setLayer(id)}
             style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: layer === id ? 'none' : '1px solid var(--line)',
               background: layer === id ? 'var(--ink)' : 'transparent', color: layer === id ? '#fff' : 'var(--ink-2)',

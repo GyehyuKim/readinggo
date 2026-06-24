@@ -490,6 +490,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <button className="checkin-cta" onClick={onOpenSearch} style={{ display: 'inline-flex', width: 'auto', padding: '14px 28px' }}>
               📖 읽을 책 등록하기
             </button>
+            {/* P2(co-reading.md §7.5): 등록 전 같이읽기 기본 선택 — 같이+공개(opt-out). 켜두면 등록 시 공개 숲에 자동 함께. */}
+            {window.CoReadModeToggle && (
+              <div style={{ maxWidth: 360, margin: '18px auto 0', textAlign: 'left' }}>
+                <window.CoReadModeToggle />
+              </div>
+            )}
           </div>
         </div>
       </section>
