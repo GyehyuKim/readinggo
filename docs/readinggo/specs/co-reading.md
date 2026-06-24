@@ -1,6 +1,6 @@
 # 같이읽기 (숲) — 화면 스펙 `co-reading.md`
 
-> **상태**: 🟢 활성. P1 완료(#987/PR #995). **P2 1차 = 같이 기본(opt-out) + 공개 자동합류 + 명칭 "숲" 확정**(#988, owner 결정). 나머지 P2(마일스톤·게시판·역할·auto-match 풀)는 계속 미룬다.
+> **상태**: 🟢 활성. P1 완료(#987/PR #995). P2-1 = 같이 기본(opt-out) + 공개 자동합류 + 명칭 "숲"(#988, 완료). **마일스톤(함께 읽기 일정/구간) = #999(이 PR)** — `village_parts` 활성화, host 일정 설정 + 이번 구간 + 멤버 위치 + 집계 + 응원(§5.6·§10.7). 나머지 P2(게시판·역할·auto-match 풀·파트 랭킹·리마인더)는 계속 미룬다.
 > **명칭 (owner 확정 #987 후속)**: 방 단위 정식 명칭 = **"숲"**(둥지가 모인 곳). 화면 텍스트는 모두 "숲"으로 통일. **탭 라벨은 "함께" 유지**. 코드 식별자(`rooms.*` 계약·CSS `.rg-room-*`·함수명·`RG_openRoom`·내부 탭 키 `social`)는 회귀·churn 방지를 위해 **변경하지 않는다**(명칭은 화면 텍스트만). §8 참조.
 > **선행 prior-art**: [`village.md`](./village.md) (⚠️ 폐기 마을, #440) 의 **재설계 부활**. 마일스톤·게시판·역할은 P2 로 미루고, 같은 책 그룹의 *핵심 루프*만 SLC 로 되살린다. 잘 만든 부분은 살리고(데이터·코드·RLS), 무거운 부분은 떼어낸다.
 > **owner**: gyehyu (피드·소셜 재편 owner — [feed.md](./feed.md) 도 같은 owner). 데이터·DataStore 계약은 [backend.md §7](./backend.md), 스키마는 `supabase/schema.sql` `villages`/`village_members` (재사용).
@@ -296,6 +296,23 @@
 
 > 정원 수정·공개 전환·비밀번호 변경·멤버 관리(강퇴·역할)는 **P2**. P1 설정은 *공유 + 나가기*까지.
 
+### 5.6 마일스톤 — 함께 읽기 일정/구간 (#999, P2 마일스톤)
+
+> **결정됨 (#999).** 숲에 **공동 읽기 일정(구간)** 을 얹어 "같이 완독 챌린지"로 만든다. 별도 마감 압박 강제(레이스)는 아니고, *이번 구간이 어디고 누가 따라오는지*를 보여주는 느슨한 동행 + 가벼운 응원. `village_parts`(마을 유산) 활성화 — **새 테이블 없음**.
+
+**구조**: 숲 내부(`RoomModal`, §5.3)에 **3번째 탭 "🗓️ 일정"** 추가(멤버 진척·한 문장과 일관). 한 문장·그리드와 같은 카드 위계.
+
+| 영역 | 누구 | 동작 |
+|---|---|---|
+| **일정 설정/편집** | **host = `villages.created_by`만** (별도 역할 테이블 없음 — created_by=host 단순화) | 구간(part) 목록 작성·편집. 각 part = **제목 + 목표페이지(`end_page`) + 마감(`due_date`)**. 예: "1주차 ~120p (6/30)". `RoomScheduleEditor` 시트(구간 행 추가/수정/삭제 → `setParts` 전체 교체). 멤버는 read-only |
+| **이번 구간 (활성 구간)** | 전원 | **날짜 기준 가장 임박한 미완 구간** = 마감(`due_date`)이 오늘 이후인 첫 구간(마감 없으면 그 첫 구간, 다 지났으면 마지막). 하이라이트 카드 — 제목·목표페이지·`D-N`/오늘마감/N일지남 |
+| **멤버 위치** | 전원 | 멤버별 진도(그 숲 책 `user_books.current_page`, §5.3.1 진척 그리드가 이미 계산) vs 활성 구간 `end_page` → **완료**(≥목표) / **온트랙**(≥목표 80%) / **뒤처짐**(<80%). 자유 구간(목표 없음)은 항상 온트랙 |
+| **함께 진도 집계** | 전원 | "N명 중 M명 이번 구간 완료" + 진행바 |
+| **응원** | 전원 | **뒤처진 멤버**에 가벼운 응원 버튼 — 기존 `pokes`(콕찌르기) 재사용(`DataStore.pokes.send`). 로컬/게스트는 어댑터 no-op(표면 일치, 새 테이블 없음). 자기 자신은 응원 대상 제외 |
+| **빈/콜드스타트** | 분기 | 일정 없는 숲 → **host**엔 "일정 만들기" CTA, **멤버**엔 "아직 일정 없음 — 숲을 만든 사람이 정하면 보여요" 안내 |
+
+> **마일스톤 잔여(이 PR 범위 밖, 계속 미룸)**: ① **파트 랭킹 리더보드**(구간별 순위·경쟁) ② **host 외 역할**(공동관리자·강퇴·권한 이양) ③ **알림/리마인더 고도화**(마감 임박 푸시 등). 이들은 §7 "마일스톤 잔여"로 남긴다. 이 PR 은 *host 일정 설정 + 이번 구간 + 멤버 위치 + 집계 + 가벼운 응원 + 빈상태*까지.
+
 ---
 
 ## 6. 데이터 모델
@@ -318,7 +335,7 @@ alter table public.villages add column if not exists invite_token  text unique; 
 | `villages.password` (신규) | ✅ | nullable. 비공개 방 선택적 비밀번호(§5.2) |
 | `villages.invite_token` (신규) | ✅ | unique. 모든 방의 토큰 URL 입장(§5.2) |
 | `village_members` (village_id, user_id, joined_at) | ✅ | 방 멤버십 그대로 |
-| `village_parts` (마일스톤) | ❌ P1 미사용 | 테이블 존재하나 P1 안 씀 → **P2 마일스톤**에서 활성화 |
+| `village_parts` (id, village_id, part_order, title, end_page, due_date) | ✅ **마일스톤 활성화(#999)** | host(`villages.created_by`)가 구간(part) 목록 작성·편집(§5.6). 기존 컬럼 그대로 — 새 컬럼·새 테이블 없음. RLS `vparts_sel`(멤버/공개 read)·`vparts_mod`(host write)도 기존 정의 재사용(`schema.sql`) |
 | `village_topics`/`village_opinions` (게시판) | ❌ P1 미사용 | **P2 게시판** |
 | `is_village_member(uuid)` SECURITY DEFINER | ✅ | RLS 순환 방지 헬퍼 — `villages_sel`/`vmembers_sel` 정책 그대로 재사용(`schema.sql` RLS 블록) |
 
@@ -339,6 +356,10 @@ rooms.members(roomId)                    → MemberProgress[]                // 
 rooms.findByToken(token)                 → Room | null                     // 토큰 URL 입장 미리보기
 rooms.findByCode(code)                   → Room | null                     // 6자리 코드 입장 미리보기
 
+// 마일스톤(#999, §5.6) — village_parts. 멤버 read, host(created_by) write. 양 어댑터 대칭.
+rooms.listParts(roomId)                  → Part[]                          // part_order 오름차순 [{id,village_id,part_order,title,end_page,due_date}]
+rooms.setParts(roomId, parts[])          → Part[]                          // host 가 구간 목록 전체 교체(빈배열=삭제). part_order 1..N 재부여
+
 // P2-1(§7.5) 같이읽기 기본 모드 — 클라 측 디바이스 플래그(consent 선례, 양 어댑터 대칭).
 coReadMode.get()                         → 'together' | 'solo'             // 기본 'together'
 coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 정규화 후 저장
@@ -355,9 +376,10 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 | `myRooms` | `listMine` | rename |
 | `findByToken` | (신규) | `invite_token` eq 조회(`findByCode` 와 동형) |
 | `findByCode` | `findByCode` | 유지 |
+| `listParts`/`setParts` | (신규, #999) | `village_parts` read/write. host(`created_by`) 가 일정 편집. RLS `vparts_mod` 가 host 가드 |
 | ~~`delete`/`update`/`invite`/`listTopics`/`addTopic`/...~~ | 게시판·관리 | **P2** (P1 계약에서 제외 — 코드 잔존 가능하나 스펙 비노출) |
 
-- **Phase 0(local)**: 타 사용자 부재 → `members` 는 나 1명, `byBook`/`myRooms` 는 로컬 방 목록. 표면 일치만 보장([backend.md](./backend.md) §7.2).
+- **Phase 0(local)**: 타 사용자 부재 → `members` 는 나 1명, `byBook`/`myRooms` 는 로컬 방 목록. `listParts`/`setParts` 는 방 객체 `_parts` 인라인 배열(supabase `village_parts` 표면 일치). 표면 일치만 보장([backend.md](./backend.md) §7.2).
 - **book_id 해소**: 로컬 책 id(`b104` 등)는 어댑터가 Supabase `books` UUID 로 upsert·해소(기존 `create` 로직 재사용).
 
 ### 6.3 입장 검증 위치
@@ -378,28 +400,33 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 ## 7. SLC 범위 — P1 vs P2
 
-> **P1 = #987(완료, PR #995) · P2 = #988.** P1 은 *발견→숲 퍼널 + 숲 코어*를 complete·lovable 하게. P2 **1차(이 PR)** 는 *같이 기본(opt-out) + 공개 자동합류*(§7.5)와 *명칭 "숲" 확정*(§8). 나머지 P2(마일스톤·게시판·역할·auto-match 풀)는 계속 미룬다.
+> **P1 = #987(완료, PR #995) · P2-1 = #988(완료) · 마일스톤 = #999(이 PR).** P1 은 *발견→숲 퍼널 + 숲 코어*. P2-1 은 *같이 기본(opt-out) + 공개 자동합류*(§7.5) + *명칭 "숲" 확정*(§8). **#999(이 PR)** 는 *함께 읽기 일정(마일스톤)*(§5.6) — host 일정 설정 + 이번 구간 + 멤버 위치 + 집계 + 가벼운 응원. 나머지 P2(게시판·역할·auto-match 풀·파트 랭킹·리마인더)는 계속 미룬다.
 
-| 기능 | P1 (#987) | P2-1 (#988, 이 PR) | P2 잔여 | 비고 |
-|---|---|---|---|---|
-| 함께 탭 재편(발견+숲 2레이어) | ✅ | | | IA 결정 C(§2) |
-| 숲 만들기(책·이름·공개/비공개·정원) | ✅ | | | §5.1 |
-| 참여·나가기 | ✅ | | | §5.1·5.4 |
-| 접근 제어(공개 검색 / 비공개 토큰·비밀번호) | ✅ | | | §5.2 |
-| 발견(공개 숲 책 검색·"N명" badge·코드/링크) | ✅ | | | §4.4 |
-| 멤버 진척 그리드(진도%·오늘불빛·둥지) | ✅ | | | §5.3.1 |
-| 숲 한 문장 모음(숲 지정 책) | ✅ | | | §5.3.2 |
-| 진척 자동 반영(별도 체크인 없음) | ✅ | | | §5.3.1 |
-| **명칭 "숲" 확정**(화면 텍스트, 탭 "함께" 유지) | | ✅ | | §8 (owner 결정) |
-| **책 등록 기본 = 같이+공개(opt-out 토글)** | | ✅ | | §7.5 — 등록 글루 + 토글 |
-| **공개 숲 자동합류**(byBook→join, 없으면 create) | | ✅ | | §7.5 — P1 `rooms.*` 재사용 |
-| auto-match 풀(추천·매칭 기준 설계) | | | ✅ | 매칭 풀·기준 설계 필요 — 비자명 |
-| 마일스톤(챕터·마감) + 파트 랭킹 | | | ✅ | `village_parts` 활성화 |
-| 게시판(주제·의견) | | | ✅ | `village_topics`/`village_opinions` |
-| 역할(공동관리자·강퇴·권한 이양) | | | ✅ | |
-| 콕찌르기(🪱) 숲 내부 | | | ✅ | |
-| 순위 번호·랭킹·완독 레이스 | | | ✅ | P1 그리드는 표시 정렬만, 경쟁 X |
-| 숲 상태(활성/완료)·완독 자동 아카이브 | | | ✅ | 마일스톤 의존 |
+| 기능 | P1 (#987) | P2-1 (#988) | #999 (이 PR) | P2 잔여 | 비고 |
+|---|---|---|---|---|---|
+| 함께 탭 재편(발견+숲 2레이어) | ✅ | | | | IA 결정 C(§2) |
+| 숲 만들기(책·이름·공개/비공개·정원) | ✅ | | | | §5.1 |
+| 참여·나가기 | ✅ | | | | §5.1·5.4 |
+| 접근 제어(공개 검색 / 비공개 토큰·비밀번호) | ✅ | | | | §5.2 |
+| 발견(공개 숲 책 검색·"N명" badge·코드/링크) | ✅ | | | | §4.4 |
+| 멤버 진척 그리드(진도%·오늘불빛·둥지) | ✅ | | | | §5.3.1 |
+| 숲 한 문장 모음(숲 지정 책) | ✅ | | | | §5.3.2 |
+| 진척 자동 반영(별도 체크인 없음) | ✅ | | | | §5.3.1 |
+| **명칭 "숲" 확정**(화면 텍스트, 탭 "함께" 유지) | | ✅ | | | §8 (owner 결정) |
+| **책 등록 기본 = 같이+공개(opt-out 토글)** | | ✅ | | | §7.5 — 등록 글루 + 토글 |
+| **공개 숲 자동합류**(byBook→join, 없으면 create) | | ✅ | | | §7.5 — P1 `rooms.*` 재사용 |
+| **마일스톤: host 일정 설정(구간 제목·목표페이지·마감)** | | | ✅ | | §5.6 — `village_parts` 활성화·`setParts` |
+| **마일스톤: 이번 구간(날짜 기준 활성 구간 하이라이트)** | | | ✅ | | §5.6 |
+| **마일스톤: 멤버 위치(완료/온트랙/뒤처짐) + 집계** | | | ✅ | | §5.6 — 진척 그리드 진도 재사용 |
+| **마일스톤: 뒤처진 멤버 응원**(`pokes` 재사용) | | | ✅ | | §5.6 — 새 테이블 없음 |
+| 마일스톤: 파트 랭킹 리더보드(구간별 순위) | | | | ✅ | 경쟁 요소 — 마일스톤 잔여 |
+| 마일스톤: 알림/리마인더 고도화(마감 임박 푸시) | | | | ✅ | 마일스톤 잔여 |
+| auto-match 풀(추천·매칭 기준 설계) | | | | ✅ | 매칭 풀·기준 설계 필요 — 비자명 |
+| 게시판(주제·의견) | | | | ✅ | `village_topics`/`village_opinions` |
+| 역할(공동관리자·강퇴·권한 이양) | | | | ✅ | 마일스톤 잔여(host 외 역할) |
+| 콕찌르기(🪱) 숲 내부 일반 | | | | ✅ | (응원은 #999 에서 뒤처진 멤버 한정 도입) |
+| 순위 번호·랭킹·완독 레이스 | | | | ✅ | P1 그리드는 표시 정렬만, 경쟁 X |
+| 숲 상태(활성/완료)·완독 자동 아카이브 | | | | ✅ | 마일스톤 의존 |
 
 ### 7.5 P2-1 결정 — "같이가 기본(opt-out) + 공개 자동합류" (#988)
 
@@ -450,15 +477,17 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 | 2 | 탭 라벨 "함께" vs "같이" | ✅ **확정 = "함께"**(§8) |
 | 3 | `password` 저장 방식(평문/해시/서버검증) | 보류 — §6.4, 별도 추적 #996(평문은 P1 데모 현행) |
 | 4 | 멤버 0 숲 가비지 컬렉션 | 보류 — §5.4, P2 |
-| 5 | "혼자/같이" 분기 + auto-match | ◐ **분기 = 해소**(§7.5 같이 기본 opt-out + 공개 자동합류, 이 PR). **auto-match 풀**(추천·매칭 기준)만 P2(#988) 잔여 |
+| 5 | "혼자/같이" 분기 + auto-match | ◐ **분기 = 해소**(§7.5 같이 기본 opt-out + 공개 자동합류, #988). **auto-match 풀**(추천·매칭 기준)만 P2 잔여 |
 | 6 | 숲 탭 미읽음/오늘 신호 배지 | 보류 — §4.1, P1 미적용(목록만), P2 검토 |
+| 7 | 마일스톤(함께 읽기 일정/구간) | ◐ **코어 = 구현**(§5.6 host 일정 + 이번 구간 + 멤버 위치 + 집계 + 응원, #999, 이 PR). **파트 랭킹·host 외 역할·리마인더**만 마일스톤 잔여 |
+| 8 | 활성 구간 판정 기준 | ✅ **확정 = 날짜 기준**(마감 ≥ 오늘인 첫 구간; 마감 없으면 그 첫 구간, 다 지났으면 마지막). §5.6. *진도 기준*(완료된 다음 구간)은 멤버마다 달라 "공동 이번 구간" 메타포와 안 맞아 기각 |
 
 ---
 
 ## 10. 구현 상태 (as-built)
 
 > 스펙↔구현 동기화 (CONTRIBUTING §4.1). 이 절은 코드 PR과 함께 갱신된다.
-> 10.1–10.3 = **P1**(#987, PR #995). 10.4 = **명칭 "숲" 확정**. 10.5 = **P2-1 같이 기본 + 공개 자동합류**(#988). 10.6 = 잔여.
+> 10.1–10.3 = **P1**(#987, PR #995). 10.4 = **명칭 "숲" 확정**. 10.5 = **P2-1 같이 기본 + 공개 자동합류**(#988). 10.6 = 잔여. 10.7 = **마일스톤 — 함께 읽기 일정/구간**(#999, 이 PR).
 
 ### 10.1 마이그레이션
 
@@ -468,11 +497,12 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 `js/datastore.js`(localStorage) · `js/datastore-supabase.js`(supabase) 양쪽에 동일 시그니처 구현(§6.2):
 
-`create({bookId,name,visibility,capacity?,password?})` · `join(roomId,{password?})` · `leave(roomId)` · `byBook(bookId,{limit?})` · `myRooms()` · `get(roomId)` · `members(roomId)` · `findByToken(token)` · `findByCode(code)`.
+`create({bookId,name,visibility,capacity?,password?})` · `join(roomId,{password?})` · `leave(roomId)` · `byBook(bookId,{limit?})` · `myRooms()` · `get(roomId)` · `members(roomId)` · `findByToken(token)` · `findByCode(code)` · **`listParts(roomId)` · `setParts(roomId,parts[])`**(마일스톤 #999, §10.7).
 
 - `invite_token` = 26자 랜덤(crypto, §6.4). `invite_code` 6자리 병행. UNIQUE 충돌 5회 재시도.
 - `password` = **평문 저장**(P1 데모 한정, §6.4 — 해시/서버검증은 Phase 1 `/cso` 후속). 검증은 `join` + 미리보기.
-- supabase `rooms.*` 는 폐기 `villages.*` 구현 재사용(rename·slim, `parts`/게시판 메서드는 P1 계약에서 제외). 구 `villages.*` 블록은 잔존(데드, 호환).
+- supabase `rooms.*` 는 폐기 `villages.*` 구현 재사용(rename·slim, 게시판 메서드는 P1 계약에서 제외). `parts` 는 #999 에서 `village_parts` 로 활성화(§10.7). 구 `villages.*` 블록은 잔존(데드, 호환).
+- **`pokes`** — 마일스톤 응원용. supabase 는 기존 `pokes.send(toUserId)`, local 은 no-op 어댑터 추가(대칭, 새 테이블 없음).
 - local 어댑터: 타 사용자 부재 → `members` 는 나 1명, `byBook`/`myRooms` 는 `rg_rooms_v1` 키 로컬 방. 표면 일치만 보장.
 
 ### 10.3 UI
@@ -516,6 +546,27 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 > 위 잔여는 대부분 *기능 누락*이 아니라 **실데이터(Supabase 로그인) 의존 표면** — 핵심 루프(만들기·참여·접근제어·진척 그리드·한 문장·나가기·**자동합류·모드 토글**)는 양 어댑터에서 동작.
 
+### 10.7 마일스톤 — 함께 읽기 일정/구간 (이 PR, #999, §5.6)
+
+- **마이그레이션 = 없음(불필요).** `village_parts` 테이블(id·village_id·part_order·title·end_page·due_date)·인덱스(`idx_vparts_village_order`)·RLS(`vparts_sel` 멤버/공개 read, `vparts_mod` host write)는 **이미 `schema.sql` 에 마을 유산으로 존재**. 라이브 DB(project `cttllwwkaddghqttyhkg`)에서 Management API 로 컬럼·RLS 실측 확인 완료(컬럼·정책 모두 spec 과 일치). 새 컬럼·새 테이블·새 RLS **없음** — 활성화만.
+- **DataStore 계약**(양 어댑터 대칭, §6.2):
+  - `js/datastore-supabase.js` `rooms.listParts(roomId)`(`village_parts` select, part_order asc) · `rooms.setParts(roomId, parts[])`(기존 parts delete 후 새로 insert = 전체 교체; RLS `vparts_mod` 가 host 가드). 빈 텍스트·빈 값 행은 필터.
+  - `js/datastore.js`(local) — 방 객체 `_parts` 인라인 배열로 동일 표면. `created_by` 가드(로컬 host='me' 폴백). `pokes`(send/listReceived) no-op 어댑터 추가(supabase pokes 와 대칭, 응원용).
+- **UI** `js/co-reading.js`:
+  - `RoomModal` 에 **3번째 탭 "🗓️ 일정"** 추가(멤버 진척·한 문장과 일관, §5.3).
+  - `RoomSchedule` — 이번 구간 하이라이트 + 멤버 위치(완료/온트랙/뒤처짐) + "N명 중 M명 완료" 진행바 + 전체 구간 목록(활성 하이라이트) + (host)편집/(member·뒤처짐)응원. 빈/콜드스타트 분기(host=만들기 CTA, member=안내).
+  - `RoomScheduleEditor` 시트 — 구간 행(제목·목표페이지`number`·마감`date`) 추가/삭제/수정 → `setParts` 저장. host 만 진입.
+  - 헬퍼: `rgActivePartIndex`(날짜 기준 활성 구간) · `rgMemberPartStatus`(완료/온트랙≥80%/뒤처짐) · `rgDaysUntil`/`rgDueLabel`(D-N). `window.RoomSchedule`/`rgActivePartIndex`/`rgMemberPartStatus` 노출.
+  - host 판정 = `room.created_by === ((RG_ME&&RG_ME.id)||'me')` (로컬/게스트 생성자도 host 로 인식).
+- **응원** = `DataStore.pokes.send(userId)` 재사용(뒤처진 멤버, 자기 자신 제외). 로컬/게스트는 no-op 이어도 토스트로 따뜻한 피드백. **새 테이블 없음.**
+- `index.html` — `.rg-part-*` CSS(이번 구간 카드=brand-soft tonal + brand 보더, 뒤처짐 배지=fire 계열 부드러운 경고, 응원 버튼=tonal, ghost 금지 — DESIGN.md 위계).
+- **검증**(로컬 게스트, render-smoke 통과 + 브라우저 JS·DOM·computed-style):
+  - `setParts`/`listParts` 라운드트립(part_order 1..N) ✅ · 전체 교체(replace) 멱등 ✅ · 빈배열=삭제 ✅.
+  - 활성 구간 = 마감 ≥ 오늘인 첫 구간(과거 구간 스킵) ✅(today 6/25 기준 6/20 스킵→6/30 "2주차" D-5).
+  - 멤버 위치 완료/온트랙/뒤처짐 판정 ✅ · "N명 중 M명 완료" 집계 ✅ · 전체 일정 활성 행 하이라이트 ✅.
+  - host 빈상태 "일정 만들기" CTA ✅ · member 빈상태 안내 ✅ · 편집 시트 기존 parts 프리필 ✅ · computed-style DESIGN 위계(tonal·no ghost) ✅.
+- **마일스톤 잔여(이 PR 범위 밖, §5.6·§7)**: 파트 랭킹 리더보드 · host 외 역할(공동관리자·강퇴·이양) · 알림/리마인더 고도화. auto-match(#997)·게시판·비번해시(#996)는 본 PR 무관.
+
 ---
 
 ## 부록: prior-art 매핑 (마을 → 방)
@@ -529,7 +580,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 | 한 문장 탭(방 지정 책) | ✅ 그대로 |
 | 코드·링크 초대 + 책 검색 | ✅ 그대로 + 토큰 URL·비밀번호 추가 |
 | 공개/비공개 + 정원 | ✅ 그대로 |
-| 마일스톤(챕터·마감·파트 랭킹) | ❌ → P2 |
+| 마일스톤(챕터·마감) | ◐ **코어 부활 #999**(host 일정·이번 구간·멤버 위치·집계·응원, §5.6) — 파트 랭킹·역할·리마인더만 잔여 |
 | 게시판(주제·의견) | ❌ → P2 |
 | 역할(공동관리자·강퇴·이양) | ❌ → P2 |
 | 콕찌르기·순위·완독 레이스 | ❌ → P2 |

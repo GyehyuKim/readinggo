@@ -933,6 +933,35 @@ const DataStore = {
       const r = this._load().find(x => x.invite_code === String(code).toUpperCase().trim());
       return r ? this._shape(r) : null;
     },
+    /* ── 마일스톤(함께 읽기 일정/구간) — village_parts (co-reading.md §6, P2 마일스톤) ──
+       host(created_by)가 구간 목록(제목·목표페이지·마감)을 만들고, 멤버는 읽기만.
+       로컬/게스트는 방 객체에 _parts 배열로 인라인 보관(supabase village_parts 표면 일치). */
+    async listParts(roomId) {
+      const r = this._load().find(x => x.id === roomId);
+      const parts = (r && r._parts) || [];
+      return parts.slice().sort((a, b) => (a.part_order || 0) - (b.part_order || 0));
+    },
+    // host 가 구간 목록 전체를 교체(set). parts = [{title,end_page,due_date}] 순서대로 part_order 부여.
+    async setParts(roomId, parts) {
+      const list = this._load();
+      const r = list.find(x => x.id === roomId);
+      if (!r) return [];
+      const me = (window.RG_ME && window.RG_ME.id) || 'me';
+      if (r.created_by && r.created_by !== me) throw new Error('일정은 숲을 만든 사람만 정할 수 있어요.');
+      // 빈 행(제목·목표·마감 전부 없음)은 버린다 — supabase 어댑터와 동일 필터(표면 일치).
+      r._parts = (Array.isArray(parts) ? parts : [])
+        .filter(p => p && ((p.title && String(p.title).trim()) || (p.end_page != null && p.end_page !== '') || p.due_date))
+        .map((p, i) => ({
+          id: p.id || _dsId('vpart'),
+          village_id: roomId,
+          part_order: i + 1,
+          title: (p.title || '').trim(),
+          end_page: (p.end_page != null && p.end_page !== '') ? Number(p.end_page) : null,
+          due_date: p.due_date || null,
+        }));
+      this._save(list);
+      return r._parts.slice();
+    },
   },
 
   /* 유저 공개 데이터 — Phase 0 로컬 어댑터 stub (표면 일치용)
@@ -975,6 +1004,13 @@ const DataStore = {
   consent: {
     get() { try { return localStorage.getItem('rg_data_consent'); } catch (e) { return null; } },
     set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
+  },
+
+  /* 콕찌르기/응원 (pokes) — 로컬/게스트는 타 사용자 부재라 no-op(표면 일치).
+     숲 마일스톤 응원이 Supabase pokes.send 와 같은 표면을 쓰도록 어댑터 대칭 유지(새 테이블 없음). */
+  pokes: {
+    async send() { return null; },        // 로컬은 받을 상대가 없음 → 조용히 no-op
+    async listReceived() { return []; },
   },
 
   /* 같이읽기 기본 모드 (co-reading.md §7.5, P2) — 클라 측 플래그(consent 선례).

@@ -1115,6 +1115,34 @@
         return unwrap(await sb().from('villages').select(this._SEL)
           .eq('invite_code', String(code).toUpperCase().trim()).maybeSingle());
       },
+      /* ── 마일스톤(함께 읽기 일정/구간) — village_parts (co-reading.md §6, P2 마일스톤) ──
+         읽기 = 멤버 누구나(vparts_sel: 공개/멤버/host), 쓰기 = host(created_by)만(vparts_mod RLS).
+         새 테이블 없음 — 마을 유산 village_parts 재사용. local 어댑터와 표면 일치. */
+      async listParts(roomId) {
+        if (!roomId) return [];
+        return unwrap(await sb().from('village_parts')
+          .select('id, village_id, part_order, title, end_page, due_date')
+          .eq('village_id', roomId)
+          .order('part_order', { ascending: true })) || [];
+      },
+      // host 가 구간 목록 전체 교체(set) — 기존 parts 삭제 후 새로 insert. RLS(vparts_mod)가 host 가드.
+      // parts = [{title,end_page,due_date}] 순서대로 part_order(1..N) 부여. 빈 배열이면 전부 삭제.
+      async setParts(roomId, parts) {
+        if (!roomId) return [];
+        await sb().from('village_parts').delete().eq('village_id', roomId);
+        const rows = (Array.isArray(parts) ? parts : [])
+          .filter(p => p && ((p.title && p.title.trim()) || p.end_page != null || p.due_date))
+          .map((p, i) => ({
+            village_id: roomId,
+            part_order: i + 1,
+            title: (p.title || '').trim() || null,
+            end_page: (p.end_page != null && p.end_page !== '') ? Number(p.end_page) : null,
+            due_date: p.due_date || null,
+          }));
+        if (!rows.length) return [];
+        return unwrap(await sb().from('village_parts').insert(rows)
+          .select('id, village_id, part_order, title, end_page, due_date')) || [];
+      },
     },
 
     /* 운영 대시보드 집계 — is_admin=true 전용 (#161) */

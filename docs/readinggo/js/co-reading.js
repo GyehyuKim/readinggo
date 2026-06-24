@@ -592,7 +592,300 @@ function RoomsView() {
   );
 }
 
-/* ── 숲 내부 모달 (§5.3) — 멤버 진척 그리드 + 한 문장 ─────────── */
+/* ════════════════════════════════════════════════════════════════
+   마일스톤 — 함께 읽기 일정/구간 (co-reading.md §6·§7 P2 마일스톤)
+   village_parts(제목·목표페이지·마감) 재사용. host(created_by)=일정 편집,
+   멤버=이번 구간·내 위치 보기 + 뒤처진 멤버 응원. 새 테이블 없음.
+   ════════════════════════════════════════════════════════════════ */
+
+// 오늘(로컬, YYYY-MM-DD). 마감 D-N 계산용. (RG_today 훅 있으면 우선 — 데모 날짜 시뮬레이터 정합.)
+function rgToday() {
+  try { if (window.RG_today) return window.RG_today(); } catch (e) {}
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+
+// 날짜 차 (마감까지 며칠) — 음수면 지남.
+function rgDaysUntil(due) {
+  if (!due) return null;
+  const a = new Date(rgToday() + 'T00:00:00'); const b = new Date(due + 'T00:00:00');
+  if (isNaN(b.getTime())) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+/* 활성 구간 = 가장 임박한 "미완" 구간.
+   "미완"의 기준은 날짜 — 마감이 오늘 이후(또는 마감 없음)인 첫 구간을 활성으로 본다.
+   모든 구간 마감이 지났으면 마지막 구간을 활성(완주 구간)으로 둔다. */
+function rgActivePartIndex(parts) {
+  const list = Array.isArray(parts) ? parts : [];
+  if (!list.length) return -1;
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i].due_date;
+    if (!d) return i;                       // 마감 없는 첫 구간 = 활성
+    if (rgDaysUntil(d) >= 0) return i;       // 아직 안 지난 첫 구간 = 활성
+  }
+  return list.length - 1;                    // 다 지났으면 마지막 구간
+}
+
+// 멤버 위치 vs 활성 구간 목표페이지 → 'done' | 'ontrack' | 'behind'.
+// 목표페이지 없으면(자유 구간) 항상 ontrack.
+function rgMemberPartStatus(cumulativePage, endPage) {
+  if (endPage == null) return 'ontrack';
+  const page = cumulativePage || 0;
+  if (page >= endPage) return 'done';
+  // 목표의 80% 이상이면 온트랙(거의 따라옴), 그 미만은 뒤처짐.
+  return page >= endPage * 0.8 ? 'ontrack' : 'behind';
+}
+
+// 마감 문구 — D-N / 오늘 / N일 지남.
+function rgDueLabel(due) {
+  const n = rgDaysUntil(due);
+  if (n == null) return '';
+  if (n === 0) return '오늘 마감';
+  if (n > 0) return `D-${n}`;
+  return `${-n}일 지남`;
+}
+
+/* host 일정 편집 시트 — 구간 행(제목·목표페이지·마감) 추가/수정/삭제 후 setParts 로 저장.
+   별도 역할 테이블 없음: created_by=host 가드(어댑터·RLS). */
+function RoomScheduleEditor({ roomId, initial, totalPages, onClose, onSaved }) {
+  const { useState } = React;
+  const blank = () => ({ key: Math.random().toString(36).slice(2), title: '', end_page: '', due_date: '' });
+  const [rows, setRows] = useState(() => {
+    const src = (initial && initial.length) ? initial : [];
+    return src.length
+      ? src.map(p => ({ key: Math.random().toString(36).slice(2), title: p.title || '', end_page: p.end_page == null ? '' : String(p.end_page), due_date: p.due_date || '' }))
+      : [blank()];
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const setRow = (i, patch) => setRows(rs => rs.map((r, j) => j === i ? { ...r, ...patch } : r));
+  const addRow = () => setRows(rs => [...rs, blank()]);
+  const delRow = (i) => setRows(rs => rs.length > 1 ? rs.filter((_, j) => j !== i) : rs);
+
+  const save = async () => {
+    setErr('');
+    const parts = rows
+      .map(r => ({ title: (r.title || '').trim(), end_page: r.end_page, due_date: r.due_date || null }))
+      .filter(r => r.title || r.end_page !== '' || r.due_date);
+    setBusy(true);
+    try {
+      const saved = await DataStore.rooms.setParts(roomId, parts);
+      if (window.showToast) window.showToast('일정을 저장했어요', { sparrow: true });
+      onSaved(saved || []);
+    } catch (e) {
+      setErr((e && e.message) || '일정을 저장하지 못했어요.');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="rg-room-sheet-backdrop" onClick={onClose}>
+      <div className="rg-room-sheet" onClick={e => e.stopPropagation()}>
+        <div className="rg-room-sheet-head">
+          <strong>함께 읽기 일정</strong>
+          <button className="rg-room-x" onClick={onClose} aria-label="닫기">×</button>
+        </div>
+        <p className="rg-room-hint" style={{ margin: '0 0 12px' }}>
+          구간을 나눠 같이 완독해요. 각 구간에 목표 페이지와 마감을 정할 수 있어요{totalPages ? ` (총 ${totalPages}쪽)` : ''}.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '46vh', overflowY: 'auto' }}>
+          {rows.map((r, i) => (
+            <div key={r.key} className="rg-part-editrow">
+              <div className="rg-part-editnum">{i + 1}</div>
+              <div className="rg-part-editfields">
+                <input className="rg-room-input" value={r.title} maxLength={40}
+                  onChange={e => setRow(i, { title: e.target.value })}
+                  placeholder={`${i + 1}구간 이름 (예: ${i + 1}주차)`} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <input className="rg-room-input" type="number" min={1} value={r.end_page}
+                    onChange={e => setRow(i, { end_page: e.target.value })}
+                    placeholder="목표 ~쪽" style={{ flex: 1 }} />
+                  <input className="rg-room-input" type="date" value={r.due_date}
+                    onChange={e => setRow(i, { due_date: e.target.value })}
+                    style={{ flex: 1.2 }} />
+                </div>
+              </div>
+              <button className="rg-part-del" onClick={() => delRow(i)} aria-label="구간 삭제"
+                disabled={rows.length <= 1}>×</button>
+            </div>
+          ))}
+        </div>
+        <button className="rg-btn-tonal" onClick={addRow} style={{ width: '100%', marginTop: 10 }}>+ 구간 추가</button>
+        {err ? <p className="rg-room-err">{err}</p> : null}
+        <button className="rg-btn-primary" disabled={busy} onClick={save} style={{ marginTop: 12 }}>
+          {busy ? '저장 중…' : '일정 저장'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* 일정 탭 — 이번 구간 하이라이트 + 멤버 위치 + 진도 집계 + (host)편집/(member)응원.
+   members = RoomModal 이 이미 로드한 멤버 진척(각 user.cumulativePage·handle 포함, §5.3.1). */
+function RoomSchedule({ roomId, room, members, totalPages }) {
+  const { useState, useEffect, useCallback } = React;
+  const [parts, setParts] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [cheered, setCheered] = useState({});   // userId -> true (이 세션에서 응원 보냄)
+
+  // 로그인 사용자 id, 게스트/로컬은 어댑터와 동일하게 'me' 폴백(로컬 created_by='me' 와 매칭 → 생성자=host 인식).
+  const me = (window.RG_ME && window.RG_ME.id) || 'me';
+  const isHost = !!(room && room.created_by && room.created_by === me);
+
+  const load = useCallback(() => {
+    if (!roomId) return;
+    Promise.resolve(DataStore.rooms.listParts(roomId)).then(p => setParts(p || [])).catch(() => setParts([]));
+  }, [roomId]);
+  useEffect(() => { load(); }, [load]);
+
+  const cheer = async (u) => {
+    if (!u || !u.id) return;
+    setCheered(c => ({ ...c, [u.id]: true }));   // 낙관적(로컬은 no-op이어도 따뜻한 피드백)
+    try { if (DataStore.pokes && DataStore.pokes.send) await DataStore.pokes.send(u.id); } catch (e) {}
+    if (window.showToast) window.showToast(`${u.handle ? '@' + u.handle : '독자'}님에게 응원을 보냈어요 💪`);
+  };
+
+  if (parts === null) return <p className="rg-room-hint">불러오는 중…</p>;
+
+  // 빈/콜드스타트 — host엔 만들기 CTA, 멤버엔 안내.
+  if (!parts.length) {
+    return (
+      <div className="rg-part-empty">
+        <div style={{ fontSize: 30, marginBottom: 6 }}>🗓️</div>
+        {isHost ? (
+          <>
+            <p style={{ margin: 0, fontWeight: 800, color: 'var(--ink-2)' }}>아직 함께 읽기 일정이 없어요</p>
+            <p style={{ margin: '6px 0 14px', fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+              구간을 나눠 같이 완독 챌린지를 시작해보세요.
+            </p>
+            <button className="rg-btn-primary" style={{ width: '100%' }} onClick={() => setEditOpen(true)}>일정 만들기</button>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: 0, fontWeight: 800, color: 'var(--ink-2)' }}>아직 일정이 없어요</p>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+              숲을 만든 사람이 함께 읽기 일정을 정하면 여기에 보여요.
+            </p>
+          </>
+        )}
+        {editOpen && (
+          <RoomScheduleEditor roomId={roomId} initial={parts} totalPages={totalPages}
+            onClose={() => setEditOpen(false)}
+            onSaved={(saved) => { setEditOpen(false); setParts(saved); }} />
+        )}
+      </div>
+    );
+  }
+
+  const activeIdx = rgActivePartIndex(parts);
+  const active = activeIdx >= 0 ? parts[activeIdx] : null;
+  const mlist = Array.isArray(members) ? members : [];
+
+  // 활성 구간 기준 멤버 상태 집계.
+  const statuses = mlist.map(m => {
+    const u = m.user || m;
+    return { u, status: rgMemberPartStatus(u.cumulativePage || 0, active ? active.end_page : null) };
+  });
+  const doneCount = statuses.filter(s => s.status === 'done').length;
+  const behind = statuses.filter(s => s.status === 'behind');
+
+  return (
+    <div>
+      {/* 이번 구간 하이라이트 */}
+      {active && (
+        <div className="rg-part-active">
+          <div className="rg-part-active-top">
+            <span className="rg-part-active-tag">이번 구간</span>
+            {active.due_date ? (
+              <span className={'rg-part-due' + (rgDaysUntil(active.due_date) < 0 ? ' over' : (rgDaysUntil(active.due_date) <= 1 ? ' soon' : ''))}>
+                {rgDueLabel(active.due_date)}
+              </span>
+            ) : null}
+          </div>
+          <div className="rg-part-active-title">{active.title || `${activeIdx + 1}구간`}</div>
+          <div className="rg-part-active-goal">
+            {active.end_page != null ? `목표 ~${active.end_page}쪽` : '목표 페이지 자유'}
+          </div>
+          {active.end_page != null && mlist.length > 0 && (
+            <div className="rg-part-progress">
+              <div className="rg-part-progressbar">
+                <span style={{ width: `${mlist.length ? Math.round((doneCount / mlist.length) * 100) : 0}%` }} />
+              </div>
+              <span className="rg-part-progresslabel">{mlist.length}명 중 {doneCount}명 이번 구간 완료</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 멤버 위치 — 활성 구간 대비 온트랙/완료/뒤처짐 */}
+      {active && mlist.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <p className="rg-room-section">멤버 위치</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {statuses.map(({ u, status }, i) => (
+              <div key={u.id || i} className="rg-part-memrow">
+                <button className="rg-part-memname"
+                  onClick={() => { if (u.handle && window.RG_openProfile) window.RG_openProfile(u.handle); }}>
+                  {u.handle || u.display_name || '독자'}
+                </button>
+                <span className="rg-part-mempage">{u.cumulativePage || 0}{active.end_page != null ? `/${active.end_page}` : ''}쪽</span>
+                <span className={'rg-part-badge rg-part-' + status}>
+                  {status === 'done' ? '완료' : status === 'behind' ? '뒤처짐' : '온트랙'}
+                </span>
+                {status === 'behind' && me && u.id && u.id !== me && (
+                  cheered[u.id]
+                    ? <span className="rg-part-cheered">응원함 💪</span>
+                    : <button className="rg-part-cheer" onClick={() => cheer(u)}>응원</button>
+                )}
+              </div>
+            ))}
+          </div>
+          {behind.length > 0 && (
+            <p className="rg-room-hint" style={{ marginTop: 8 }}>
+              뒤처진 {behind.length}명에게 가벼운 응원을 보내보세요.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 전체 구간 목록 */}
+      <div style={{ marginTop: 18 }}>
+        <p className="rg-room-section">전체 일정 ({parts.length}구간)</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {parts.map((p, i) => (
+            <div key={p.id || i} className={'rg-part-listrow' + (i === activeIdx ? ' on' : '')}>
+              <span className="rg-part-listnum">{i + 1}</span>
+              <span className="rg-part-listtitle">{p.title || `${i + 1}구간`}</span>
+              <span className="rg-part-listmeta">
+                {p.end_page != null ? `~${p.end_page}쪽` : ''}
+                {p.end_page != null && p.due_date ? ' · ' : ''}
+                {p.due_date ? rgDueLabel(p.due_date) : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* host 편집 진입 */}
+      {isHost && (
+        <button className="rg-btn-tonal" style={{ width: '100%', marginTop: 14 }} onClick={() => setEditOpen(true)}>
+          일정 편집
+        </button>
+      )}
+
+      {editOpen && (
+        <RoomScheduleEditor roomId={roomId} initial={parts} totalPages={totalPages}
+          onClose={() => setEditOpen(false)}
+          onSaved={(saved) => { setEditOpen(false); setParts(saved); }} />
+      )}
+    </div>
+  );
+}
+
+/* ── 숲 내부 모달 (§5.3) — 멤버 진척 그리드 + 한 문장 + 일정 ─────────── */
 function RoomModal({ roomId, onClose }) {
   const { useState, useEffect } = React;
   const [room, setRoom] = useState(null);
@@ -674,9 +967,10 @@ function RoomModal({ roomId, onClose }) {
           </div>
         )}
 
-        {/* 2탭 */}
+        {/* 3탭 (멤버 진척 · 일정 · 한 문장) */}
         <div className="rg-room-tabs">
           <button className={'rg-room-tab' + (tab === 'members' ? ' on' : '')} onClick={() => setTab('members')}>👥 멤버 진척</button>
+          <button className={'rg-room-tab' + (tab === 'schedule' ? ' on' : '')} onClick={() => setTab('schedule')}>🗓️ 일정</button>
           <button className={'rg-room-tab' + (tab === 'sentences' ? ' on' : '')} onClick={() => setTab('sentences')}>📖 한 문장</button>
         </div>
 
@@ -701,6 +995,8 @@ function RoomModal({ roomId, onClose }) {
                 })}
               </div>
             )
+          ) : tab === 'schedule' ? (
+            <RoomSchedule roomId={roomId} room={room} members={members} totalPages={total} />
           ) : (
             sentences === null ? <p className="rg-room-hint">불러오는 중…</p> :
               sentences.length === 0 ? (
@@ -728,3 +1024,7 @@ window.RG_coReadMode = rgCoReadMode;            // 외부(app.js) alias
 window.RG_setCoReadMode = rgSetCoReadMode;
 window.RG_autoJoinPublicRoom = rgAutoJoinPublicRoom;
 window.CoReadModeToggle = CoReadModeToggle;
+// 마일스톤(함께 읽기 일정/구간, §6·§7 P2) — RoomModal 일정 탭에서 사용. 헬퍼는 검증/재사용 위해 노출.
+window.RoomSchedule = RoomSchedule;
+window.rgActivePartIndex = rgActivePartIndex;
+window.rgMemberPartStatus = rgMemberPartStatus;
