@@ -89,9 +89,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           FILENAME: ${{ steps.bundle.outputs.filename }}
         run: |
+          # --remote 필수: wrangler v4 는 local-first(기본=로컬 miniflare). 빼면 실제 R2 에 안 올라가고
+          #   job 은 success 로 끝난다(로그에 "Resource location: local"). #990.
           npx -y wrangler@4 r2 object put "readinggo-ota/${FILENAME}" \
             --file "${FILENAME}" \
-            --content-type application/zip
+            --content-type application/zip \
+            --remote
 
       # beta 채널 매니페스트 갱신. 워커는 version·url·checksum·minNative 를 사용.
       # minNative=1: 현재 Capgo 셸의 Android versionCode. 향후 네이티브 릴리스가 versionCode 를 올리고
@@ -123,7 +126,8 @@ jobs:
             process.stdout.write(JSON.stringify(o));
           ')
           echo "manifest: $MANIFEST"
-          npx -y wrangler@4 kv key put --namespace-id e22049c87f9d44139242316c3c445bf9 \
+          # --remote 필수: 없으면 로컬 KV 에만 쓰여 실제 매니페스트가 안 올라간다(#990).
+          npx -y wrangler@4 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
             "ota:android:beta" "$MANIFEST"
           {
             echo "### OTA beta published 🚀"

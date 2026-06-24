@@ -40,7 +40,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -o pipefail
-          BETA=$(npx -y wrangler@4 kv key get --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:beta")
+          # --remote 필수: wrangler v4 local-first. 없으면 로컬 KV(빈 값)를 읽어 항상 실패한다(#990).
+          BETA=$(npx -y wrangler@4 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:beta")
           if [ -z "$BETA" ]; then
             echo "::error::beta 채널이 비어 있음(ota:android:beta). 먼저 main 머지로 beta 를 publish 하세요(ota-release.yml)."
             exit 1
@@ -48,7 +49,8 @@ jobs:
           # 유효한 JSON·필수 필드 검증(빈 prod·깨진 매니페스트 승격 방지).
           echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);if(!m.version||!m.url){console.error("invalid manifest: version/url 누락");process.exit(1)}})'
           echo "promoting beta manifest: $BETA"
-          npx -y wrangler@4 kv key put --namespace-id e22049c87f9d44139242316c3c445bf9 \
+          # --remote 필수: 없으면 로컬 KV 에만 써서 prod 가 실제로 안 바뀐다(#990).
+          npx -y wrangler@4 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
             "ota:android:production" "$BETA"
           VER=$(echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).version))')
           URL=$(echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).url))')
