@@ -23,6 +23,7 @@
 | **운영: 운영자 대시보드** | [`admin-dashboard.md`](./admin-dashboard.md) | 신설 (#744) — 풀페이지 하이브리드 대시보드 |
 | **법무: 개인정보처리방침** | [`privacy-policy.md`](./privacy-policy.md) | 신설 (#757) — 처리방침 정본·국외이전·게시 |
 | **리팩토링: 모듈화** | [`refactor-modularize.md`](./refactor-modularize.md) | 신설 (#761) — monolith 분할 맵·prod-안전 플로우 |
+| **운영: OTA 업데이트** | [`ota.md`](./ota.md) | 신설 (#876) — 웹 번들 무선 업데이트(Capgo 자가호스팅 R2/KV), beta→prod 수동 승격(앱판 카나리) |
 | **디자인** | [`design.md`](./design.md) | [§11](./design.md) + [§12](./design.md) |
 | **메타: 여정** | [`meta/journey.md`](./meta/journey.md) | [§0.5](./meta/journey.md) |
 | **메타: 결정 이력** | [`meta/decisions.md`](./meta/decisions.md) | [§8](./meta/decisions.md) 미결 → 확정 |
