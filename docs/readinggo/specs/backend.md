@@ -75,7 +75,7 @@ activeBook.set(userBookId)                                  // = users.active_us
 // 일일 기록 (세션 + 한 문장)
 sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 세션 생성 + 스트릭/XP. duration_sec(#430): 읽기 세션 시간(초) 누적
 sessions.list(userBookId)                  → Session[]
-sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): quote(기본)|thought(내 의견) — 20_sentence_kind.sql
+sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
 sentences.listByBook(userBookId)           → Sentence[]      // 내 책(user_book) 한 문장
 sentences.byBook(bookId, {limit?, sort?})  → Sentence[]      // 그 책(books.id)의 *타인* 공개 한 문장(#11). 본인 제외(neq user_id), 비-UUID id → []. sort='likes'(#594): 좋아요 많은 순 Top N(clap_count embed), 기본 'recent'(최신순). 각 행에 clapCount 부착
