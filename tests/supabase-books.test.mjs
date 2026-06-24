@@ -44,12 +44,11 @@ function check(name, cond) { if (cond) { pass++; console.log('OK   ' + name); } 
   check('1. isbn 시드 fb 매칭(데미안)', W.getBook('9788937460449') && Array.isArray(W.getBook('9788937460449').fb));
 }
 
-// ── 케이스 2: Supabase 비었으면 TSV 폴백 (RG_SB 미설정) ──
+// ── 케이스 2: Supabase 미설정(RG_SB null) → 인라인 RG_BOOKS 폴백 (#972: 정적 TSV 폴백 제거) ──
 {
-  const tsv = 'book_id\tisbn\ttitle\tauthor\tpublisher\ttotal_pages\tcover_url\nb001\t9788934972464\t사피엔스\t유발 하라리\t김영사\t648\thttps://c/sap\n';
   const sandbox = {
     window: {}, document: {}, console,
-    fetch: () => Promise.resolve({ ok: true, text: () => Promise.resolve(tsv) }),
+    fetch: () => Promise.reject(new Error('no network')),  // 폴백은 더 이상 fetch 안 함 — 인라인 RG_BOOKS
     RG_SB: null,
   };
   sandbox.window.RG_SB = null;
@@ -57,16 +56,15 @@ function check(name, cond) { if (cond) { pass++; console.log('OK   ' + name); } 
   vm.runInContext(src, sandbox);
   const W = sandbox.window;
   const books = await W.loadBooks();
-  check('2. RG_SB 미설정 → TSV 폴백', Array.isArray(books) && books.length === 1 && books[0].title === '사피엔스');
+  check('2. RG_SB 미설정 → 인라인 RG_BOOKS 폴백', Array.isArray(books) && books.length === W.RG_BOOKS.length && books[0].title === '사피엔스');
   check('2. 폴백도 isbn 인덱스', W.getBook('9788934972464') && W.getBook('9788934972464').id === 'b001');
 }
 
-// ── 케이스 3: Supabase 빈 결과([]) → TSV 폴백 ──
+// ── 케이스 3: Supabase 빈 결과([]) → 인라인 RG_BOOKS 폴백 (#972) ──
 {
-  const tsv = 'book_id\tisbn\ttitle\tauthor\tpublisher\ttotal_pages\tcover_url\nb010\t9788937460777\t1984\t조지 오웰\t민음사\t452\thttps://c/1984\n';
   const sandbox = {
     window: {}, document: {}, console,
-    fetch: () => Promise.resolve({ ok: true, text: () => Promise.resolve(tsv) }),
+    fetch: () => Promise.reject(new Error('no network')),
     RG_SB: { client: () => ({ from: () => ({ select: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }) },
   };
   sandbox.window.RG_SB = sandbox.RG_SB;
@@ -74,7 +72,8 @@ function check(name, cond) { if (cond) { pass++; console.log('OK   ' + name); } 
   vm.runInContext(src, sandbox);
   const W = sandbox.window;
   const books = await W.loadBooks();
-  check('3. Supabase 빈 결과 → TSV 폴백', Array.isArray(books) && books.length === 1 && books[0].title === '1984');
+  check('3. Supabase 빈 결과 → 인라인 RG_BOOKS 폴백', Array.isArray(books) && books.length === W.RG_BOOKS.length && books[0].title === '사피엔스');
+  check('3. 폴백서 1984 isbn 조회', W.getBook('9788937460777') && W.getBook('9788937460777').title === '1984');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
