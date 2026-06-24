@@ -1424,6 +1424,98 @@ input,textarea{font-family:inherit;}
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
 }
+
+/* ── 같이읽기(방) — co-reading.md. 버튼 위계·간격은 DESIGN.md 준수 ── */
+/* 버튼 위계: 1차 솔리드(--brand), 2차 tonal(--brand-soft 배경 + --brand-3 글씨), ghost 금지 */
+.rg-btn-primary{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:12px 18px; border:none; border-radius:var(--r-sm);
+  background:var(--brand); color:#fff; font-size:14px; font-weight:800;
+  cursor:pointer; letter-spacing:-.2px;
+}
+.rg-btn-primary:disabled{ opacity:.5; cursor:default; }
+.rg-btn-tonal{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:12px 18px; border:1px solid var(--brand-soft); border-radius:var(--r-sm);
+  background:var(--brand-soft); color:var(--brand-3); font-size:14px; font-weight:800;
+  cursor:pointer; letter-spacing:-.2px;
+}
+.rg-btn-tonal:disabled{ opacity:.5; cursor:default; }
+
+/* 세그먼트(공개/비공개 등) */
+.rg-room-segor{ display:flex; gap:6px; }
+.rg-seg{
+  flex:1; padding:9px 0; border:1px solid var(--line); border-radius:999px;
+  background:transparent; color:var(--ink-2); font-size:13px; font-weight:800; cursor:pointer;
+}
+.rg-seg.on{ border:none; background:var(--ink); color:#fff; }
+
+/* 방 목록 섹션·카드 */
+.rg-room-section{ font-size:12.5px; font-weight:800; color:var(--ink-2); margin:0 0 10px; }
+.rg-room-empty{ text-align:center; padding:28px 18px; background:var(--card); border:1px solid var(--line); border-radius:var(--r-md); }
+.rg-room-card{
+  display:flex; gap:12px; align-items:center; width:100%; text-align:left;
+  background:var(--card); border:1px solid var(--line); border-radius:var(--r-md);
+  padding:12px; cursor:pointer;
+}
+.rg-room-cardbody{ min-width:0; flex:1; }
+.rg-room-cardname{ font-size:14.5px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rg-room-cardline{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-3); font-weight:700; margin-top:4px; flex-wrap:wrap; }
+.rg-room-cardpct{ font-size:12px; color:var(--brand-3); font-weight:800; margin-top:3px; }
+
+/* 방 목록 1행(검색결과·추천) */
+.rg-room-listrow{
+  display:flex; gap:10px; align-items:center; width:100%; text-align:left;
+  background:var(--card); border:1px solid var(--line); border-radius:var(--r-sm);
+  padding:9px 12px; cursor:pointer;
+}
+.rg-room-listmeta{ min-width:0; flex:1; display:flex; flex-direction:column; }
+.rg-room-listname{ font-size:13.5px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rg-room-listsub{ font-size:11.5px; color:var(--ink-3); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rg-room-listcta{ flex:0 0 auto; font-size:12px; font-weight:800; color:var(--brand-3); background:var(--brand-soft); border-radius:999px; padding:5px 12px; }
+
+/* 시트(찾기·만들기·미리보기) */
+.rg-room-sheet-backdrop{ position:fixed; inset:0; z-index:60; background:rgba(20,20,30,.45); backdrop-filter:blur(2px); display:flex; align-items:flex-end; justify-content:center; animation:fadeIn .2s ease both; }
+.rg-room-sheet{ width:100%; max-width:430px; background:var(--card); border-radius:20px 20px 0 0; padding:18px 18px 24px; max-height:88vh; overflow-y:auto; animation:slideUp .28s cubic-bezier(.2,.8,.2,1) both; }
+.rg-room-sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.rg-room-sheet-head strong{ font-size:17px; font-weight:900; color:var(--ink); letter-spacing:-.3px; }
+.rg-room-x{ background:rgba(0,0,0,.06); border:none; border-radius:50%; width:30px; height:30px; font-size:17px; line-height:1; color:var(--ink-2); cursor:pointer; }
+.rg-room-input{ width:100%; box-sizing:border-box; padding:11px 13px; border:1.5px solid var(--line); border-radius:var(--r-sm); font-size:14px; outline:none; }
+.rg-room-input:focus{ border-color:var(--brand-soft); }
+.rg-room-num{ width:72px; padding:7px 9px; border:1.5px solid var(--line); border-radius:10px; font-size:13px; outline:none; margin-left:auto; }
+.rg-room-label{ font-size:12px; font-weight:800; color:var(--ink-2); margin:0 0 6px; }
+.rg-room-hint{ font-size:12.5px; color:var(--ink-3); line-height:1.6; margin:8px 0 0; }
+.rg-room-err{ font-size:12.5px; color:#C0392B; font-weight:700; margin:8px 0 0; }
+.rg-room-toggle-row{ display:flex; align-items:center; gap:8px; margin-top:12px; font-size:13.5px; font-weight:700; color:var(--ink); cursor:pointer; }
+.rg-room-bookrow{ display:flex; gap:10px; align-items:center; width:100%; text-align:left; background:transparent; border:none; border-radius:10px; padding:7px 4px; cursor:pointer; }
+.rg-room-bookrow:hover{ background:var(--paper-2); }
+.rg-room-bookmeta{ min-width:0; flex:1; display:flex; flex-direction:column; }
+.rg-room-booktitle{ font-size:13.5px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rg-room-bookauthor{ font-size:11.5px; color:var(--ink-3); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* 방 내부 모달 — 전체 화면 시트 */
+.rg-room-modal-backdrop{ position:fixed; inset:0; z-index:55; background:rgba(20,20,30,.5); display:flex; align-items:flex-end; justify-content:center; animation:fadeIn .2s ease both; }
+.rg-room-modal{ width:100%; max-width:430px; height:92vh; background:var(--paper); border-radius:20px 20px 0 0; display:flex; flex-direction:column; animation:slideUp .3s cubic-bezier(.2,.8,.2,1) both; overflow:hidden; }
+.rg-room-modal-head{ display:flex; align-items:center; gap:8px; padding:14px 14px 10px; border-bottom:1px solid var(--line); }
+.rg-room-back, .rg-room-gear{ background:transparent; border:none; font-size:18px; cursor:pointer; color:var(--ink-2); width:32px; height:32px; }
+.rg-room-modal-title{ flex:1; font-size:15.5px; font-weight:900; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rg-room-summary{ padding:10px 16px; font-size:12.5px; font-weight:700; color:var(--ink-2); background:var(--card-soft); }
+.rg-room-settings{ padding:8px 12px; border-bottom:1px solid var(--line); background:var(--card); display:flex; flex-direction:column; }
+.rg-room-set-item{ text-align:left; background:transparent; border:none; padding:11px 6px; font-size:13.5px; font-weight:700; color:var(--ink); cursor:pointer; border-radius:8px; }
+.rg-room-set-item:hover{ background:var(--paper-2); }
+.rg-room-set-item:disabled{ opacity:.45; cursor:default; }
+.rg-room-set-item.rg-danger{ color:#C0392B; }
+.rg-room-tabs{ display:flex; border-bottom:1px solid var(--line); background:var(--card); position:sticky; top:0; z-index:1; }
+.rg-room-tab{ flex:1; padding:12px 0; background:transparent; border:none; border-bottom:2px solid transparent; font-size:13.5px; font-weight:800; color:var(--ink-3); cursor:pointer; }
+.rg-room-tab.on{ color:var(--ink); border-bottom-color:var(--brand); }
+.rg-room-modal-body{ flex:1; overflow-y:auto; padding:14px 16px; }
+.rg-room-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.rg-room-membercard{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-sm); padding:12px 6px 10px; text-align:center; cursor:pointer; }
+.rg-room-membertop{ display:flex; align-items:center; justify-content:center; gap:4px; }
+.rg-room-nest{ font-size:24px; }
+.rg-room-light{ font-size:10px; }
+.rg-room-membername{ font-size:12px; font-weight:800; color:var(--ink); margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rg-room-memberpct{ font-size:11.5px; color:var(--brand-3); font-weight:800; margin-top:2px; }
 </style>
 </head>
 <body>

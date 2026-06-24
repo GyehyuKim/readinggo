@@ -21,6 +21,7 @@ function BookInfoModal({ bookId, onClose }) {
   const [seeding, setSeeding] = useState(false); // 마중물 시드 큐 처리 대기 (#774 큐 방식) — '모으는 중' placeholder 게이트
   const [mySents, setMySents] = useState([]); // 내 한 문장 (#610) — 이 책에 내가 남긴 것 (읽은 책)
   const [shelf, setShelf] = useState(null); // 서재 상태 (#644) — null=미상, 'reading'|'completed'|'aborted'|'wish'|'none'
+  const [rooms, setRooms] = useState([]); // 같이읽기 방 (co-reading.md §4.4) — 이 책의 공개 방. 발견→방 진입점.
   useEffect(() => {
     let alive = true;
     const DS = window.DataStore || {}; // 활성 어댑터 — 게스트가 Supabase로 새던 400 수정 (QA ISSUE-004)
@@ -121,6 +122,24 @@ function BookInfoModal({ bookId, onClose }) {
       .catch(() => { if (alive) { setDesc(''); setDescSource(''); } });
     return () => { alive = false; };
   }, [bk]);
+  // 같이읽기 방 (co-reading.md §4.4) — 이 책의 공개 방. badge "이 책 N명 같이 읽는 중".
+  useEffect(() => {
+    let alive = true; setRooms([]);
+    const DS = window.DataStore || {};
+    if (!bk || !(DS.rooms && DS.rooms.byBook)) return;
+    Promise.resolve(DS.rooms.byBook(bk.id, { limit: 12 }))
+      .then(rs => { if (alive) setRooms(Array.isArray(rs) ? rs : []); })
+      .catch(() => { if (alive) setRooms([]); });
+    return () => { alive = false; };
+  }, [bk]);
+  // 방 멤버 합계 — N≥2 일 때만 "N명" 노출(1명짜리 과노출 방지, §4.4). 방 0·인원 0 이면 badge 생략.
+  const roomMemberTotal = (rooms || []).reduce((n, r) => n + ((r.village_members && r.village_members[0] && r.village_members[0].count) || 0), 0);
+  const showRoomBadge = (rooms || []).length > 0 && roomMemberTotal >= 1;
+  const openRoomDiscovery = () => {
+    // 방 1개면 바로 그 방, 여러 개면 첫 공개 방으로(P1: 단순 — 미리보기 없이 입장 미리보기는 방 탭에서).
+    const first = (rooms || [])[0];
+    if (first && window.RG_openRoom) { window.RG_openRoom(first.id); onClose && onClose(); }
+  };
   const kyoboUrl = bk ? `https://search.kyobobook.co.kr/search?keyword=${encodeURIComponent(bk.isbn13 || bk.title)}` : '#';
   return (
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -139,6 +158,13 @@ function BookInfoModal({ bookId, onClose }) {
               </div>
               <h2 style={{ fontSize: 18, fontWeight: 900, margin: '0 0 4px', color: 'var(--ink)' }}>{bk.title}</h2>
               <p style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 700, margin: 0 }}>{bk.author}{bk.publisher ? ' · ' + bk.publisher : ''}{bk.total_pages ? ' · ' + bk.total_pages + 'p' : ''}</p>
+              {/* 같이읽기 진입점 (co-reading.md §4.4) — 발견 맥락에 "이 책 N명 같이 읽는 중" → 방으로. */}
+              {showRoomBadge && (
+                <button onClick={openRoomDiscovery}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '6px 12px', borderRadius: 999, border: '1px solid var(--brand-soft)', background: 'var(--brand-tint, var(--brand-soft))', color: 'var(--brand-3)', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>
+                  📖 이 책 {roomMemberTotal >= 2 ? `${roomMemberTotal}명 ` : ''}같이 읽는 중
+                </button>
+              )}
             </div>
             <a href={kyoboUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '12px', background: 'var(--brand-tint)', border: '1.5px solid var(--brand)', borderRadius: 8, color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, textDecoration: 'none', marginBottom: 10 }}>교보문고에서 보기 →</a>
             {/* 책 소개 (#578) — 왜 읽는지 보여 읽고 싶게. DB description 우선·알라딘 폴백, 없으면 섹션 생략. */}

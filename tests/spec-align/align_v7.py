@@ -36,6 +36,7 @@ FEATURE_FILES = [
     "user-profile-modal.js", "sentence-collection-modal.js",
     "shelf-import.js",
     "milestone-recap.js",  # #938 A2 — 마일스톤 회고 모달(직접 localStorage 금지 범위 포함)
+    "co-reading.js",  # #987 같이읽기(방) — 방 UI(직접 localStorage 금지, DataStore.rooms.* 경유)
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]

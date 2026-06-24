@@ -39,6 +39,21 @@
   function _dayDiff(from, to) {
     return Math.round((new Date(to + 'T00:00:00') - new Date(from + 'T00:00:00')) / 86400000);
   }
+  // 방 초대 토큰 (co-reading.md §6.4) — 추측 불가한 충분 길이(≈26자) 랜덤. URL-safe(영숫자).
+  // crypto.getRandomValues 우선, 미지원 시 Math.random 폴백. UNIQUE 충돌은 create 가 재시도.
+  function _roomToken() {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const len = 26;
+    let out = '';
+    try {
+      const buf = new Uint8Array(len);
+      (window.crypto || window.msCrypto).getRandomValues(buf);
+      for (let i = 0; i < len; i++) out += alphabet[buf[i] % alphabet.length];
+    } catch (e) {
+      for (let i = 0; i < len; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    return out;
+  }
   // 추천 점수 (#787) — claps 임베드 count 추출 + 신선도 감쇠 + 좋아요 가중.
   // 데이터가 적으면 clap=0 → log항=0 → freshness(최신순)로 수렴 → 저트래픽서도 안전.
   function _clapCount(r) { return (r && r.clap_count && r.clap_count[0] && r.clap_count[0].count) || 0; }
@@ -941,6 +956,164 @@
       patches: {
         load() { try { return JSON.parse(localStorage.getItem('rg_town_patches_v1') || '{}'); } catch(e) { return {}; } },
         save(p) { try { localStorage.setItem('rg_town_patches_v1', JSON.stringify(p)); } catch(e) {} },
+      },
+    },
+
+    /* 방(room) — 같이읽기 P1 (co-reading.md §6.2). 폐기 villages.* 어댑터를 rooms.* 로
+       부활·rename + slim. 기존 villages/village_members 테이블·RLS 재사용(병렬 테이블 신설 X).
+       create 에 password·invite_token 추가, join 에 password 검증 추가. local 어댑터와 표면 일치. */
+    rooms: {
+      // 공통 select 프로젝션 — 책·멤버수 임베드 (parts 는 P1 미사용이라 제외)
+      _SEL: '*, book:books(id, isbn13, title, author, cover_url, total_pages), village_members(count)',
+      async create({ bookId, name, visibility, capacity, password }) {
+        const id = await uid();
+        // bookId 가 로컬 카탈로그 ID("b104" 등)인 경우 Supabase books 테이블 UUID로 해소(기존 로직).
+        let supaBookId = bookId;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(bookId || ''));
+        if (!isUuid) {
+          const localBook = typeof window !== 'undefined' && window.getBook ? window.getBook(bookId) : null;
+          if (localBook && localBook.isbn) {
+            const sbBook = await A.books.upsert({
+              isbn13: localBook.isbn, title: localBook.title, author: localBook.author,
+              publisher: localBook.pub, total_pages: localBook.total, cover_url: localBook.cover,
+            }).catch(() => null);
+            if (sbBook && sbBook.id) supaBookId = sbBook.id;
+          }
+        }
+        const vis = visibility === 'private' ? 'private' : 'public';
+        const pw = (vis === 'private' && password) ? String(password) : null; // 비밀번호는 비공개 방만
+        // invite_code(6자리) + invite_token(22+자) 동시 생성. UNIQUE 충돌 시 최대 5회 재시도.
+        let v = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+          const inviteToken = _roomToken();
+          const res = await sb().from('villages').insert({
+            book_id: supaBookId, name, visibility: vis, created_by: id,
+            invite_code: inviteCode, invite_token: inviteToken,
+            ...(pw != null && { password: pw }),
+            ...(capacity != null && { capacity }),
+          }).select().single();
+          if (!res.error) { v = res.data; break; }
+          if (res.error.code !== '23505') throw res.error; // UNIQUE 위반 외 에러는 즉시 throw
+          // 23505 = unique_violation(code/token 충돌) → 새 값으로 재시도
+        }
+        if (!v) throw new Error('방 코드 생성 실패 (5회 시도 초과)');
+        await sb().from('village_members').insert({ village_id: v.id, user_id: id });
+        // book + member count 포함해 다시 조회 (insert 응답엔 임베드 미포함)
+        return unwrap(await sb().from('villages').select(this._SEL).eq('id', v.id).single()) || v;
+      },
+      async join(roomId, opts) {
+        const id = await uid();
+        const password = opts && opts.password;
+        // 정원·비밀번호 검증 — capacity 설정 방은 미만이어야, 비밀번호 설정 방은 일치해야 참여.
+        const vRow = unwrap(await sb().from('villages')
+          .select('capacity, password, visibility, village_members(count)')
+          .eq('id', roomId).maybeSingle());
+        if (vRow) {
+          if (vRow.capacity) {
+            const cnt = (Array.isArray(vRow.village_members) && vRow.village_members[0]) ? (vRow.village_members[0].count || 0) : 0;
+            if (cnt >= vRow.capacity) throw new Error('정원이 마감되었습니다.');
+          }
+          // 비공개+비밀번호 방: 비밀번호가 맞아야 한다(토큰/링크 입장은 미리보기에서 분기 — join 직접 호출 시 검증).
+          if (vRow.password && String(vRow.password) !== String(password || '')) {
+            throw new Error('비밀번호가 맞지 않아요.');
+          }
+        }
+        await sb().from('village_members').upsert({ village_id: roomId, user_id: id }, { onConflict: 'village_id,user_id' });
+        return true;
+      },
+      async leave(roomId) {
+        const id = await uid();
+        await sb().from('village_members').delete().eq('village_id', roomId).eq('user_id', id);
+        return true;
+      },
+      // 책으로 공개 방 검색(§4.3 책으로 검색 · §4.4 badge 카운트). bookId 지정 시 그 책 방만.
+      async byBook(bookId, opts) {
+        const limit = opts && opts.limit;
+        let q = sb().from('villages').select(this._SEL)
+          .eq('visibility', 'public').order('created_at', { ascending: false });
+        if (bookId) {
+          // 로컬 카탈로그 id → Supabase UUID 해소(임베드 책은 UUID 기준 매칭).
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(bookId || ''));
+          let supaBookId = bookId;
+          if (!isUuid && typeof window !== 'undefined' && window.getBook) {
+            const lb = window.getBook(bookId);
+            if (lb && lb.isbn) {
+              const found = unwrap(await sb().from('books').select('id').eq('isbn13', lb.isbn).maybeSingle());
+              if (found && found.id) supaBookId = found.id;
+            }
+          }
+          q = q.eq('book_id', supaBookId);
+        }
+        if (limit) q = q.limit(limit);
+        return unwrap(await q) || [];
+      },
+      // 참여 중인 방 (구 listMine)
+      async myRooms() {
+        const id = await uid();
+        const rows = unwrap(await sb().from('village_members')
+          .select(`village:villages(${this._SEL})`)
+          .eq('user_id', id));
+        return (rows || []).map(r => r.village).filter(Boolean);
+      },
+      async get(roomId) {
+        return unwrap(await sb().from('villages').select(this._SEL).eq('id', roomId).single());
+      },
+      // 멤버 진척 그리드 — 진도·오늘불빛·최근 한 문장 (§5.3.1). villages.members 로직 재사용.
+      async members(roomId) {
+        const today = _today();
+        const vRow = unwrap(await sb().from('villages').select('book_id').eq('id', roomId).maybeSingle());
+        const bookId = vRow && vRow.book_id;
+        const memberRows = unwrap(await sb().from('village_members')
+          .select('joined_at, user:users(id, handle, display_name, nest_emoji, streak:streak(current))')
+          .eq('village_id', roomId)) || [];
+        if (!memberRows.length || !bookId) return memberRows;
+        const memberIds = memberRows.map(r => r.user && r.user.id).filter(Boolean);
+        if (!memberIds.length) return memberRows;
+        const ubRows = unwrap(await sb().from('user_books')
+          .select('id, user_id, current_page')
+          .eq('book_id', bookId).in('user_id', memberIds)) || [];
+        const userBookIds = ubRows.map(r => r.id);
+        // 오늘 어떤 책이든 기록했는지(스트릭 동일 기준 — 방 책 한정 X)는 reading_sessions 전체로 판정.
+        const todaySessions = memberIds.length
+          ? unwrap(await sb().from('reading_sessions').select('user_id').in('user_id', memberIds).eq('session_date', today)) || []
+          : [];
+        const todayUserSet = new Set(todaySessions.map(s => s.user_id));
+        const sentRows = userBookIds.length
+          ? unwrap(await sb().from('sentences')
+              .select('user_id, user_book_id, text, page')
+              .in('user_book_id', userBookIds)
+              .order('created_at', { ascending: false })
+              .limit(userBookIds.length * 5)) || []
+          : [];
+        const sentByUbId = {};
+        for (const s of sentRows) { if (!sentByUbId[s.user_book_id]) sentByUbId[s.user_book_id] = s; }
+        return memberRows.map(r => {
+          const u = r.user || {};
+          const ub = ubRows.find(x => x.user_id === u.id);
+          const sent = ub ? sentByUbId[ub.id] : null;
+          return {
+            ...r,
+            user: {
+              ...u,
+              cumulativePage: (ub && ub.current_page) || 0,
+              todayRecorded: todayUserSet.has(u.id),   // 오늘 어떤 책이든 기록 = ● (§5.3.1)
+              todaySentence: sent ? { text: sent.text, page: sent.page } : null,
+            },
+          };
+        });
+      },
+      // 토큰 URL 입장 미리보기 (§5.2) — invite_token 직접 조회(전체 스캔 없음).
+      async findByToken(token) {
+        if (!token) return null;
+        return unwrap(await sb().from('villages').select(this._SEL)
+          .eq('invite_token', String(token).trim()).maybeSingle());
+      },
+      // 6자리 코드 입장 미리보기 — invite_code 직접 조회.
+      async findByCode(code) {
+        if (!code) return null;
+        return unwrap(await sb().from('villages').select(this._SEL)
+          .eq('invite_code', String(code).toUpperCase().trim()).maybeSingle());
       },
     },
 

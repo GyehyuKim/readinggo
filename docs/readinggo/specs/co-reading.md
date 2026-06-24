@@ -420,6 +420,48 @@ rooms.findByCode(code)                   → Room | null                     // 
 
 ---
 
+## 10. P1 구현 상태 (as-built, #987 코드 PR)
+
+> 스펙↔구현 동기화 (CONTRIBUTING §4.1). 이 절은 코드 PR과 함께 갱신된다.
+
+### 10.1 마이그레이션
+
+`docs/readinggo/supabase/34_co_reading_rooms.sql` — `villages.password`(nullable) + `villages.invite_token`(unique) 컬럼 2개 추가 + `invite_token` 부분 인덱스. 기존 `villages`/`village_members`/RLS 그대로 재사용(병렬 테이블·새 RLS 신설 없음, §6.1). `schema.sql` 통합 정의에도 반영. **적용 = 사람(또는 Management API)이 라이브 DB에 실행** — `migrations_applied.py` 가 적용 여부를 검사(코드 머지≠DB 적용).
+
+### 10.2 DataStore 계약 `rooms.*` (양 어댑터 대칭)
+
+`js/datastore.js`(localStorage) · `js/datastore-supabase.js`(supabase) 양쪽에 동일 시그니처 구현(§6.2):
+
+`create({bookId,name,visibility,capacity?,password?})` · `join(roomId,{password?})` · `leave(roomId)` · `byBook(bookId,{limit?})` · `myRooms()` · `get(roomId)` · `members(roomId)` · `findByToken(token)` · `findByCode(code)`.
+
+- `invite_token` = 26자 랜덤(crypto, §6.4). `invite_code` 6자리 병행. UNIQUE 충돌 5회 재시도.
+- `password` = **평문 저장**(P1 데모 한정, §6.4 — 해시/서버검증은 Phase 1 `/cso` 후속). 검증은 `join` + 미리보기.
+- supabase `rooms.*` 는 폐기 `villages.*` 구현 재사용(rename·slim, `parts`/게시판 메서드는 P1 계약에서 제외). 구 `villages.*` 블록은 잔존(데드, 호환).
+- local 어댑터: 타 사용자 부재 → `members` 는 나 1명, `byBook`/`myRooms` 는 `rg_rooms_v1` 키 로컬 방. 표면 일치만 보장.
+
+### 10.3 UI
+
+- `js/co-reading.js` (신규) — `RoomsView`(방 탭 §4.2: 참여 중·추천·찾기/만들기) · `FindRoomSheet`(§4.3) · `CreateRoomSheet`(§5.1) · `RoomPreviewSheet`(§4.5) · `RoomModal`(§5.3: 멤버 진척 그리드 + 한 문장 2탭 + ⚙️ 공유/나가기). `window.RoomsView`/`window.RoomModal` 노출.
+- `js/social.js` — 피드 탭을 **'함께'** 셸로 재편(§2.1): 상단 세그먼트 **① 발견 / ② 방**, 기본=발견. 발견 = 기존 피드 그대로(`DiscoverLayer`, feed.md §5.7 보존), 방 = `RoomsView`. 내부 탭 키 `social` 유지.
+- `js/app.js` — 하단 탭 라벨 **피드 → 함께**. `window.RG_openRoom(roomId)` 등록 + `RoomModal` 포털.
+- `js/book-info-modal.js` — "📖 이 책 N명 같이 읽는 중" badge(§4.4, N≥2 일 때만 카운트) → 방 진입.
+- `index.html` — `.rg-btn-primary`/`.rg-btn-tonal`(DESIGN.md 버튼 위계: 1차 솔리드/2차 tonal, ghost 금지) + `.rg-room-*` 클래스.
+- `render-smoke.mjs` — 탭 라벨 변경(피드→함께) 동반 갱신.
+- **멤버 그리드 둥지 이모지** = 방 책 진척% 5구간 매핑(🌿🪹🪺🐣🏰, `NEST_STAGES` 이모지 재사용, `rgRoomNestEmoji`). 오늘 불빛(●/○) = 오늘 어떤 책이든 기록(스트릭 동일 기준).
+
+### 10.4 P1 잔여 (이 PR에서 미완 — 정직 표기)
+
+| 항목 | 상태 |
+|---|---|
+| 책으로 방 검색(§4.3 책으로 검색 탭) | ✅ 구현(카탈로그 fuzzy → `byBook` 합집합). 단 **공개 방 카탈로그 검색은 Supabase 실데이터 의존** — 게스트/로컬은 로컬 방만 노출(표면만). 브라우저 QA(실 로그인)에서 교차 사용자 검색 검증 권장 |
+| 방 미리보기 capacity 'N/M' 표시 | ✅ 단 현재 인원 카운트는 `village_members(count)` 임베드 의존(supabase) |
+| 발견(① 피드) 카드의 책 badge | 책 상세(`BookInfoModal`) 경유로 통일(§4.4) — 피드 카드 자체엔 미부착(책 상세 단일화 원칙). 인기 책/피드에서 책 탭 → 상세 → badge |
+| 명칭 | "방"·"함께" = **placeholder**(§8, owner 확정 대기) |
+
+> 위 잔여는 *기능 누락*이 아니라 **실데이터(Supabase 로그인) 의존 표면**이라 로컬 데모에서 제한적으로 보이는 항목 — 핵심 루프(만들기·참여·접근제어·진척 그리드·한 문장·나가기)는 양 어댑터에서 동작.
+
+---
+
 ## 부록: prior-art 매핑 (마을 → 방)
 
 [village.md](./village.md)(폐기 #440)에서 **살린 것 / 떼어낸 것**:

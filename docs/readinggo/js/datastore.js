@@ -835,6 +835,106 @@ const DataStore = {
     },
   },
 
+  /* 방(room) — 같이읽기 P1 (co-reading.md §6.2). localStorage 어댑터(게스트/Phase0).
+     타 사용자 부재 → members 는 나 1명, byBook/myRooms 는 로컬 방 목록. Supabase 어댑터와
+     같은 메서드 표면(Promise)만 보장(backend.md §7.2). 로컬 방은 rg_rooms_v1 키에 영속. */
+  rooms: {
+    _load() { try { return JSON.parse(localStorage.getItem('rg_rooms_v1') || '[]') || []; } catch (e) { return []; } },
+    _save(list) { try { localStorage.setItem('rg_rooms_v1', JSON.stringify(list || [])); } catch (e) {} },
+    _token() {
+      const a = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let s = ''; for (let i = 0; i < 26; i++) s += a[Math.floor(Math.random() * a.length)]; return s;
+    },
+    // 로컬 방을 Supabase 어댑터 표면으로 — book 임베드(getBook 해소) + village_members count.
+    _shape(r) {
+      const bk = (typeof window.getBook === 'function') ? window.getBook(r.book_id) : null;
+      const book = bk ? { id: bk.id, isbn13: bk.isbn, title: bk.title, author: bk.author, cover_url: bk.cover, total_pages: bk.total } : { id: r.book_id };
+      return { ...r, book, village_members: [{ count: (r._members && r._members.length) || 1 }] };
+    },
+    async create({ bookId, name, visibility, capacity, password }) {
+      const list = this._load();
+      const vis = visibility === 'private' ? 'private' : 'public';
+      const r = {
+        id: _dsId('room'), book_id: bookId, name: name || '', visibility: vis,
+        capacity: capacity != null ? capacity : null,
+        password: (vis === 'private' && password) ? String(password) : null,
+        invite_code: Math.random().toString(36).slice(2, 8).toUpperCase(),
+        invite_token: this._token(),
+        created_by: (window.RG_ME && window.RG_ME.id) || 'me',
+        created_at: new Date().toISOString(),
+        _members: [(window.RG_ME && window.RG_ME.id) || 'me'],   // 로컬 멤버십(나만)
+      };
+      list.unshift(r); this._save(list);
+      return this._shape(r);
+    },
+    async join(roomId, opts) {
+      const list = this._load();
+      const r = list.find(x => x.id === roomId);
+      if (r) {
+        if (r.capacity && (r._members || []).length >= r.capacity) throw new Error('정원이 마감되었습니다.');
+        if (r.password && String(r.password) !== String((opts && opts.password) || '')) throw new Error('비밀번호가 맞지 않아요.');
+        const me = (window.RG_ME && window.RG_ME.id) || 'me';
+        r._members = r._members || []; if (!r._members.includes(me)) r._members.push(me);
+        this._save(list);
+      }
+      return true;
+    },
+    async leave(roomId) {
+      const list = this._load();
+      const r = list.find(x => x.id === roomId);
+      if (r) {
+        const me = (window.RG_ME && window.RG_ME.id) || 'me';
+        r._members = (r._members || []).filter(m => m !== me);
+        this._save(list);
+      }
+      return true;
+    },
+    async byBook(bookId, opts) {
+      let out = this._load().filter(r => r.visibility === 'public' && (!bookId || r.book_id === bookId));
+      if (opts && opts.limit) out = out.slice(0, opts.limit);
+      return out.map(r => this._shape(r));
+    },
+    async myRooms() {
+      const me = (window.RG_ME && window.RG_ME.id) || 'me';
+      return this._load().filter(r => (r._members || []).includes(me)).map(r => this._shape(r));
+    },
+    async get(roomId) {
+      const r = this._load().find(x => x.id === roomId);
+      return r ? this._shape(r) : null;
+    },
+    // 멤버 진척 그리드 — 로컬은 나 1명. 내 활성/지정 책 진도·오늘 기록·최근 한 문장 반영.
+    async members(roomId) {
+      const r = this._load().find(x => x.id === roomId);
+      if (!r) return [];
+      const me = window.RG_ME || {};
+      const myUb = localStorageAdapter.mutate(s => (s.user_books || []).find(u => u.book_id === r.book_id) || null);
+      const today = _today();
+      const recordedToday = localStorageAdapter.mutate(s =>
+        (s.user_books || []).some(u => (u.sessions || []).some(se => se.session_date === today)));
+      const lastSent = myUb && (myUb.sentences || []).length ? myUb.sentences[myUb.sentences.length - 1] : null;
+      return [{
+        joined_at: r.created_at,
+        user: {
+          id: me.id || 'me', handle: me.handle || 'me', display_name: me.display_name || me.handle || '나',
+          nest_emoji: me.nest_emoji || null, streak: me.streak ? [{ current: me.streak }] : [],
+          cumulativePage: (myUb && myUb.current_page) || 0,
+          todayRecorded: !!recordedToday,
+          todaySentence: lastSent ? { text: lastSent.text, page: lastSent.page } : null,
+        },
+      }];
+    },
+    async findByToken(token) {
+      if (!token) return null;
+      const r = this._load().find(x => x.invite_token === String(token).trim());
+      return r ? this._shape(r) : null;
+    },
+    async findByCode(code) {
+      if (!code) return null;
+      const r = this._load().find(x => x.invite_code === String(code).toUpperCase().trim());
+      return r ? this._shape(r) : null;
+    },
+  },
+
   /* 유저 공개 데이터 — Phase 0 로컬 어댑터 stub (표면 일치용)
      Phase 1 에서 SupabaseDataStore.users 로 실구현. */
   users: {

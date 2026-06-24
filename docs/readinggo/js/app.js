@@ -341,6 +341,9 @@ function App() {
   // 설정 모달(§5.8) — 프로필 ⚙️ 로 열림.
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => { window.RG_openSettings = () => setSettingsOpen(true); return () => { window.RG_openSettings = null; }; }, []);
+  // 같이읽기 방 모달(co-reading.md §5.3) — 방 카드·badge·미리보기에서 window.RG_openRoom(roomId) 로 열림.
+  const [roomOpenId, setRoomOpenId] = useState(null);
+  useEffect(() => { window.RG_openRoom = (id) => setRoomOpenId(id); return () => { window.RG_openRoom = null; }; }, []);
   // 로그인 화면 열기(저장 시점 트리거) — 설정/프로필/배너에서 호출.
   useEffect(() => { window.RG_login = () => setShowLogin(true); return () => { window.RG_login = null; }; }, []);
   // 책 상세 통일(#11, 통일성) — 어디서 누르든 같은 책=같은 화면. 탭이 아니라 '소유'로 라우팅:
@@ -837,7 +840,7 @@ function App() {
                 <path d="M9 21V12h6v9"/>
               </svg>
             )},
-            { id: 'social', label: '피드', svg: (
+            { id: 'social', label: '함께', svg: (
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>
@@ -924,6 +927,11 @@ function App() {
         {shelfImportOpen && ReactDOM.createPortal(
           <ShelfImportModal onClose={() => setShelfImportOpen(false)} />,
           document.body
+        )}
+
+        {/* 같이읽기 방 내부 (co-reading.md §5.3) — 방 카드·badge 진입 */}
+        {roomOpenId && window.RoomModal && (
+          <window.RoomModal roomId={roomOpenId} onClose={() => setRoomOpenId(null)} />
         )}
 
       </div>
