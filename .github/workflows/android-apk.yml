@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # Capacitor 8 CLI 는 Node >=22 요구(cap sync). #1003
 
       # Capacitor 8 / AGP 8 = JDK 17+. 21 사용(안전).
       - uses: actions/setup-java@v4
