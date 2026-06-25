@@ -1,0 +1,58 @@
+# 안드로이드 디버그 APK 빌드 (#1003) — 수동 트리거.
+# 로컬 툴체인(JDK·SDK) 없이 GitHub 러너에서 빌드 → app-debug.apk 아티팩트.
+# 흐름: Vite build(dist) → cap sync android → gradlew assembleDebug.
+# 디버그 서명(러너 생성 debug.keystore)이라 테스트 설치용. release 서명은 별도(#873 후).
+name: android-apk
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: build debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Capacitor 8 / AGP 8 = JDK 17+. 21 사용(안전).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Android SDK + 라이선스 자동 수락 + ANDROID_HOME 설정.
+      - uses: android-actions/setup-android@v3
+
+      # 웹 번들(dist) 빌드 — capacitor webDir=dist.
+      - name: Build web bundle (Vite)
+        working-directory: docs/readinggo
+        run: |
+          npm ci
+          npm run build
+
+      # dist → android 동기화 + 플러그인(capgo 등) 반영.
+      - name: Capacitor sync (android)
+        working-directory: docs/readinggo
+        run: npx cap sync android
+
+      # 디버그 APK 빌드.
+      - name: Gradle assembleDebug
+        working-directory: docs/readinggo/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: readinggo-debug-apk
+          path: docs/readinggo/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
