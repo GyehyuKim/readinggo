@@ -702,7 +702,12 @@ function App() {
         // P2(co-reading.md §7.5): 같이읽기 기본 = 같이+공개(opt-out). together 모드면 이 책의
         // 공개 숲에 자동 합류(없으면 새로 만들어 합류) = "공개로 열면 알아서 붙어서 읽는다".
         // solo 모드·게스트/로컬 표면은 헬퍼가 알아서 no-op/로컬 처리. 등록을 막지 않게 fire-and-forget.
-        if (window.RG_autoJoinPublicRoom && (!window.RG_coReadMode || window.RG_coReadMode() !== 'solo')) {
+        // #1035 P2: **로그인 유저만** 자동합류. 게스트(미로그인)는 로컬 전용 1인 숲이 만들어지고
+        //   "함께했어요" 토스트가 떠 아무도 없는데 모임에 든 듯한 오해를 준다. 세션을 call-time 에
+        //   확인(콜백 stale-closure 회피) — currentUser()는 게스트·로컬 모드 모두 null. 등록은 안 막음.
+        let _loggedIn = false;
+        try { _loggedIn = !!(window.RG_SB && window.RG_SB.currentUser && (await window.RG_SB.currentUser())); } catch (e) { _loggedIn = false; }
+        if (_loggedIn && window.RG_autoJoinPublicRoom && (!window.RG_coReadMode || window.RG_coReadMode() !== 'solo')) {
           Promise.resolve(window.RG_autoJoinPublicRoom({
             id: ub.book_id || book.book_id || book.id || '', title: book.title, author: book.author,
           })).then(room => {

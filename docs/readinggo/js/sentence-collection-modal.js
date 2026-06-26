@@ -170,8 +170,11 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
             </div>
           )}
           {mode === 'find' && (<>
-          {/* 내 한 문장 검색(#1007, §5.8.8) — 쌓인 문장을 키워드로 즉시 좁힌다. 검색할 문장이 있을 때만 노출. */}
-          {mine !== undefined && (list.length + saved.length) > 0 && (
+          {/* 내 한 문장 검색(#1007, §5.8.8) — 쌓인 문장을 키워드로 즉시 좁힌다. 검색할 문장이 있을 때만 노출.
+              #1035 P2: 가시 조건을 현재 필터의 검색 스코프(base, line 74)와 일치시킨다. 전체/책별은 내
+              문장(list), 좋아요는 좋아요한 문장(favPool→favCount). 안 맞추면 "좋아요만 ≥1·내 문장 0" 유저가
+              전체 탭에서 검색창은 보이는데 스코프(list)가 비어 늘 "검색 결과 없음" 막다른 길이 된다. */}
+          {mine !== undefined && (filter === 'fav' ? favCount > 0 : list.length > 0) && (
             <input type="text" value={query} onChange={e => setQuery(e.target.value)}
               placeholder="내 문장·감상·책 검색" aria-label="내 한 문장 검색"
               style={{ width: '100%', boxSizing: 'border-box', padding: '9px 14px', marginBottom: 12, borderRadius: 999, border: '1px solid var(--line)', background: 'var(--paper)', color: 'var(--ink)', fontSize: 13, fontWeight: 600, outline: 'none' }} />

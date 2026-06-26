@@ -477,7 +477,8 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 **제약 (이 PR)**:
 - **반드시 P1 `rooms.*` 계약만 재사용**(`byBook`·`join`·`create`·`myRooms`). 새 저장소 직접호출·새 테이블 **없음**. P2-1 의 본체는 *등록 시점 글루(app.js `handleSearchSelectBook`) + 토글 UI(co-reading.js) + CSS*.
-- 자동합류는 **fire-and-forget** — 실패해도 책 등록 자체는 막지 않는다(조용히). 게스트/로컬은 어댑터가 로컬 숲만 다루므로 표면만 일치(교차 사용자 합류는 Supabase 로그인 의존).
+- 자동합류는 **fire-and-forget** — 실패해도 책 등록 자체는 막지 않는다(조용히).
+- **로그인 유저만 자동합류**(#1035 P2): 게스트(미로그인)는 자동합류·"함께했어요" 토스트를 **모두 skip** 한다. together 가 기본이라 게스트가 책을 등록하면 로컬 어댑터가 **아무도 없는 1인 로컬 숲**을 만들고 "🌳 …같이 읽는 숲에 함께했어요" 토스트를 띄워, 실제로는 혼자인데 모임에 든 듯한 오해를 줬다. 호출부(app.js `handleSearchSelectBook`)가 call-time 에 세션(`RG_SB.currentUser()`)을 확인해 미로그인이면 헬퍼를 부르지 않는다(콜백 stale-closure 회피). 등록 자체는 막지 않는다. 교차 사용자 합류는 여전히 Supabase 로그인 의존.
 - 중복 숲 방지: 같은 책 공개 숲에 이미 들어가 있으면(`myRooms` 교차 확인) 새로 만들지 않는다(멱등).
 
 > **auto-match 추천 후속 = #997(§7.6, 구현됨)**: "같이/혼자" 분기는 위 토글로, **능동 추천(공개 숲 권유)** 은 §7.6 으로 해소. **페이스(진도대) 매칭·임베딩/ML** 은 규모상 과설계라 **보류**(후속).
@@ -587,7 +588,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
   - `rgCoReadMode()`/`rgSetCoReadMode()` — `DataStore.coReadMode.*` 경유(어댑터). `window.RG_coReadMode`/`RG_setCoReadMode` alias + `rg:coread-mode-changed` 이벤트로 토글 동기화.
   - `rgAutoJoinPublicRoom(book)` — together 모드 시 `rooms.byBook`→없으면 `rooms.create({visibility:'public'})`. `myRooms` 교차 확인으로 멱등(중복 숲 방지). `window.RG_autoJoinPublicRoom`.
   - `CoReadModeToggle` — 2차 tonal 카드 + 스위치(ghost 금지). 프라이버시 트레이드오프 안내문 포함. `window.CoReadModeToggle`.
-- `js/app.js` — `handleSearchSelectBook`(읽는중 등록 단일 퍼널)에서 등록 성공 후 `RG_autoJoinPublicRoom` **fire-and-forget**(solo·실패는 no-op, 등록 안 막음). 합류 시 토스트.
+- `js/app.js` — `handleSearchSelectBook`(읽는중 등록 단일 퍼널)에서 등록 성공 후 `RG_autoJoinPublicRoom` **fire-and-forget**(solo·실패는 no-op, 등록 안 막음). 합류 시 토스트. **#1035 P2: 로그인 유저만** — call-time 에 `RG_SB.currentUser()` 로 세션 확인, 게스트(미로그인)면 자동합류·토스트 skip(유령 1인 로컬 숲·오해 토스트 방지, §7.5).
 - `js/nest.js` — 홈 빈 상태(첫 등록 전)에 `CoReadModeToggle` 노출(등록 전 기본 선택).
 - `js/co-reading.js` `RoomsView` 상단 상주 토글 + `RG_roomsChanged`/`rg:rooms-changed` 수신해 자동합류·나가기 후 목록 갱신.
 - `index.html` — `.rg-coread-mode*`/`.rg-coread-switch`/`.rg-coread-knob` CSS.

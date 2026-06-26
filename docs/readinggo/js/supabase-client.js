@@ -87,12 +87,17 @@
 
     // 이메일 매직링크 — 비밀번호 없이 메일 링크로 로그인. 메일 소유 검증이 곧 confirm
     // 이라 mailer_autoconfirm 무관하게 안전 (#159).
+    // 네이티브(#1035 P1): OAuth(signInWithOAuth) 와 동일하게, 네이티브에선 emailRedirectTo 를
+    //   커스텀 스킴(NATIVE_REDIRECT)으로 보낸다. web-origin(`https://localhost`) 복귀는 외부
+    //   브라우저에 멈춰 앱이 로그인 화면에 갇히던 버그(소셜 #968 과 동일류). 복귀는 appUrlOpen
+    //   핸들러가 PKCE `?code=`(exchangeCodeForSession) 또는 `token_hash`+`type`(verifyOtp)로 교환.
+    //   전제: Supabase 대시보드 Auth→URL Configuration→Redirect URLs 에 그 스킴 등록(#968 과 공유).
     async signInWithEmail(email) {
       const c = client();
       if (!c) throw new Error('Supabase 미설정');
       return c.auth.signInWithOtp({
         email: email,
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: isNative() ? NATIVE_REDIRECT : window.location.origin },
       });
     },
 
@@ -149,26 +154,37 @@
     },
   };
 
-  // 네이티브 OAuth 복귀(#968): 인앱 브라우저가 com.readinggo.app://login-callback?code=... 로 돌아오면
-  // appUrlOpen 이벤트로 받아 code 를 세션으로 교환하고 브라우저를 닫는다. 교환 성공 시 onAuthStateChange
-  // 가 자동 발화 → 앱이 로그인 상태로 갱신(별도 네비게이션 불필요). 웹/비네이티브에선 no-op.
+  // 네이티브 인증 복귀(#968 OAuth · #1035 이메일 매직링크): 인앱 브라우저가
+  // com.readinggo.app://login-callback?... 로 돌아오면 appUrlOpen 이벤트로 받아 세션을 교환하고
+  // 브라우저를 닫는다. 교환 성공 시 onAuthStateChange 가 자동 발화 → 앱이 로그인 상태로 갱신
+  // (별도 네비게이션 불필요). 웹/비네이티브에선 no-op.
+  //   - 소셜 OAuth + PKCE 이메일 매직링크(기본): `?code=` → exchangeCodeForSession.
+  //   - 이메일 OTP(템플릿이 {{ .TokenHash }} 인 경우): `token_hash`+`type` → verifyOtp.
+  // 두 모양 모두 처리해 이메일 링크가 어느 Supabase 설정에서도 앱으로 복귀하게 한다(#1035 P1).
   function initNativeAuth() {
     if (!isNative() || !window.CapApp) return;
+    const param = (url, key) => { const m = url.match(new RegExp('[?&#]' + key + '=([^&]+)')); return m ? decodeURIComponent(m[1]) : null; };
     window.CapApp.addListener('appUrlOpen', async (event) => {
       const url = (event && event.url) || '';
       if (url.indexOf('login-callback') === -1) return;
       const c = client();
       try {
-        const m = url.match(/[?&]code=([^&]+)/);
-        const code = m ? decodeURIComponent(m[1]) : null;
+        const code = param(url, 'code');
+        const tokenHash = param(url, 'token_hash');
+        const otpType = param(url, 'type');
         if (code && c) {
+          // PKCE(소셜 + 기본 이메일 매직링크) — 인가 코드를 세션으로 교환.
           const { error } = await c.auth.exchangeCodeForSession(code);
           if (error) console.warn('[RG_SB] exchangeCodeForSession 실패:', error.message);
+        } else if (tokenHash && c) {
+          // 이메일 OTP 매직링크(token_hash 모양) — verifyOtp 로 검증·세션화. type 기본 'magiclink'.
+          const { error } = await c.auth.verifyOtp({ token_hash: tokenHash, type: otpType || 'magiclink' });
+          if (error) console.warn('[RG_SB] verifyOtp 실패:', error.message);
         } else {
-          console.warn('[RG_SB] login-callback 에 code 없음:', url);
+          console.warn('[RG_SB] login-callback 에 code/token_hash 없음:', url);
         }
       } catch (e) {
-        console.warn('[RG_SB] 네이티브 OAuth 복귀 처리 실패:', e);
+        console.warn('[RG_SB] 네이티브 인증 복귀 처리 실패:', e);
       } finally {
         try { if (window.CapBrowser) await window.CapBrowser.close(); } catch (e) {}
       }
