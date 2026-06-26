@@ -34,6 +34,28 @@ jobs:
         with:
           node-version: 20
 
+      # 승격으로 prod 를 덮어쓰기 전에, 현재 prod 매니페스트를 :prev 키로 백업한다(원클릭 롤백용, #1029).
+      # prod 가 나쁜 번들로 승격됐을 때 RELEASE.md §4.1 의 한 줄로 :prev → :production 복원 가능.
+      - name: Backup current production manifest → :prev
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          # --remote 필수: wrangler v4 local-first. 없으면 로컬 KV(빈 값)를 읽어 백업이 무의미(#990).
+          # 최초 승격(아직 prod 없음)이면 빈 값 → 백업 스킵(graceful). kv get 은 키 부재 시 빈 출력.
+          CUR=$(npx -y wrangler@4 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:production")
+          if [ -z "$CUR" ]; then
+            echo "ℹ️ 현재 production 매니페스트 없음(최초 승격) — :prev 백업 스킵."
+          else
+            echo "backing up current production manifest → :prev: $CUR"
+            # --remote 필수: 없으면 로컬 KV 에만 써서 실제 백업이 안 됨(#990).
+            npx -y wrangler@4 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
+              "ota:android:production:prev" "$CUR"
+            PREV_VER=$(echo "$CUR" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).version||"?")}catch{process.stdout.write("?")}})')
+            echo "✅ 직전 production 백업 완료(ota:android:production:prev): $PREV_VER"
+          fi
+
       - name: Read beta manifest → write to production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -1,5 +1,5 @@
 // markdownlint-cli2 설정 — Korean docs + table-heavy spec 친화 룰셋
-// 적용 범위: docs/readinggo/specs/, docs/readinggo/CLAUDE.md, 루트 *.md
+// 적용 범위: docs/readinggo/specs/, docs/readinggo/CLAUDE.md, docs/readinggo/RELEASE.md, 루트 *.md
 // 제외: docs/2. specifications/ (legacy + autopilot), docs/1. research_and_lectures/, docs/4. user_interviews/, old/
 {
   "config": {
@@ -29,6 +29,7 @@
   "globs": [
     "docs/readinggo/specs/**/*.md",
     "docs/readinggo/CLAUDE.md",
+    "docs/readinggo/RELEASE.md",
     "CLAUDE.md",
     "CONTRIBUTING.md",
     "README.md",
