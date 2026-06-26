@@ -385,7 +385,7 @@ village_parts(village_id, part_order)                    -- v7 신설
 - `inquiries` (v7.2): 본인만 insert(user_id=auth.uid()). select = 본인 OR `is_admin()`. update = `is_admin()`만(상태 변경)
 - `village_members` (v7.2): leave = 본인 행 delete (마을 탈퇴, #9)
 - `villages`: 누구나 공개 마을 목록 select. insert는 로그인 사용자. `village_members` 의 멤버만 피드/멤버 현황 select (구경 불가는 §village 에서 규정). **단 `password_hash` 컬럼은 `revoke select` 로 클라 read 차단** — 비번 검증은 `room_verify_password` RPC 서버측만(#996, §7.6.1)
-- `village_members`: 본인 가입/탈퇴만 insert/delete
+- `village_members` (#1022, CSO HIGH): `vmembers_mod` = **본인 탈퇴(delete)만** 클라 직접 허용. **INSERT 자격 회수** — 클라 직접 `village_members` insert/upsert 가 방 비번·정원·visibility 우회 입장 경로였으므로(RLS 가 `user_id=auth.uid()` 만 봄), 멤버십 생성은 SECURITY DEFINER RPC(`room_join`/`room_create_membership`, §7.6.1)가 서버측 검증 후에만 수행한다(`36_room_join_rpc.sql`). select(`vmembers_sel`)는 유지
 - v7 제거: `operator_replies` RLS (운영자 짹 폐기)
 
 ### 7.6 닉네임 RPC
@@ -406,6 +406,20 @@ room_verify_password(p_room_id uuid, p_password text) → boolean  -- crypt(inpu
 
 - `rooms.create` 는 평문 insert 안 함 — 방 생성 후 `room_set_password` 호출. `rooms.join` 은 `password` select 제거 → `room_verify_password`(boolean)로 분기.
 - 마이그레이션 `35_room_password_hash.sql` **수동 1회 적용 필수**(pgcrypto·컬럼·REVOKE·RPC). 기존 평문은 해시로 변환 후 컬럼 drop.
+
+#### 7.6.2 숲(방) 입장 RPC — 서버측 권한 강제 (#1022, co-reading §6.3)
+
+방 입장(멤버십) 권한은 **서버가 최종**이다. 이전엔 어댑터(JS)가 비번·정원을 검사한 뒤 `village_members` 를 **클라가 직접 insert** 했고, RLS(`vmembers_mod`)는 `user_id=auth.uid()` 만 확인 → join UI 를 건너뛴 직접 `POST /rest/v1/village_members` 로 **비번·정원·visibility 우회 입장**이 가능했다(CSO HIGH, OWASP A01). 이제 클라 직접 insert 는 RLS(`vmembers_mod` = **delete만**)로 거부되고, 멤버십 생성은 아래 **SECURITY DEFINER** RPC(search_path 고정) 경유만 — 함수 안에서 서버가 검증한 뒤에만 행을 만든다.
+
+```
+room_join(p_room_id uuid, p_password text)  → void   -- ①방 존재 ②room_verify_password=true ③count(members)<capacity 검증 후에만
+                                                     --   insert village_members(auth.uid()) on conflict do nothing. 실패=raise(errcode 로 비번/정원/없는방 구분)
+room_create_membership(p_room_id uuid)       → void   -- 방 생성자(created_by=auth.uid()) 자기등록. create 직후 호출(직접 insert 대체)
+```
+
+- `rooms.join` → `room_join` RPC 호출(직접 upsert 제거). `rooms.create` → 생성자 멤버 등록을 `room_create_membership` RPC 로(직접 insert 제거).
+- RLS 변경: `vmembers_mod` 를 `for all`(insert/delete) → **`for delete`(본인 탈퇴)만**. INSERT 정책이 없어 클라 직접 insert/upsert 거부. `vmembers_sel`(조회)은 유지.
+- 마이그레이션 `36_room_join_rpc.sql` **수동 1회 적용 필수**. `room_verify_password`(#35)에 의존 → **35 를 먼저** 적용. `migrations_applied.py` 는 컬럼/테이블만 검사하므로 RPC·정책은 적용 후 수동 확인.
 
 ### 7.7 가입 전 데이터 동기화 (DataStore 어댑터 전환점)
 

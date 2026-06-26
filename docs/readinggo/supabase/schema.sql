@@ -399,16 +399,53 @@ create policy vparts_mod on public.village_parts for all using (
   exists (select 1 from public.villages v where v.id = village_id and v.created_by = auth.uid())
 );
 
--- village_members: 본인 가입/탈퇴만, 같은 마을/공개 마을 멤버 select
--- ※ 자기참조(village_members 안에서 village_members 조회) 제거 → is_village_member() 사용
+-- village_members: 본인 탈퇴(delete)만 클라 직접 허용, 같은 마을/공개 마을 멤버 select.
+-- ※ 자기참조(village_members 안에서 village_members 조회) 제거 → is_village_member() 사용.
+-- ※ 입장(INSERT)은 클라 직접 불가 — 서버측 검증(visibility·비번·정원) 후 SECURITY DEFINER
+--   RPC(room_join / room_create_membership, 36_room_join_rpc.sql, #1022)만 멤버 행을 만든다.
+--   vmembers_mod 가 for delete 만이라 INSERT 정책이 없어 클라 직접 insert/upsert 는 거부된다.
 drop policy if exists vmembers_sel on public.village_members;
 create policy vmembers_sel on public.village_members for select using (
   user_id = auth.uid()
   or public.is_village_member(village_id)
   or exists (select 1 from public.villages v where v.id = village_id and v.visibility = 'public')
 );
+-- (#1022) for all → for delete: 클라 직접 INSERT 차단. 멤버십 생성은 RPC 경유만.
 drop policy if exists vmembers_mod on public.village_members;
-create policy vmembers_mod on public.village_members for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy vmembers_mod on public.village_members for delete using (user_id = auth.uid());
+
+-- 숲 입장 권한 = 서버측 강제 (co-reading §6.3, #1022, 36_room_join_rpc.sql).
+-- 클라가 village_members 를 직접 insert 못 하게 막고(위 vmembers_mod = delete 만), 멤버십 생성은
+-- 아래 SECURITY DEFINER RPC 경유만. 함수 안에서 서버가 방존재·비번·정원을 검증한 뒤에만 insert.
+create or replace function public.room_join(p_room_id uuid, p_password text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_capacity int; v_count int; v_exists boolean;
+begin
+  select (id is not null), capacity into v_exists, v_capacity from public.villages where id = p_room_id;
+  if not coalesce(v_exists, false) then raise exception 'room not found' using errcode = 'P0002'; end if;
+  if not public.room_verify_password(p_room_id, coalesce(p_password, '')) then
+    raise exception 'invalid room password' using errcode = '28000'; end if;
+  if v_capacity is not null then
+    select count(*) into v_count from public.village_members where village_id = p_room_id;
+    if v_count >= v_capacity
+       and not exists (select 1 from public.village_members where village_id = p_room_id and user_id = auth.uid()) then
+      raise exception 'room is full' using errcode = '23505'; end if;
+  end if;
+  insert into public.village_members (village_id, user_id) values (p_room_id, auth.uid())
+  on conflict (village_id, user_id) do nothing;
+end; $$;
+create or replace function public.room_create_membership(p_room_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_owner uuid;
+begin
+  select created_by into v_owner from public.villages where id = p_room_id;
+  if v_owner is null then raise exception 'room not found' using errcode = 'P0002'; end if;
+  if v_owner <> auth.uid() then raise exception 'only the room host can self-register on create' using errcode = '42501'; end if;
+  insert into public.village_members (village_id, user_id) values (p_room_id, auth.uid())
+  on conflict (village_id, user_id) do nothing;
+end; $$;
+grant execute on function public.room_join(uuid, text)        to authenticated;
+grant execute on function public.room_create_membership(uuid) to authenticated;
 
 -- ── 권한(grant) — RLS 가 행 단위 통제. anon=읽기, authenticated=쓰기 ──────
 grant usage on schema public to anon, authenticated;

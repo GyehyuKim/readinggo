@@ -342,7 +342,7 @@ alter table public.villages add column if not exists has_password  boolean not n
 | `village_topics`/`village_opinions` (게시판) | ❌ P1 미사용 | **P2 게시판** |
 | `is_village_member(uuid)` SECURITY DEFINER | ✅ | RLS 순환 방지 헬퍼 — `villages_sel`/`vmembers_sel` 정책 그대로 재사용(`schema.sql` RLS 블록) |
 
-> **RLS**: 기존 정책(`villages_sel`: public OR 생성자 OR `is_village_member`; `vmembers_sel`/`vmembers_mod`: 본인 가입·탈퇴, 공개 방 멤버 조회)을 **그대로 쓴다**. `invite_token`·`has_password` 는 컬럼이라 RLS 변경 불필요. **`password_hash` 만 예외** — `revoke select (password_hash)` 로 클라 read 를 컬럼 단위 차단하고, 검증은 SECURITY DEFINER RPC(`room_verify_password`)가 서버에서만(§6.4, #996). 비공개 방 토큰/비밀번호 입장 시 멤버 insert 가 곧 접근권 부여.
+> **RLS**: `villages_sel`(public OR 생성자 OR `is_village_member`) · `vmembers_sel`(본인·같은 방·공개 방 멤버 조회)는 그대로. `invite_token`·`has_password` 는 컬럼이라 변경 불필요. **두 가지 예외:** ⑴ `password_hash` — `revoke select (password_hash)` 로 클라 read 차단, 검증은 SECURITY DEFINER RPC(`room_verify_password`)만(§6.4, #996). ⑵ **`vmembers_mod` 변경(#1022)** — `for all`(본인 행 insert/delete) → **`for delete`(본인 탈퇴)만**. 클라 직접 `village_members` insert 가 비번·정원 우회 경로였으므로 INSERT 자격을 회수하고, 멤버십 생성은 **SECURITY DEFINER RPC `room_join`/`room_create_membership`** 경유만(서버가 visibility·비번·정원 검증 후 insert — §6.3·§6.4, `36_room_join_rpc.sql`).
 
 ### 6.2 DataStore 계약 — `rooms.*` (구 `villages.*` 부활·rename)
 
@@ -372,8 +372,8 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 | 신 메서드(`rooms.*`) | 구 메서드(`villages.*`) | 변경 |
 |---|---|---|
-| `create` | `create` | `parts` 인자 제거(P1 마일스톤 없음), `password` 인자 추가(→ `room_set_password` RPC 로 **bcrypt 해시 저장**, #996), `invite_token` 생성 추가 |
-| `join` | `join` | `password` **서버측 검증** 추가 — `room_verify_password` RPC(boolean), 평문·해시 클라 비노출(비공개+PW 방, #996) |
+| `create` | `create` | `parts` 인자 제거(P1 마일스톤 없음), `password` 인자 추가(→ `room_set_password` RPC 로 **bcrypt 해시 저장**, #996), `invite_token` 생성 추가, **멤버 등록을 `room_create_membership` RPC 로**(직접 insert 제거, #1022) |
+| `join` | `join` | 입장 **권한 서버측 강제**(#1022) — `room_join` RPC 호출(직접 `village_members` upsert 제거). 비번·정원을 서버가 최종 검증(내부 `room_verify_password` #996). errcode → 친화 메시지 |
 | `leave`/`get`/`members` | 동일 | 시그니처 동일(재사용) |
 | `byBook` | `listPublic` 확장 | 책 필터 검색(제목/저자/ISBN) — `listPublic` 에 book 필터 추가 |
 | `myRooms` | `listMine` | rename |
@@ -385,14 +385,22 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 - **Phase 0(local)**: 타 사용자 부재 → `members` 는 나 1명, `byBook`/`myRooms` 는 로컬 방 목록. `listParts`/`setParts` 는 방 객체 `_parts` 인라인 배열(supabase `village_parts` 표면 일치). 표면 일치만 보장([backend.md](./backend.md) §7.2).
 - **book_id 해소**: 로컬 책 id(`b104` 등)는 어댑터가 Supabase `books` UUID 로 upsert·해소(기존 `create` 로직 재사용).
 
-### 6.3 입장 검증 위치
+### 6.3 입장 검증 위치 (#1022 — 서버측 강제)
 
-| 검증 | 위치 |
+> **결정·구현됨 (#1022, CSO HIGH · OWASP A01).** 입장(멤버십) 권한은 **서버가 최종**이다. 이전엔
+> 정원·비밀번호를 클라(어댑터 JS)가 검사한 뒤 `village_members` 를 **직접 insert/upsert** 했는데,
+> RLS(`vmembers_mod`)가 `user_id = auth.uid()` 만 봐서 join UI/검증을 건너뛴 직접
+> `POST /rest/v1/village_members` 로 **비번·정원·visibility 우회 입장**이 가능했다. 이제 클라 직접
+> insert 는 RLS 로 거부되고, 멤버십 생성은 **SECURITY DEFINER RPC `room_join`** 경유만 — 함수
+> 안에서 서버가 검증한 뒤에만 행을 만든다(§6.4 표 참고).
+
+| 검증 | 위치 (서버 = 최종 강제) |
 |---|---|
-| 정원(capacity) | `rooms.join` — 현재 인원 ≥ capacity 면 throw `"정원이 마감되었습니다."`(기존 로직) |
-| 비밀번호(password) | 미리보기(§4.5) + `rooms.join` 인자 검증 |
+| 정원(capacity) | **`room_join` RPC(서버)** — 현재 멤버수 ≥ capacity 면 `raise exception 'room is full'` → 어댑터가 `"정원이 마감되었습니다."`. 클라 카운트 미리보기는 UX 힌트일 뿐 |
+| 비밀번호(password) | **`room_join` RPC(서버)** — 내부에서 `room_verify_password`(#996, bcrypt) 호출, 불일치면 `raise exception` → `"비밀번호가 맞지 않아요."`. 미리보기(§4.5)는 입력칸 노출 판단(`has_password`)만 |
 | 토큰/코드 유효성 | `findByToken`/`findByCode` (없으면 null → "방을 찾을 수 없어요") |
-| 멤버십·열람권 | RLS(`is_village_member`) — insert 가 접근권 부여 |
+| 멤버십 생성(insert) | **`room_join` / `room_create_membership` SECURITY DEFINER RPC 만** — 클라 직접 `village_members` insert 는 RLS(`vmembers_mod` = **delete(본인 탈퇴)만**)로 거부. `36_room_join_rpc.sql` |
+| 열람권 | RLS(`is_village_member`) — 멤버 행이 곧 접근권. 그 행은 위 RPC 경유로만 생김 |
 
 ### 6.4 보안 메모 — 비밀번호 해시화 + 서버측 검증 (#996, 평문 후속)
 
@@ -404,9 +412,11 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 | 해시 노출 차단 | `revoke select (password_hash) on villages from anon, authenticated` — 해시 컬럼은 **클라가 read 불가**. 어댑터 select 도 `password_hash` 미포함(컬럼 명시, `*` 금지). |
 | 비번여부 플래그 | `villages.has_password`(`boolean`, 비-비밀) — 미리보기에서 입력칸 노출 여부 판단용(해시 없이도 "비번 걸림"은 알아야 함). 클라 read 허용. |
 | 설정/해제 (host) | `room_set_password(room_id, password)` — **SECURITY DEFINER** RPC, `created_by = auth.uid()`(host) 가드. 빈 값이면 해제(NULL). 해시 저장 + `has_password` 갱신. |
-| 입장 검증 | `room_verify_password(room_id, password)` — **SECURITY DEFINER** RPC, `crypt(input, stored) = stored` 로 서버 비교, **boolean 만 반환**(해시 비노출). 비번 없는 방은 항상 `true`(입장 자유). |
-| 어댑터 (supabase) | `rooms.create` 는 평문 insert 안 함 — 방 생성 후 `room_set_password` RPC 로 해시 저장. `rooms.join` 은 `password` select 제거 → `room_verify_password` RPC 결과(boolean)로 분기. |
-| 어댑터 (local, Phase 0) | 서버 부재 → 평문 비교 불가피(한계 명시). 저장 레코드엔 평문 유지하되 **반환 표면에선 `password` 제거 + `has_password` 만 노출**(supabase 표면 일치). |
+| 비번 검증 | `room_verify_password(room_id, password)` — **SECURITY DEFINER** RPC, `crypt(input, stored) = stored` 로 서버 비교, **boolean 만 반환**(해시 비노출). 비번 없는 방은 항상 `true`(입장 자유). |
+| **입장 강제 (#1022)** | `room_join(room_id, password)` — **SECURITY DEFINER** RPC. 함수 안에서 ①방 존재 ②`room_verify_password`=true ③`count(village_members) < capacity` 를 검증한 **뒤에만** `insert into village_members(... auth.uid()) on conflict do nothing`. 실패는 `raise exception`(errcode 로 비번/정원/없는 방 구분). 생성자 등록은 `room_create_membership(room_id)`(`created_by=auth.uid()` 가드). |
+| **직접 insert 차단 (#1022)** | `vmembers_mod` 를 `for all` → **`for delete`(본인 탈퇴)만** 으로 좁힘 → 클라 직접 `village_members` insert/upsert 거부. 멤버십은 위 두 RPC(정의자 권한 RLS 우회) 경유만. `36_room_join_rpc.sql`. |
+| 어댑터 (supabase) | `rooms.create` 는 평문 insert 안 함 — 방 생성 후 `room_set_password` RPC 로 해시 저장, **멤버 등록도 `room_create_membership` RPC**(직접 insert 제거). `rooms.join` 은 `password` select·직접 upsert 제거 → **`room_join` RPC** 호출(서버가 비번·정원 최종 검증). |
+| 어댑터 (local, Phase 0) | 서버 부재 → 평문 비교 불가피(한계 명시). 저장 레코드엔 평문 유지하되 **반환 표면에선 `password` 제거 + `has_password` 만 노출**(supabase 표면 일치). 멤버십 강제는 로컬(단일 사용자)이라 무의미. |
 
 - `invite_token` 은 추측 불가한 충분 길이(예: 22+ 문자) 랜덤. unique 충돌 시 재시도(기존 `invite_code` 5회 재시도 패턴 재사용).
 - **마이그레이션 수동 적용 전제**: `35_room_password_hash.sql`(pgcrypto 확장·`password_hash`/`has_password` 컬럼·REVOKE·RPC 2개)은 Supabase Dashboard SQL Editor 또는 Management API 로 **사람이 1회 실행**해야 한다(코드 머지 ≠ DB 적용). `migrations_applied.py` 는 컬럼/테이블만 검사하므로 RPC·REVOKE 는 적용 후 수동 확인.
@@ -491,6 +501,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 | 1 | 방 단위 정식 명칭 | ✅ **확정 = "숲"**(§8, #987 후속) |
 | 2 | 탭 라벨 "함께" vs "같이" | ✅ **확정 = "함께"**(§8) |
 | 3 | `password` 저장 방식(평문/해시/서버검증) | ✅ **해소 = bcrypt 해시 + 서버 RPC 검증**(§6.4, #996). 평문 컬럼 제거, 해시 클라 비노출 |
+| 3b | 입장 권한 강제 위치(클라 vs 서버) | ✅ **해소 = 서버측**(§6.3, #1022 CSO HIGH). 클라 직접 `village_members` insert 회수(`vmembers_mod` = delete만), 멤버십은 `room_join`/`room_create_membership` SECURITY DEFINER RPC 경유만 |
 | 4 | 멤버 0 숲 가비지 컬렉션 | 보류 — §5.4, P2 |
 | 5 | "혼자/같이" 분기 + auto-match | ◐ **분기 = 해소**(§7.5 같이 기본 opt-out + 공개 자동합류, #988). **auto-match 풀**(추천·매칭 기준)만 P2 잔여 |
 | 6 | 숲 탭 미읽음/오늘 신호 배지 | 보류 — §4.1, P1 미적용(목록만), P2 검토 |
@@ -509,6 +520,8 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 `docs/readinggo/supabase/34_co_reading_rooms.sql` — `villages.password`(nullable) + `villages.invite_token`(unique) 컬럼 2개 추가 + `invite_token` 부분 인덱스. 기존 `villages`/`village_members`/RLS 그대로 재사용(병렬 테이블·새 RLS 신설 없음, §6.1). `schema.sql` 통합 정의에도 반영. **적용 = 사람(또는 Management API)이 라이브 DB에 실행** — `migrations_applied.py` 가 적용 여부를 검사(코드 머지≠DB 적용).
 
 `docs/readinggo/supabase/35_room_password_hash.sql` (#996) — 비밀번호 평문 → **bcrypt 해시 + 서버측 검증** 격상(§6.4). pgcrypto 확장 + `villages.password_hash`(해시)·`has_password`(플래그) 컬럼 + `revoke select (password_hash)`(클라 read 차단) + RPC 2개(`room_set_password` host-only, `room_verify_password` boolean). 기존 평문 `password` 는 해시로 1회 변환 후 컬럼 drop. **수동 1회 적용 필수**(Dashboard SQL Editor/Management API). `migrations_applied.py` 는 컬럼/테이블만 검사 — RPC·REVOKE 는 적용 후 수동 확인.
+
+`docs/readinggo/supabase/36_room_join_rpc.sql` (#1022, CSO HIGH) — 입장 권한 **서버측 강제**(§6.3). SECURITY DEFINER RPC 2개(`room_join(room_id, password)` = 방존재·비번·정원 검증 후에만 멤버 insert; `room_create_membership(room_id)` = 생성자 host 가드 자기등록) + RLS `vmembers_mod` 를 `for all` → **`for delete`(본인 탈퇴)만** 으로 좁혀 클라 직접 `village_members` insert/upsert 차단. `room_verify_password`(#35)에 의존하므로 **35 를 먼저 적용**한 뒤 36 을 **수동 1회 적용**(Dashboard/Management API). `migrations_applied.py` 는 컬럼/테이블만 검사 — RPC·정책 변경은 적용 후 수동 확인. (둘 다 미적용 시 `migrations` CI 가 빨간불 — 의도된 "적용 필요" 신호, #633.)
 
 ### 10.2 DataStore 계약 `rooms.*` (양 어댑터 대칭)
 
