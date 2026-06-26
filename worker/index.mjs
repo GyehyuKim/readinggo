@@ -484,30 +484,57 @@ function bufToBase64(buf) {
   return btoa(bin);
 }
 
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
 // Gemini Flash vision 호출 (OpenAI 호환). VISION_* env + GEMINI_API_KEY.
+// 재시도(#1006): Gemini 무료 티어는 egress 지역에 따라 400 FAILED_PRECONDITION
+// ("User location is not supported")을 간헐 반환한다(워커가 도는 Cloudflare PoP의
+// 송출 지역에 좌우 — 실측 ~50% flap). 같은 요청을 재시도하면 다른 경로/PoP로 나가
+// 성공률이 크게 오른다. 429/5xx(일시 과부하)도 함께 재시도. 본문 변경 없음(멱등).
 async function callVision({ env, dataUrl, maxTokens }) {
   const base = (env.VISION_BASE_URL || '').replace(/\/$/, '');
   const model = env.VISION_MODEL, key = env.GEMINI_API_KEY;
   if (!base || !model || !key) throw new Error('VISION env 미설정');
-  const r = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: HIGHLIGHT_SYSTEM },
-        { role: 'user', content: [
-          { type: 'text', text: '이 책 페이지에서 강조(밑줄/형광펜) 표시된 문장만 추출해.' },
-          { type: 'image_url', image_url: { url: dataUrl } },
-        ] },
-      ],
-      temperature: 0.1,
-      max_tokens: maxTokens || 800,
-    }),
+  const payload = JSON.stringify({
+    model,
+    messages: [
+      { role: 'system', content: HIGHLIGHT_SYSTEM },
+      { role: 'user', content: [
+        { type: 'text', text: '이 책 페이지에서 강조(밑줄/형광펜) 표시된 문장만 추출해.' },
+        { type: 'image_url', image_url: { url: dataUrl } },
+      ] },
+    ],
+    temperature: 0.1,
+    max_tokens: maxTokens || 800,
   });
-  if (!r.ok) throw new Error('VISION HTTP ' + r.status);
-  const d = await r.json();
-  return ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+  const MAX_TRIES = 3;
+  let lastErr = '';
+  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+    let r;
+    try {
+      r = await fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: payload,
+      });
+    } catch (e) {                                   // 네트워크 실패 — 재시도 대상
+      lastErr = 'fetch ' + String((e && e.message) || e);
+      if (attempt < MAX_TRIES) { await sleep(350 * attempt); continue; }
+      throw new Error('VISION ' + lastErr);
+    }
+    if (r.ok) {
+      const d = await r.json();
+      return ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+    }
+    const bodyText = await r.text().catch(() => '');
+    lastErr = 'HTTP ' + r.status + (bodyText ? ' :: ' + bodyText.slice(0, 200) : '');
+    // 재시도 가능 분류: 429/5xx(일시) + 400 FAILED_PRECONDITION(지역 flap). 그 외(401/403 등)는 즉시 중단.
+    const retryable = r.status === 429 || r.status >= 500
+      || (r.status === 400 && /FAILED_PRECONDITION|User location/i.test(bodyText));
+    if (!retryable || attempt === MAX_TRIES) break;
+    await sleep(350 * attempt);
+  }
+  throw new Error('VISION ' + lastErr);
 }
 
 // 배치 OCR (#844) — 사진 1장 → 강조 문장 배열 { sentences }. 클라가 N장 순차 호출.

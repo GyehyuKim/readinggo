@@ -88,21 +88,29 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return; }
     setOcrBusy(true); setOcrProgress({ done: 0, total: files.length });
     const all = [];
+    let failed = 0;   // #1006 추출 실패(서버 비2xx·네트워크) 장 수 — '문장 못 찾음'과 구분해 정직한 안내.
     for (let i = 0; i < files.length; i++) {
       try {
         const fd = new FormData();
         fd.append('document', files[i], files[i].name || ('p' + i + '.jpg'));
         const r = await fetch('/api/extract-highlights', { method: 'POST', body: fd });
-        const d = await r.json();
-        if (d && Array.isArray(d.sentences)) all.push(...d.sentences);
-      } catch (e) { /* 실패 장 스킵 — 부분 완료 */ }
+        if (!r.ok) { failed++; }              // 503(미설정)·502(vision 실패, 지역 flap 포함) 등 → 실패로 집계
+        else { const d = await r.json(); if (d && Array.isArray(d.sentences)) all.push(...d.sentences); }
+      } catch (e) { failed++; /* 네트워크 실패 — 부분 완료 */ }
       setOcrProgress({ done: i + 1, total: files.length });
       if (i < files.length - 1) await new Promise((res) => setTimeout(res, 1200));
     }
     setOcrBusy(false);
     const seen = new Set(), items = [];
     all.forEach((t) => { const k = (t || '').trim(); if (k && !seen.has(k)) { seen.add(k); items.push(k); } });
-    if (!items.length) { showToast('강조된 문장을 찾지 못했어요 — 더 또렷한 사진으로'); return; }
+    if (!items.length) {
+      // #1006 실패(서버/지역 outage)를 사진 탓으로 오인 표시하지 않는다.
+      if (failed >= files.length) showToast('추출에 실패했어요 — 잠시 후 다시 시도해 주세요');
+      else if (failed > 0) showToast('일부 사진을 처리하지 못했고, 강조 문장도 찾지 못했어요 — 잠시 후 다시');
+      else showToast('강조된 문장을 찾지 못했어요 — 더 또렷한 사진으로');
+      return;
+    }
+    if (failed > 0) showToast(`사진 ${failed}장은 처리하지 못했어요 — 찾은 문장만 보여드려요`);
     setOcrItems(items);
   };
   // #610: 자체 삭제/좋아요/공개범위 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 한 문장 카드).

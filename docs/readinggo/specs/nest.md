@@ -176,6 +176,7 @@ bar pct  = cycleXp / next.minXp * 100       # 숫자와 동일 기준
 
 - **진입**: 책 상세(BookDetailModal) **"📷 사진에서 여러 문장 담기"** — §5.8 텍스트 카드 옆(배치류 허브). 단발 OCR(§5.6)은 홈 입력부에 유지.
 - **추출 = Gemini Flash vision (핵심)**: Upstage Document OCR은 글자만 읽고 "밑줄 위치"를 모른다(Solar는 텍스트 전용·vision 미지원, 2026-06 확인). 따라서 각 장 사진을 **Gemini Flash vision 서버리스 프록시**(`/api/extract-highlights`)에 보내 **"밑줄·형광펜 등 강조 표시된 문장만 추출"**(JSON 배열). **원문 충실**(병합·교정·요약·번역·환각 금지, §5.6 보정 원칙 재사용). 형광펜·연필·볼펜 모두 의미적으로 인식. Stack Lock: Gemini vision은 [CLAUDE.md AI v9](../../CLAUDE.md)로 자유(별도 결정 불필요).
+- **형광펜 실동작 검증(#1006, 2026-06-26)**: 노랑·분홍·초록 형광펜 + 본문 혼재 합성 페이지(한글)를 배포 워커에 실호출 → 강조 3문장 **정확·원문 그대로 추출, 비강조 본문 3문장 전부 제외**. 색·다중 형광펜 처리 OK(밑줄과 동등). 프롬프트(`HIGHLIGHT_SYSTEM`)가 "강조된 것만"을 명시하고 비강조/머리말/쪽번호 제외를 지시 — 정확성 검증됨.
 - **흐름**:
   ```
   [앨범 N장 선택]
@@ -186,7 +187,9 @@ bar pct  = cycleXp / next.minXp * 100       # 숫자와 동일 기준
   ```
 - **공통 모듈(#848 공유)**: 검토 큐(`BatchQuoteImport`) + 저장(`saveBatchQuotes`)은 텍스트 import와 동일. OCR 배치 신규 코드는 **"앨범 다중 → 각 장 vision 추출 → 문장 배열"** 앞단뿐.
 - **rate limit**: 무료 `gemini-2.5-flash` 10 RPM / 1,500 RPD. 수십 장은 순차+지연(또는 소량 동시)으로 조절. 실패 장은 스킵/재시도.
-- **환각 안전망**: vision이 없는 문장을 지어낼 위험 → 검토 큐에서 사용자가 확인·삭제로 거른다.
+- **지역 precondition flap + 재시도(#1006)**: Gemini 무료 티어(`generativelanguage.googleapis.com`)는 송출 지역에 따라 `400 FAILED_PRECONDITION: "User location is not supported"`을 **간헐** 반환한다(워커가 도는 Cloudflare PoP의 egress 지역에 좌우 — 2026-06-26 실측 동일 사진 5회 중 ~50% 502 flap). 같은 요청이 다른 경로/PoP로 재송출되면 통과하므로 `callVision`은 **최대 3회 재시도**(429·5xx·`FAILED_PRECONDITION` 한정, 350ms×n 백오프, 멱등). 401/403 등 비일시 오류는 즉시 중단.
+- **실패 vs 빈 결과 구분(#1006)**: 클라(`runOcrBatch`)는 장별 **비2xx·네트워크 실패 수(`failed`)**를 집계해, 추출 0건일 때 서버/지역 outage(`failed≥N`)는 "추출에 실패했어요 — 잠시 후 다시"로, 강조가 실제로 없을 때만 "더 또렷한 사진으로"를 보여준다(backend 장애를 사진 탓으로 오인 표시 금지). 일부 장 실패+일부 성공이면 찾은 문장은 보여주되 실패 장 수를 안내.
+- **환각 안전망**: vision이 없는 문장을 지어낼 위험 → 검토 큐에서 사용자가 확인·삭제로 거른다. (#1006 검증: 비강조 본문은 추출되지 않아 over-extraction 환각은 관측되지 않음.)
 - **키 보호/제한**: `GEMINI_API_KEY` **서버에서만**(클라 노출 금지). `VISION_BASE_URL`/`VISION_MODEL`은 wrangler vars + 로컬 `.env`. 이미지 ≤8MB(§5.6 동일). 동일출처만.
 - **분석 이벤트**: `ocr_batch_started`(count), `highlights_extracted`(page_idx, n), `ocr_batch_saved`(book_id, saved, skipped).
 
