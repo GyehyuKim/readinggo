@@ -54,7 +54,9 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<!-- DESIGN.md Typography(#1032): Body/UI = Noto Sans KR, Quote/흔적·발췌 = Noto Serif KR.
+     세리프는 따옴표 흔적·발췌 문장 전용(헤딩·버튼·라벨은 Sans 유지). -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Serif+KR:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 @font-face{
   font-family: 'Moneygraphy Rounded';
@@ -84,20 +86,25 @@
   /* 빈 별점(☆) 전용 회색 — 크림(--paper)에 또렷이 보이는 라이트 그레이.
      디바이더 토큰 --line-2(거의 크림)를 아이콘색으로 오용하면 별이 안 보임(#984). 별점 트랙은 항상 이 토큰. */
   --star-empty:   #C7CCD3;
-  --brand:        #3FD17F;
-  --brand-2:      #2EB867;
-  --brand-3:      #1F8E4D;
-  --brand-soft:   #DFF6EA;
-  --brand-tint:   #F1FBF5;
-  --brand-shadow: #1F8E4D;
-  --fire:         #FF8A3D;
-  --fire-2:       #FFA970;
-  --fire-soft:    #FFE6D4;
-  --fire-shadow:  #D8651F;
-  --gold:         #FFC233;
-  --gold-2:       #FFD66B;
-  --gold-soft:    #FFF1C7;
-  --gold-shadow:  #C8901C;
+  /* 세이지 그린 리프레시(DESIGN.md 2026-06-19 Color 표, #1032) — 쨍한 민트 → 차분한 세이지.
+     DESIGN.md가 명시한 7개 토큰(brand/brand-2/brand-3/brand-soft/fire/gold) 교체.
+     --brand-shadow/--shadow-mint 는 옛 brand 색을 직접 참조하던 파생값이라 새 brand 기준으로
+     동반 정합. --brand-tint·--fire-2/soft/shadow·--gold-2/soft/shadow 는 표 외 파생 음영이라
+     새 base 채도에 맞춰 비례 조정(임의 신색 아님). */
+  --brand:        #2EA86A;
+  --brand-2:      #228A57;
+  --brand-3:      #196B45;
+  --brand-soft:   #E4F2EA;
+  --brand-tint:   #EFF7F1;
+  --brand-shadow: #196B45;
+  --fire:         #E08A5E;
+  --fire-2:       #EBA988;
+  --fire-soft:    #F6E4D8;
+  --fire-shadow:  #B5613A;
+  --gold:         #D9A52E;
+  --gold-2:       #E6C26A;
+  --gold-soft:    #F5EBCB;
+  --gold-shadow:  #A87B1E;
   --blue:         #5AB5F0;
   --blue-soft:    #E1F1FB;
   --rose:         #F08A9A;
@@ -106,11 +113,12 @@
   --violet-soft:  #ECE2FB;
   --shadow-1:  0 1px 2px rgba(20,20,30,.04), 0 6px 18px rgba(20,20,30,.06);
   --shadow-2:  0 2px 6px rgba(20,20,30,.06), 0 12px 28px rgba(20,20,30,.08);
-  --shadow-mint: 0 8px 22px rgba(63,209,127,.25);
+  --shadow-mint: 0 8px 22px rgba(46,168,106,.25);   /* 새 세이지 brand(#2EA86A) 기준 */
+  /* 라운딩(DESIGN.md #1032): 12 / 16 / 18 중심으로 정제(덜 토이). 구 --r-lg:22·--r-xl:28 → 18 통일. */
   --r-sm: 12px;
   --r-md: 16px;
-  --r-lg: 22px;
-  --r-xl: 28px;
+  --r-lg: 18px;
+  --r-xl: 18px;
 }
 
 *{box-sizing:border-box;}
@@ -120,7 +128,10 @@ html,body{margin:0;padding:0;}
    상단 헤더(.topbar)를 화면 밖으로 보낼 여지가 없다. 스크롤은 .main(overflow:auto)만 담당. */
 html{ overflow: hidden; }
 body{
-  font-family: 'Moneygraphy Rounded','Noto Sans KR',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  /* DESIGN.md(#1032): Body/UI 기본 = Noto Sans KR. Moneygraphy Rounded 는 Display/히어로·큰 숫자
+     전용으로 후퇴 — 브랜드 워드마크(.brand-mark)·세리머니 히어로(.ceremony h2)·큰 숫자(.pixel 군)
+     에만 명시 적용한다(아래). 본문/라벨/버튼은 Noto Sans. */
+  font-family: 'Noto Sans KR',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
@@ -160,6 +171,21 @@ input,textarea{font-family:inherit;}
 .league-xp{ font-weight: 400; letter-spacing: 1px; }
 .nest-stage{ letter-spacing: 1px; }
 .page-num{ font-weight: 400; letter-spacing: 1.5px; }
+
+/* ── DESIGN.md Typography(#1032) ─────────────────────────────────────────
+   Display / 히어로: Moneygraphy Rounded (브랜드 시그니처 유지). 본문이 Noto Sans 로
+   바뀌었으므로 진짜 '큰 한방' 텍스트에만 명시 적용한다. */
+.brand-mark,
+.ceremony h2{
+  font-family: 'Moneygraphy Rounded','Noto Sans KR',-apple-system,system-ui,sans-serif;
+}
+/* Quote / 책 발췌·"내가 남긴 흔적": Noto Serif KR — 따옴표로 감싼 흔적·발췌 문장에만.
+   (헤딩·버튼·라벨·로고 등 UI 텍스트는 Noto Sans 유지)
+   개별 .quote/.saved-quote/.sentence-area 블록도 각자 동일 세리프 스택을 명시(아래)해
+   한 곳만 봐도 폰트 의도가 보이게 한다. 여기 그룹 규칙은 폰트 미명시 흔적 카드 안전망. */
+.my-q-card .quote{
+  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif;
+}
 
 .stage{
   min-height: 100vh;
@@ -821,8 +847,8 @@ input,textarea{font-family:inherit;}
 .quick-ocr:disabled{ opacity:.6; cursor:default; }
 
 /* 오늘의 한 문장 카드 AI 진입 (#469) */
-.my-q-card .q-ai{ margin-top:8px; display:inline-flex; align-items:center; gap:6px; background:var(--brand); border:none; color:#fff; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(63,209,127,0.35); }
-.my-q-card .q-ai:active{ transform:translateY(1px); box-shadow:0 1px 4px rgba(63,209,127,0.2); }
+.my-q-card .q-ai{ margin-top:8px; display:inline-flex; align-items:center; gap:6px; background:var(--brand); border:none; color:#fff; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(46,168,106,0.35); }
+.my-q-card .q-ai:active{ transform:translateY(1px); box-shadow:0 1px 4px rgba(46,168,106,0.2); }
 
 .nudge{
   margin-top: 10px; text-align:center;
@@ -865,7 +891,7 @@ input,textarea{font-family:inherit;}
 .sentence-card .nick{ font-size: 13px; font-weight: 800; color: var(--ink); }
 .sentence-card .meta{ font-size: 11px; color: var(--ink-3); margin-left: auto; }
 .sentence-card .quote{
-  font-family: 'Moneygraphy Rounded','Noto Sans KR'; font-weight: 400;
+  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif; font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
   font-size: 14px; line-height: 1.55;
   color: var(--ink); padding-left: 10px;
   border-left: 3px solid var(--brand-soft);
@@ -1071,7 +1097,7 @@ input,textarea{font-family:inherit;}
 }
 .tab .ico{ font-size: 22px; line-height: 1; }
 .tab.active{ color: var(--brand-3); }
-.tab.active .ico{ transform: translateY(-2px) scale(1.1); transition: transform .2s ease; filter: drop-shadow(0 0 4px rgba(63,209,127,0.4)); }
+.tab.active .ico{ transform: translateY(-2px) scale(1.1); transition: transform .2s ease; filter: drop-shadow(0 0 4px rgba(46,168,106,0.4)); }
 
 .modal-backdrop{
   position: fixed; inset: 0; z-index: 50;
@@ -1158,7 +1184,7 @@ input,textarea{font-family:inherit;}
   padding: 12px 14px;
   border-radius: var(--r-md);
   border: 1.5px solid var(--line);
-  font-family: 'Moneygraphy Rounded','Noto Sans KR'; font-weight: 400;
+  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif; font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
   font-size: 14px; line-height: 1.55;
   resize: none;
   background: var(--card-soft);
@@ -1256,7 +1282,7 @@ input,textarea{font-family:inherit;}
   border-left: 4px solid var(--brand);
   padding: 12px 14px;
   border-radius: 0 12px 12px 0;
-  font-family: 'Moneygraphy Rounded','Noto Sans KR'; font-weight: 400;
+  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif; font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
   font-size: 14px; line-height: 1.55; color: var(--ink);
   text-align: left;
   margin-bottom: 18px;
@@ -1365,7 +1391,7 @@ input,textarea{font-family:inherit;}
 .complete-review .rating-star-hit:focus-visible{
   outline: 3px solid var(--brand-3);
   outline-offset: 1px;
-  background: rgba(63,209,127,.12);
+  background: rgba(46,168,106,.12);
 }
 .complete-review .review-area{
   width: 100%; box-sizing: border-box;

@@ -372,7 +372,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:8, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
                   <div style={{display:'flex', gap:6, marginTop:6}}>
                     <button onClick={saveMeta} style={{padding:'6px 12px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
-                    <button onClick={() => setEditMeta(false)} style={{padding:'6px 12px', borderRadius:8, border:'1px solid var(--line)', background:'transparent', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
+                    {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
+                    <button onClick={() => setEditMeta(false)} style={{padding:'6px 12px', borderRadius:8, border:'none', background:'transparent', color:'var(--ink-2)', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
                   </div>
                 </div>
               ) : (
@@ -420,9 +421,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               {recap ? (
                 <>
                   <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{recap}</div>
+                  {/* 다시 받기 = 2차 tonal(DESIGN.md #1032: ghost 투명+brand 보더 금지 → brand-soft 채움) */}
                   {bookQuotes.length > 0 && (
                     <button onClick={loadRecap} disabled={recapLoading}
-                      style={{marginTop:8, padding:'5px 12px', background:'none', border:'1px solid var(--brand)', borderRadius:8, color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
+                      style={{marginTop:8, padding:'5px 12px', background:'var(--brand-soft)', border:'1px solid var(--brand-soft)', borderRadius:8, color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
                       {recapLoading ? '참새가 곱씹는 중…' : '🔄 다시 받기'}
                     </button>
                   )}
@@ -530,8 +532,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 완독으로 표시
               </button>
+              {/* 읽기 중단 = 중립 tonal(DESIGN.md #1032: ghost 투명+보더 금지 → 채워진 배경.
+                  비긍정 액션이라 그린 tonal 대신 중립 paper-2 채움으로 '완독' 그린과 위계 구분) */}
               <button onClick={abortBook}
-                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'transparent', border:'1.5px solid var(--line)', borderRadius:10, color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:10, color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
                 읽기 중단
               </button>
@@ -632,8 +636,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                       style={{width:72, textAlign:'center', padding:'7px 4px', border:'1.5px solid var(--line)', borderRadius:8, fontSize:13, fontWeight:700}} />
                   </div>
                   <div style={{display:'flex', gap:8, marginTop:10}}>
+                    {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
                     <button onClick={() => { setAddOpen(false); setAddText(''); setAddPage(''); }}
-                      style={{flex:'0 0 auto', padding:'10px 14px', borderRadius:8, border:'1.5px solid var(--line)', background:'transparent', color:'var(--ink-3)', fontWeight:700, fontSize:13, cursor:'pointer'}}>취소</button>
+                      style={{flex:'0 0 auto', padding:'10px 14px', borderRadius:8, border:'none', background:'transparent', color:'var(--ink-3)', fontWeight:700, fontSize:13, cursor:'pointer'}}>취소</button>
                     <button onClick={saveNewQuote} disabled={addBusy}
                       style={{flex:1, padding:'10px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:addBusy?'default':'pointer', opacity:addBusy?0.6:1}}>{addBusy?'저장 중…':'저장'}</button>
                   </div>
@@ -690,8 +695,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                               </button>
                             </div>
                           ) : (
+                            // 재키와 대화하기 = 2차 tonal(DESIGN.md #1032: ghost 점선 투명 금지 → brand-soft 채움)
                             <button onClick={openChat}
-                              style={{marginTop:6, padding:'5px 12px', borderRadius:8, border:'1px dashed var(--line)', background:'transparent', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer'}}>
+                              style={{marginTop:6, padding:'5px 12px', borderRadius:8, border:'1px solid var(--brand-soft)', background:'var(--brand-soft)', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer'}}>
                               <window.SparrowInline size={13} /> 재키와 대화하기
                             </button>
                           );

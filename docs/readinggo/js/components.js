@@ -113,7 +113,9 @@ function Confetti({ active, nestUp }) {
 function ConsentBanner({ onChoose }) {
   const [detail, setDetail] = useState(false);
   const [optional, setOptional] = useState(true); // 선택 기본 체크 → 전체 동의 유도
-  const ghost = { flex: '0 0 auto', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
+  // 버튼 위계(DESIGN.md #1032): ghost(투명+보더) 금지 → 2차는 채워진 중립 tonal(paper-2).
+  // 동의 선택지(필수만/상세)는 비긍정 보조라 그린 tonal 대신 중립 채움으로 '전체 동의' 그린 1차와 위계 구분.
+  const tonal = { flex: '0 0 auto', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
   const primary = { flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, background: 'var(--card)', borderTop: '1px solid var(--line)', boxShadow: '0 -4px 16px rgba(0,0,0,0.10)', padding: '14px 16px 16px' }}>
@@ -138,8 +140,8 @@ function ConsentBanner({ onChoose }) {
           <button onClick={() => onChoose(optional ? 'yes' : 'no')} style={primary}>저장</button>
         ) : (
           <>
-            <button onClick={() => onChoose('no')} style={ghost}>필수만</button>
-            <button onClick={() => setDetail(true)} style={ghost}>상세 설정</button>
+            <button onClick={() => onChoose('no')} style={tonal}>필수만</button>
+            <button onClick={() => setDetail(true)} style={tonal}>상세 설정</button>
             <button onClick={() => onChoose('yes')} style={primary}>전체 동의</button>
           </>
         )}
