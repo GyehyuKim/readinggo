@@ -13,7 +13,14 @@
   // 구글 콜백이 앱으로 못 돌아오고 외부 브라우저에 멈춘다. 네이티브일 때만 커스텀 스킴으로 복귀.
   const NATIVE_REDIRECT = 'com.readinggo.app://login-callback';
   function isNative() {
-    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    // #1009: setup-globals 가 로드 시점에 확정한 RG_NATIVE 플래그를 1순위로 신뢰
+    //   (window.Capacitor 가 번들 인스턴스로 덮여 isNativePlatform()=false 가 되는 케이스 차단).
+    if (typeof window.RG_NATIVE === 'boolean') return window.RG_NATIVE;
+    const cap = window.Capacitor;
+    return !!(cap && (
+      (cap.isNativePlatform && cap.isNativePlatform()) ||
+      (cap.getPlatform && cap.getPlatform() !== 'web')
+    ));
   }
 
   function client() {
