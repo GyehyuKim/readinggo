@@ -6,6 +6,7 @@
 > **v7.2 갱신 (2026-06-04, post-beta 2)**: ⚠️ `is_private` binary → **`visibility` 3단계**(public/followers/private, `06_privacy_v2.sql`), `admin.stats()`·`claps.isMine`·`friends.unfollow/isFollowing`·`users.public*`·`sessions.calendar` 계약 추가, 마을 Supabase 연동·이메일 브랜딩. [decisions §8.2/§8.3](./meta/decisions.md).
 > **v8 갱신 (2026-06-24, #968)**: **네이티브 OAuth 딥링크**. Capacitor 채택(§7.1 모바일/네이티브 갱신)으로 네이티브 앱 구글 로그인이 외부 브라우저(`https://localhost` 복귀)에 멈추던 문제 해결 — 네이티브일 때 `redirectTo=com.readinggo.app://login-callback`(커스텀 스킴) + PKCE + `appUrlOpen` 복귀. 웹 분기 무변경.
 > **v9 갱신 (2026-06-24, #937)**: **카카오 소셜 로그인 추가** + **애플**(iOS·웹만 노출, Android 제외) + **네이버 보류**. `signInWithGoogle`을 `signInWithOAuth(provider)`로 일반화 — 같은 네이티브 딥링크 경로(#968)를 모든 provider 가 공유. provider 등록(Supabase 대시보드 + Kakao Developers + Apple Developer)은 §7.1 모바일/네이티브 끝의 체크리스트 참조.
+> **v10 갱신 (2026-06-26, #1007)**: **독서 위키 Q&A — `POST /api/wiki-ask`** 신설(§7.9.2). "내 문장에게 묻기"의 호출 경로 — companion 형제 프록시(동일출처 가드·`callLLM` 키 서버 보관). 내가 모은 문장에만 근거(그라운딩·환각 가드), 질문당 1콜(Gemini Flash 텍스트, AI lock 안), RAG 불필요(전체 문장 한 프롬프트).
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -487,5 +488,17 @@ Phase 0 (localStorage, `rg_v41`):
 - **라우트**: `POST /api/related` (`worker/index.mjs` `relatedProxy`). 입력 `{isbn, title, author}`(현재 책) → 출력 `{books:[{isbn, title, author}]}` (최대 8). system = 사서(실존 한국 출간서만, 각 책의 **ISBN-13** 포함, JSON 배열만 출력). worker 는 ISBN-13(13자리 숫자) 형식이 유효한 후보만 추리고 ISBN 기준 중복 제거. 키/설정 없거나 호출 실패 시 `{books:[]}` 폴백(무중단).
 - **ISBN 환각 필터(클라)**: LLM 이 준 ISBN 을 **신뢰하지 않는다**. `data.js filterRelatedCandidates`(순수 함수)가 후보를 **실존 books DB 의 ISBN 과 정확 일치할 때만** 통과시킨다. 통과 조건: ① ISBN-13 형식 유효 ② 현재 책 ISBN 아님 ③ 중복 ISBN 아님 ④ DB 에 해당 ISBN 실재 ⑤ DB 책의 정규화 제목이 후보 제목과 일치. **제목 prefix/부분 매칭은 환각 필터로 쓰지 않는다**(다른 책·다른 권·다른 판본 오통과 방지). 매칭된 실제 DB 책 객체만 반환, 책 단위 메모리 캐시. #489 외서 보강의 ISBN 매칭 환각 필터와 동일 원칙.
 - **DataStore 계약**: `books.related(book)` — 두 어댑터 표면 일치(§7.2). Phase 0 은 양쪽 모두 LLM 폴백. **Phase 1**: Supabase 어댑터를 `user_books` 공동독서 집계 RPC(예: `books_also_read`)로 교체 → '이 책 읽은 사람들이 읽은 책'(실데이터). 그 전까지 허위 카피 금지.
+
+#### 7.9.2 독서 위키 Q&A — `POST /api/wiki-ask` (#1007)
+
+"내 문장에게 묻기"([profile.md §5.8.8](./profile.md)) 의 호출 경로. 사용자가 책에서 모은 한 문장(+감상)에 **근거해서만** LLM이 답한다(개인 독서 위키). companion/related 와 동일한 동일출처 가드 + `callLLM(env)` 프록시 패턴(키 서버 보관).
+
+- **AI lock**: Gemini Flash **텍스트** 사용 — CLAUDE.md Stack Lock 'AI: 텍스트·vision 모두 자유 사용' 범위 안이라 **별도 lock 결정 불필요**. provider-agnostic `callLLM`(base_url/model/key 전부 env) 재사용.
+- **라우트**: `POST /api/wiki-ask` (`worker/index.mjs` `wikiAskProxy`). 입력 `{question, items:[{text, note, book, author, page}]}` — 클라가 `listMine()` 결과(내 문장만)를 payload 로 보낸다. 출력 `{answer}`. 워커가 items 를 번호 매긴 코퍼스로 묶어(책·페이지·감상 포함) 한 프롬프트에 통째로 넣는다. 토큰 안전: items **최대 120**·각 필드 길이 컷, question 500자 컷.
+- **규모상 RAG 불필요**: 유저당 ≤약 100문장 ≈ 2-3K 토큰 → 임베딩·벡터DB 없이 **전체를 한 프롬프트에**, **질문당 1콜**. 무료 티어 한도 내(비용 0).
+- **그라운딩(환각 가드)**: system 프롬프트가 ① 답의 근거가 된 문장·책 제목을 함께 밝히고 ② 모은 문장에서 못 찾으면 지어내지 말고 정확히 "모은 문장에서는 못 찾았어요"라고만 답하며 ③ 문장에 없는 사실·다른 책 내용을 새로 만들지 않도록 강제한다. "다른 책에서 비슷한 생각"(책 가로지르기, #919)은 *주어진 문장들 사이*에서만 짝을 찾는다.
+- **프라이버시/저작권**: 내 문장→LLM 전송은 `/api/companion`(재키)이 이미 하는 선례와 동일 경로(키 서버 보관). **내 문장만** 보내므로 타인 발췌 수집/저작권(#1008) 위험은 낮다([legal-copyright.md] 원칙 일관).
+- **폴백**: `question` 누락 → 422, `items` 비었으면 422(`empty`). 키/설정 없으면 200 + 안내 문구(`demo:true`, 목 답 대신 "키워드 검색으로 찾아보세요"). LLM 호출 실패 → 502(`error`). 클라(`window.RG_wikiAsk`, supabase-client.js)가 로딩·에러·빈 상태를 처리.
+- **DataStore 계약 밖**: 저장 없는 stateless LLM 프록시라 어댑터(§7.2) 표면이 아니다 — companion/related 와 같이 클라 래퍼가 직접 `fetch`. (저장형 위키·소재 태깅으로 확장하면 그때 계약화.)
 
 ---

@@ -30,6 +30,13 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return companionProxy(request, env);
     }
+    // 독서 위키 Q&A — "내 문장에게 묻기" (#1007). 사용자가 모은 한 문장(+감상)에만 근거해 답.
+    // companion 형제 — 같은 LLM 프록시(callLLM)·동일출처 가드·키 서버보관. 클라가 내 문장만 전송.
+    if (p === '/api/wiki-ask') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      return wikiAskProxy(request, env);
+    }
     // 계정 삭제 (#875, Apple 심사 필수) — 호출자 토큰으로 본인 확인 후 service_role 로 admin 삭제.
     // public.users → auth.users(id) on delete cascade 라 전 데이터(서재·문장·둥지) 일괄 삭제. 동일출처만.
     if (p === '/api/delete-account') {
@@ -918,6 +925,55 @@ async function companionRecap(body, env) {
     return json({ recap: stripMd(recap) || recapMock(bookTitle, sentences) }, 200);
   } catch (e) {
     return json({ recap: recapMock(bookTitle, sentences), demo: true, error: String((e && e.message) || e) }, 200);
+  }
+}
+
+/* ── 독서 위키 Q&A — "내 문장에게 묻기" (#1007) ─────────────
+   사용자가 책에서 모은 한 문장(+감상)에 *근거해서만* LLM이 답한다. 예: "내가 외로움에
+   대해 모은 문장?", "이 문장들 관통하는 주제?", "다른 책에서 비슷한 생각 한 부분?"(#919).
+   규모(유저당 ≤약 100문장 ≈ 2-3K 토큰)상 RAG/임베딩 불필요 — 내 문장 전체를 한 프롬프트에
+   통째로 넣어 1콜(Gemini Flash 텍스트 = CLAUDE.md Stack Lock '텍스트 자유 사용' 안).
+   환각 가드: 제공 문장에만 근거·인용·없으면 "못 찾음" 폴백(지어내지 말 것 — 프롬프트로 강제).
+   프라이버시: 내 문장만 전송(타인·전체 X)이라 #1008 저작권 위험 낮음(companion 선례와 동일 경로). */
+const WIKI_ASK_SYSTEM = '당신은 사용자의 "독서 위키" 사서입니다. 사용자가 여러 책에서 직접 모아 둔 문장들(과 본인이 남긴 감상)이 아래에 번호로 주어집니다. 사용자의 질문에 대해 **오직 이 모아 둔 문장들에만 근거**해 한국어로 답하세요. 규칙: (1) 답의 근거가 된 문장과 그 책 제목을 반드시 함께 밝히세요(예: 《책제목》 "…"). (2) 모아 둔 문장들에서 근거를 찾을 수 없으면, 추측하거나 지어내지 말고 정확히 "모은 문장에서는 못 찾았어요"라고만 답하세요. (3) 문장에 없는 사실·해석·다른 책 내용을 새로 만들어 내지 마세요. (4) "다른 책에서 비슷한 생각" 같은 질문이면, 모아 둔 문장들 사이에서 주제·정서가 통하는 짝을 책을 가로질러 찾아 연결하되, 어디까지나 주어진 문장 범위 안에서만. (5) 따뜻하고 담백한 톤, 마크다운 서식(별표·머리말·목록 기호)을 쓰지 말고 일반 문장으로. 3~6문장 이내로 핵심만.';
+
+async function wikiAskProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  const question = String((body && body.question) || '').slice(0, 500).trim();
+  // 내 문장 payload — 클라가 listMine() 결과를 보냄. 토큰 안전: 최대 120문장, 각 필드 길이 컷.
+  const items = (Array.isArray(body && body.items) ? body.items : [])
+    .slice(0, 120)
+    .map((it) => ({
+      text: String((it && it.text) || '').slice(0, 400).trim(),
+      note: String((it && it.note) || '').slice(0, 300).trim(),
+      book: String((it && it.book) || '').slice(0, 200).trim(),
+      author: String((it && it.author) || '').slice(0, 120).trim(),
+      page: (it && (typeof it.page === 'number' || typeof it.page === 'string')) ? String(it.page).slice(0, 12) : '',
+    }))
+    .filter((it) => it.text);
+  if (!question) return json({ error: 'question 필요' }, 422);
+  if (!items.length) return json({ error: '모은 문장이 없어요', empty: true }, 422);
+  // 키/설정 없으면 데모 폴백(무중단) — 위키 Q&A는 실 LLM이 핵심이라 목 답 대신 안내 문구.
+  if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
+    return json({ answer: '지금은 답하기 기능을 쓸 수 없어요(데모). 키워드 검색으로 찾아보세요.', demo: true }, 200);
+  }
+  // 그라운딩 — 모은 문장 전체를 번호로 한 프롬프트에. 책·페이지·감상을 함께 줘 근거 인용을 돕는다.
+  const corpus = items.map((it, i) => {
+    const where = `${it.book ? `《${it.book}》` : '(책 미상)'}${it.author ? ` — ${it.author}` : ''}${it.page ? ` ${it.page}p` : ''}`;
+    return `${i + 1}. ${where}\n   문장: "${it.text}"${it.note ? `\n   내 감상: ${it.note}` : ''}`;
+  }).join('\n');
+  const messages = [
+    { role: 'system', content: WIKI_ASK_SYSTEM },
+    { role: 'user', content: `[내가 모아 둔 문장 ${items.length}개]\n${corpus}\n\n[질문]\n${question}\n\n위 문장들에만 근거해 한국어로 답해 주세요. 근거 문장·책을 밝히고, 없으면 "모은 문장에서는 못 찾았어요".` },
+  ];
+  try {
+    const ans = await callLLM({ messages, env, maxTokens: 600, temperature: 0.5 });
+    const out = stripMd(ans).trim();
+    return json({ answer: out || '모은 문장에서는 못 찾았어요' }, 200);
+  } catch (e) {
+    return json({ error: '답하기 실패', detail: String((e && e.message) || e) }, 502);
   }
 }
 
