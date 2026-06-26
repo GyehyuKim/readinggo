@@ -186,6 +186,21 @@ input,textarea{font-family:inherit;}
   display: flex;
   flex-direction: column;
 }
+/* 하단 탭바(floating pill, .tabbar) 뒤로 스크롤 컨텐츠가 비치는 것 방지(#1013).
+   컨텐츠가 탭바 영역에서 크림 배경(--paper)으로 자연스럽게 사라지게 하는 그라데이션 스크림.
+   pseudo-element 라 DOM/JS 무변경. z-index: 정적 .main 위 · .tabbar(z30) 아래 → 탭바는 또렷,
+   컨텐츠만 페이드. .app overflow:hidden 이라 데스크톱 라운드 코너에도 깔끔히 클립. */
+.app::after{
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: calc(116px + env(safe-area-inset-bottom));
+  z-index: 25;
+  pointer-events: none;
+  /* 솔리드 영역(~70%)이 pill 높이(좌우 12px 여백 포함)를 덮어 옆/뒤 컨텐츠를 가리고,
+     상단 ~30% 만 페이드 → pill 은 또렷, 컨텐츠는 부드럽게 사라짐. %라 safe-area 비례. */
+  background: linear-gradient(to top, var(--paper) 0%, var(--paper) 70%, rgba(250,246,240,0) 100%);
+}
 @media (min-width: 800px){
   /* #615 데스크톱 프레이밍 — 카드 양옆 여백을 '빈 공간'이 아닌 의도된 무대로.
      은은한 radial 페이드만(하드 블롭·도형 금지). 베이스를 --paper-2로 살짝 진하게 해
