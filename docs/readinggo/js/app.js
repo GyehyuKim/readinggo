@@ -498,6 +498,11 @@ function App() {
     return window.RG_SB.onAuthChange(u => setAuthUser(u || null));
   }, []);
 
+  // 로그인 성공 시 로그인 화면 자동 닫기(#1011). 웹은 OAuth 리디렉트가 페이지를 리로드해
+  // showLogin 이 초기화되지만, 네이티브(#968 딥링크 복귀)는 리로드가 없어 인증돼도 로그인
+  // 화면이 그대로 남는다. authUser 가 채워지면(로그인·세션복원) 로그인 화면을 닫는다.
+  useEffect(() => { if (authUser) setShowLogin(false); }, [authUser]);
+
   // #490: 부팅 시 books 카탈로그 적재 — getBook 동기 캐시 워밍(게스트도 anon RLS read, 실패 시 TSV 폴백).
   useEffect(() => { if (window.loadBooks) Promise.resolve(window.loadBooks()).catch(() => {}); }, []);
 
