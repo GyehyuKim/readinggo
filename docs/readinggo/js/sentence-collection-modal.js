@@ -13,6 +13,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
   const [saved, setSaved] = useState([]);   // #608/#641: 좋아요한 타인 문장 — '좋아요' 필터 전용(전체/책별엔 미혼입)
   const [favIds, setFavIds] = useState(new Set());
   const [filter, setFilter] = useState(initialFilter || 'all'); // all | book | fav — 좋아요한 문장 진입 시 'fav' (#510)
+  const [query, setQuery] = useState('');  // 내 한 문장 키워드 검색 (#1007, profile §5.8.8)
   // 작성일자 표기 (#608) — created_at 은 number(localStorage)·ISO(Supabase) 모두 new Date 로 처리. 월/일만.
   const fmtWhen = (t) => { if (!t) return ''; const d = new Date(t); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }); };
   useEffect(() => {
@@ -58,7 +59,14 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
   // #608/#641: 좋아요 필터 풀 = 내 문장 + 좋아요한 타인 문장. 전체/책별은 내 문장(list)만.
   const favPool = list.concat(saved);
   const favCount = favPool.filter(s => favIds.has(s.id)).length;
-  const filtered = filter === 'fav' ? favPool.filter(s => favIds.has(s.id)) : list;
+  // 키워드 검색(#1007, §5.8.8) — 정규화 substring(소문자·공백정리)으로 문장+감상+책제목+저자 부분일치.
+  // 퍼지(Fuse) 대신 substring: 한글에서 예측 가능·오매칭 없음. 규모(유저당 ≤약 100문장)라 클라 즉시.
+  // 기존 전체/책별/좋아요 탭과 AND 합성 — 빈 검색어면 현행 동작 그대로.
+  const nrm = (s) => (s == null ? '' : String(s)).toLowerCase().replace(/\s+/g, ' ').trim();
+  const q = nrm(query);
+  const matchQ = (s) => !q || nrm([s.text, s.note, s.bookTitle, s.author].join(' ')).includes(q);
+  const base = filter === 'fav' ? favPool.filter(s => favIds.has(s.id)) : list;
+  const filtered = q ? base.filter(matchQ) : base;
   const byBook = {};
   if (filter === 'book') filtered.forEach(s => { const k = s.bookTitle || '기타'; (byBook[k] = byBook[k] || []).push(s); });
   const renderLine = (s) => (
@@ -92,11 +100,17 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
               <button key={id} onClick={() => setFilter(id)} style={{ padding: '6px 14px', borderRadius: 999, border: filter === id ? 'none' : '1px solid var(--line)', background: filter === id ? 'var(--ink)' : 'transparent', color: filter === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
             ))}
           </div>
+          {/* 내 한 문장 검색(#1007, §5.8.8) — 쌓인 문장을 키워드로 즉시 좁힌다. 검색할 문장이 있을 때만 노출. */}
+          {mine !== undefined && (list.length + saved.length) > 0 && (
+            <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="내 문장·감상·책 검색" aria-label="내 한 문장 검색"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 14px', marginBottom: 12, borderRadius: 999, border: '1px solid var(--line)', background: 'var(--paper)', color: 'var(--ink)', fontSize: 13, fontWeight: 600, outline: 'none' }} />
+          )}
           {mine === undefined ? (
             <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20 }}>불러오는 중…</div>
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 20, lineHeight: 1.6 }}>
-              {filter === 'fav' ? (
+              {q ? '검색 결과가 없어요' : filter === 'fav' ? (
                 <>아직 저장한 문장이 없어요 · 소셜 탭에서 마음에 드는 문장에 <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{display:'inline',verticalAlign:'middle'}}><path d="M6 10.5C6 10.5 1 7.5 1 4.5a2.5 2.5 0 0 1 5-0.5 2.5 2.5 0 0 1 5 .5c0 3-5 6-5 6z" fill="var(--brand)" stroke="var(--brand)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/></svg>를 눌러보세요</>
               ) : '아직 한 문장이 없어요'}
             </div>
