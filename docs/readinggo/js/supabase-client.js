@@ -176,3 +176,29 @@
   }
   initNativeAuth();
 })();
+
+/* ── 독서 위키 Q&A 클라 래퍼 — "내 문장에게 묻기" (#1007, profile §5.8.8) ──
+   내 한 문장(listMine 결과)을 payload 로 구성해 worker /api/wiki-ask 로 전송.
+   companion(/api/companion) 과 동일한 동일출처 프록시 패턴 — 키는 서버 보관(클라 노출 0).
+   서버가 그 문장들에만 근거해 답(환각 가드는 워커 프롬프트). 호출부(SentenceCollectionModal)가
+   로딩·에러·빈 상태를 처리한다. payload: text·note(my_note)·book(제목)·author·page. */
+window.RG_wikiAsk = async function RG_wikiAsk(question, mine) {
+  const items = (mine || [])
+    .map((s) => ({
+      text: s.text || '',
+      note: s.note || s.my_note || '',
+      book: s.bookTitle || '',
+      author: s.author || '',
+      page: (s.page != null) ? s.page : '',
+    }))
+    .filter((it) => it.text);
+  const r = await fetch('/api/wiki-ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: String(question || '').trim(), items }),
+  });
+  let d = null;
+  try { d = await r.json(); } catch (e) { d = null; }
+  if (!r.ok) throw new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
+  return (d && d.answer) || '';
+};
