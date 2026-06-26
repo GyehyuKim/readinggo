@@ -1032,7 +1032,10 @@
         await sb().from('village_members').delete().eq('village_id', roomId).eq('user_id', id);
         return true;
       },
-      // 책으로 공개 방 검색(§4.3 책으로 검색 · §4.4 badge 카운트). bookId 지정 시 그 책 방만.
+      // 책으로 공개 방 검색(§4.3 책으로 검색 · §4.4 badge 카운트 · §7.6 추천). bookId 지정 시 그 책 방만.
+      // 정렬 = 멤버 인원수 내림차순, 동률은 최신순(자동합류·추천·badge 통일, §4.2·§7.6).
+      //   village_members(count) 는 임베드 집계라 PostgREST .order() 불가 → created_at desc 로 받고 JS 재정렬.
+      //   limit 은 JS 정렬 뒤 적용(DB created_at limit 으로 인기-구(old)숲이 잘리는 것 방지).
       async byBook(bookId, opts) {
         const limit = opts && opts.limit;
         let q = sb().from('villages').select(this._SEL)
@@ -1050,8 +1053,11 @@
           }
           q = q.eq('book_id', supaBookId);
         }
-        if (limit) q = q.limit(limit);
-        return unwrap(await q) || [];
+        const rows = unwrap(await q) || [];
+        // 멤버 인원수 desc 정렬(동률은 위 created_at desc 보존 — 안정 정렬). limit 은 정렬 후.
+        const cnt = (r) => (r.village_members && r.village_members[0] && r.village_members[0].count) || 0;
+        const sorted = rows.slice().sort((a, b) => cnt(b) - cnt(a));
+        return limit ? sorted.slice(0, limit) : sorted;
       },
       // 참여 중인 방 (구 listMine)
       async myRooms() {

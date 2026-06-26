@@ -276,6 +276,27 @@ INVARIANTS = [
         ["index.html"], r"\.rating-star-empty\s*\{[^}]*color:\s*var\(--(?:line-2|paper)\b"),
     ("E", "present", ".rating-star-empty CSS 색 = var(--star-empty) (index.html, #984)",
         ["index.html"], r"\.rating-star-empty\s*\{[^}]*color:\s*var\(--star-empty\)"),
+
+    # ── F: auto-match 추천 — 공개 숲 권유(인원순 + 신규 끼움, 자동입장 X) (#997, co-reading.md §7.6) ──
+    ("F", "present", "추천 랭킹 헬퍼 — 인원순 + 갓 생긴 숲 1개 끼움 (#997, §7.6)",
+        ["co-reading.js"], r"function rgRankRecommendedRooms\([\s\S]*newest"),
+    ("F", "present", "추천 랭킹 window 노출 (#997)",
+        ["co-reading.js"], r"window\.rgRankRecommendedRooms\s*=\s*rgRankRecommendedRooms"),
+    ("F", "present", "RoomsView 추천 섹션 = rgRankRecommendedRooms 경유 (#997, §4.2·§7.6)",
+        ["co-reading.js"], r"setRecommended\(rgRankRecommendedRooms\("),
+    ("F", "present", "책 상세 '이 책 같이 읽는 숲' 추천 한 줄 컴포넌트 (#997, §4.4)",
+        ["co-reading.js"], r"function BookCoReadRow\([\s\S]*이 책 같이 읽는 숲"),
+    ("F", "present", "BookCoReadRow window 노출 (#997)",
+        ["co-reading.js"], r"window\.BookCoReadRow\s*=\s*BookCoReadRow"),
+    ("F", "present", "BookDetailModal 책 상세 숲 추천 진입점 마운트 (#997, §4.4)",
+        ["book-detail-modal.js"], r"window\.BookCoReadRow"),
+    # byBook 정렬 통일 = 멤버 인원수 desc(자동합류·추천·badge 일치, §4.2·§7.6). 양 어댑터.
+    ("F", "present", "byBook 인원순 정렬 — supabase 어댑터 (#997, §7.6)",
+        ["datastore-supabase.js"], r"sort\(\(a, b\) => cnt\(b\) - cnt\(a\)\)"),
+    ("F", "present", "byBook 인원순 정렬 — local 어댑터 (#997, §7.6)",
+        ["datastore.js"], r"out\.sort\(\(a, b\) => cnt\(b\) - cnt\(a\)\)"),
+    ("F", "present", "추천 카드 CSS .rg-coread-rec (index.html, #997 — 2차 tonal, ghost 금지)",
+        ["index.html"], r"\.rg-coread-rec\s*\{"),
 ]
 
 

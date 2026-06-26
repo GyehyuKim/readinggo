@@ -894,9 +894,14 @@ const DataStore = {
       return true;
     },
     async byBook(bookId, opts) {
-      let out = this._load().filter(r => r.visibility === 'public' && (!bookId || r.book_id === bookId));
+      // 정렬 = 멤버 인원수 desc, 동률은 최신순(supabase 어댑터·자동합류·추천 통일, §4.2·§7.6).
+      //   _load() 는 unshift 순(최신 먼저)이라 동률 안정 정렬이 곧 최신순. limit 은 정렬 뒤 적용.
+      let out = this._load().filter(r => r.visibility === 'public' && (!bookId || r.book_id === bookId))
+        .map(r => this._shape(r));
+      const cnt = (r) => (r.village_members && r.village_members[0] && r.village_members[0].count) || 0;
+      out.sort((a, b) => cnt(b) - cnt(a));
       if (opts && opts.limit) out = out.slice(0, opts.limit);
-      return out.map(r => this._shape(r));
+      return out;
     },
     async myRooms() {
       const me = (window.RG_ME && window.RG_ME.id) || 'me';

@@ -1490,6 +1490,18 @@ input,textarea{font-family:inherit;}
   background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); transition:transform .18s ease;
 }
 .rg-coread-switch.on .rg-coread-knob{ transform:translateX(18px); }
+
+/* P2(§7.6) 책 상세 "이 책 같이 읽는 숲" 추천 한 줄 — 2차 tonal 권유 카드(ghost 금지, DESIGN.md). */
+.rg-coread-rec{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left; cursor:pointer;
+  background:var(--brand-soft); border:1px solid var(--brand-soft); border-radius:var(--r-md);
+  padding:11px 14px; margin-bottom:14px; box-sizing:border-box;
+}
+.rg-coread-rec-emoji{ font-size:19px; line-height:1; flex:0 0 auto; }
+.rg-coread-rec-meta{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+.rg-coread-rec-title{ font-size:13px; font-weight:800; color:var(--brand-3); letter-spacing:-.2px; }
+.rg-coread-rec-sub{ font-size:11.5px; font-weight:600; color:var(--ink-3); line-height:1.4; }
+.rg-coread-rec-cta{ flex:0 0 auto; font-size:12px; font-weight:800; color:var(--brand-3); }
 .rg-room-card{
   display:flex; gap:12px; align-items:center; width:100%; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:var(--r-md);

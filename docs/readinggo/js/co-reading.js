@@ -447,6 +447,71 @@ function RoomListRow({ room, onTap }) {
   );
 }
 
+/* ── 추천 랭킹 (§7.6 auto-match) — 인원순 + 갓 생긴 숲 1개 끼움 ──────────
+   "이 숲 어때요?" 권유용 정렬. 강제 join 아님(탭하면 미리보기). 입력 pool 은 이미
+   내 숲 제외·dedup 된 후보들. 규칙:
+     ① 멤버 인원수 desc(동률은 최신 created_at) — 사람 있는 숲을 위로.
+     ② rich-get-richer 완화: 후보 중 가장 최근 생긴 숲 1개를 결과에 반드시 포함
+        (인원순 정렬에서 limit 밖으로 밀렸어도 끼워 넣는다). 이미 상위에 있으면 그대로.
+   limit 지정 시 그 길이를 지키되, 신규 숲 슬롯은 보존(상위에 없으면 마지막 자리를 양보).
+   byBook 가 인원순 정렬을 이미 하지만, 합집합(여러 책) pool 은 재정렬이 필요하므로 여기서 통일. */
+function rgRankRecommendedRooms(pool, opts) {
+  const list = Array.isArray(pool) ? pool.slice() : [];
+  if (list.length <= 1) return list;
+  const cnt = (r) => (r.village_members && r.village_members[0] && r.village_members[0].count) || 0;
+  const ts = (r) => { const t = Date.parse(r && r.created_at); return isNaN(t) ? 0 : t; };
+  // ① 인원순 desc, 동률 최신순.
+  const ranked = list.sort((a, b) => (cnt(b) - cnt(a)) || (ts(b) - ts(a)));
+  const limit = opts && opts.limit;
+  const capped = limit ? ranked.slice(0, limit) : ranked;
+  // ② 갓 생긴 숲(최신 created_at) 1개가 결과에 없으면 끼운다(인기 숲만 비대해지는 것 완화).
+  let newest = null;
+  for (const r of list) { if (!newest || ts(r) > ts(newest)) newest = r; }
+  if (newest && !capped.some(r => r.id === newest.id)) {
+    if (limit && capped.length >= limit) capped[capped.length - 1] = newest; // 마지막 자리를 신규에 양보
+    else capped.push(newest);
+  }
+  return capped;
+}
+
+/* ── 책 상세 "이 책 같이 읽는 숲" 추천 한 줄 (§4.4·§7.6) ───────────────
+   BookDetailModal/BookInfoModal 에서 그 책의 공개 숲이 있을 때만 노출되는 소형 권유.
+   강제 join 아님 — 탭하면 가장 사람 많은(추천 상위) 숲으로 입장(RG_openRoom).
+   공개 숲 0 이면 아무것도 렌더 안 함(섹션 자체 생략 — 빈 박스 금지). */
+function BookCoReadRow({ bookId, onOpen }) {
+  const { useState, useEffect } = React;
+  const [rooms, setRooms] = useState(null);   // null=로딩, []=없음
+  useEffect(() => {
+    let alive = true; setRooms(null);
+    const DS = window.DataStore || {};
+    if (!bookId || !(DS.rooms && DS.rooms.byBook)) { setRooms([]); return () => { alive = false; }; }
+    Promise.resolve(DS.rooms.byBook(bookId, { limit: 6 }))
+      .then(rs => { if (alive) setRooms(rgRankRecommendedRooms(Array.isArray(rs) ? rs : [], { limit: 3 })); })
+      .catch(() => { if (alive) setRooms([]); });
+    return () => { alive = false; };
+  }, [bookId]);
+  if (!rooms || rooms.length === 0) return null;   // 로딩·없음 = 미노출(존재할 때만)
+  const top = rooms[0];
+  const cnt = (r) => (r.village_members && r.village_members[0] && r.village_members[0].count) || 0;
+  const total = rooms.reduce((n, r) => n + cnt(r), 0);
+  const open = () => {
+    if (onOpen) return onOpen(top);
+    if (window.RG_openRoom) window.RG_openRoom(top.id);
+  };
+  return (
+    <button type="button" className="rg-coread-rec" onClick={open}>
+      <span className="rg-coread-rec-emoji" aria-hidden="true">🌳</span>
+      <span className="rg-coread-rec-meta">
+        <span className="rg-coread-rec-title">이 책 같이 읽는 숲</span>
+        <span className="rg-coread-rec-sub">
+          {rooms.length > 1 ? `${rooms.length}개 숲 · ` : ''}{total >= 2 ? `${total}명 함께 읽는 중` : '같이 읽어볼까요?'}
+        </span>
+      </span>
+      <span className="rg-coread-rec-cta">들어가기 →</span>
+    </button>
+  );
+}
+
 /* ── 들어간 숲 카드 (members 로드해 불빛·평균) ─────────────── */
 function MyRoomCard({ room, onOpen }) {
   const { useState, useEffect } = React;
@@ -516,7 +581,8 @@ function RoomsView() {
 
   const reload = useCallback(() => {
     Promise.resolve(DataStore.rooms.myRooms()).then(r => setMine(r || [])).catch(() => setMine([]));
-    // 추천 = 내 활성책을 같이 읽는 공개 숲 (없으면 빈 섹션). 내 책장 책별 byBook 합집합.
+    // 추천(§7.6 auto-match) = 내 활성책을 같이 읽는 공개 숲. 강제 join 아님 — "이 숲 어때요?" 권유.
+    //   내 책장 활성책별 byBook 합집합 → dedup(내 숲 제외) → rgRankRecommendedRooms(인원순 + 신규 1개 끼움).
     Promise.resolve((DataStore.myBooks && DataStore.myBooks.list) ? DataStore.myBooks.list() : [])
       .then(async (books) => {
         const reading = (books || []).filter(ub => (ub.status || 'reading') === 'reading' && ub.book).slice(0, 6);
@@ -524,9 +590,9 @@ function RoomsView() {
         const lists = await Promise.all(reading.map(ub =>
           Promise.resolve(DataStore.rooms.byBook(ub.book_id || (ub.book && ub.book.id), { limit: 6 })).catch(() => [])));
         const myIds = new Set((mine || []).map(r => r.id));
-        const seen = new Set(); const out = [];
-        lists.forEach(arr => (arr || []).forEach(r => { if (!seen.has(r.id) && !myIds.has(r.id)) { seen.add(r.id); out.push(r); } }));
-        setRecommended(out);
+        const seen = new Set(); const pool = [];
+        lists.forEach(arr => (arr || []).forEach(r => { if (!seen.has(r.id) && !myIds.has(r.id)) { seen.add(r.id); pool.push(r); } }));
+        setRecommended(rgRankRecommendedRooms(pool, { limit: 5 }));
       })
       .catch(() => setRecommended([]));
   }, [mine]);
@@ -577,10 +643,12 @@ function RoomsView() {
         )}
       </div>
 
-      {/* 이 책 같이 읽는 숲 (추천) */}
+      {/* 이 책 같이 읽는 숲 (추천 §7.6) — 권유 카드(탭하면 미리보기 → 입장). 강제 join 아님.
+          정렬 = 인원순 + 갓 생긴 숲 1개(rgRankRecommendedRooms). */}
       {recommended && recommended.length > 0 && (
         <div style={{ padding: '18px 16px 0' }}>
           <p className="rg-room-section">이 책 같이 읽는 숲</p>
+          <p className="rg-room-hint" style={{ margin: '-2px 0 8px' }}>같은 책 읽는 사람들과 같이 읽어볼까요? 탭하면 미리 볼 수 있어요.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {recommended.map(r => <RoomListRow key={r.id} room={r} onTap={() => setPreview(r)} />)}
           </div>
@@ -1026,6 +1094,9 @@ window.RG_coReadMode = rgCoReadMode;            // 외부(app.js) alias
 window.RG_setCoReadMode = rgSetCoReadMode;
 window.RG_autoJoinPublicRoom = rgAutoJoinPublicRoom;
 window.CoReadModeToggle = CoReadModeToggle;
+// P2(§7.6) 공개 숲 추천(auto-match) — 책 상세 진입점 + 랭킹 헬퍼(검증/재사용 위해 노출).
+window.BookCoReadRow = BookCoReadRow;
+window.rgRankRecommendedRooms = rgRankRecommendedRooms;
 // 마일스톤(함께 읽기 일정/구간, §6·§7 P2) — RoomModal 일정 탭에서 사용. 헬퍼는 검증/재사용 위해 노출.
 window.RoomSchedule = RoomSchedule;
 window.rgActivePartIndex = rgActivePartIndex;

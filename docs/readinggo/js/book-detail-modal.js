@@ -543,6 +543,13 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             교보문고에서 보기 →
           </a>
 
+          {/* 이 책 같이 읽는 숲 추천 (co-reading.md §4.4·§7.6) — 그 책의 공개 숲이 있을 때만 한 줄.
+              강제 join 아님 — 탭하면 상세 닫고 추천 상위(인원 많은) 숲으로 입장. 공개 숲 0 이면 미노출. */}
+          {window.BookCoReadRow && (
+            <window.BookCoReadRow bookId={book.id}
+              onOpen={(room) => { onClose(); if (window.RG_openRoom && room) window.RG_openRoom(room.id); }} />
+          )}
+
           {/* 책 소개 (#530) — DB books.description 우선, 없으면 알라딘 실시간 폴백. 둘 다 없으면 섹션 생략. */}
           {(bookDesc || descLoading) && (
             <div style={{marginBottom:14}}>
