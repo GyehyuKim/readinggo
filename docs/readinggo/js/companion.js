@@ -191,8 +191,9 @@ function CompanionModal({ sentence, onClose }) {
               <textarea value={stext} onChange={(e) => { if (e.target.value.length <= 1000) setStext(e.target.value); }} rows={3}
                 style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--brand)', borderRadius: 12, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
                 <button onClick={() => { setStext(sentence.text || ''); setSkind(sentence.kind === 'thought' ? 'thought' : 'quote'); setEditing(false); }}
-                  style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 999, border: '1.5px solid var(--line)', background: 'transparent', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>취소</button>
+                  style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 999, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>취소</button>
                 <button onClick={saveText}
                   style={{ flex: 1, padding: '7px 14px', borderRadius: 999, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>저장</button>
               </div>

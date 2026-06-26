@@ -88,7 +88,8 @@ function BookEditModal({ book, onClose, onSaved }) {
         <input value={total} onChange={(e) => setTotal(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="예: 341"
           style={{ width: '100%', boxSizing: 'border-box', padding: '11px 12px', margin: '6px 0 16px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 700 }} />
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onClose} style={{ flex: '0 0 auto', padding: '12px 18px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
+          {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 투명+보더 금지 → 텍스트만 dismiss) */}
+          <button onClick={onClose} style={{ flex: '0 0 auto', padding: '12px 18px', borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
           <button onClick={save} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 900, fontSize: 14, cursor: 'pointer' }}>저장</button>
         </div>
       </div>
@@ -714,8 +715,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
               style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
               재키와 다시 대화하기
             </button>
+            {/* 나중에 = 3차 텍스트(DESIGN.md #1032: ghost 금지 → 텍스트 dismiss) */}
             <button onClick={resurfaceLater}
-              style={{ padding: '10px 18px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
               나중에
             </button>
           </div>
