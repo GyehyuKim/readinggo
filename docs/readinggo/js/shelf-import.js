@@ -32,7 +32,9 @@ const { useState } = React;
    - rankMatch: fuzzySearch 후보를 제목 정확도로 랭크 → 최적 1건(보수 가드 유지: 양방향 포함만 채택).
    - aladinLookup: /aladin 검색으로 미매칭 책 메타(표지·쪽수·ISBN) 보강. */
 const RG_shelfImport = (function () {
-  function _norm(s) { return String(s || '').replace(/\s+/g, '').toLowerCase(); }
+  // 정규화: NFC(한글 결합형 통일) + 공백·구두점 제거 + 소문자. 타일마다 다른 NFC/NFD·괄호·판본
+  // 표기로 "피로사회 ×3"처럼 눈엔 같은데 키가 달라 안 합쳐지던 dedup 실패를 막고 매칭도 견고히(재현·검증 완료).
+  function _norm(s) { return String(s || '').normalize('NFC').replace(/[\s\p{P}]+/gu, '').toLowerCase(); }
 
   // 카탈로그 book(loadBooks/_mapDbBook 산출: {id,isbn,title,author,pub,total,cover})을
   // 어댑터(add/addBatch)가 기대하는 표면({cover_url,total_pages,isbn13,publisher})으로 정규화.
@@ -291,6 +293,20 @@ const SHELF_DESTS = [
   { value: 'reading', label: '읽는 중', hint: '읽는 중으로 추가' },
 ];
 
+// 보강(카탈로그/알라딘)으로 ISBN이 채워진 뒤, 행을 isbn13 으로 한 번 더 dedup — 제목 표기가
+// 달라도 같은 책(같은 ISBN)이면 한 권으로. ISBN 없는 행(미확인)은 보존(과병합 방지). 첫 등장 유지.
+function _dedupRowsByIsbn(rows) {
+  const seen = new Set(), out = [];
+  for (const r of (rows || [])) {
+    const raw = r && r.book && (r.book.isbn13 || r.book.isbn);
+    const key = raw ? String(raw).replace(/[^0-9Xx]/g, '') : '';
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
 function ShelfImportModal({ onClose }) {
   const [phase, setPhase] = useState('upload');   // upload | loading | review
   const [rows, setRows] = useState([]);           // [{title, author, rating, book|null, checked, source}]
@@ -336,17 +352,20 @@ function ShelfImportModal({ onClose }) {
   const autoEnrich = async (matched) => {
     const targets = [];
     (matched || []).forEach((r, idx) => { if (!r.book && (r.title || '').trim()) targets.push({ idx, r }); });
-    if (!targets.length) return;
-    setEnriching(true);
-    for (const { idx, r } of targets) {
-      let found = null;
-      try { found = await RG_shelfImport.aladinLookup(r.title, r.author); } catch (e) { found = null; }
-      if (found) {
-        setRows((rs) => rs.map((row, j) => (j === idx && !row.book
-          ? { ...row, book: found, author: row.author || found.author, source: 'aladin' } : row)));
+    if (targets.length) {
+      setEnriching(true);
+      for (const { idx, r } of targets) {
+        let found = null;
+        try { found = await RG_shelfImport.aladinLookup(r.title, r.author); } catch (e) { found = null; }
+        if (found) {
+          setRows((rs) => rs.map((row, j) => (j === idx && !row.book
+            ? { ...row, book: found, author: row.author || found.author, source: 'aladin' } : row)));
+        }
       }
+      setEnriching(false);
     }
-    setEnriching(false);
+    // ISBN 확보 후 한 번 더 중복 제거(제목 표기 달라도 같은 ISBN → 한 권). 미확인은 보존.
+    setRows((rs) => _dedupRowsByIsbn(rs));
   };
 
   // 단건 수동 보강("찾기" 버튼) — 자동이 못 찾은 책을 유저가 다시 시도(제목 편집 후 등).
@@ -486,8 +505,8 @@ function ShelfImportModal({ onClose }) {
                   </div>
                 ))}
               </div>
-              <button className="submit-btn" style={{ width: '100%', margin: 0 }} disabled={!checkedCount} onClick={register}>
-                {checkedCount}권 검토함에 담기
+              <button className="submit-btn" style={{ width: '100%', margin: 0 }} disabled={!checkedCount || enriching} onClick={register}>
+                {enriching ? '책 정보 찾는 중… 잠시만요' : `${checkedCount}권 검토함에 담기`}
               </button>
               <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, textAlign: 'center', lineHeight: 1.5 }}>
                 바로 책장에 넣지 않고 <b>검토함</b>에 담아요 · 책장(서재)에서 확인하고 옮기세요 ({destLabel} 기본)

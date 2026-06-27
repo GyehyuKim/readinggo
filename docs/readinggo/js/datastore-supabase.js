@@ -682,10 +682,16 @@
         const row = unwrap(await sb().from('import_staging').select('*')
           .eq('id', stagingId).eq('user_id', id).maybeSingle());
         if (!row) return null;
-        // book_id 있으면 그대로(add 가 upsert 생략), 없으면 메타로 upsert 재해소.
+        // 미확인(book_id·isbn 없음) 행은 책장 삽입 직전 알라딘으로 한 번 더 해소 — "DB엔 ISBN" 보장 +
+        //   기존 검토함 미확인 행도 [내 서재로] 이동 시점에 표지·ISBN·쪽수가 채워진다(#1052).
+        let enriched = null;
+        if (!row.book_id && !row.isbn13 && row.title && window.RG_shelfImport && window.RG_shelfImport.aladinLookup) {
+          try { enriched = await window.RG_shelfImport.aladinLookup(row.title, row.author || ''); } catch (e) { enriched = null; }
+        }
+        // book_id 있으면 그대로(add 가 upsert 생략), 없으면 알라딘 보강분 → 메타 순으로 채워 upsert 재해소.
         const book = row.book_id
           ? { id: row.book_id, title: row.title, author: row.author || '', publisher: '', total_pages: row.total_pages || 0, cover_url: row.cover_url || '', isbn13: row.isbn13 || '' }
-          : { title: row.title, author: row.author || '', publisher: '', total_pages: row.total_pages || 0, cover_url: row.cover_url || '', isbn13: row.isbn13 || '' };
+          : { title: (enriched && enriched.title) || row.title, author: (enriched && enriched.author) || row.author || '', publisher: (enriched && enriched.publisher) || '', total_pages: (enriched && enriched.total_pages) || row.total_pages || 0, cover_url: (enriched && enriched.cover_url) || row.cover_url || '', isbn13: (enriched && enriched.isbn13) || row.isbn13 || '' };
         const st = status || row.suggested_status || 'completed';
         const out = await A.myBooks.addBatch([{ book, status: st, rating: row.rating }]);
         // 책장 이동 성공 시에만 검토함에서 제거(실패면 보존해 재시도 가능).
