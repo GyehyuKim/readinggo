@@ -33,33 +33,39 @@
 ### 4.1 동선 (UX)
 
 1. **진입**: ⓐ 내서재 빈 상태 CTA "📸 스샷으로 서가 복원" ⓑ 온보딩 선택 단계(옵션).
-2. **업로드**: 알라딘/밀리/교보 등 주문·서재 캡쳐 1장(다중은 후속). 기존 `OcrCropOverlay` 자르기 재사용 가능(선택).
-3. **처리중**: 비전 OCR → 책 목록 추출(스피너 + "책 찾는 중…").
-4. **검수 리스트**: 인식된 책 카드 목록(체크박스 + 제목·저자 인라인 편집). 매칭 실패분은 "미확인" 표기.
+2. **업로드**: 알라딘/밀리/교보/왓챠 등 주문·서재·**표지 그리드** 캡쳐 1장(다중은 후속). 기존 `OcrCropOverlay` 자르기 재사용 가능(선택).
+3. **처리중**: **비전(Gemini) 추출 1순위**(표지 그리드 인식) → 책 목록 추출(스피너 + "책 찾는 중…"). 텍스트 리스트는 OCR 폴백.
+4. **검수 리스트**: 인식된 책 카드 목록(체크박스 + 제목·저자 인라인 편집). 매칭 실패분은 "미확인" 표기. **별점이 인식되면 카드에 ★ 표시**(#1042, '읽은 책'/'읽는 중' 목적지에서).
 5. **일괄 등록**: 선택분을 서가에 등록. 완료 토스트 + "한 문장 남겨보기" 유도(영혼 진입점).
 
-### 4.2 서버 — `POST /api/shelf-import` (OCR 스택 확장)
+### 4.2 서버 — `POST /api/shelf-import` (비전 1순위 + OCR 폴백)
 
-기존 `/api/ocr`(Upstage Document OCR + solar-pro3 보정)는 **자유 텍스트** 반환용이라, 서가 복원엔 **구조화 추출**이 필요 → 별도 엔드포인트(또는 `/api/ocr?mode=shelf`).
+> **갱신 (#1042, 2026-06-27)**: 추출을 **비전(Gemini Flash) 1순위 + 텍스트 OCR(Upstage) 폴백**으로 교체. 실측 근거: 왓챠피디아 '평가한 작품들'(표지 그리드) 스샷 → 텍스트 OCR **0권**(표지 아트·잘린 제목·UI 텍스트가 뒤죽박죽), 같은 이미지를 **비전으로 보니 ~23/26권** 제목·저자·**별점**까지. 한국 유저 서재 스샷은 대부분 표지 그리드 → **비전이 핵심**. 텍스트 리스트(구매내역)는 기존 OCR 폴백으로 유지. (#1040 매칭·알라딘 보강·게스트 패리티·목적지 토글 위에 **추출 단계만** 교체.)
 
-- 입력: `formData{ document: 이미지 }`. 재사용: Upstage `model=ocr` → raw 텍스트.
-- 추가 단계: `callLLM`(solar-pro3, temperature 0.1)로 raw → **책 목록 JSON** 추출:
-  `{ books: [{ title, author, status? }], partial: bool }`
-  - 시스템 프롬프트: "구매내역/서재 캡쳐에서 책 제목·저자만. UI 텍스트(가격·배송·버튼)·중복 제거. 불확실하면 제외."
-- 출력: `{ books, raw, partial }`. 키는 **서버 보관(클라 노출 금지)**, 8MB 제한(기존 `OCR_MAX_BYTES`).
-- 실패/미설정: `503 { demo:true }` (기존 패턴) — 데모는 수동 추가 폴백.
+- 입력: `formData{ document: 이미지 }`. 8MB 제한(기존 `OCR_MAX_BYTES`).
+- **① 비전 추출 (1순위, #1042)** — `GEMINI_API_KEY`+`VISION_*` 설정 시. `/api/extract-highlights`(#844)의 `callVision`(OpenAI 호환 chat completions + `image_url` base64, 지역 flap 재시도) **재사용** — system/userText 인자로 서가 프롬프트 주입.
+  - 시스템 프롬프트(`SHELF_VISION_SYSTEM`, temperature 0.1): "책장/평가 목록 스샷에서 **보이는 책을 모두** 추출(표지로 알아본 제목·저자 포함). **별점(★/숫자) 보이면 `rating`(0.5~5.0) 함께**. UI·메뉴·광고·푸터·통계 숫자 제외. **확신 없으면 제외(지어내지 말 것)**. JSON 배열 `[{title, author, rating?}]`만."
+  - 파싱: #1040의 관용 파서(`parseShelfBooks`) 재사용/확장 — 코드펜스·trailing comma 폴백 + **`rating` 0.5단위 스냅·0.5~5.0 클램프**(텍스트 OCR 경로엔 rating 미출현 → 무해).
+  - 큰/긴 스샷(왓챠 풀페이지): Gemini가 **내부 타일링**으로 처리 → 워커 다운스케일 없이 8MB 가드만(이미지 라이브러리 미도입 — Stack Lock). `max_tokens` 여유(2000)로 다수 책 안전.
+  - 비전이 책을 찾으면 그 결과 반환: `{ books, source:'vision' }`(rating 포함). **0건·호출 실패면 ② 텍스트 OCR 폴백**(가능할 때), 그것도 없으면 `{ books:[], empty:true }`.
+- **② 텍스트 OCR 폴백 (구매내역 등)** — Upstage `model=ocr` → raw 텍스트 → `callLLM`(solar-pro3, temperature 0.1)로 책 목록 JSON 추출(`SHELF_EXTRACT_SYSTEM`). 출력: `{ books, raw, partial }`.
+- 출력 공통: `{ books:[{ title, author, rating? }], source?, raw?, partial?, empty? }`. 키는 **서버 보관(클라 노출 금지)**.
+- 실패/미설정: 비전·OCR **둘 다 미설정**이면 `503 { demo:true }`(기존 패턴) — 데모는 수동 추가 폴백.
 
 ### 4.3 매칭·미존재 처리
 
-- 각 추출 책 → `DataStore.books.search(title)` + 저자 퍼지 매칭(isbn13 우선, 없으면 제목+저자).
-- **매칭 성공** → 카탈로그 `Book`(표지·메타 확보).
-- **매칭 실패** → "미확인 책"으로 보존(제목·저자 텍스트만). 검수 리스트에서 알라딘 검색 보조 버튼 제공(`/aladin`). 끝까지 미매칭이면 표지 없는 최소 책으로 등록 허용(메타는 후속 보강).
+- 각 추출 책 → 카탈로그(`loadBooks`) **랭크 매칭**(#1038): `fuzzySearch` 후보를 제목 정확도로 점수화(완전일치>prefix>짧은 길이차) + 저자 일치 가산 → 최적 1건. 보수 가드(제목 양방향 정규화 포함)는 유지해 환각 표지·갖다붙이기 방지. 무순위 `hits[0]` 채택(구 동작)을 대체해 오매칭↓.
+- **매칭 성공** → 카탈로그 `Book`(표지·메타 확보). 카탈로그 book(data.js 형태 `cover`/`total`/`isbn`)은 **어댑터 표면**(`cover_url`/`total_pages`/`isbn13`)으로 **정규화**해 등록 — 게스트(local)·로그인(Supabase) 모두 표지·쪽수·ISBN 보존(패리티, #1038 P1-2). 검수 카드 표지도 `cover_url`로 표시(P1-3).
+- **매칭 실패** → **알라딘 보강**(#1038 P1-1, §4.3 구 약속 구현): 검수 진입 시 미매칭 책을 `/aladin` 검색(worker `ItemSearch`)으로 자동 보강(표지·쪽수·ISBN). 자동이 못 찾으면 검수 카드의 **"🔍 찾기" 버튼**으로 재시도(제목 편집 후). 알라딘 결과도 제목 정확도로 랭크. 워커가 결과를 Supabase `books`에 비파괴 upsert(#489)하므로 카탈로그도 점진 보강. 끝까지 미매칭이면 표지 없는 최소 책으로 등록 허용("미확인").
+- 핵심 매핑·매칭·보강 로직은 `window.RG_shelfImport`(`normalizeCatalogBook`·`rankMatch`·`aladinLookup`·`matchRows`)로 추출 — 재사용 가능(#1039 유연 임포트 등). 비전 추출 `rating`(#1042)도 `matchRows` 가 행에 그대로 보존(매칭/미확인 무관)해 검수·등록까지 전달.
 
 ### 4.4 일괄 등록 (DataStore 계약 확장)
 
-- 검수 후 선택분을 **배치 등록**. 신설 제안: `myBooks.addBatch(items[]) → UserBook[]` (없으면 `myBooks.add` 반복 — Phase 0 폴백).
-- **기본 status**: 과거 독서 복원 맥락이라 후보는 `completed`(완독) 또는 `wish`. → **§7 미해결**(유저 선택 토글 권장: "다 읽었어요 / 읽고 싶어요").
-- 게스트(미로그인)는 §7.7(backend.md) pending 흐름으로 로컬 보관 후 로그인 시 흡수.
+- 검수 후 선택분을 **배치 등록**: `myBooks.addBatch(items[]) → UserBook[]`(양 어댑터 구현). `items[i] = { book, status, rating? }`.
+- **목적지 토글**(#1038 결정 — §7 미해결 해소): 검수 단계에서 **읽은 책(기본=`completed`) / 읽고싶어요(`wish`) / 읽는 중(`reading`)** 일괄 선택 → 그 status 로 등록(구 `completed` 고정 해제). 전체 일괄 토글 1개(책별 status 는 후속).
+- **status 라우팅**(`addBatch`): `wish` → `wish_books`(위시 UX 일치 — Supabase 는 `books.upsert`로 캐노니컬 id 확보 후, local 은 메타를 `BOOK_BY_ID`에 시드해 getBook 해소). `completed`/`reading` → `user_books`(`add` 재사용, 중복 자동 스킵).
+- **별점 보존**(#1042): 비전 추출 `rating` → `addBatch` item 으로 흘러 `user_books.rating` 에 보존(양 어댑터). 0.5~5.0 0.5단위 스냅(Supabase `ub_rating_range` CHECK 준수). `wish` 경로는 `wish_books` 에 별점 컬럼이 없어 **무시**(읽고싶어요엔 별점 의미 없음). 기존 user_book 재사용 시엔 **별점이 비어있을 때만** 채움(기존 평가 비파괴).
+- 게스트(미로그인)는 local 어댑터로 보관 후 로그인 시 흡수(§7.7 backend.md).
 
 ### 4.5 폴백·실패 UX
 
@@ -69,7 +75,7 @@
 ### 4.6 프라이버시·분석
 
 - 업로드 스샷은 **처리 후 미저장**(워커 메모리 경유, 영속 저장 없음). 원본은 분석·리플레이에 미포함.
-- 이벤트: `shelf_import_started` / `shelf_import_extracted{count}` / `shelf_import_registered{count}` (analytics.md §3 필수=익명 집계).
+- 이벤트: `shelf_import_started` / `shelf_import_extracted{count}` / `shelf_import_registered{count, status}` (analytics.md §3 필수=익명 집계). `status`=목적지 토글값(#1038).
 
 ## 5. ② 웹 리뷰 마중물 시드 (#774)
 
@@ -171,9 +177,9 @@ alter table public.seed_sentences enable row level security;
 ## 7. 결정·미해결
 
 - **[결정] #774 방향**: **실제 출처 시드**(책속문장 + 네이버 블로그 API → 후속 서점 리뷰). AI 생성 폐기. 비영리·출처표기·인용 최소 가드(§5.2).
-- **[미해결] #772 등록 기본 status**: 완독 vs 읽고 싶어요 — **권장: 유저 토글("다 읽었어요/읽고 싶어요")**.
+- **[결정·구현 #1038] #772 등록 status**: 검수 단계 **목적지 토글**(읽은 책=`completed` 기본 / 읽고싶어요=`wish` / 읽는 중=`reading`) 일괄 1개 → 그 status 로 `addBatch`. 책별 status 는 후속.
 - **[미해결] 시드 상호작용**: 짹/대화 허용 범위 — **권장: 읽기 전용, 대화는 검토**.
-- **[미해결] 다중 스샷**: MVP는 1장, 다중은 후속.
+- **[미해결] 다중 스샷**: MVP는 1장, 다중은 후속(#1038에서 미구현 — 코어 정리·알라딘 보강 우선).
 
 ## 8. Phasing (MVP cut)
 

@@ -57,8 +57,9 @@ export default {
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       return extractHighlightsProxy(request, env);
     }
-    // 통합 서가 ① 스샷 서가 복원 (#772) — 구매내역/서재 캡쳐 → 비전 OCR → 책 목록 구조화 추출.
-    // OCR 스택 재사용(Upstage + solar-pro3). 키는 서버에서만(클라 노출 금지). 동일출처만.
+    // 통합 서가 ① 스샷 서가 복원 (#772·#1042) — 구매내역/서재 캡쳐 → 책 목록 구조화 추출.
+    // 비전 1순위(#1042): Gemini Flash로 표지 그리드(왓챠·밀리·교보) 직접 인식 + 별점. 텍스트 OCR(Upstage+solar-pro3)은 폴백/병행.
+    // 키는 서버에서만(클라 노출 금지). 동일출처만.
     if (p === '/api/shelf-import') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
@@ -498,16 +499,17 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 // ("User location is not supported")을 간헐 반환한다(워커가 도는 Cloudflare PoP의
 // 송출 지역에 좌우 — 실측 ~50% flap). 같은 요청을 재시도하면 다른 경로/PoP로 나가
 // 성공률이 크게 오른다. 429/5xx(일시 과부하)도 함께 재시도. 본문 변경 없음(멱등).
-async function callVision({ env, dataUrl, maxTokens }) {
+// system/userText 인자(#1042 서가 비전 추출 재사용) — 기본값은 강조 추출(기존 #844 호출부 무변).
+async function callVision({ env, dataUrl, maxTokens, system, userText }) {
   const base = (env.VISION_BASE_URL || '').replace(/\/$/, '');
   const model = env.VISION_MODEL, key = env.GEMINI_API_KEY;
   if (!base || !model || !key) throw new Error('VISION env 미설정');
   const payload = JSON.stringify({
     model,
     messages: [
-      { role: 'system', content: HIGHLIGHT_SYSTEM },
+      { role: 'system', content: system || HIGHLIGHT_SYSTEM },
       { role: 'user', content: [
-        { type: 'text', text: '이 책 페이지에서 강조(밑줄/형광펜) 표시된 문장만 추출해.' },
+        { type: 'text', text: userText || '이 책 페이지에서 강조(밑줄/형광펜) 표시된 문장만 추출해.' },
         { type: 'image_url', image_url: { url: dataUrl } },
       ] },
     ],
@@ -566,15 +568,28 @@ async function extractHighlightsProxy(request, env) {
 // 통합 서가 ① (#772) — 구매내역/서재 캡쳐 OCR 텍스트에서 책 목록만 구조화 추출.
 const SHELF_EXTRACT_SYSTEM = '너는 책 구매내역·서재 캡쳐의 OCR 텍스트에서 책 목록만 뽑는 추출기다. 각 책의 제목(title)과 저자(author)만 JSON 배열로 출력한다. 형식: [{"title":"제목","author":"저자"}]. 규칙: (1) UI 텍스트(가격·할인·배송·날짜·버튼·카테고리·별점·페이지수·"장바구니" 등)는 모두 제외. (2) 저자가 불분명하면 author는 빈 문자열. (3) 같은 책은 한 번만. (4) 확실한 책만, 애매하면 제외. (5) 설명·코드펜스 없이 JSON 배열만 출력.';
 
+// 통합 서가 비전 추출 (#1042) — 표지 그리드(왓챠·밀리·교보 서재) 스샷에서 책을 직접 본다.
+// 텍스트 OCR이 표지 아트·잘린 제목으로 0건 추락하는 케이스를 비전(Gemini Flash)이 표지로 인식.
+// 별점(★)이 보이면 함께. 환각 가드: 확신 없으면 제외(지어내지 말 것) — 검수 큐가 2차 가드.
+const SHELF_VISION_SYSTEM = '너는 사용자의 책장·평가 목록 스크린샷에서 책을 모두 찾아내는 추출기다. 보이는 책을 모두 추출한다 — 표지 이미지로 알아본 제목·저자도 포함. 각 책의 제목(title)·저자(author), 그리고 별점(★ 또는 숫자 평점)이 보이면 rating(0.5~5.0 숫자)도 함께 JSON 배열로 출력한다. 형식: [{"title":"제목","author":"저자","rating":4.5}]. 규칙: (1) UI·메뉴·탭·버튼·광고·배너·푸터·검색창·통계 숫자는 모두 제외 — 책만. (2) 저자가 불분명하면 author는 빈 문자열. rating이 안 보이면 rating 키는 생략(0 넣지 말 것). (3) 같은 책은 한 번만. (4) 확신 없는 책은 제외 — 절대 지어내지 말 것(흐릿하거나 표지 일부만 보여 제목을 모르면 버림). (5) 설명·코드펜스 없이 JSON 배열만 출력.';
+
 // OCR→LLM 출력(JSON 배열) 견고 파싱 — 코드펜스·잡텍스트 제거, 제목 기준 중복 제거, 상한 60.
+// 관용 폴백(#1038 P2-4): 1차 JSON.parse 실패 시 trailing comma 제거 후 재시도, 그래도 실패면
+// 단일 객체({...})를 배열로 감싸 수용(parseSeedJson 선례) → LLM 사소한 포맷 흠으로 전체 0건 추락 방지.
+// rating(#1042): 비전 추출이 별점을 함께 주면 0.5~5.0 으로 클램프해 보존(텍스트 OCR 경로엔 미출현 → 무해).
 function parseShelfBooks(s) {
   if (!s) return [];
   let t = String(s).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   const a = t.indexOf('['), b = t.lastIndexOf(']');
   if (a >= 0 && b > a) t = t.slice(a, b + 1);
+  else { const oa = t.indexOf('{'), ob = t.lastIndexOf('}'); if (oa >= 0 && ob > oa) t = '[' + t.slice(oa, ob + 1) + ']'; }
   let arr;
-  try { arr = JSON.parse(t); } catch { return []; }
-  if (!Array.isArray(arr)) return [];
+  try { arr = JSON.parse(t); }
+  catch {
+    try { arr = JSON.parse(t.replace(/,\s*([\]}])/g, '$1')); } // trailing comma 제거 후 재시도
+    catch { return []; }
+  }
+  if (!Array.isArray(arr)) arr = [arr];
   const seen = new Set(), out = [];
   for (const it of arr) {
     if (!it || typeof it !== 'object') continue;
@@ -584,7 +599,11 @@ function parseShelfBooks(s) {
     const key = title.replace(/\s+/g, '').toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ title, author });
+    const row = { title, author };
+    // 별점 — 숫자만 채택, 0.5~5.0 클램프. 0/음수/비숫자는 미부착(rating 없음).
+    const rn = Number(it.rating);
+    if (Number.isFinite(rn) && rn > 0) row.rating = Math.min(5, Math.max(0.5, Math.round(rn * 2) / 2));
+    out.push(row);
     if (out.length >= 60) break;
   }
   return out;
@@ -592,13 +611,39 @@ function parseShelfBooks(s) {
 
 async function shelfImportProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-  if (!env.UPSTAGE_API_KEY) return json({ error: 'OCR 미설정', demo: true }, 503);
+  // 비전(Gemini) 또는 텍스트 OCR(Upstage) 중 하나라도 설정돼 있어야 동작(#1042). 둘 다 없으면 데모.
+  const visionOn = !!(env.GEMINI_API_KEY && env.VISION_BASE_URL && env.VISION_MODEL);
+  if (!visionOn && !env.UPSTAGE_API_KEY) return json({ error: 'OCR 미설정', demo: true }, 503);
   let form;
   try { form = await request.formData(); } catch { return json({ error: 'invalid form' }, 400); }
   const file = form.get('document');
   if (!file || typeof file === 'string') return json({ error: 'document(이미지) 필요' }, 422);
   if (file.size && file.size > OCR_MAX_BYTES) return json({ error: '이미지가 너무 큽니다(최대 8MB)' }, 413);
-  // 1) Upstage Document OCR — raw 텍스트.
+
+  // 0) 비전 추출 1순위 (#1042) — 표지 그리드 스샷을 직접 인식(텍스트 OCR이 약한 케이스).
+  //    Gemini가 책을 찾으면 그 결과를 그대로 반환(rating 포함). 큰/긴 스샷은 Gemini가 내부 타일링으로
+  //    처리하므로 워커에서 별도 다운스케일 없이 8MB 가드만 둔다(이미지 라이브러리 미도입 — Stack Lock).
+  //    실패(키 미설정·지역 flap 소진·0건)면 아래 Upstage 텍스트 OCR 경로로 폴백.
+  if (visionOn) {
+    try {
+      const buf = await file.arrayBuffer();
+      const dataUrl = `data:${file.type || 'image/jpeg'};base64,${bufToBase64(buf)}`;
+      const vraw = await callVision({
+        env, dataUrl, maxTokens: 2000,
+        system: SHELF_VISION_SYSTEM,
+        userText: '이 스크린샷에서 보이는 책을 모두 추출해(표지로 알아본 책 포함). 별점이 보이면 함께. JSON 배열만.',
+      });
+      const books = parseShelfBooks(vraw);
+      if (books.length) return json({ books, source: 'vision' }, 200);
+      // 비전이 0건 — 텍스트 OCR이 가능하면 폴백, 아니면 빈 결과(empty)로 종료.
+      if (!env.UPSTAGE_API_KEY) return json({ books: [], source: 'vision', empty: true }, 200);
+    } catch (e) {
+      // 비전 호출 실패(지역 flap 소진 등) — 텍스트 OCR 폴백. 그것도 없으면 502.
+      if (!env.UPSTAGE_API_KEY) return json({ error: 'vision 호출 실패: ' + String((e && e.message) || e) }, 502);
+    }
+  }
+
+  // 1) Upstage Document OCR — raw 텍스트. (텍스트 리스트=구매내역 폴백·병행, #1042)
   let raw = '';
   try {
     const up = new FormData();

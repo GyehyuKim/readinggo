@@ -171,7 +171,7 @@
           .eq('user_id', id).order('started_at', { ascending: false }));
         return (rows || []).map(_applyBookOverrides);
       },
-      async add({ book, current_page, status }) {
+      async add({ book, current_page, status, rating }) {
         const id = await uid();
         const bk = book && book.id ? book : await A.books.upsert(book);
         // #772 서가 복원: status='completed'면 완독으로(completed_at·진척 100%). 기본 'reading'.
@@ -182,16 +182,31 @@
           current_page: st === 'completed' ? (tp || current_page || 0) : (current_page || 0),
         };
         if (st === 'completed') ins.completed_at = new Date().toISOString();
+        // 별점(#1042 스샷 비전 추출) — 0.5~5.0, 0.5 단위로 스냅(ub_rating_range CHECK 준수). local 어댑터와 표면 일치.
+        const rn = Number(rating);
+        if (Number.isFinite(rn) && rn > 0) ins.rating = Math.min(5, Math.max(0.5, Math.round(rn * 2) / 2));
         const row = unwrap(await sb().from('user_books').insert(ins).select('*, book:books(*)').single());
         return _applyBookOverrides(row);
       },
-      // 스샷 서가 복원 (#772) — 책 목록 일괄 등록. items: [{book, status}]. 개별 실패는 스킵(무중단).
+      // 스샷 서가 복원 (#772·#1038·#1042) — 책 목록 일괄 등록. items: [{book, status, rating?}]. 개별 실패는 스킵(무중단).
+      // status 라우팅: 'wish' → books.upsert 로 캐노니컬 id 확보 후 wish_books(위시 UX 일치),
+      //   그 외('completed'/'reading') → user_books(add 재사용). local 어댑터와 표면 일치.
+      // rating(#1042): user_books 경로만 별점 보존(wish_books 엔 별점 컬럼 없음 → 무시).
       async addBatch(items) {
         const list = Array.isArray(items) ? items : [];
         const out = [];
         for (const it of list) {
           if (!it || !it.book) continue;
-          try { out.push(await this.add({ book: it.book, status: it.status })); } catch (e) { /* 개별 실패 스킵 */ }
+          try {
+            if (it.status === 'wish') {
+              // 검색 raw id(b001/외서)는 books 행이 없어 wish_books FK 위반 → upsert 로 캐노니컬 id 확보(#552 선례).
+              const isUuid = it.book.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(it.book.id));
+              const bk = isUuid ? it.book : await A.books.upsert(it.book);
+              if (bk && bk.id) { await A.wishBooks.add(bk.id); out.push({ book_id: bk.id, book: bk }); }
+            } else {
+              out.push(await this.add({ book: it.book, status: it.status, rating: it.rating }));
+            }
+          } catch (e) { /* 개별 실패 스킵 */ }
         }
         return out;
       },
