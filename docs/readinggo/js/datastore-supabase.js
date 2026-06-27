@@ -628,6 +628,74 @@
         return A.wishBooks.list();
       },
     },
+
+    /* 스샷 서가 복원 검토함 (#1048, integrated-shelf.md §4.7) — 로그인 전용 임포트 스테이징.
+       shelf-import 검수 "등록"이 책장 직행(myBooks.addBatch) 대신 여기로 적재 → 서재 "검토함" 뷰가
+       항목별/일괄로 책장 이동(commit)·제외(remove). 영속(import_staging, 37_import_staging.sql).
+       local 어댑터(datastore.js)는 게이트라 no-op — 게스트는 RG_openShelfImport 에서 차단(app.js). */
+    importStaging: {
+      // 검수분 적재. items: [{ book|null, status, rating? }] (addBatch 와 같은 표면).
+      // 매칭/보강 메타(표지·쪽수·isbn)를 행으로 평탄화해 검토함 카드가 책장 없이도 표시 가능.
+      async add(items) {
+        const id = await uid();
+        if (!id) return [];
+        const list = Array.isArray(items) ? items : [];
+        const rows = list.map((it) => {
+          if (!it) return null;
+          const b = it.book || {};
+          const title = String((b.title || it.title || '')).trim();
+          if (!title) return null;
+          // canonical UUID(Supabase 카탈로그 매칭)만 book_id 로 보존. raw id(b001)·알라딘(id 없음)은 null.
+          const isUuid = b.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(b.id));
+          const rn = Number(it.rating);
+          const rating = (Number.isFinite(rn) && rn > 0) ? Math.min(5, Math.max(0.5, Math.round(rn * 2) / 2)) : null;
+          return {
+            user_id: id,
+            book_id: isUuid ? b.id : null,
+            title,
+            author: String((b.author || it.author || '')).trim() || null,
+            cover_url: b.cover_url || null,
+            isbn13: b.isbn13 || null,
+            total_pages: Number(b.total_pages) || 0,
+            suggested_status: it.status || 'completed',
+            rating,
+          };
+        }).filter(Boolean);
+        if (!rows.length) return [];
+        return unwrap(await sb().from('import_staging').insert(rows).select()) || [];
+      },
+      async list() {
+        const id = await uid();
+        if (!id) return [];
+        return unwrap(await sb().from('import_staging').select('*')
+          .eq('user_id', id).order('created_at', { ascending: false })) || [];
+      },
+      async remove(stagingId) {
+        const id = await uid();
+        await sb().from('import_staging').delete().eq('id', stagingId).eq('user_id', id);
+        return A.importStaging.list();
+      },
+      // 검토함 → 책장 이동. status(없으면 suggested_status) 로 myBooks.addBatch 라우팅(별점 보존) 후 행 삭제.
+      // 반환: 등록된 UserBook|wish 표면(addBatch out[0]) | null(행 없음/실패).
+      async commit(stagingId, status) {
+        const id = await uid();
+        const row = unwrap(await sb().from('import_staging').select('*')
+          .eq('id', stagingId).eq('user_id', id).maybeSingle());
+        if (!row) return null;
+        // book_id 있으면 그대로(add 가 upsert 생략), 없으면 메타로 upsert 재해소.
+        const book = row.book_id
+          ? { id: row.book_id, title: row.title, author: row.author || '', publisher: '', total_pages: row.total_pages || 0, cover_url: row.cover_url || '', isbn13: row.isbn13 || '' }
+          : { title: row.title, author: row.author || '', publisher: '', total_pages: row.total_pages || 0, cover_url: row.cover_url || '', isbn13: row.isbn13 || '' };
+        const st = status || row.suggested_status || 'completed';
+        const out = await A.myBooks.addBatch([{ book, status: st, rating: row.rating }]);
+        // 책장 이동 성공 시에만 검토함에서 제거(실패면 보존해 재시도 가능).
+        if (out && out.length) {
+          await sb().from('import_staging').delete().eq('id', stagingId).eq('user_id', id);
+        }
+        return (out && out[0]) || null;
+      },
+    },
+
     pokes: {
       async send(toUserId) {
         const id = await uid();

@@ -27,6 +27,8 @@ function LibraryView({ state, onActivateUserBook }) {
   const [ratingSheetOpen, setRatingSheetOpen] = _useState(false);
   const [myBooks, setMyBooks] = _useState(null);   // null=로딩
   const [wishlistBooks, setWishlistBooks] = _useState([]);
+  const [stagedItems, setStagedItems] = _useState([]);    // 📦 검토함(import_staging) — 로그인 전용 임포트 스테이징 (#1048)
+  const [stagedStatus, setStagedStatus] = _useState({});  // 검토함 항목별 목적지 토글 {id: 'completed'|'wish'|'reading'} (기본 suggested_status)
   const [savedCount, setSavedCount] = _useState(0); // ❤️ 저장(북마크) 문장 수 — stats행 (#471/#472)
   const [followCounts, setFollowCounts] = _useState({ following: 0, followers: 0 }); // 팔로잉/팔로워 수 (#516)
   const [followModal, setFollowModal] = _useState(null); // null | 'following' | 'followers' — 유저 목록 모달 (#509)
@@ -227,6 +229,20 @@ function LibraryView({ state, onActivateUserBook }) {
     return () => window.removeEventListener('rg:wish-changed', reload);
   }, []);
 
+  // 📦 검토함(import_staging, #1048) 로드 + 갱신 구독. 로그인 전용 — local(게스트)은 importStaging.list()
+  // no-op([]) → 섹션 미노출. shelf-import 적재(rg:import-staged)·책장 이동/제외 후 재로드. 메서드 부재(구버전) 가드.
+  _useEffect(() => {
+    let alive = true;
+    const load = () => {
+      Promise.resolve((DataStore.importStaging && DataStore.importStaging.list) ? DataStore.importStaging.list() : [])
+        .then((rows) => { if (alive) setStagedItems(Array.isArray(rows) ? rows : []); })
+        .catch(() => { if (alive) setStagedItems([]); });
+    };
+    load();
+    window.addEventListener('rg:import-staged', load);
+    return () => { alive = false; window.removeEventListener('rg:import-staged', load); };
+  }, []);
+
   // #593: 중단 탭은 책 있을 때만 노출 → 마지막 중단 책을 다시 읽기로 옮기면 탭이 사라진다.
   // activeSubtab 이 'aborted'에 머물면 빈 화면이 되므로 '읽는 중'으로 되돌린다.
   _useEffect(() => {
@@ -241,6 +257,48 @@ function LibraryView({ state, onActivateUserBook }) {
     setWishlistBooks((prev) => prev.filter((w) => w.id !== bookId));
     if (DataStore.wishBooks && DataStore.wishBooks.remove) Promise.resolve(DataStore.wishBooks.remove(bookId)).catch(() => {});
     showToast('찜 목록에서 제거했어요');
+  };
+
+  // 📦 검토함(#1048) 액션 — 항목별 목적지(책장 토글)·이동(commit, 별점 보존)·제외(remove) + 일괄.
+  const STAGED_DESTS = [
+    { value: 'completed', label: '읽은책' },
+    { value: 'wish', label: '읽고싶어요' },
+    { value: 'reading', label: '읽는중' },
+  ];
+  const stagedDestOf = (it) => stagedStatus[it.id] || it.suggested_status || 'completed';
+  const setStagedDest = (id, st) => setStagedStatus((m) => ({ ...m, [id]: st }));
+  // 검토함 → 내 서재로 이동. commit 이 myBooks.addBatch 라우팅(별점 보존) 후 staging row 삭제.
+  // 낙관적 제거 + 성공 시 rg:wish-changed(서재 갱신) / 실패 시 rg:import-staged 로 재로드 복구.
+  const moveStaged = (it) => {
+    if (!(DataStore.importStaging && DataStore.importStaging.commit)) return;
+    const st = stagedDestOf(it);
+    setStagedItems((prev) => prev.filter((x) => x.id !== it.id));
+    Promise.resolve(DataStore.importStaging.commit(it.id, st))
+      .then(() => { window.dispatchEvent(new CustomEvent('rg:wish-changed')); })
+      .catch(() => { window.dispatchEvent(new CustomEvent('rg:import-staged')); });
+    showToast(st === 'wish' ? '읽고싶어요로 옮겼어요' : '내 서재로 옮겼어요');
+  };
+  const excludeStaged = (it) => {
+    if (!(DataStore.importStaging && DataStore.importStaging.remove)) return;
+    setStagedItems((prev) => prev.filter((x) => x.id !== it.id));
+    Promise.resolve(DataStore.importStaging.remove(it.id)).catch(() => {});
+    showToast('검토함에서 제외했어요');
+  };
+  const moveAllStaged = () => {
+    const list = stagedItems.slice();
+    if (!list.length || !(DataStore.importStaging && DataStore.importStaging.commit)) return;
+    setStagedItems([]);
+    Promise.all(list.map((it) => Promise.resolve(DataStore.importStaging.commit(it.id, stagedDestOf(it))).catch(() => null)))
+      .then(() => { window.dispatchEvent(new CustomEvent('rg:wish-changed')); window.dispatchEvent(new CustomEvent('rg:import-staged')); });
+    showToast(`${list.length}권을 내 서재로 옮겼어요`);
+  };
+  const excludeAllStaged = () => {
+    const list = stagedItems.slice();
+    if (!list.length || !(DataStore.importStaging && DataStore.importStaging.remove)) return;
+    setStagedItems([]);
+    Promise.all(list.map((it) => Promise.resolve(DataStore.importStaging.remove(it.id)).catch(() => null)))
+      .then(() => { window.dispatchEvent(new CustomEvent('rg:import-staged')); });
+    showToast('검토함을 비웠어요');
   };
 
   const books = myBooks || [];
@@ -405,6 +463,61 @@ function LibraryView({ state, onActivateUserBook }) {
             📸 스샷으로 복원
           </button>
         </div>
+
+        {/* 📦 검토함 (#1048) — 임포트가 책장 직행 대신 여기로 적재. 항목별 책장 토글 + [내 서재로][제외] + 일괄.
+            로그인 전용(local/게스트는 stagedItems=[]로 미노출). 영속(import_staging) — 세션 넘어 유지. */}
+        {stagedItems.length > 0 && (
+          <div style={{marginBottom:18, border:'1.5px solid var(--brand)', borderRadius:14, background:'var(--brand-tint)', padding:'12px 12px 14px'}}>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8, gap:8}}>
+              <div style={{fontSize:13.5, fontWeight:900, color:'var(--brand-3)'}}>📦 가져온 책 {stagedItems.length}권 · 검토</div>
+              <div style={{display:'flex', gap:6, flexShrink:0}}>
+                <button onClick={moveAllStaged}
+                  style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:8, padding:'5px 9px', cursor:'pointer'}}>전체 이동</button>
+                <button onClick={excludeAllStaged}
+                  style={{fontSize:11, fontWeight:800, color:'var(--ink-2)', background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:'5px 9px', cursor:'pointer'}}>전체 제외</button>
+              </div>
+            </div>
+            <div style={{fontSize:11, color:'var(--ink-3)', marginBottom:10, lineHeight:1.5}}>
+              스샷에서 찾은 책이에요. 책장을 고르고 <b>내 서재로</b> 옮기거나, 아닌 책은 <b>제외</b>하세요.
+            </div>
+            <div style={{display:'flex', flexDirection:'column', gap:8}}>
+              {stagedItems.map((it) => {
+                const dest = stagedDestOf(it);
+                const matched = !!it.book_id;
+                return (
+                  <div key={it.id} style={{display:'flex', alignItems:'center', gap:10, background:'var(--card)', border:'1px solid var(--line)', borderRadius:10, padding:'8px 10px'}}>
+                    <BookCover title={it.title} author={it.author || ''} cover={it.cover_url || ''} fb={['#9AA7B2','#C7D0D8']} style={{width:34, height:48, borderRadius:5, flexShrink:0}} />
+                    <div style={{flex:1, minWidth:0}}>
+                      <div style={{fontSize:13, fontWeight:800, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{it.title}</div>
+                      <div style={{fontSize:11, color:'var(--ink-3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                        {it.author || '저자 미상'}
+                        {typeof it.rating === 'number' && it.rating > 0 ? ` · ⭐ ${it.rating}` : ''}
+                        {matched ? ' · 매칭됨' : ' · 미확인'}
+                      </div>
+                      <div style={{display:'flex', gap:4, marginTop:6}}>
+                        {STAGED_DESTS.map((d) => (
+                          <button key={d.value} onClick={() => setStagedDest(it.id, d.value)}
+                            style={{fontSize:10, fontWeight:800, padding:'3px 7px', borderRadius:7, cursor:'pointer',
+                              border: dest === d.value ? '1.5px solid var(--brand)' : '1px solid var(--line)',
+                              background: dest === d.value ? 'var(--brand)' : 'var(--card)',
+                              color: dest === d.value ? '#fff' : 'var(--ink-2)'}}>
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{display:'flex', flexDirection:'column', gap:5, flexShrink:0}}>
+                      <button onClick={() => moveStaged(it)}
+                        style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:8, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>내 서재로</button>
+                      <button onClick={() => excludeStaged(it)}
+                        style={{fontSize:11, fontWeight:800, color:'var(--ink-3)', background:'transparent', border:'1px solid var(--line)', borderRadius:8, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>제외</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 탭 버튼들 */}
         <div style={{display:'flex', gap:8, marginBottom:16, overflowX:'auto', paddingBottom:8, scrollBehavior:'smooth'}}>
