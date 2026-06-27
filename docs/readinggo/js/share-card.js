@@ -188,8 +188,8 @@ function _buildCardNode(n, coverDataUrl) {
   Object.assign(wm.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' });
   const brand = document.createElement('span');
   Object.assign(brand.style, { display: 'flex', alignItems: 'center', gap: '14px', fontSize: '38px', color: _SC.ink });
-  // 참새 마크는 인라인 SVG(#823) — 이모지 대신 SparrowMark 실루엣을 래스터에 박는다(assets/sparrow.svg 동일 path).
-  brand.innerHTML = '<svg width="40" height="40" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0"><path d="M50 30 L62 25 L60 36 L50 37 Z" fill="#1F8E4D"/><ellipse cx="34" cy="37" rx="17" ry="15" fill="#3FD17F"/><circle cx="24" cy="26" r="12" fill="#3FD17F"/><path d="M21 41 Q31 51 45 45 Q40 51 30 51 Q22 49 19 43 Z" fill="#DFF6EA"/><path d="M31 31 Q42 30 49 39 Q40 43 32 40 Q27 35 31 31 Z" fill="#2EB867"/><path d="M11 25 L23 21 L23 30 Z" fill="#FF8A3D"/><circle cx="21" cy="24" r="2.5" fill="#2A2D33"/><circle cx="21.9" cy="23.1" r="0.85" fill="#FFFFFF"/></svg>ReadingGo';
+  // 참새 마크는 인라인 SVG(#823) — 이모지 대신 SparrowMark 실루엣을 래스터에 박는다(아이콘 리디자인·세이지 팔레트, SparrowMark 동일 path).
+  brand.innerHTML = '<svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0"><path d="M66 50 L95 40 L79 65 Z" fill="#2EA86A"/><ellipse cx="56" cy="62" rx="28" ry="24" fill="#2EA86A"/><circle cx="40" cy="40" r="19" fill="#2EA86A"/><path d="M46 23 Q51 12 55 24 Q50 26 46 23 Z" fill="#2EA86A"/><path d="M44 50 Q70 47 80 66 Q60 73 46 65 Q39 57 44 50 Z" fill="#228A57"/><path d="M23 36 L13 39.5 L24 45 Z" fill="#E8962F"/><circle cx="35" cy="38" r="3.4" fill="#2A2D33"/><circle cx="36.3" cy="36.7" r="1.15" fill="#FFFFFF"/></svg>ReadingGo';
   const handle = document.createElement('span');
   Object.assign(handle.style, { fontFamily: _SC.fontPixel, fontSize: '30px', letterSpacing: '1.2px', color: _SC.ink3 });
   handle.textContent = RG_SHARE_HANDLE;

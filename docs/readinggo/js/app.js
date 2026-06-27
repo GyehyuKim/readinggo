@@ -268,8 +268,10 @@ function LoginScreen({ onLogin, onBack }) {
         </button>
       )}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '0 32px', textAlign: 'center' }}>
-        <window.SparrowMark size={54} />
-        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)' }}>Reading<span style={{ color: 'var(--brand)' }}>Go</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <window.SparrowMark size={50} spark />
+          <div style={{ fontSize: 27, fontWeight: 900, color: 'var(--ink)' }}>Reading<span style={{ color: 'var(--brand)' }}>Go</span></div>
+        </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>지금까지 남긴 기록을<br />계정에 안전하게 간직해요.</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 300, marginTop: 8 }}>
           <button onClick={() => social('google')} aria-label="Google로 시작하기"

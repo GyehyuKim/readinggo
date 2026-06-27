@@ -94,23 +94,30 @@ function nestArt(lv, size) {
 window.NEST_ART = NEST_ART;
 window.nestArt = nestArt;
 
-/* ── SparrowMark (#785 · #924 귀여움 개선): ReadingGo 참새 브랜드 마크 — 부트·로딩·에러 화면 공용 인라인 SVG.
-   favicon(assets/sparrow.svg)과 동일 실루엣(배경 칩만 제외). 참새 머리 이모지 대체(모든 DPI 선명, #864).
-   #924: DESIGN.md 톤(Warm Editorial·토이 과잉 후퇴) 유지하며 절제된 baby-schema — 눈 확대·중앙↑·
-   캐치라이트 강화 + 부리 짧고 부드럽게 + 몸통 살짝 둥글게. 컬러 토큰·실루엣·장식은 불변(과한 변형 금지).
+/* ── SparrowMark (#785 · #924 · 아이콘 리디자인): ReadingGo 참새 브랜드 마크 — 부트·로딩·에러·아바타 공용 인라인 SVG.
+   앱아이콘(assets/icon.png)·favicon(assets/sparrow.svg)과 동일 참새 캐릭터(배지·그라데이션만 제외한 새 본체).
+   세이지 팔레트(DESIGN.md 2026-06-19 리프레시): 몸통 #2EA86A / 날개 #228A57 / 부리 #E8962F / 눈 #2A2D33.
+   고개 든 통통 참새 + 짧은 부리 + 작은 깃(crest). viewBox 0 0 100 100.
+   spark=true 면 골드 스파크(짹!/한 문장) 추가 — 로그인·브랜드 모먼트 전용(아바타엔 미사용, 군더더기 회피).
    size=픽셀(기본 40). 빌드 도구 없음 → 인라인 SVG(Stack Lock). ── */
-function SparrowMark({ size = 40, style }) {
+function SparrowMark({ size = 40, style, spark }) {
   const s = size || 40;
   return (
-    <svg width={s} height={s} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ReadingGo 참새" style={{ display: 'block', flexShrink: 0, ...(style || {}) }}>
-      <path d="M50 31 L61 26.5 L59.5 36 L50 37 Z" fill="#1F8E4D" />
-      <ellipse cx="34" cy="38" rx="17" ry="15.5" fill="#3FD17F" />
-      <circle cx="23.5" cy="25.5" r="12.5" fill="#3FD17F" />
-      <path d="M21 42 Q31 51.5 45 45.5 Q40 51 30 51 Q22 49 19 43.5 Z" fill="#DFF6EA" />
-      <path d="M31 31.5 Q42 30.5 49 39.5 Q40 43.5 32 40.5 Q27 35.5 31 31.5 Z" fill="#2EB867" />
-      <path d="M7 25 L17 22 L17 28 Z" fill="#FF8A3D" />
-      <circle cx="20.5" cy="24" r="3.4" fill="#2A2D33" />
-      <circle cx="21.7" cy="22.8" r="1.15" fill="#FFFFFF" />
+    <svg width={s} height={s} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ReadingGo 참새" style={{ display: 'block', flexShrink: 0, ...(style || {}) }}>
+      <path d="M66 50 L95 40 L79 65 Z" fill="#2EA86A" />
+      <ellipse cx="56" cy="62" rx="28" ry="24" fill="#2EA86A" />
+      <circle cx="40" cy="40" r="19" fill="#2EA86A" />
+      <path d="M46 23 Q51 12 55 24 Q50 26 46 23 Z" fill="#2EA86A" />
+      <path d="M44 50 Q70 47 80 66 Q60 73 46 65 Q39 57 44 50 Z" fill="#228A57" />
+      <path d="M23 36 L13 39.5 L24 45 Z" fill="#E8962F" />
+      <circle cx="35" cy="38" r="3.4" fill="#2A2D33" />
+      <circle cx="36.3" cy="36.7" r="1.15" fill="#FFFFFF" />
+      {spark && (
+        <g fill="#D9A52E">
+          <path d="M62 12.5 Q63.7 19.3 70.5 21 Q63.7 22.7 62 29.5 Q60.3 22.7 53.5 21 Q60.3 19.3 62 12.5 Z" />
+          <path d="M76 27 Q77.7 30.3 81 32 Q77.7 33.7 76 37 Q74.3 33.7 71 32 Q74.3 30.3 76 27 Z" />
+        </g>
+      )}
     </svg>
   );
 }

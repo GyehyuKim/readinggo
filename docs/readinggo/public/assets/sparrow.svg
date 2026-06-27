@@ -1,18 +1,24 @@
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ReadingGo 참새">
-  <rect width="64" height="64" rx="16" fill="#F1FBF5"/>
-  <!-- 꼬리 -->
-  <path d="M50 31 L61 26.5 L59.5 36 L50 37 Z" fill="#1F8E4D"/>
-  <!-- 몸통 -->
-  <ellipse cx="34" cy="38" rx="17" ry="15.5" fill="#3FD17F"/>
-  <!-- 머리 -->
-  <circle cx="23.5" cy="25.5" r="12.5" fill="#3FD17F"/>
-  <!-- 배(밝은 톤) -->
-  <path d="M21 42 Q31 51.5 45 45.5 Q40 51 30 51 Q22 49 19 43.5 Z" fill="#DFF6EA"/>
-  <!-- 날개 -->
-  <path d="M31 31.5 Q42 30.5 49 39.5 Q40 43.5 32 40.5 Q27 35.5 31 31.5 Z" fill="#2EB867"/>
-  <!-- 부리 (짧고 부드럽게 #924, 머리 밖으로 돌출 복구 — #933에서 머리 안에 묻혀 안 보이던 것 수정) -->
-  <path d="M7 25 L17 22 L17 28 Z" fill="#FF8A3D"/>
-  <!-- 눈 (확대·중앙↑ #924) -->
-  <circle cx="20.5" cy="24" r="3.4" fill="#2A2D33"/>
-  <circle cx="21.7" cy="22.8" r="1.15" fill="#FFFFFF"/>
+<svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ReadingGo 참새">
+  <!-- 앱아이콘과 동일 — 따뜻한 종이 배지 + 세이지 참새 + 골드 스파크 (favicon / apple-touch) -->
+  <defs>
+    <linearGradient id="rgbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FCF8F0"/>
+      <stop offset="1" stop-color="#F2E9D9"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="url(#rgbg)"/>
+  <g transform="translate(4 6) scale(0.85)">
+    <path d="M66 50 L95 40 L79 65 Z" fill="#2EA86A"/>
+    <ellipse cx="56" cy="62" rx="28" ry="24" fill="#2EA86A"/>
+    <circle cx="40" cy="40" r="19" fill="#2EA86A"/>
+    <path d="M46 23 Q51 12 55 24 Q50 26 46 23 Z" fill="#2EA86A"/>
+    <path d="M44 50 Q70 47 80 66 Q60 73 46 65 Q39 57 44 50 Z" fill="#228A57"/>
+    <path d="M23 36 L13 39.5 L24 45 Z" fill="#E8962F"/>
+    <circle cx="35" cy="38" r="3.4" fill="#2A2D33"/>
+    <circle cx="36.3" cy="36.7" r="1.15" fill="#FFFFFF"/>
+    <g fill="#D9A52E">
+      <path d="M62 12.5 Q63.7 19.3 70.5 21 Q63.7 22.7 62 29.5 Q60.3 22.7 53.5 21 Q60.3 19.3 62 12.5 Z"/>
+      <path d="M76 27 Q77.7 30.3 81 32 Q77.7 33.7 76 37 Q74.3 33.7 71 32 Q74.3 30.3 76 27 Z"/>
+    </g>
+  </g>
 </svg>
