@@ -32,11 +32,11 @@
 
 ### 4.1 동선 (UX)
 
-1. **진입**: ⓐ 내서재 빈 상태 CTA "📸 스샷으로 서가 복원" ⓑ 온보딩 선택 단계(옵션).
+1. **진입(+로그인 게이트, #1048)**: ⓐ 내서재 빈 상태 CTA "📸 스샷으로 서가 복원" ⓑ 온보딩 선택 단계(옵션). 진입 시 미로그인(게스트)이면 모달 대신 **로그인 유도**(`RG_login()` + 토스트 "로그인하면 책을 가져올 수 있어요"). 로그인 사용자만 모달 진입(§4.7).
 2. **업로드**: 알라딘/밀리/교보/왓챠 등 주문·서재·**표지 그리드** 캡쳐 1장(다중은 후속). 기존 `OcrCropOverlay` 자르기 재사용 가능(선택).
 3. **처리중**: **비전(Gemini) 추출 1순위**(표지 그리드 인식) → 책 목록 추출(스피너 + "책 찾는 중…"). **큰/긴 스샷은 클라가 세로 조각으로 나눠 순차 처리** → "큰 사진이라 나눠 읽는 중 · N/M 조각" 진행 표시(#1045). 텍스트 리스트는 OCR 폴백.
 4. **검수 리스트**: 인식된 책 카드 목록(체크박스 + 제목·저자 인라인 편집). 매칭 실패분은 "미확인" 표기. **별점이 인식되면 카드에 ★ 표시**(#1042, '읽은 책'/'읽는 중' 목적지에서).
-5. **일괄 등록**: 선택분을 서가에 등록. 완료 토스트 + "한 문장 남겨보기" 유도(영혼 진입점).
+5. **검토함 적재(#1048)**: 선택분을 책장 직행이 아니라 **검토함(import_staging)** 에 담는다. "📦 검토함에 N권 담았어요 — 책장에서 검토하세요" 토스트. 책장(서재)의 "📦 가져온 책 · 검토" 뷰에서 한 번 더 보고 이동/제외(§4.7).
 
 ### 4.2 서버 — `POST /api/shelf-import` (비전 1순위 + OCR 폴백)
 
@@ -74,6 +74,8 @@
 
 ### 4.4 일괄 등록 (DataStore 계약 확장)
 
+> **갱신 (#1048)**: 검수 "등록"은 이제 책장에 직행하지 않고 **검토함(import_staging)** 에 적재한다(§4.7). 아래 `myBooks.addBatch` 배치 등록은 **검토함 → 책장 이동(`importStaging.commit`)** 단계에서 재사용된다(status 라우팅·별점 보존 로직 그대로). 즉 추출→매칭→검수 산출물의 *최종 목적지*만 "책장"에서 "검토함"으로 한 칸 당겨졌고, 등록 계약 자체는 보존.
+
 - 검수 후 선택분을 **배치 등록**: `myBooks.addBatch(items[]) → UserBook[]`(양 어댑터 구현). `items[i] = { book, status, rating? }`.
 - **목적지 토글**(#1038 결정 — §7 미해결 해소): 검수 단계에서 **읽은 책(기본=`completed`) / 읽고싶어요(`wish`) / 읽는 중(`reading`)** 일괄 선택 → 그 status 로 등록(구 `completed` 고정 해제). 전체 일괄 토글 1개(책별 status 는 후속).
 - **status 라우팅**(`addBatch`): `wish` → `wish_books`(위시 UX 일치 — Supabase 는 `books.upsert`로 캐노니컬 id 확보 후, local 은 메타를 `BOOK_BY_ID`에 시드해 getBook 해소). `completed`/`reading` → `user_books`(`add` 재사용, 중복 자동 스킵).
@@ -88,7 +90,32 @@
 ### 4.6 프라이버시·분석
 
 - 업로드 스샷은 **처리 후 미저장**(워커 메모리 경유, 영속 저장 없음). 원본은 분석·리플레이에 미포함.
-- 이벤트: `shelf_import_started` / `shelf_import_extracted{count}` / `shelf_import_registered{count, status}` (analytics.md §3 필수=익명 집계). `status`=목적지 토글값(#1038).
+- 이벤트: `shelf_import_started` / `shelf_import_extracted{count}` / `shelf_import_staged{count, status}`(#1048 검수→검토함 적재) / `shelf_import_registered{count, status}`(#1048 검토함→책장 이동) (analytics.md §3 필수=익명 집계). `status`=목적지 토글값(#1038).
+
+### 4.7 로그인 게이트 + 검토함 스테이징 (#1048)
+
+> **결정 (#1048, 2026-06-27)**: 임포트를 **로그인 사용자 전용**으로 막고, 검수 "등록"을 책장 직행 대신 **검토함(import_staging)** 으로 보낸다. 이유 두 가지 — ① **비전 LLM 코스트**(게스트 무제한 호출 차단) ② **임포트는 실계정에 영속**(localStorage 게스트는 로그인 시 흡수 경로가 따로 필요해 일관성↓). 추출·매칭·검수(§4.2~4.4)는 그대로, **앞단(게이트)·뒷단(검토함)** 만 추가.
+
+#### A. 로그인 게이트
+
+- `RG_openShelfImport`(app.js) 진입 시 **로그인 여부 확인**: Supabase 설정 + 미로그인(게스트, `authUser === null`)이면 **모달 대신** `RG_login()` 호출 + 토스트 "로그인하면 책을 가져올 수 있어요". 로그인 사용자만 `ShelfImportModal` 진입.
+- 서재(library.js)의 두 진입 버튼("📸 스샷으로 복원" 상시·빈 서가 CTA)은 모두 `RG_openShelfImport` 경유 → 게이트 자동 적용(중복 구현 없음).
+- 순수 로컬 데모(`!_supa`)는 게이트 비적용(모달 진입)이나 워커 미설정이라 추출이 `demo`로 떨어져 등록 단계 도달 안 함(무해).
+
+#### B. 검토함 스테이징 (로그인 전용)
+
+- **테이블** `public.import_staging`(`37_import_staging.sql`, **수동 1회 적용**) — backend.md §7.3. 사용자별 임포트 검토 큐. RLS 본인만(`user_id = auth.uid()`). 영속(세션 넘어 유지).
+- **어댑터** `DataStore.importStaging`(backend.md §7.2) — 양 어댑터 시그니처 일치:
+  - `add(items)` — 검수분([{book, status, rating?}], `addBatch` 표면)을 행으로 평탄화해 적재(매칭/보강 메타 보존, book_id=canonical 매칭 시).
+  - `list()` — 본인 검토함 목록(최신순).
+  - `remove(id)` — 제외(영구 삭제).
+  - `commit(id, status)` — **책장 이동**: status(없으면 `suggested_status`)로 `myBooks.addBatch` 라우팅(§4.4 등록 로직·별점 보존 재사용) → 성공 시 staging row 삭제.
+  - **local 어댑터(datastore.js)는 no-op**(게스트는 게이트로 도달 안 함) — 계약 표면 패리티만 유지(같은 시그니처, 빈 동작).
+- **임포트 흐름 변경**(shelf-import.js): 검수 "등록"이 `myBooks.addBatch` 직행 대신 `importStaging.add`로 적재 + "검토함에 N권 담았어요" 안내(`rg:import-staged` 이벤트로 서재 검토함 갱신).
+- **검토함 뷰**(library.js, 내 서재 섹션 상단): 검토함이 비지 않으면 **"📦 가져온 책 N권 · 검토"** 패널 노출 →
+  - 항목별: 표지·제목·저자·**매칭상태(매칭됨/미확인)**·별점 + **책장 토글(읽은책/읽고싶어요/읽는중**, 기본 `suggested_status`) + **[내 서재로 이동]**(`commit`, 별점 보존) **[제외]**(`remove`).
+  - 일괄: **[전체 이동]**(각 항목 현재 토글값으로 commit) / **[전체 제외]**.
+- **별점 보존**: 비전 추출 `rating`이 검토함 행(`import_staging.rating`)에 보존되고 `commit` → `addBatch` → `user_books.rating`까지 흐른다(`wish` 경로는 §4.4대로 무시).
 
 ## 5. ② 웹 리뷰 마중물 시드 (#774)
 
@@ -191,6 +218,7 @@ alter table public.seed_sentences enable row level security;
 
 - **[결정] #774 방향**: **실제 출처 시드**(책속문장 + 네이버 블로그 API → 후속 서점 리뷰). AI 생성 폐기. 비영리·출처표기·인용 최소 가드(§5.2).
 - **[결정·구현 #1038] #772 등록 status**: 검수 단계 **목적지 토글**(읽은 책=`completed` 기본 / 읽고싶어요=`wish` / 읽는 중=`reading`) 일괄 1개 → 그 status 로 `addBatch`. 책별 status 는 후속.
+- **[결정·구현 #1048] 로그인 게이트 + 검토함 스테이징**: 임포트는 **로그인 전용**(게스트 차단 — 비전 코스트·실계정 영속), 검수 "등록"은 **검토함(import_staging)** 적재 후 서재 "검토함" 뷰에서 항목별/일괄 이동·제외(§4.7). 별점 보존. local 어댑터는 no-op(계약 패리티만).
 - **[미해결] 시드 상호작용**: 짹/대화 허용 범위 — **권장: 읽기 전용, 대화는 검토**.
 - **[미해결] 다중 스샷**: MVP는 1장, 다중은 후속(#1038에서 미구현 — 코어 정리·알라딘 보강 우선).
 
@@ -208,7 +236,8 @@ alter table public.seed_sentences enable row level security;
 
 - [ ] 서버 키 클라 미노출(Stack Lock) · 8MB 제한 · 실패 폴백 무중단
 - [ ] 큰/긴 스샷 클라 타일링(세로 분할·~250px 겹침·순차+지연·정규화 dedup·UI 잡음 필터), 작은 이미지 단일 호출 폴백 유지 (#1045)
-- [ ] DataStore 계약 경유(직접 저장소 호출 0)
+- [ ] DataStore 계약 경유(직접 저장소 호출 0) · `importStaging` 양 어댑터 시그니처 일치(supabase 실구현 / local no-op) (#1048)
+- [ ] 로그인 게이트(게스트 차단 → RG_login+토스트) · 검수 "등록"=검토함 적재 · 서재 검토함 뷰 이동(commit, 별점 보존)/제외(remove) (#1048)
 - [ ] 시드 = 🌱 마중물 라벨 + 출처(sourceName·sourceUrl) 표기, 인용 범위 최소, 진짜 유저 문장 우선
 - [ ] 영혼 보존(§2): 복원/시드 후 "한 문장" 진입점 유지
 - [ ] boot-smoke · spec-align · 프리뷰(비프로모션) 통과

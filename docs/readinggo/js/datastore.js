@@ -433,6 +433,17 @@ const DataStore = {
     },
   },
 
+  /* 스샷 서가 복원 검토함 (#1048) — 로그인(Supabase) 전용 스테이징(import_staging).
+     게스트/로컬은 RG_openShelfImport 게이트(app.js)로 차단돼 여기 도달하지 않는다.
+     DataStore 계약(§7.2) 표면 패리티만 유지하려고 같은 시그니처를 두되 **미지원 no-op**:
+     검토함 적재/이동은 SupabaseDataStore.importStaging 만 구현. (Promise 표면도 일치 — 호출부 await 안전.) */
+  importStaging: {
+    add() { return Promise.resolve([]); },     // no-op — 로컬은 검토함 미지원
+    list() { return Promise.resolve([]); },     // 검토함 비어있음(섹션 미노출)
+    remove() { return Promise.resolve([]); },
+    commit() { return Promise.resolve(null); },
+  },
+
   /* 일일 기록 (세션) ──────────────────────────────
      sessions.addToday: 그날 세션 1행 생성(같은 날 재호출 중복 방지)
      + streak.bumpOnCheckIn 연동. */

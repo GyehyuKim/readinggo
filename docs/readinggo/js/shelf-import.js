@@ -2,7 +2,7 @@
    ReadingGo — shelf-import.js  (#772 통합 서가 ① 스샷 서가 복원 · #1038 고도화)
    ShelfImportModal: 구매내역/서재 캡쳐 업로드 → /api/shelf-import(비전 OCR) →
    카탈로그 매칭(loadBooks·랭크매칭) → 검수(목적지 토글·알라딘 보강) →
-   DataStore.myBooks.addBatch 일괄 등록.
+   DataStore.importStaging.add 로 **검토함 적재**(#1048: 책장 직행 아님 — 로그인 게이트 + 서재 검토함서 확인 후 이동).
    components 이후 로드. window 전역(showToast·DataStore·loadBooks)은 bare/window로 호출.
 
    #1038 고도화:
@@ -364,30 +364,31 @@ function ShelfImportModal({ onClose }) {
   const toggle = (i) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, checked: !r.checked } : r)));
   const edit = (i, k, v) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
 
+  // 검수 "등록" → 책장 직행이 아니라 **검토함(import_staging)** 으로 적재(#1048). 사용자가 서재
+  // "📦 가져온 책 · 검토"에서 한 번 더 보고 [내 서재로 이동]/[제외]. 비전 오인식·UI 잡음이 실계정
+  // 책장에 바로 영속되지 않게 한다. dest(목적지 토글)는 suggested_status 로 보존(검토함서 항목별 변경 가능),
+  // 별점(#1042)도 보존. 게스트는 RG_openShelfImport 게이트(app.js)로 차단돼 여기 도달하지 않음.
   const register = () => {
     const picked = rows.filter((r) => r.checked && (r.title || '').trim());
     if (!picked.length) { setErr('등록할 책을 한 권 이상 선택해요.'); return; }
     const DS = window.DataStore || {};
-    if (!(DS.myBooks && DS.myBooks.addBatch)) { setErr('등록 경로가 준비되지 않았어요.'); return; }
+    if (!(DS.importStaging && DS.importStaging.add)) { setErr('검토함이 준비되지 않았어요.'); return; }
     // 매칭/보강된 책은 어댑터 표면 메타(정규화 완료), 미확인은 제목·저자만. status=목적지 토글값.
-    // rating(#1042): 비전 추출 별점을 함께 넘김 → 어댑터가 user_books.rating 으로 보존(wish 는 별점 없음 → 무시).
     const items = picked.map((r) => ({
       book: r.book ? r.book : { title: r.title.trim(), author: (r.author || '').trim() },
       status: dest,
       rating: (typeof r.rating === 'number' && r.rating > 0) ? r.rating : null,
     }));
-    Promise.resolve(DS.myBooks.addBatch(items))
+    Promise.resolve(DS.importStaging.add(items))
       .then((res) => {
-        const n = (res || []).length || items.length;
-        if (window.rgTrack) window.rgTrack('shelf_import_registered', { count: n, status: dest });
-        try { window.dispatchEvent(new CustomEvent('rg:wish-changed')); } catch (e) {}
-        const msg = dest === 'wish'
-          ? `📚 ${n}권을 읽고싶어요에 담았어요!`
-          : `📚 ${n}권을 서가에 복원했어요! 한 문장도 남겨보세요`;
-        if (window.showToast) window.showToast(msg);
+        const n = Array.isArray(res) ? res.length : 0;
+        if (!n) { setErr('검토함에 담지 못했어요 — 다시 시도해요.'); return; }   // 로컬 no-op/실패도 여기로
+        if (window.rgTrack) window.rgTrack('shelf_import_staged', { count: n, status: dest });
+        try { window.dispatchEvent(new CustomEvent('rg:import-staged')); } catch (e) {}
+        if (window.showToast) window.showToast(`📦 검토함에 ${n}권 담았어요 — 책장에서 검토하세요`);
         onClose();
       })
-      .catch(() => { setErr('등록 중 문제가 생겼어요 — 다시 시도해요.'); });
+      .catch(() => { setErr('검토함 담기에 문제가 생겼어요 — 다시 시도해요.'); });
   };
 
   const checkedCount = rows.filter((r) => r.checked).length;
@@ -486,8 +487,11 @@ function ShelfImportModal({ onClose }) {
                 ))}
               </div>
               <button className="submit-btn" style={{ width: '100%', margin: 0 }} disabled={!checkedCount} onClick={register}>
-                {checkedCount}권 {destLabel}에 추가
+                {checkedCount}권 검토함에 담기
               </button>
+              <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, textAlign: 'center', lineHeight: 1.5 }}>
+                바로 책장에 넣지 않고 <b>검토함</b>에 담아요 · 책장(서재)에서 확인하고 옮기세요 ({destLabel} 기본)
+              </p>
             </div>
           )}
         </div>
