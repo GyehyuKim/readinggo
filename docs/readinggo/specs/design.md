@@ -122,6 +122,8 @@ Pixel 폰트 적용 대상 (선택자 단위):
 | `fall` | Confetti | 2.4s cubic-bezier(.25,.5,.5,1), translateY -20px → 110vh + rotate 720deg |
 | `ping` | 마을 불빛 ON | 1.2s ease-out infinite, box-shadow ripple |
 
+> **바텀시트 끌어 닫기 (#1046, 2026-06-28)**: 모든 `.sheet`(설정·체크인 등)는 **grip 또는 시트 상단 44px 밴드를 아래로 끌면 닫힌다**(글로벌 포인터 위임 `js/sheet-drag.js`). 임계: 이동 ≥120px 또는 플릭(≥0.6px/ms & 24px 초과). 끄는 동안 `.sheet.dragging`으로 transition 제거(즉시 추종), 손 떼면 스냅백 또는 슬라이드아웃(`translateY(100%)` 180ms 후 닫힘). 닫기는 backdrop 클릭(React `onClose`)에 위임하고, 없으면 `aria-label`/`title="닫기"` 버튼 폴백. grip은 `cursor:grab; touch-action:none`로 시트 스크롤에 제스처를 뺏기지 않게 한다. 시트 내부 스크롤 위치가 최상단일 때만 제스처 시작(스크롤과 충돌 방지), 인터랙티브 요소(버튼·입력) 위는 제외.
+
 참새 마스코트: 온보딩·소개 화면·라벨은 **SparrowMark SVG**(`<window.SparrowMark>` / 인라인용 `<window.SparrowInline>`, `sparrow-bounce` 애니메이션)로 표현한다. (#785/#823/#824 — 🐦 이모지를 브랜드 SVG 마크로 통일. 2026-06: 🐦 이모지 참새 머리 렌더가 위협적이라는 피드백으로 앱 전반에서 제거 — 텍스트 토스트는 SVG 삽입 불가라 이모지만 제거.) 둥지 단계 시각화는 NEST_STAGES 이모지(🪵🪹🏠🏡🏰) 사용.
 
 ### 11.5 반응형 내비게이션 (v8.1, #466)

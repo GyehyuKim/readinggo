@@ -1126,7 +1126,12 @@ input,textarea{font-family:inherit;}
   width: 44px; height: 5px; border-radius: 999px;
   background: var(--ink-4); opacity: .35;
   margin: 0 auto 14px;
+  cursor: grab; touch-action: none;   /* #1046 끌어 닫기 — 시트 스크롤에 핸들 제스처를 뺏기지 않게 */
 }
+.sheet-grip:active{ cursor: grabbing; }
+/* #1046 drag-to-dismiss: 끌리는 동안엔 transition 제거(즉시 추종), 손 떼면 스냅백/슬라이드아웃을 부드럽게. */
+.sheet{ transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+.sheet.dragging{ transition: none; }
 .sheet-head{
   text-align:center; margin-bottom: 16px;
 }
