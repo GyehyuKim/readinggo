@@ -43,8 +43,12 @@
 
 - **이상**: 24시간 이내 머지
 - **최대**: 72시간. 그 이상 살리려면 PR 설명에 이유를 적는다.
-- **머지 후**: 자동 삭제 비활성화. 각 팀원이 브랜치를 보존하거나 수동 삭제.
-- **정리 권장**: 더 이상 필요 없는 브랜치는 PR 닫고 수동 삭제. 과제 기간 중에는 HW 제출 브랜치를 보존 권장.
+- **머지 후 (원격, 자동)**: GitHub가 head 브랜치를 **자동 삭제**한다 — "Automatically delete head branches" 활성화(§7, #895). 원격은 따로 손댈 것 없음.
+- **머지 후 (로컬, 수동 — 필수)**: 원격 자동삭제는 *원격만* 지운다. 로컬 클론 브랜치와 `.claude/worktrees/agent-*`(에이전트/워크플로 워크트리)는 **자동 정리되지 않으므로** 브랜치/PR 작업·머지 직후 직접 정리한다:
+  - `git fetch --prune` — 원격 삭제분의 로컬 추적 ref 제거
+  - 머지된 로컬 브랜치 삭제 — squash 머지라 `git branch --merged`가 못 잡는다. `gh pr list --state merged` head 와 대조해 머지 확인된 것만 `git branch -D`
+  - stale 워크트리는 `git worktree remove <path>` 후 `git worktree prune`
+  - **보존**: 열린 PR head, closed-but-unmerged 브랜치(의도적 보관)는 지우지 않는다. 과제 기간 중 HW 제출 브랜치도 보존.
 
 ---
 
