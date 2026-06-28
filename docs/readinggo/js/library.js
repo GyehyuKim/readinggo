@@ -483,7 +483,11 @@ function LibraryView({ state, onActivateUserBook }) {
             <div style={{display:'flex', flexDirection:'column', gap:8}}>
               {stagedItems.map((it) => {
                 const dest = stagedDestOf(it);
-                const matched = !!it.book_id;
+                // 상태 판정: 카탈로그 매칭(book_id) > ISBN+표지 확인(isbn13) > 미확인.
+                // 알라딘으로 ISBN·표지가 채워졌지만 캐노니컬 book_id 없는 책은 '확인됨'(긍정)으로 — '미확인' 오해 방지.
+                const stageStatus = it.book_id
+                  ? { label: '매칭됨', dim: false }
+                  : (it.isbn13 ? { label: '확인됨', dim: false } : { label: '미확인', dim: true });
                 return (
                   <div key={it.id} style={{display:'flex', alignItems:'center', gap:10, background:'var(--card)', border:'1px solid var(--line)', borderRadius:10, padding:'8px 10px'}}>
                     <BookCover title={it.title} author={it.author || ''} cover={it.cover_url || ''} fb={['#9AA7B2','#C7D0D8']} style={{width:34, height:48, borderRadius:5, flexShrink:0}} />
@@ -492,7 +496,8 @@ function LibraryView({ state, onActivateUserBook }) {
                       <div style={{fontSize:11, color:'var(--ink-3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                         {it.author || '저자 미상'}
                         {typeof it.rating === 'number' && it.rating > 0 ? ` · ★ ${it.rating}` : ''}
-                        {matched ? ' · 매칭됨' : ' · 미확인'}
+                        {' · '}
+                        <span style={{color: stageStatus.dim ? 'var(--ink-3)' : 'var(--brand)', fontWeight: stageStatus.dim ? 400 : 700}}>{stageStatus.label}</span>
                       </div>
                       <div style={{display:'flex', gap:4, marginTop:6}}>
                         {STAGED_DESTS.map((d) => (
