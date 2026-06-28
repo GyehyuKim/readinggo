@@ -557,7 +557,11 @@ function CoReadModeToggle() {
     <div className="rg-coread-mode" role="group" aria-label="같이읽기 기본 설정">
       <button className="rg-coread-mode-btn" onClick={flip}
         aria-pressed={together} title={together ? '공개로 같이 읽는 중 — 끄면 혼자 읽어요' : '혼자 읽는 중 — 켜면 같은 책 공개 숲에 자동으로 함께해요'}>
-        <span className="rg-coread-mode-emoji">{together ? '🌳' : '🔒'}</span>
+        <span className="rg-coread-mode-emoji" style={{ display: 'inline-flex', width: 26, height: 26, borderRadius: 8, background: 'var(--brand-tint)', color: 'var(--brand-3)', alignItems: 'center', justifyContent: 'center' }}>
+          {together
+            ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 6.8 11H9.6L5.4 17h13.2L14.4 11H17.2L12 3Z" /><path d="M12 17v4" /></svg>
+            : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
+        </span>
         <span className="rg-coread-mode-text">
           <span className="rg-coread-mode-title">{together ? '공개로 같이 읽기' : '혼자 읽기'}</span>
           <span className="rg-coread-mode-sub">
@@ -617,21 +621,30 @@ function RoomsView() {
       {/* P2(§7.5): 같이읽기 기본 모드 토글(같이+공개 opt-out) — 상단 상주 */}
       <div style={{ padding: '0 16px 12px' }}><CoReadModeToggle /></div>
 
-      {/* 상단: 숲 찾기(Primary) + 만들기(Secondary tonal) — DESIGN.md 버튼 위계 */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 16px 14px' }}>
-        <button className="rg-btn-primary" style={{ flex: 1 }} onClick={() => setFindOpen(true)}>🔍 숲 찾기</button>
-        <button className="rg-btn-tonal" style={{ flex: '0 0 auto', minWidth: 104 }} onClick={() => setCreateOpen(true)}>+ 만들기</button>
-      </div>
+      {/* 상단 액션바(숲 찾기·만들기) — 들어간 숲이 있을 때만(#1056). 빈 상태는 아래 카드에 액션 통합
+          (중복 1차 버튼 제거, DESIGN.md "1차 버튼 1개"). 아이콘=Feather 모노라인(탭바 결). */}
+      {!empty && (
+        <div style={{ display: 'flex', gap: 8, padding: '0 16px 14px' }}>
+          <button className="rg-btn-primary" style={{ flex: 1 }} onClick={() => setFindOpen(true)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.8-3.8" /></svg>숲 찾기</button>
+          <button className="rg-btn-tonal" style={{ flex: '0 0 auto', minWidth: 104 }} onClick={() => setCreateOpen(true)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>만들기</button>
+        </div>
+      )}
 
       {/* 참여 중인 숲 */}
       <div style={{ padding: '0 16px' }}>
         {mine === null ? (
           <p className="rg-room-hint" style={{ padding: '12px 0' }}>불러오는 중…</p>
         ) : empty ? (
-          <div className="rg-room-empty">
-            <p style={{ margin: 0, fontWeight: 800, color: 'var(--ink-2)' }}>아직 들어간 숲이 없어요</p>
-            <p style={{ margin: '6px 0 12px', fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6 }}>같은 책 읽는 사람들과 같이 읽어볼까요?</p>
-            <button className="rg-btn-primary" style={{ width: '100%' }} onClick={() => setFindOpen(true)}>숲 찾기 →</button>
+          <div className="rg-room-empty" style={{ padding: '30px 20px' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--brand-tint)', color: 'var(--brand-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4 4.6 10.5H7L3.2 15.5h11.6L11 10.5h2.4L9 4Z" /><path d="M9 15.5V19" /><path d="M16.5 8 14 12h1.7l-2 3h6l-2-3H19.5L17 8Z" /></svg>
+            </div>
+            <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: 'var(--ink)' }}>아직 들어간 숲이 없어요</p>
+            <p style={{ margin: '7px 0 18px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65 }}>같은 책 읽는 사람들과<br />같이 읽어볼까요?</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="rg-btn-primary" style={{ flex: 1 }} onClick={() => setFindOpen(true)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.8-3.8" /></svg>숲 찾기</button>
+              <button className="rg-btn-tonal" style={{ flex: '0 0 auto', minWidth: 108 }} onClick={() => setCreateOpen(true)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>만들기</button>
+            </div>
           </div>
         ) : (
           <>
