@@ -246,10 +246,12 @@ function LoginScreen({ onLogin, onBack }) {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
-  // 애플 로그인 노출 게이팅 (#937): iOS 또는 웹에서만. Android(Play)는 '제3자 로그인 시 Apple 의무'
-  // 규칙이 없어 굳이 안 띄운다(iOS-PLAN Android-first 메모). Capacitor 미로드 시엔 웹으로 간주.
+  // 애플 로그인 노출 게이팅 (#937 · #1054): iOS 네이티브에서만. 웹·Android 는 숨긴다 — 웹 Apple 은
+  // $99 Apple Developer 미결제로 비기능(거슬리는 빈 버튼, #873 보류)이라 가린다. iOS App Store 4.8
+  // (타사 소셜로그인 쓰면 Apple 동등 제공 필수)은 iOS 네이티브에서만 발효 → 거기서만 노출하면 충족.
+  // Capacitor 미로드 시엔 웹으로 간주(=숨김). 완전 삭제 아님: iOS 트랙서 Apple Developer 설정 시 즉시 복원.
   const platform = (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || 'web';
-  const showApple = platform !== 'android';
+  const showApple = platform === 'ios';
   const social = (provider) => { try { onLogin(provider); } catch (e) { alert('로그인 실패: ' + ((e && e.message) || e)); } };
   const sendLink = async () => {
     const addr = email.trim();
