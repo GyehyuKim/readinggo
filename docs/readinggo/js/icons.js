@@ -26,6 +26,12 @@ const RG_ICONS = {
   download: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5v7.5"/><path d="M4.8 7l3.2 3.2L11.2 7"/><path d="M2.5 13h11"/></g>,
   // 서비스 외부 공유 (#650 B) — 노드 3개 + 연결선(표준 share 아이콘).
   share: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="3.5" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12.5" r="2"/><path d="M5.8 7l4.4-2.4M5.8 9l4.4 2.4"/></g>,
+  // 기능 이모지 대체(#1062) — Feather 모노라인 16x16, currentColor 상속·둥근 끝. 🔍🏠📷🗑📦 통일.
+  search: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"><circle cx="7" cy="7" r="4.3"/><line x1="10.2" y1="10.2" x2="13.6" y2="13.6"/></g>,
+  home: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 7.8L8 3l5.5 4.8"/><path d="M3.9 8.1v5.4h8.2V8.1"/><path d="M6.6 13.5V9.6h2.8v3.9"/></g>,
+  camera: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.4h2.3l1-1.6h5.4l1 1.6H14a.8.8 0 0 1 .8.8v6.2a.8.8 0 0 1-.8.8H2a.8.8 0 0 1-.8-.8V6.2A.8.8 0 0 1 2 5.4z"/><circle cx="8" cy="9" r="2.5"/></g>,
+  trash: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 4.3h11"/><path d="M4 4.3l.7 8.8a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.8"/><path d="M6 4.3V3.2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.1"/><path d="M6.7 6.6l.3 4.8M9.3 6.6l-.3 4.8"/></g>,
+  box: <g stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 11V5a1 1 0 0 0-.5-.87l-4.5-2.6a1 1 0 0 0-1 0L3 4.13A1 1 0 0 0 2.5 5v6a1 1 0 0 0 .5.87l4.5 2.6a1 1 0 0 0 1 0l4.5-2.6A1 1 0 0 0 13.5 11z"/><path d="M2.7 4.9L8 7.9l5.3-3"/><path d="M8 14V7.9"/></g>,
 };
 function rgIcon(name, size) {
   const s = size || 16;

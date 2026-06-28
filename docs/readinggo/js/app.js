@@ -205,7 +205,7 @@ class ErrorBoundary extends React.Component {
             <button onClick={() => this.setState({ hasError: false })}
               style={{ padding: '12px 20px', borderRadius: 12, border: '1.5px solid var(--line)', background: '#fff', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>다시 시도</button>
             <button onClick={() => { this.setState({ hasError: false }); if (this.props.onReset) this.props.onReset(); }}
-              style={{ padding: '12px 20px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>🏠 둥지로 가기</button>
+              style={{ padding: '12px 20px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{window.rgIcon('home', 15)} 둥지로 가기</button>
           </div>
         </div>
       );
@@ -680,7 +680,7 @@ function App() {
           if (bookId && DataStore.wishBooks && DataStore.wishBooks.add) {
             await Promise.resolve(DataStore.wishBooks.add(bookId));
             window.dispatchEvent(new CustomEvent('rg:wish-changed'));
-            showToast(`🔖 '${book.title}' 읽고 싶은 책에 담았어요`);
+            showToast(`'${book.title}' 읽고 싶은 책에 담았어요`);
           } else { showToast('이 책은 찜할 수 없어요 — 잠시 후 다시'); }
           return;
         }
@@ -714,7 +714,7 @@ function App() {
           },
         }));
         window.dispatchEvent(new CustomEvent('rg:wish-changed')); // #822: 서재 '읽고 있는 책' 즉시 갱신
-        showToast(`📖 ${book.title} 등록 완료`);
+        showToast(`${book.title} 등록 완료`);
         // P2(co-reading.md §7.5): 같이읽기 기본 = 같이+공개(opt-out). together 모드면 이 책의
         // 공개 숲에 자동 합류(없으면 새로 만들어 합류) = "공개로 열면 알아서 붙어서 읽는다".
         // solo 모드·게스트/로컬 표면은 헬퍼가 알아서 no-op/로컬 처리. 등록을 막지 않게 fire-and-forget.
@@ -765,7 +765,7 @@ function App() {
       },
       // 둥지는 책과 무관 — 유지 (#313). ubId(#822): 체크인 저장 귀속 직결.
     }));
-    showToast(`📖 ${item.title} — 활성 책으로 변경`);
+    showToast(`${item.title} — 활성 책으로 변경`);
     switchTab('nest');
     if (item.ubId && DataStore.activeBook && DataStore.activeBook.set) {
       Promise.resolve(DataStore.activeBook.set(item.ubId)).catch(e => console.warn('[ReadingGo] 활성 전환 실패:', e));
@@ -832,8 +832,8 @@ function App() {
               저장하기
             </button>
             <button onClick={() => setGuestBannerOff(true)} aria-label="배너 닫기"
-              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: 16, padding: '13px 14px', margin: '-13px -14px' }}>
-              ×
+              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex', alignItems: 'center', padding: '13px 14px', margin: '-13px -14px' }}>
+              {window.rgIcon('close', 16)}
             </button>
           </div>
         )}

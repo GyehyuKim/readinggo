@@ -130,7 +130,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink-2)', padding: '3px 9px', lineHeight: 1 };
   const chipOn = { ...chip, background: 'var(--brand-tint)', borderColor: 'var(--brand)', color: 'var(--brand-3)' };
   const _visChip = {
-    public:    { ...chip, background: 'rgba(63,209,127,0.1)', borderColor: 'rgba(63,209,127,0.4)', color: '#1a9e5a' },
+    public:    { ...chip, background: 'rgba(63,209,127,0.1)', borderColor: 'rgba(63,209,127,0.4)', color: 'var(--brand)' },
     followers: { ...chip, background: 'rgba(88,130,255,0.1)', borderColor: 'rgba(88,130,255,0.4)', color: '#3a5fcc' },
     private:   { ...chip, background: 'rgba(120,120,130,0.1)', borderColor: 'rgba(120,120,130,0.35)', color: 'var(--ink-3)' },
   };
@@ -153,10 +153,10 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
       sentence.text = text; sentence.page = page;   // 카드 즉시 정합
       setEditing(false); setSaving(false);
       window.dispatchEvent(new CustomEvent('rg:sentence-updated', { detail: { id, text, page } }));
-      showToast('✏️ 한 문장을 수정했어요');
+      showToast('한 문장을 수정했어요');
     }).catch(() => { setSaving(false); showToast('수정 실패 — 잠시 후 다시'); });
   };
-  const del = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.remove)) return; if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return; Promise.resolve(DataStore.sentences.remove(id)).then(() => { if (onRemoved) onRemoved(id); window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); showToast('🗑 한 문장을 삭제했어요'); }).catch(() => showToast('삭제 실패 — 잠시 후 다시')); };
+  const del = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.remove)) return; if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return; Promise.resolve(DataStore.sentences.remove(id)).then(() => { if (onRemoved) onRemoved(id); window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); showToast('한 문장을 삭제했어요'); }).catch(() => showToast('삭제 실패 — 잠시 후 다시')); };
   const toggleLike = (e) => { stop(e); if (!(DataStore.claps && DataStore.claps.toggle)) return; Promise.resolve(DataStore.claps.toggle(id)).then((on) => { setLiked(on); setLikeN(n => Math.max(0, n + (on ? 1 : -1))); }).catch(() => {}); };
   const likeBtn = <button onClick={toggleLike} title="좋아요" style={liked ? chipOn : chip}>
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -245,6 +245,11 @@ const _RG_THOUGHT_ICO = (
     </svg>
   </span>
 );
+const _RG_BOOK_KIND_ICO = (
+  <span style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', marginRight: 5 }}>
+    {window.rgIcon('book', 13)}
+  </span>
+);
 function QuoteCard({ q, variant, onOpenBook, children }) {
   const isThought = q.kind === 'thought';
   const isLib = variant === 'library';
@@ -262,7 +267,7 @@ function QuoteCard({ q, variant, onOpenBook, children }) {
   return (
     <div className="my-q-card" onClick={clickable ? () => onOpenBook(q.bookId) : undefined} style={clickable ? { cursor: 'pointer' } : undefined}>
       <div className="meta">
-        {isLib && (<><span className="kind">{isThought ? '💭내생각' : '📖책속'}</span><span className="dot">·</span></>)}
+        {isLib && (<><span className="kind">{isThought ? <>{_RG_THOUGHT_ICO}내생각</> : <>{_RG_BOOK_KIND_ICO}책속</>}</span><span className="dot">·</span></>)}
         <span className="bk" style={isLib ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 } : undefined}>{bkTitle}</span>
         {hasPage && (<><span className="dot">·</span><span>{q.page}p</span></>)}
         {dateText && (<><span className="dot">·</span><span>{dateText}</span></>)}

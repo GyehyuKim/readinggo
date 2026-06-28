@@ -37,7 +37,7 @@ function AdminDashboardModal({ onClose }) {
     setInqs((list) => (list || []).map((x) => x.id === q.id ? { ...x, status: next } : x));
     Promise.resolve(DS.admin.inquirySetStatus(q.id, next)).catch(() => {});
   };
-  const _stColor = { open: '#E5484D', answered: '#F59E0B', closed: '#9097A0' };
+  const _stColor = { open: '#E5484D', answered: '#F59E0B', closed: 'var(--ink-3)' };
   const rows = [
     ['👤 가입자', stats && stats.users],
     ['🙋 실사용자', stats && stats.realUsers],   // NPC 제외 (#190 A)
@@ -227,7 +227,7 @@ function AdminDashboardModal({ onClose }) {
           </div>
           {/* 문의 목록 */}
           <div style={{ marginTop: 22 }}>
-            <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>✉️ 문의 {inqs && inqs.length ? '(' + inqs.length + ')' : ''}</div>
+            <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>{window.rgIcon('mail', 15)}{'문의' + (inqs && inqs.length ? ' (' + inqs.length + ')' : '')}</div>
             {inqs === undefined ? (
               <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>불러오는 중…</div>
             ) : inqs.length === 0 ? (
@@ -236,11 +236,11 @@ function AdminDashboardModal({ onClose }) {
               <div key={q.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>@{(q.user && q.user.handle) || '익명'} · {String(q.created_at).slice(0, 10)}</div>
-                  <button onClick={() => cycleStatus(q)} title="상태 변경" style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: _stColor[q.status] || '#9097A0', border: 'none', borderRadius: 10, padding: '2px 8px', cursor: 'pointer' }}>{q.status}</button>
+                  <button onClick={() => cycleStatus(q)} title="상태 변경" style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: _stColor[q.status] || 'var(--ink-3)', border: 'none', borderRadius: 10, padding: '2px 8px', cursor: 'pointer' }}>{q.status}</button>
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{q.message}</div>
                 {q.app_version && <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, marginRight: 8 }}>v{q.app_version}</span>}
-                {q.email && <a href={`mailto:${q.email}?subject=${encodeURIComponent('[ReadingGo] 문의 답변')}`} style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: 'var(--brand-3)', fontWeight: 800 }}>✉️ {q.email} 로 답장</a>}
+                {q.email && <a href={`mailto:${q.email}?subject=${encodeURIComponent('[ReadingGo] 문의 답변')}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--brand-3)', fontWeight: 800 }}>{window.rgIcon('mail', 13)}{q.email + ' 로 답장'}</a>}
                 {/* AI 자동 답변 (#208) — 스캐폴드: LLM 연동 전까지 자리만 */}
                 {q.response ? (
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-2)', background: 'var(--brand-tint)', borderRadius: 6, padding: '6px 8px', whiteSpace: 'pre-wrap' }}>🤖 {q.response}</div>

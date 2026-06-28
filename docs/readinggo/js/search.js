@@ -183,12 +183,13 @@ const SearchModal = ({
               border: 'none',
               font: 'inherit',
               cursor: 'pointer',
-              fontSize: 20,
+              display: 'inline-flex',
+              alignItems: 'center',
               padding: 4,
             }}
             title="닫기"
           >
-            ✕
+            {window.rgIcon('close', 18)}
           </button>
           <input
             type="text"
@@ -214,12 +215,13 @@ const SearchModal = ({
                 border: 'none',
                 font: 'inherit',
                 cursor: 'pointer',
-                fontSize: 16,
+                display: 'inline-flex',
+                alignItems: 'center',
                 color: 'var(--ink-3)',
                 padding: 4,
               }}
             >
-              ✕
+              {window.rgIcon('close', 16)}
             </button>
           )}
           {/* 바코드로 등록 (#943) — 지원 환경(BarcodeDetector+ean_13)에서만. 책 뒤표지 ISBN 스캔 → 정확 매칭. */}
@@ -264,7 +266,7 @@ const SearchModal = ({
                       margin: 0,
                     }}
                   >
-                    📚 인기 도서
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{window.rgIcon('book', 13)} 인기 도서</span>
                   </h3>
                   {topRecommendations.map((book) => (
                     <SearchResultItem
@@ -299,7 +301,7 @@ const SearchModal = ({
           ) : searching ? (
             // 검색 진행중 (#202) — 결과없음과 구분
             <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--ink-3)' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>🔎</div>
+              <div style={{ marginBottom: 8 }}>{window.rgIcon('search', 32)}</div>
               <div style={{ fontSize: 14 }}>검색 중…</div>
             </div>
           ) : (
@@ -311,7 +313,7 @@ const SearchModal = ({
                 color: 'var(--ink-3)',
               }}
             >
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📖</div>
+              <div style={{ marginBottom: 8 }}>{window.rgIcon('book', 32)}</div>
               <div style={{ fontSize: 14 }}>검색 결과가 없어요</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
                 제목·저자·ISBN으로 다시 검색해보세요

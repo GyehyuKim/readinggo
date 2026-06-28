@@ -66,10 +66,10 @@ function UserProfileModal({ handle, onClose }) {
       <div style={{ width: 84, height: 118, borderRadius: 6, overflow: 'hidden', background: 'var(--line)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {ub.book && ub.book.cover_url
           ? <img src={ub.book.cover_url} alt={ub.book.title} loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <span style={{ fontSize: 28 }}>📖</span>}
+          : <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>{window.rgIcon('book', 30)}</span>}
       </div>
       <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{ub.book && ub.book.title}</div>
-      {typeof ub.rating === 'number' && <div style={{ fontSize: 10, color: 'var(--brand-3)', fontWeight: 800 }}>⭐ {ub.rating}</div>}
+      {typeof ub.rating === 'number' && <div style={{ fontSize: 10, color: 'var(--brand-3)', fontWeight: 800 }}>★ {ub.rating}</div>}
     </div>
   );
 
@@ -89,11 +89,11 @@ function UserProfileModal({ handle, onClose }) {
             <>
               {contrib && contrib.userBook && (typeof contrib.userBook.rating === 'number' || contrib.userBook.review_text) && (
                 <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                  {typeof contrib.userBook.rating === 'number' && <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--brand-3)', marginBottom: 4 }}>⭐ {contrib.userBook.rating} / 5</div>}
+                  {typeof contrib.userBook.rating === 'number' && <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--brand-3)', marginBottom: 4 }}>★ {contrib.userBook.rating} / 5</div>}
                   {contrib.userBook.review_text && <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.6 }}>{contrib.userBook.review_text}</div>}
                 </div>
               )}
-              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>📖 한 문장 {(contrib && contrib.sentences || []).length}개</div>
+              <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>{window.rgIcon('book', 15)} 한 문장 {(contrib && contrib.sentences || []).length}개</div>
               {(!contrib || contrib.sentences.length === 0) ? (
                 <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>공개된 한 문장이 없어요</div>
               ) : contrib.sentences.map((s) => {
@@ -102,7 +102,7 @@ function UserProfileModal({ handle, onClose }) {
                   <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{s.page}p</div>
                     {blinded
-                      ? <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기</div>
+                      ? <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>
                       : <div style={{ fontSize: 14, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>}
                   </div>
                 );
@@ -129,13 +129,13 @@ function UserProfileModal({ handle, onClose }) {
           <div style={{ textAlign: 'center', marginBottom: 18 }}>
             <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><window.SparrowMark size={26} /> {data.user.display_name || data.user.handle}</div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 8, fontSize: 12, color: 'var(--ink-2)', fontWeight: 800 }}>
-              <span>✅ 완독 {data.completed.length}</span>
-              <span>📖 읽는 중 {data.reading.length}</span>
-              <span>✨ {data.user.xp || 0} XP</span>
+              <span>완독 {data.completed.length}</span>
+              <span>읽는 중 {data.reading.length}</span>
+              <span>{data.user.xp || 0} XP</span>
             </div>
             {following !== null && (
               <button onClick={toggleFollow}
-                style={{ marginTop: 12, padding: '8px 22px', borderRadius: 20, border: following ? '1.5px solid var(--line)' : 'none', background: following ? 'transparent' : 'var(--brand)', color: following ? 'var(--ink-2)' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                style={{ marginTop: 12, padding: '8px 22px', borderRadius: 20, border: 'none', background: following ? 'var(--brand-soft)' : 'var(--brand)', color: following ? 'var(--brand-3)' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
                 {following ? '팔로잉 ✓' : '+ 팔로우'}
               </button>
             )}
@@ -150,7 +150,7 @@ function UserProfileModal({ handle, onClose }) {
             return (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ fontSize: 15, fontWeight: 900 }}>📚 책장</div>
+                  <div style={{ fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 6 }}>{window.rgIcon('book', 16)} 책장</div>
                   {totalShelf > 6 && <button onClick={() => setShelfOpen((v) => !v)} style={{ background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{shelfOpen ? '접기' : '더 보기 ›'}</button>}
                 </div>
                 {!shelfOpen ? (
@@ -160,7 +160,7 @@ function UserProfileModal({ handle, onClose }) {
                   <>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                       {[['completed', `완독 ${data.completed.length}`], ['reading', `읽는 중 ${data.reading.length}`]].map(([id, label]) => (
-                        <button key={id} onClick={() => setShelfFilter(id)} style={{ padding: '6px 14px', borderRadius: 16, border: shelfFilter === id ? 'none' : '1px solid var(--line)', background: shelfFilter === id ? 'var(--brand)' : 'transparent', color: shelfFilter === id ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+                        <button key={id} onClick={() => setShelfFilter(id)} style={{ padding: '6px 14px', borderRadius: 16, border: 'none', background: shelfFilter === id ? 'var(--brand)' : 'var(--brand-soft)', color: shelfFilter === id ? '#fff' : 'var(--brand-3)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
                       ))}
                     </div>
                     {filtered.length === 0 ? <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>없어요</div>
@@ -177,7 +177,7 @@ function UserProfileModal({ handle, onClose }) {
           {/* 위시리스트 — wishlist_public=true 인 경우만 노출 (#558) */}
           {data.wishlist && data.wishlist.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>🔖 읽고 싶어하는 책 {data.wishlist.length}</div>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>{window.rgIcon('bookmark', 15)} 읽고 싶어하는 책 {data.wishlist.length}</div>
               <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 6 }}>
                 {data.wishlist.map((wb) => {
                   const bk = wb.book || {};
@@ -188,7 +188,7 @@ function UserProfileModal({ handle, onClose }) {
                         <div style={{ width: 84, height: 118, borderRadius: 6, overflow: 'hidden', background: 'var(--line)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {bk.cover_url
                             ? <img src={bk.cover_url} alt={bk.title} loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <span style={{ fontSize: 28 }}>❤️</span>}
+                            : <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>{window.rgIcon('heart', 30)}</span>}
                         </div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{bk.title}</div>
                       </div>
@@ -200,7 +200,7 @@ function UserProfileModal({ handle, onClose }) {
           )}
 
           {/* 공개 한 문장 */}
-          <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>✏️ 공개 한 문장 {data.sents.length}</div>
+          <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>{window.rgIcon('pen', 15)} 공개 한 문장 {data.sents.length}</div>
           {data.sents.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: '8px 0' }}>아직 공개된 한 문장이 없어요</div>
           ) : data.sents.map((s) => {
@@ -211,7 +211,7 @@ function UserProfileModal({ handle, onClose }) {
               <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{bt ? bt + ' · ' : ''}{s.page}p</div>
                 {blinded ? (
-                  <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기</div>
+                  <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>
                 ) : (
                   <div style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
                 )}

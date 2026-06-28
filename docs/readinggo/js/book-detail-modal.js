@@ -52,7 +52,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
         createdAt: row.created_at || '', note: row.my_note || '', kind: 'quote', visibility: row.visibility || 'public',
       } } }));
       setAddText(''); setAddPage(''); setAddOpen(false);
-      showToast('✍️ 한 문장을 남겼어요');
+      showToast('한 문장을 남겼어요');
       if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote' });
     } catch (e) { showToast('저장 실패 — 잠시 후 다시'); }
     finally { setAddBusy(false); }
@@ -164,7 +164,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     Promise.resolve(DataStore.wishBooks.add(rb.id))
       .then(() => {
         setWished(w => ({ ...w, [rb.id]: true }));
-        showToast('🔖 찜한 책에 담았어요');
+        showToast('찜한 책에 담았어요');
         if (window.rgTrack) window.rgTrack('related_book_wished', { from: book.id, to: rb.id });
       })
       .catch(() => showToast('담기 실패 — 잠시 후 다시'));
@@ -234,14 +234,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.abort)) return;
     if (!window.confirm(`'${book.title}' 읽기를 중단할까요?\n진척은 보존되고, '중단' 탭에서 다시 읽을 수 있어요.`)) return;
     Promise.resolve(DataStore.myBooks.abort(book.ubId))
-      .then(() => { showToast('⏸️ 읽기를 중단했어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
+      .then(() => { showToast('읽기를 중단했어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
       .catch(() => showToast('중단 처리 실패 — 다시 시도'));
   };
   // 다시 읽기 (#593): 중단 책을 '읽는 중'으로 복귀. current_page 그대로 이어감.
   const resumeBook = () => {
     if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.resume)) return;
     Promise.resolve(DataStore.myBooks.resume(book.ubId))
-      .then(() => { showToast('📖 다시 읽기 시작 — 읽는 중으로 옮겼어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
+      .then(() => { showToast('다시 읽기 시작 — 읽는 중으로 옮겼어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
       .catch(() => showToast('다시 읽기 실패 — 다시 시도'));
   };
   // 내 한 문장 좋아요(즐겨찾기) — claps 단일(#641: 자기 문장 좋아요=저장 통일), 토글 (#11)
@@ -296,7 +296,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     // 완독 정보
     if (book.status === 'completed') {
       lines.push('', '---', '', '## 📖 완독 정보');
-      const r = (typeof book.rating === 'number') ? `⭐ ${book.rating.toFixed(1)} / 5` : '';
+      const r = (typeof book.rating === 'number') ? `★ ${book.rating.toFixed(1)} / 5` : '';
       const cd = fmtDate(book.completedAt);
       const head = [r, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · ');
       if (head) lines.push(head);
@@ -323,14 +323,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('📄 Markdown 저장됨');
+    showToast('Markdown 저장됨');
   };
 
   return (
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label={book.title}>
         <div className="sheet-grip" />
-        <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1, zIndex:2}}>✕</button>
+        <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, cursor:'pointer', color:'var(--ink-2)', zIndex:2, display:'inline-flex', alignItems:'center', justifyContent:'center'}}>{window.rgIcon('close',16)}</button>
         
         <div style={{textAlign:'center', padding:'16px 20px 0'}}>
           <BookCover
@@ -349,7 +349,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             <div style={{background:'var(--paper-2)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
               <div style={{fontSize:12, color:'var(--ink-3)', fontWeight:800, marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                 <span>완독 정보</span>
-                {!editMeta && <button onClick={() => { setRt(book.rating || 0); setRv(book.comment || ''); setEditMeta(true); }} style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:12, cursor:'pointer'}}>✏️ 수정</button>}
+                {!editMeta && <button onClick={() => { setRt(book.rating || 0); setRv(book.comment || ''); setEditMeta(true); }} style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:12, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4}}>{window.rgIcon('pen',13)} 수정</button>}
               </div>
               {editMeta ? (
                 <div>
@@ -360,7 +360,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                       return (
                         <span key={n} style={{position:'relative', display:'inline-block', width:26, height:26, fontSize:24, lineHeight:'26px'}}>
                           <span style={{color:'var(--star-empty)'}}>★</span>
-                          <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'#f5b301'}}>★</span>
+                          <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'var(--gold)'}}>★</span>
                           <button type="button" aria-label={`${n-0.5}점`} onClick={() => setRt(rt === n-0.5 ? 0 : n-0.5)} style={{position:'absolute', left:0, top:0, width:'50%', height:'100%', background:'none', border:'none', cursor:'pointer', padding:0}} />
                           <button type="button" aria-label={`${n}점`} onClick={() => setRt(rt === n ? 0 : n)} style={{position:'absolute', right:0, top:0, width:'50%', height:'100%', background:'none', border:'none', cursor:'pointer', padding:0}} />
                         </span>
@@ -389,7 +389,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                             onClick={() => { setRt(bookshelfEntry.rating); setRv(book.comment || ''); setEditMeta(true); }}
                             style={{position:'relative', display:'inline-block', width:26, height:26, fontSize:24, lineHeight:'26px', background:'none', border:'none', cursor:'pointer', padding:0}}>
                             <span style={{color:'var(--star-empty)'}}>★</span>
-                            <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'#f5b301'}}>★</span>
+                            <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'var(--gold)'}}>★</span>
                           </button>
                         );
                       })}
@@ -509,7 +509,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                 </>
               ) : (
                 <div style={{fontSize:13, color:'var(--ink-3)', fontWeight:700}}>
-                  📖 {prog.cur}p 읽음 · <span style={{color:'var(--ink-3)'}}>쪽수 미상</span>
+                  <span style={{display:'inline-flex', alignItems:'center', gap:5}}>{window.rgIcon('book',14)}{prog.cur}p 읽음</span> · <span style={{color:'var(--ink-3)'}}>쪽수 미상</span>
                 </div>
               )}
             </div>
@@ -518,8 +518,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* 다시 읽기 (#593): 중단(aborted) 책 → 읽는 중 복귀. current_page 보존. */}
           {book.status === 'aborted' && book.ubId && (
             <button onClick={resumeBook}
-              style={{display:'block', width:'100%', textAlign:'center', padding:'12px 14px', background:'var(--brand)', border:'none', borderRadius:'8px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
-              📖 다시 읽기
+              style={{display:'flex', width:'100%', alignItems:'center', justifyContent:'center', gap:6, padding:'12px 14px', background:'var(--brand)', border:'none', borderRadius:'8px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
+              {window.rgIcon('book',15)} 다시 읽기
             </button>
           )}
 
@@ -609,7 +609,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               {!addOpen ? (
                 <>
                   <button onClick={() => setAddOpen(true)}
-                    style={{display:'block', width:'100%', padding:'12px', borderRadius:8, border:'1.5px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer'}}>✍️ 한 문장 추가</button>
+                    style={{display:'flex', width:'100%', alignItems:'center', justifyContent:'center', gap:6, padding:'12px', borderRadius:8, border:'1.5px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer'}}>{window.rgIcon('pen',15)} 한 문장 추가</button>
                   {/* #848 여러 문장 한 번에 담기 — 눈에 띄는 카드 + 사용법 안내 */}
                   <button onClick={() => setQuotePasteOpen(true)}
                     style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:8, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
@@ -619,7 +619,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   {/* #844 사진에서 여러 문장 담기 — 앨범 다중 → Gemini vision 강조 추출 */}
                   <button onClick={() => _ocrAlbumRef.current && _ocrAlbumRef.current.click()}
                     style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:8, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
-                    <div style={{fontWeight:800, fontSize:14}}>📷 사진에서 여러 문장 담기</div>
+                    <div style={{fontWeight:800, fontSize:14, display:'flex', alignItems:'center', gap:6}}>{window.rgIcon('camera',15)} 사진에서 여러 문장 담기</div>
                     <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>밑줄·형광펜 친 페이지를 <b>여러 장</b> 올리면 강조 문장만 골라 담아요</div>
                   </button>
                   <input ref={_ocrAlbumRef} type="file" accept="image/*" multiple style={{display:'none'}}
@@ -649,8 +649,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
 
           {bookQuotes.length > 0 && (
             <>
-              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:10}}>
-                📖 내 한 문장 {bookQuotes.length}개
+              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:10, display:'flex', alignItems:'center', gap:6}}>
+                {window.rgIcon('book',15)}<span>내 한 문장 {bookQuotes.length}개</span>
               </div>
               {bookQuotes.map((q, i) => {
                 const blinded = !revealAll && !revealed[i] &&
@@ -740,7 +740,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             try {
               const r = await saveBatchQuotes(quotes);
               if (r && r.error) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
-              else { showToast('✨ ' + (r.saved || quotes.length) + '개 담았어요'); setQuotePasteOpen(false); }
+              else { showToast((r.saved || quotes.length) + '개 담았어요'); setQuotePasteOpen(false); }
             } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
             finally { setBatchBusy(false); }
           }} />
@@ -749,7 +749,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       {/* #844 배치 OCR 진행률 */}
       {ocrBusy && (
         <div style={{position:'fixed', inset:0, height:'var(--app-h, 100dvh)', background:'rgba(0,0,0,0.62)', zIndex:1100, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, color:'#fff'}}>
-          <div style={{fontWeight:800, fontSize:16}}>📷 사진에서 강조 문장 읽는 중…</div>
+          <div style={{fontWeight:800, fontSize:16, display:'flex', alignItems:'center', gap:8}}>{window.rgIcon('camera',17)} 사진에서 강조 문장 읽는 중…</div>
           <div style={{fontSize:14, opacity:0.85}}>{ocrProgress.done} / {ocrProgress.total}장</div>
         </div>
       )}
@@ -764,7 +764,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             try {
               const r = await saveBatchQuotes(quotes);
               if (r && r.error) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
-              else { showToast('✨ ' + (r.saved || quotes.length) + '개 담았어요'); setOcrItems(null); }
+              else { showToast((r.saved || quotes.length) + '개 담았어요'); setOcrItems(null); }
             } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
             finally { setBatchBusy(false); }
           }} />

@@ -145,7 +145,7 @@ function BookInfoModal({ bookId, onClose }) {
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label="책 정보">
         <div className="sheet-grip" />
-        <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1, zIndex:2}}>✕</button>
+        <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, cursor:'pointer', color:'var(--ink-2)', zIndex:2, display:'inline-flex', alignItems:'center', justifyContent:'center'}}>{rgIcon('close', 16)}</button>
         {bk === undefined ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>불러오는 중…</div>
         ) : bk === null ? (
@@ -162,7 +162,7 @@ function BookInfoModal({ bookId, onClose }) {
               {showRoomBadge && (
                 <button onClick={openRoomDiscovery}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '6px 12px', borderRadius: 999, border: '1px solid var(--brand-soft)', background: 'var(--brand-tint, var(--brand-soft))', color: 'var(--brand-3)', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>
-                  📖 이 책 {roomMemberTotal >= 2 ? `${roomMemberTotal}명 ` : ''}같이 읽는 중
+                  {rgIcon('book', 14)} 이 책 {roomMemberTotal >= 2 ? `${roomMemberTotal}명 ` : ''}같이 읽는 중
                 </button>
               )}
             </div>

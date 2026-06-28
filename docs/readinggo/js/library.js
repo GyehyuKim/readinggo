@@ -147,14 +147,14 @@ function LibraryView({ state, onActivateUserBook }) {
         const metaBits = [b.author, (b.total_pages > 0 ? `${b.total_pages}쪽` : ''), (b.isbn13 ? `ISBN ${b.isbn13}` : '')].filter(Boolean);
         if (metaBits.length) lines.push(metaBits.join(' · '));
         if (ub.status === 'completed') {
-          const r = (typeof ub.rating === 'number') ? `⭐ ${ub.rating.toFixed(1)} / 5` : '';
+          const r = (typeof ub.rating === 'number') ? `★ ${ub.rating.toFixed(1)} / 5` : '';
           const cd = fmtDate(ub.completed_at);
           const head = [r, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · ');
           if (head) lines.push('', head);
           if (ub.review_text) lines.push(`> ${ub.review_text}`);
         }
         const qs = byBook[key] || [];
-        if (qs.length) { lines.push('', `### ✍️ 내 한 문장 (${qs.length})`, ''); emitQuotes(qs); }
+        if (qs.length) { lines.push('', `### 내 한 문장 (${qs.length})`, ''); emitQuotes(qs); }
         delete byBook[key];
       };
       books.forEach(emitBook);
@@ -164,7 +164,7 @@ function LibraryView({ state, onActivateUserBook }) {
         if (!qs || !qs.length) return;
         const meta = bookMeta[key] || {};
         const title = meta.title || (qs[0] && qs[0].user_book && qs[0].user_book.book && qs[0].user_book.book.title) || '기타';
-        lines.push('', '---', '', `## ${title}`, '', `### ✍️ 내 한 문장 (${qs.length})`, '');
+        lines.push('', '---', '', `## ${title}`, '', `### 내 한 문장 (${qs.length})`, '');
         emitQuotes(qs);
       });
       downloadBlob(['﻿', lines.join('\n')], 'text/markdown;charset=utf-8',
@@ -460,7 +460,7 @@ function LibraryView({ state, onActivateUserBook }) {
           <button onClick={() => window.RG_openShelfImport && window.RG_openShelfImport()}
             title="책장 스크린샷으로 읽은 책 한 번에 복원"
             style={{display:'inline-flex', alignItems:'center', gap:4, background:'transparent', border:'none', color:'var(--brand-3)', fontSize:12, fontWeight:800, cursor:'pointer', padding:'4px 2px', whiteSpace:'nowrap'}}>
-            📸 스샷으로 복원
+            {window.rgIcon('camera',13)} 스샷으로 복원
           </button>
         </div>
 
@@ -469,7 +469,7 @@ function LibraryView({ state, onActivateUserBook }) {
         {stagedItems.length > 0 && (
           <div style={{marginBottom:18, border:'1.5px solid var(--brand)', borderRadius:14, background:'var(--brand-tint)', padding:'12px 12px 14px'}}>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8, gap:8}}>
-              <div style={{fontSize:13.5, fontWeight:900, color:'var(--brand-3)'}}>📦 가져온 책 {stagedItems.length}권 · 검토</div>
+              <div style={{fontSize:13.5, fontWeight:900, color:'var(--brand-3)', display:'inline-flex', alignItems:'center', gap:5}}>{window.rgIcon('box',15)} 가져온 책 {stagedItems.length}권 · 검토</div>
               <div style={{display:'flex', gap:6, flexShrink:0}}>
                 <button onClick={moveAllStaged}
                   style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:8, padding:'5px 9px', cursor:'pointer'}}>전체 이동</button>
@@ -491,7 +491,7 @@ function LibraryView({ state, onActivateUserBook }) {
                       <div style={{fontSize:13, fontWeight:800, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{it.title}</div>
                       <div style={{fontSize:11, color:'var(--ink-3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                         {it.author || '저자 미상'}
-                        {typeof it.rating === 'number' && it.rating > 0 ? ` · ⭐ ${it.rating}` : ''}
+                        {typeof it.rating === 'number' && it.rating > 0 ? ` · ★ ${it.rating}` : ''}
                         {matched ? ' · 매칭됨' : ' · 미확인'}
                       </div>
                       <div style={{display:'flex', gap:4, marginTop:6}}>
@@ -510,7 +510,7 @@ function LibraryView({ state, onActivateUserBook }) {
                       <button onClick={() => moveStaged(it)}
                         style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:8, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>내 서재로</button>
                       <button onClick={() => excludeStaged(it)}
-                        style={{fontSize:11, fontWeight:800, color:'var(--ink-3)', background:'transparent', border:'1px solid var(--line)', borderRadius:8, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>제외</button>
+                        style={{fontSize:11, fontWeight:800, color:'var(--ink-3)', background:'transparent', border:'none', borderRadius:8, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>제외</button>
                     </div>
                   </div>
                 );
@@ -568,7 +568,7 @@ function LibraryView({ state, onActivateUserBook }) {
               );
             })}
             <button onClick={() => setRatingSheetOpen(true)}
-              style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: ratingFilter.size ? 'var(--gold)' : 'var(--card)', color: ratingFilter.size ? '#fff' : 'var(--ink-2)', boxShadow: ratingFilter.size ? 'none' : 'inset 0 0 0 1px var(--line)'}}>⭐ 별점{ratingFilter.size ? ` ${ratingFilter.size}` : ''}</button>
+              style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: ratingFilter.size ? 'var(--gold)' : 'var(--card)', color: ratingFilter.size ? '#fff' : 'var(--ink-2)', boxShadow: ratingFilter.size ? 'none' : 'inset 0 0 0 1px var(--line)'}}>★ 별점{ratingFilter.size ? ` ${ratingFilter.size}` : ''}</button>
           </div>
         )}
 
@@ -586,7 +586,7 @@ function LibraryView({ state, onActivateUserBook }) {
                   style={{background:'none', border:'none', color:'var(--ink-3)', fontSize:13, fontWeight:700, cursor:'pointer'}}>초기화</button>
               </div>
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16}}>
-                {[['5','⭐ 5점'],['4','⭐ 4점대'],['3','⭐ 3점대'],['2','⭐ 2점대'],['1','⭐ 1점대'],['none','· 무평점']].map(([k,lbl]) => {
+                {[['5','★ 5점'],['4','★ 4점대'],['3','★ 3점대'],['2','★ 2점대'],['1','★ 1점대'],['none','· 무평점']].map(([k,lbl]) => {
                   const on = ratingFilter.has(k);
                   return (
                     <button key={k} onClick={() => setRatingFilter(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; })}
@@ -610,7 +610,7 @@ function LibraryView({ state, onActivateUserBook }) {
             {displayBooks.map(b => {
               const isCompleted = b.status === 'completed';
               const progText = isCompleted
-                ? (typeof b.rating === 'number' ? `⭐ ${b.rating.toFixed(1)}` : '완독')
+                ? (typeof b.rating === 'number' ? `★ ${b.rating.toFixed(1)}` : '완독')
                 : b.status === 'aborted'
                   ? (<span style={{display:'inline-flex', alignItems:'center', gap:3}}>{window.rgIcon('pause',10)}{b.cur > 0 ? `${b.cur}/${b.total}p` : '중단'}</span>)
                   : (b.cur > 0 ? `${b.cur}/${b.total}p` : '미완독');
@@ -623,7 +623,7 @@ function LibraryView({ state, onActivateUserBook }) {
                   {b.id === activeBookId && <span className="shelf-grid-active-pill">읽는중</span>}
                   {b.status === 'wish' && (
                     <button onClick={(e) => removeWish(e, b.id)} title="찜 삭제" aria-label="찜 삭제"
-                      className="shelf-grid-remove-wish">✕</button>
+                      className="shelf-grid-remove-wish">{window.rgIcon('close',14)}</button>
                   )}
                   <BookCover className="shelf-grid-cover" title={b.title} author={b.author} cover={b.cover} fb={b.fb} />
                   <div className="shelf-grid-title">{b.title}</div>
@@ -643,8 +643,8 @@ function LibraryView({ state, onActivateUserBook }) {
             </div>
             {/* 빈 서가 박멸 (#772) — 스샷으로 서가 복원 진입 */}
             <button onClick={() => window.RG_openShelfImport && window.RG_openShelfImport()}
-              style={{marginTop:14, padding:'10px 16px', borderRadius:10, border:'1.5px solid var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer'}}>
-              📸 스샷으로 서가 복원
+              style={{marginTop:14, padding:'10px 16px', borderRadius:10, border:'1.5px solid var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:5}}>
+              {window.rgIcon('camera',14)} 스샷으로 서가 복원
             </button>
           </div>
         )}

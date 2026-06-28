@@ -83,7 +83,7 @@ function MilestoneRecap({ milestone, onClose }) {
         {/* 헤더 — 따뜻한 그라데이션, 서사 톤(숫자 자랑 아님) */}
         <div style={{ background: 'linear-gradient(160deg, var(--brand-tint), var(--card))', padding: '22px 20px 16px', position: 'relative' }}>
           <button onClick={close} aria-label="닫기"
-            style={{ position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.06)', color: 'var(--ink-2)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            style={{ position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.06)', color: 'var(--ink-2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 16)}</button>
           <div style={{ fontSize: 34, lineHeight: 1, marginBottom: 8 }}>{copy.badge}</div>
           <div style={{ fontSize: 19, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>{copy.title}</div>
           <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>{copy.lead}</div>

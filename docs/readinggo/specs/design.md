@@ -2,6 +2,7 @@
 
 > **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §11, §12. 변경 이력은 git log 참조.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
+> **린트 강제 (#1062)**: DESIGN.md UI 규칙(기능 이모지→RG_ICONS·raw hex→토큰·라운딩 12/16/18·ghost 금지)을 `tests/spec-align/design_lint.py`가 코드에서 자동 검사한다(admin·test·데이터 파일 면제). #696 이모지→SVG 부채를 전면 스윕(book-detail·library·user-profile 등 88건 교체)하고 누락 RG_ICONS(검색·홈·카메라·삭제·박스)를 추가했다.
 
 ## 11. 디자인 토큰
 

@@ -60,7 +60,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
     ).then(() => {
       setWishPublic(next);
       if (window.RG_ME) window.RG_ME.wishlist_public = next;
-      showToast(next ? '🔖 읽고 싶은 책이 공개됐어요' : '🔖 읽고 싶은 책이 비공개로 바뀌었어요');
+      showToast(next ? '읽고 싶은 책이 공개됐어요' : '읽고 싶은 책이 비공개로 바뀌었어요');
     }).catch(() => showToast('저장 실패 — 잠시 후 다시'));
   };
   // 운영자 문의 (DB 저장 → admin 대시보드)
@@ -147,8 +147,8 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                   if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
                     Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
                   }
-                }} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{rgIcon('devices', 14)} 다른 기기 로그아웃</button>
-                <button onClick={logout} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>이 기기 로그아웃</button>
+                }} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{rgIcon('devices', 14)} 다른 기기 로그아웃</button>
+                <button onClick={logout} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>이 기기 로그아웃</button>
               </div>
             </>
           )}
@@ -182,7 +182,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             <div style={{ marginTop: 8 }}>
               {!delConfirm ? (
                 <button onClick={() => setDelConfirm(true)}
-                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--danger, #E5484D)', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
+                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
               ) : (
                 <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--danger, #E5484D)', background: 'var(--danger-tint, rgba(229,72,77,0.06))' }}>
                   <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 기록(한 문장·서재·둥지·대화)이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
@@ -190,7 +190,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                     <button onClick={deleteAccount} disabled={deleting}
                       style={{ flex: 1, padding: '11px', borderRadius: 10, border: 'none', background: 'var(--danger, #E5484D)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}>{deleting ? '삭제 중…' : '삭제 확정'}</button>
                     <button onClick={() => setDelConfirm(false)} disabled={deleting}
-                      style={{ flex: 1, padding: '11px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                      style={{ flex: 1, padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>취소</button>
                   </div>
                 </div>
               )}

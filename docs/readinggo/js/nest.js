@@ -70,7 +70,7 @@ function BookEditModal({ book, onClose, onSaved }) {
         window.dispatchEvent(new CustomEvent('rg:wish-changed'));
       }
       onSaved && onSaved({ pub: pub.trim(), total: tp });
-      showToast('✏️ 책 정보 수정됨');
+      showToast('책 정보 수정됨');
       onClose();
     };
     // 활성 책의 user_book id 확보 후 저장.
@@ -272,7 +272,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         setNestState((ns) => ({ ...ns, streak: restored }));
         try { window.dispatchEvent(new CustomEvent('rg:streak-repaired', { detail: { streak: restored } })); } catch (e) {}
         rgTrack('streak_repaired', { restored });
-        showToast(`🔥 ${restored}일 연속을 되살렸어요 — 오늘 한 줄로 이어가요`);
+        showToast(`${restored}일 연속을 되살렸어요 — 오늘 한 줄로 이어가요`);
       } else {
         const days = (res && res.cooldownDays) || 0;
         showToast(days > 0 ? `이번 주 만회는 이미 썼어요 — ${days}일 뒤 다시 가능해요` : '지금은 만회할 수 없어요');
@@ -365,12 +365,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     if (!file || quickOcrBusy) return;
     if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
     setQuickOcrBusy(true);
-    showToast('📷 사진에서 글자를 읽는 중…');
+    showToast('사진에서 글자를 읽는 중…');
     Promise.resolve((window.ocrExtractSentence ? window.ocrExtractSentence(file) : Promise.resolve({ text: '', error: 'unavailable' })))
       .then((d) => {
         if (d && d.text) {
           setQuickText((cur) => (cur && cur.trim() ? cur.trim() + '\n' + d.text : d.text).slice(0, 1000));
-          showToast('✨ 추출했어요 — 원하는 부분만 남기고 저장하세요');
+          showToast('추출했어요 — 원하는 부분만 남기고 저장하세요');
           rgTrack('ocr_extracted', { book_id: nestState.book.id, chars: d.text.length });
         } else if (d && d.empty) {
           showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');

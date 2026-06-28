@@ -6,6 +6,18 @@
 
 ---
 
+## UI 규칙 (always-on · 린트 강제)
+
+> 아래는 **항상 적용**되는 코드 레벨 규칙이며, `tests/spec-align/design_lint.py` 가 `js/*.js`·`index.html` 을 스캔해 위반을 자동 탐지한다(이모지·raw hex·ghost = `exit 1`, 라운딩 = warning). 새 UI 코드는 예외 없이 지킨다. 상세 근거는 아래 'Color'·'Typography'·'Layout & 버튼 위계' 섹션.
+
+- ❌ **기능 UI 이모지 금지** (📖 📚 📦 📸 📷 🔍 🔎 🔖 ✍️ ✏️ ⚙️ ✕ 🗑 🏠 ❤️ 등) → `RG_ICONS` + `rgIcon('name')` 모노라인 SVG(`icons.js`)로 통일. 단, **둥지 5단계(🌿🪹🪺🐣🏰)·컴패니언 동물(🦊🦝🐰🐹🐱)** 은 게임 시그니처라 허용.
+- ⭐ **평점 별은 이모지(⭐) 대신 `★`/`☆` 글리프** — 색·크기를 CSS로 제어하고 플랫폼 렌더 편차를 없앤다.
+- ❌ **raw hex 색값 금지** (`color:'#1a9e5a'`, `background:'#0B0D10'` 등) → `var(--token)`(`--brand`·`--ink`·`--line` 등 `:root` 토큰). `#fff`/`#000` 중립색과 OAuth 브랜드색(`#FEE500`/`#191919`)은 예외. 데이터 팔레트 파일(`data.js`·`datastore*.js`·`icons.js`)도 예외.
+- **Border radius = 12 / 16 / 18 만** → `var(--r-sm)` / `var(--r-md)` / `var(--r-lg)`. 그 외 정수 라운딩 금지(pill `50`/`999` 는 예외).
+- ❌ **ghost 버튼 금지** (투명 배경 `transparent`/`none` + `solid` 보더 조합) → 2차 액션은 반드시 **tonal**(`--brand-soft` 배경 + 진한 그린 글씨 `#196B45`). 버튼 위계는 'Layout & 버튼 위계' 참고.
+
+---
+
 ## Product Context
 
 - **무엇:** 독서 + 게이미피케이션(스트릭·XP·소셜)으로 매일 읽게 만드는 독서 습관 형성 앱
@@ -105,6 +117,7 @@
 | 2026-06-19 | Quiet Mono(그린 제거) 방향 폐기 | `/design-shotgun` D안. 그린 정체성·고양감 손실이 큼 |
 | 2026-06-26 | **코드 반영 완료(#1032)** — 세이지 토큰·라운딩 18·Noto Sans 본문·Noto Serif 흔적·버튼 위계(ghost→tonal/텍스트) | 위 2026-06-19 리프레시의 구현. `index.html`(:root·폰트) + 액션 밀집 화면(홈/책상세/동의/컴패니언) ghost 버튼 제거 |
 | 2026-06-28 | **앱 아이콘·참새 마크 리디자인** — 고개 든 통통 세이지 참새(짧은 부리·작은 깃) + 골드 스파크, 따뜻한 종이 배지. 구 flux 3D새/옛 민트 마크 전면 교체 | flux 마스코트는 토이 과잉(DESIGN이 피하라는 인상)·작은 데서 뭉개짐. 손코딩 벡터로 고대비·온브랜드(세이지 `#2EA86A`)·전 사이즈 가독. `assets/icon.png`·`sparrow.svg`·`SparrowMark`·부트로더·공유카드 공통 적용. 인앱 마크는 spark 없는 본체(아바타용), 앱아이콘/favicon은 배지+스파크 |
+| 2026-06-28 | **UI 규칙 always-on 린트(#1062)** — `design_lint.py` 신설(이모지·raw hex·ghost·라운딩 탐지, 위반 시 `exit 1`) + `RG_ICONS` 에 `search`·`home`·`camera`·`trash`·`box` 모노라인 추가 | DESIGN.md 를 코드에서 게이트로 강제. 기능 이모지→SVG 아이콘, 색→토큰, ghost→tonal 드리프트를 CI 가 차단 |
 
 ---
 

@@ -126,7 +126,7 @@ function NestTheatre({ xp, health = 100 }) {
         <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) setShowGuide(false); }}>
           <div className="sheet" role="dialog" aria-label="둥지 단계 안내">
             <div className="sheet-grip" />
-            <button onClick={() => setShowGuide(false)} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1, zIndex:2}}>✕</button>
+            <button onClick={() => setShowGuide(false)} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, cursor:'pointer', color:'var(--ink-2)', zIndex:2, display:'inline-flex', alignItems:'center', justifyContent:'center'}}>{window.rgIcon('close', 16)}</button>
             <div style={{padding:'8px 20px 24px'}}>
               <div style={{textAlign:'center', fontSize:18, fontWeight:900, color:'var(--ink)', marginBottom:4}}>둥지가 자라는 방법</div>
               <div style={{textAlign:'center', fontSize:13, color:'var(--ink-2)', fontWeight:700, marginBottom:16}}>활동하면 XP가 쌓이고 둥지가 자라요!</div>

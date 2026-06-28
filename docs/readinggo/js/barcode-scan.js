@@ -194,7 +194,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
       style={{ position: 'fixed', inset: 0, background: '#0B0D10', zIndex: 10001, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
       {/* 헤더 — 닫기 */}
       <div style={{ width: '100%', maxWidth: 430, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', color: '#fff', zIndex: 2 }}>
-        <button onClick={handleClose} aria-label="닫기" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 34, height: 34, borderRadius: 999, fontSize: 18, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        <button onClick={handleClose} aria-label="닫기" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 34, height: 34, borderRadius: 999, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 18)}</button>
         <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.2px' }}>바코드로 등록</span>
         <span style={{ width: 34 }} />
       </div>
@@ -210,7 +210,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
         {/* 권한 거부·오류 — 직접 검색 폴백 (3차/텍스트 위계) */}
         {(status === 'denied' || status === 'error') && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24, textAlign: 'center', color: '#fff' }}>
-            <div style={{ fontSize: 40 }}>📷</div>
+            <div style={{ display: 'inline-flex' }}>{window.rgIcon('camera', 40)}</div>
             <div style={{ fontSize: 15, fontWeight: 800 }}>{overlayMsg}</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
               {status === 'denied' ? '브라우저 설정에서 카메라를 허용하거나,\n제목·저자로 직접 검색할 수 있어요.' : '제목·저자로 직접 검색할 수 있어요.'}

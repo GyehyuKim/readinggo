@@ -85,7 +85,7 @@ function CompanionModal({ sentence, onClose }) {
     if (!v) { setEditing(false); return; }
     if (DataStore.sentences && DataStore.sentences.updateText) Promise.resolve(DataStore.sentences.updateText(sentence.id, v)).catch(() => {});
     // 종류 변경(#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 수정.
-    sentence.text = v; setEditing(false); showToast('✏️ 문장 수정됨');
+    sentence.text = v; setEditing(false); showToast('문장 수정됨');
   };
   _useEffect(() => {
     const past = parseNoteToExchanges(sentence.note);
@@ -113,7 +113,7 @@ function CompanionModal({ sentence, onClose }) {
     Promise.resolve(DataStore.sentences.remove(sentence.id)).then(() => {
       if (window.rgTrack) window.rgTrack('sentence_deleted', { book_id: sentence.bookId || '' });
       window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id: sentence.id } }));
-      showToast('🗑 한 문장을 삭제했어요');
+      showToast('한 문장을 삭제했어요');
       onClose();
     }).catch(() => showToast('삭제 실패 — 잠시 후 다시'));
   };

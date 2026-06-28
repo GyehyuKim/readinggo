@@ -1033,7 +1033,7 @@ function RoomModal({ roomId, onClose }) {
         <div className="rg-room-modal-head">
           <button className="rg-room-back" onClick={onClose} aria-label="뒤로">←</button>
           <span className="rg-room-modal-title">{room ? room.name : '숲'}</span>
-          <button className="rg-room-gear" onClick={() => setSettingsOpen(v => !v)} aria-label="설정">⚙️</button>
+          <button className="rg-room-gear" onClick={() => setSettingsOpen(v => !v)} aria-label="설정" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('settings', 18)}</button>
         </div>
         {/* 1줄 요약 */}
         {stats && (
@@ -1054,7 +1054,7 @@ function RoomModal({ roomId, onClose }) {
         <div className="rg-room-tabs">
           <button className={'rg-room-tab' + (tab === 'members' ? ' on' : '')} onClick={() => setTab('members')}>👥 멤버 진척</button>
           <button className={'rg-room-tab' + (tab === 'schedule' ? ' on' : '')} onClick={() => setTab('schedule')}>🗓️ 일정</button>
-          <button className={'rg-room-tab' + (tab === 'sentences' ? ' on' : '')} onClick={() => setTab('sentences')}>📖 한 문장</button>
+          <button className={'rg-room-tab' + (tab === 'sentences' ? ' on' : '')} onClick={() => setTab('sentences')}>{window.rgIcon('book', 14)} 한 문장</button>
         </div>
 
         <div className="rg-room-modal-body">
