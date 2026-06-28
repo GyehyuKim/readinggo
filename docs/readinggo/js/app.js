@@ -292,8 +292,9 @@ function LoginScreen({ onLogin, onBack }) {
           )}
         </div>
         {sent ? (
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.6, background: 'rgba(0,0,0,0.04)', borderRadius: 12, padding: '12px 16px', maxWidth: 300 }}>
-            📬 <b>{email.trim()}</b>로 로그인 링크를 보냈어요.<br />메일함에서 링크를 눌러 로그인하세요.
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.6, background: 'rgba(0,0,0,0.04)', borderRadius: 12, padding: '12px 16px', maxWidth: 300, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <span style={{ flexShrink: 0, marginTop: 1 }}>{window.rgIcon('mail', 15)}</span>
+            <span><b>{email.trim()}</b>로 로그인 링크를 보냈어요.<br />메일함에서 링크를 눌러 로그인하세요.</span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 300 }}>

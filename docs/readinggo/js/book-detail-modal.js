@@ -292,10 +292,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (book.cover) { lines.push(''); lines.push(`![표지](${book.cover})`); }
     // 책 소개 (#316) — 알라딘 description. 없으면 섹션 생략.
     const desc = decodeEntities((await fetchBookDesc()).desc);
-    if (desc) { lines.push('', '---', '', '## 📚 책 소개', '', desc); }
+    if (desc) { lines.push('', '---', '', '## 책 소개', '', desc); }
     // 완독 정보
     if (book.status === 'completed') {
-      lines.push('', '---', '', '## 📖 완독 정보');
+      lines.push('', '---', '', '## 완독 정보');
       const r = (typeof book.rating === 'number') ? `★ ${book.rating.toFixed(1)} / 5` : '';
       const cd = fmtDate(book.completedAt);
       const head = [r, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · ');
@@ -304,7 +304,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     }
     // 한 문장
     const sorted = (bookQuotes || []).slice().sort((a, b) => (a.page || 0) - (b.page || 0));
-    lines.push('', '---', '', `## ✍️ 내 한 문장 (${sorted.length})`, '');
+    lines.push('', '---', '', `## 내 한 문장 (${sorted.length})`, '');
     sorted.forEach(q => {
       const date = fmtDate(q.createdAt || q.when);
       lines.push(`### p.${q.page ?? '?'}${date ? ` · ${date}` : ''}`);
@@ -613,7 +613,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   {/* #848 여러 문장 한 번에 담기 — 눈에 띄는 카드 + 사용법 안내 */}
                   <button onClick={() => setQuotePasteOpen(true)}
                     style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:8, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
-                    <div style={{fontWeight:800, fontSize:14}}>📋 여러 문장 한 번에 담기</div>
+                    <div style={{fontWeight:800, fontSize:14, display:'flex', alignItems:'center', gap:6}}>{window.rgIcon('bookmark',15)} 여러 문장 한 번에 담기</div>
                     <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>밑줄·메모·공유한 글을 <b>한 줄에 하나씩</b> 붙여넣으면 한꺼번에 담겨요</div>
                   </button>
                   {/* #844 사진에서 여러 문장 담기 — 앨범 다중 → Gemini vision 강조 추출 */}

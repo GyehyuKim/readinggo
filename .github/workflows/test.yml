@@ -22,6 +22,20 @@ jobs:
       - name: Spec-align invariants
         run: python tests/spec-align/align_v7.py
 
+  design-lint:
+    name: design-lint (DESIGN.md UI 규칙 — 이모지·토큰·tonal)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # docs/readinggo/js/** 와 index.html 이 DESIGN.md UI 규칙(기능 이모지→RG_ICONS,
+      # 오프팔레트 raw hex→var(--token), ghost 버튼→2차 tonal)을 위반하면 실패 (#1062).
+      # radius 는 warning 으로만 카운트(exit 미반영) — design_lint.py 정책 참조.
+      - name: DESIGN.md lint
+        run: python tests/spec-align/design_lint.py
+
   contract:
     name: contract (DataStore 계약 — UI 호출↔어댑터)
     runs-on: ubuntu-latest

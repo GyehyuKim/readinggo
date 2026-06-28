@@ -166,7 +166,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     }).catch(() => {});
   }, [state.book.id]);
   const switchBook = (dir) => {
-    if (!readingBooks || readingBooks.length < 2) { showToast('읽는 중인 책이 하나예요 📖'); return; }
+    if (!readingBooks || readingBooks.length < 2) { showToast('읽는 중인 책이 하나예요'); return; }
     const idx = readingBooks.findIndex((b) => b.id === nestState.book.id);
     const ni = ((idx < 0 ? 0 : idx) + dir + readingBooks.length) % readingBooks.length;
     if (window.RG_activateBook) window.RG_activateBook(readingBooks[ni]);

@@ -95,13 +95,13 @@ function Ceremony({ data, onClose, onComplete }) {
         <div className="lead">{leadText}</div>
         <div className="reward-grid">
           <div className="reward-card brand">
-            <span className="ico">⭐</span>
+            <span className="ico">★</span>
             <div className="val">+{xpGain}</div>
             <div className="lbl">XP</div>
           </div>
           {/* 한 문장 카드 (#549) — 문장 입력 시 '저장됨', 미입력 시 거짓 표시 대신 이 책 누적 수/0건 독려 */}
           <div className="reward-card gold">
-            <span className="ico">{sentence ? '🔖' : (bookQuoteCount > 0 ? '📖' : '✍️')}</span>
+            <span className="ico">{sentence ? window.rgIcon('bookmark', 22) : (bookQuoteCount > 0 ? window.rgIcon('book', 22) : window.rgIcon('pen', 22))}</span>
             <div className="val">{sentence ? '저장됨' : (bookQuoteCount > 0 ? `${bookQuoteCount}개` : '0개')}</div>
             <div className="lbl">{sentence ? '한 문장' : (bookQuoteCount > 0 ? '이 책 한 문장' : '한 문장 남겨봐요')}</div>
           </div>

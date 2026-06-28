@@ -404,7 +404,7 @@ function ShelfImportModal({ onClose }) {
         if (!n) { setErr('검토함에 담지 못했어요 — 다시 시도해요.'); return; }   // 로컬 no-op/실패도 여기로
         if (window.rgTrack) window.rgTrack('shelf_import_staged', { count: n, status: dest });
         try { window.dispatchEvent(new CustomEvent('rg:import-staged')); } catch (e) {}
-        if (window.showToast) window.showToast(`📦 검토함에 ${n}권 담았어요 — 책장에서 검토하세요`);
+        if (window.showToast) window.showToast(`검토함에 ${n}권 담았어요 — 책장에서 검토하세요`);
         onClose();
       })
       .catch(() => { setErr('검토함 담기에 문제가 생겼어요 — 다시 시도해요.'); });
@@ -427,9 +427,9 @@ function ShelfImportModal({ onClose }) {
     <div className="modal-backdrop show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label="스샷으로 서가 복원">
         <div className="sheet-grip" />
-        <button onClick={onClose} aria-label="닫기" style={{ position: 'absolute', top: 10, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, fontSize: 16, cursor: 'pointer', color: 'var(--ink-2)', lineHeight: 1, zIndex: 2 }}>✕</button>
+        <button onClick={onClose} aria-label="닫기" style={{ position: 'absolute', top: 10, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', color: 'var(--ink-2)', lineHeight: 1, zIndex: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 16)}</button>
         <div style={{ padding: '8px 20px 20px' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 900, margin: '4px 0 6px', color: 'var(--ink)' }}>📸 스샷으로 서가 복원</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 900, margin: '4px 0 6px', color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 7 }}>{window.rgIcon('camera', 18)} 스샷으로 서가 복원</h2>
 
           {phase === 'upload' && (
             <div>
@@ -447,7 +447,7 @@ function ShelfImportModal({ onClose }) {
 
           {phase === 'loading' && (
             <div style={{ padding: '36px 0', textAlign: 'center', color: 'var(--ink-3)' }}>
-              <div style={{ fontSize: 22, marginBottom: 8 }}>🔎</div>
+              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center', color: 'var(--ink-3)' }}>{window.rgIcon('search', 24)}</div>
               <div style={{ fontSize: 13, fontWeight: 700 }}>사진에서 책을 찾는 중…</div>
               {progress && progress.total > 1 && (
                 <div style={{ fontSize: 12, marginTop: 6, color: 'var(--ink-3)' }}>
@@ -490,7 +490,7 @@ function ShelfImportModal({ onClose }) {
                       <input value={r.title} onChange={(e) => edit(i, 'title', e.target.value)} placeholder="제목" style={{ width: '100%', border: 'none', background: 'transparent', fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', padding: 0 }} />
                       <input value={r.author} onChange={(e) => edit(i, 'author', e.target.value)} placeholder="저자" style={{ width: '100%', border: 'none', background: 'transparent', fontSize: 11.5, color: 'var(--ink-3)', padding: 0, marginTop: 2 }} />
                       {showRating && r.rating > 0 && (
-                        <div title={`내 별점 ${r.rating}점 (스샷에서 인식)`} style={{ fontSize: 11, color: '#f5a623', marginTop: 1, letterSpacing: 0.5 }}>
+                        <div title={`내 별점 ${r.rating}점 (스샷에서 인식)`} style={{ fontSize: 11, color: 'var(--gold)', marginTop: 1, letterSpacing: 0.5 }}>
                           {fmtStars(r.rating)} <span style={{ color: 'var(--ink-3)' }}>{r.rating}</span>
                         </div>
                       )}
@@ -498,8 +498,8 @@ function ShelfImportModal({ onClose }) {
                     {!r.book && (
                       <button type="button" onClick={() => enrichOne(i)} disabled={r._finding}
                         title="알라딘에서 표지·정보 찾기"
-                        style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand, #2a7)', background: 'var(--brand-tint, rgba(42,119,119,0.1))', border: 'none', borderRadius: 6, padding: '3px 7px', flexShrink: 0, cursor: 'pointer' }}>
-                        {r._finding ? '찾는 중…' : '🔍 찾기'}
+                        style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand, #2a7)', background: 'var(--brand-tint, rgba(42,119,119,0.1))', border: 'none', borderRadius: 6, padding: '3px 7px', flexShrink: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {r._finding ? '찾는 중…' : <>{window.rgIcon('search', 11)} 찾기</>}
                       </button>
                     )}
                   </div>
