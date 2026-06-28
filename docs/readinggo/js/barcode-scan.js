@@ -191,7 +191,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
 
   return (
     <div onClick={(e) => e.stopPropagation()}
-      style={{ position: 'fixed', inset: 0, background: '#0B0D10', zIndex: 10001, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
+      style={{ position: 'fixed', inset: 0, background: 'rgb(11, 13, 16)', zIndex: 10001, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
       {/* 헤더 — 닫기 */}
       <div style={{ width: '100%', maxWidth: 430, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', color: '#fff', zIndex: 2 }}>
         <button onClick={handleClose} aria-label="닫기" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 34, height: 34, borderRadius: 999, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 18)}</button>

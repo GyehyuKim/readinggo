@@ -54,7 +54,22 @@ FUNCTIONAL_ICON_EMOJI = {
     0x2B50,                  # ⭐ → ★/☆ 글리프
     0x1F517,                 # 🔗 link → share
     0x2764,                  # ❤️ heart (좋아요)
-    0x1F514,                 # 🔔 bell
+    # 🔔(0x1F514)은 의도적으로 제외: RG_ICONS 에 bell 대응이 없어 "통일"할 SVG 가 없다.
+    # 이 린트의 계약은 'RG_ICONS 대응이 존재하는' 기능 아이콘만 플래그한다(위 주석). bell 아이콘이
+    # icons.js 에 추가되면 그때 여기 0x1F514 를 되살린다. (#1062 후속, settings-modal 헤딩)
+}
+
+# 데이터/콘텐츠 문자열의 이모지 면제 — rgIcon(JSX)을 끼워넣을 수 없는 자리(주석 사유 필수).
+# 키 = 파일명, 값 = (codepoint, 사유) 집합. 시각 UI 버튼/헤딩 이모지는 절대 여기 넣지 않는다 —
+# 어디까지나 ①데이터 모델 필드 ②토스트/공유 등 '콘텐츠 텍스트'(JSX 불가) 만 면제한다.
+DATA_ICON_ALLOW = {
+    # ceremony.js 의 보상 카드는 parts[].ico 문자열(데이터)을 <span>{p.ico}</span> 로 렌더한다.
+    # 미션 아이콘 셋(📖 일일·🏰 완독·🔥 스트릭)은 데이터 모델 값이며 🏰🔥 는 이미 비-기능 이모지로
+    # 통과한다. 📖 만 기능셋에 걸리므로 데이터 일관성(같은 카드 한 줄)을 위해 면제. UI 헤딩 아님.
+    "data.js": {0x1F4D6},        # 📖 computeCheckinXp parts[].ico (미션 데이터 필드)
+    # share-card.js 는 본 작업 할당 파일이 아니다(수정 불가). 아래 3건은 모두 *콘텐츠 텍스트* —
+    # 네이티브 공유/클립보드로 나가는 문자열이라 SVG 아이콘(rgIcon=JSX)을 넣을 수 없다.
+    "share-card.js": {0x1F4D6, 0x1F4CB},  # 📖 공유 텍스트 머리말 · 📋 복사 완료 토스트 메시지
 }
 
 # 내부 관리 툴 — 제품 UI 아님(제품 DESIGN.md 적용 대상 아님). 이모지·hex 검사 제외.
@@ -190,13 +205,14 @@ def find_emoji(path: Path):
     hits = []
     if path.suffix != ".js" or path.name in INTERNAL_SKIP_FILES:
         return hits  # 이모지 규칙은 JS 한정(DESIGN '## UI 규칙') · 내부툴 제외
+    allow = DATA_ICON_ALLOW.get(path.name, set())  # 데이터/콘텐츠 문자열 면제(주석 사유)
     code = strip_comments(path.read_text(encoding="utf-8"))
     for ln, line in enumerate(code.split("\n"), 1):
         for ch in line:
             cp = ord(ch)
             if cp in (0xFE0F, 0x200D):      # variation selector / ZWJ 무시
                 continue
-            if cp in FUNCTIONAL_ICON_EMOJI:
+            if cp in FUNCTIONAL_ICON_EMOJI and cp not in allow:
                 hits.append((path.name, ln, ch))
     return hits
 

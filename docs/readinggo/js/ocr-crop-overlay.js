@@ -109,8 +109,8 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
         <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>한 구절만 감싸기 · 모서리 끌어 크기조절 · 안쪽 끌어 이동</div>
       </div>
       <div style={{ display: 'flex', gap: 8, padding: '0 16px 10px', flexShrink: 0 }}>
-        <button onClick={onCancel} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
-        <button onClick={() => doCrop(true)} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>전체</button>
+        <button onClick={onCancel} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.92)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
+        <button onClick={() => doCrop(true)} style={{ flex: '0 0 auto', padding: '12px 16px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.92)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>전체</button>
         <button onClick={() => doCrop(false)} disabled={!hasSel} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', background: hasSel ? 'var(--brand)' : 'rgba(255,255,255,0.15)', color: hasSel ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: 900, fontSize: 14, cursor: hasSel ? 'pointer' : 'default' }}>{hasSel ? '✨ 선택 영역 추출' : '영역을 드래그하세요'}</button>
       </div>
       <div ref={boxRef} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', touchAction: 'none', margin: '0 12px 12px' }}

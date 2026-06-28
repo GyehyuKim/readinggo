@@ -1044,7 +1044,7 @@ function RoomModal({ roomId, onClose }) {
 
         {settingsOpen && (
           <div className="rg-room-settings">
-            <button className="rg-room-set-item" onClick={() => copy(tokenUrl, '초대 링크')} disabled={!tokenUrl}>🔗 초대 링크 복사</button>
+            <button className="rg-room-set-item" onClick={() => copy(tokenUrl, '초대 링크')} disabled={!tokenUrl}>{window.rgIcon('share', 15)} 초대 링크 복사</button>
             <button className="rg-room-set-item" onClick={() => copy(room && room.invite_code, '초대 코드')} disabled={!(room && room.invite_code)}>🔢 초대 코드 복사{room && room.invite_code ? ` (${room.invite_code})` : ''}</button>
             <button className="rg-room-set-item rg-danger" onClick={doLeave}>🚪 나가기</button>
           </div>

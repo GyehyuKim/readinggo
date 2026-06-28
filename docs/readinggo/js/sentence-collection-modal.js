@@ -105,7 +105,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
     <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-label="내 한 문장 모아보기">
         <div className="sheet-grip" />
-        <button onClick={onClose} aria-label="닫기" style={{ position: 'absolute', top: 10, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, fontSize: 16, cursor: 'pointer', color: 'var(--ink-2)', lineHeight: 1, zIndex: 2 }}>✕</button>
+        <button onClick={onClose} aria-label="닫기" style={{ position: 'absolute', top: 10, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', color: 'var(--ink-2)', lineHeight: 1, zIndex: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 16)}</button>
         <div style={{ padding: '8px 20px 20px', maxHeight: '74vh', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--ink)' }}>내 한 문장</div>
@@ -119,11 +119,11 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
               문장이 있을 때만 '묻기' 노출(문장 0개면 묻기 비활성). 선택=브랜드 솔리드 / 비선택=라인(DESIGN.md 위계). */}
           {mine !== undefined && list.length > 0 && (
             <div role="group" aria-label="찾기·묻기 모드" style={{ display: 'flex', gap: 6, marginBottom: 12, justifyContent: 'center' }}>
-              {[['find', '🔍 찾기'], ['ask', '🤖 내 문장에게 묻기']].map(([id, label]) => {
+              {[['find', <>{window.rgIcon('search', 13)} 찾기</>], ['ask', '🤖 내 문장에게 묻기']].map(([id, label]) => {
                 const on = mode === id;
                 return (
                   <button key={id} onClick={() => setMode(id)} aria-pressed={on}
-                    style={{ padding: '6px 14px', borderRadius: 999, border: on ? 'none' : '1px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+                    style={{ padding: '6px 14px', borderRadius: 999, border: on ? 'none' : '1px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>{label}</button>
                 );
               })}
             </div>
@@ -156,7 +156,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
                   {EXAMPLE_QS.map((ex, i) => (
                     <button key={i} onClick={() => submitAsk(ex)}
-                      style={{ padding: '5px 11px', borderRadius: 16, border: '1px solid var(--line)', background: 'transparent', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{ex}</button>
+                      style={{ padding: '5px 11px', borderRadius: 16, border: 'none', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{ex}</button>
                   ))}
                 </div>
               )}
