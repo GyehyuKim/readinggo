@@ -464,6 +464,16 @@ function LibraryView({ state, onActivateUserBook }) {
           </button>
         </div>
 
+        {/* ⓑ #1060: '책 찾아 담기'를 '내 서재' 타이틀 바로 아래로(어느 탭이든 상시 노출). 구는 '읽고 싶은 책'
+            탭 하위에만 있어 위시 전용처럼 보였고, 눌러보기 전엔 다른 책장에도 담을 수 있는 걸 몰랐다. 검색 모달은
+            읽고 싶은 책·읽는 중·읽은 책 어디로든 담으므로(#409) 상시 노출 + 카피로 다중 책장을 드러낸다. */}
+        <button onClick={() => window.RG_openSearch && window.RG_openSearch()}
+          title="검색해서 읽고 싶은 책·읽는 중·읽은 책 어디로든 담기"
+          style={{width:'100%', margin:'0 0 16px', padding:'12px 14px', borderRadius:12, border:'1px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13.5, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, flexWrap:'wrap'}}>
+          <span style={{display:'inline-flex', alignItems:'center', gap:5}}>{window.rgIcon('search',15)} 책 찾아 담기</span>
+          <span style={{fontSize:11.5, fontWeight:700, color:'var(--ink-3)'}}>읽고 싶은 책·읽는 중·읽은 책</span>
+        </button>
+
         {/* 📦 검토함 (#1048) — 임포트가 책장 직행 대신 여기로 적재. 항목별 책장 토글 + [내 서재로][제외] + 일괄.
             로그인 전용(local/게스트는 stagedItems=[]로 미노출). 영속(import_staging) — 세션 넘어 유지. */}
         {stagedItems.length > 0 && (
@@ -548,13 +558,8 @@ function LibraryView({ state, onActivateUserBook }) {
           ))}
         </div>
 
-        {/* 찜하기 — 위시리스트 탭에서 검색 모달로 책 추가 (#403) */}
-        {activeSubtab === 'wishlist' && (
-          <button onClick={() => window.RG_openSearch && window.RG_openSearch()}
-            style={{ width:'100%', margin:'4px 0 12px', padding:'11px', borderRadius:12, border:'1px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13.5, cursor:'pointer' }}>
-            ＋ 읽고 싶은 책 찾아 담기
-          </button>
-        )}
+        {/* 찜하기 버튼(구 #403, 위시 탭 전용)은 '내 서재' 타이틀 아래 상시 '책 찾아 담기'로 승격·이전(#1060).
+            위시 전용 중복 버튼은 제거 — 같은 RG_openSearch 진입이고 이제 항상 보인다. */}
 
         {/* 읽은 책 탭 정렬/필터 컨트롤 (#513) — 성 컬렉션 선반 대체. 완독 책이 있을 때만 노출. */}
         {activeSubtab === 'completed' && completedBooks.length > 0 && (

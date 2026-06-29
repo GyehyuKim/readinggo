@@ -286,12 +286,10 @@ const RG_shelfImport = (function () {
 })();
 window.RG_shelfImport = RG_shelfImport;
 
-// 목적지(등록 status) 옵션 — 일괄 토글 1개로 충분(책별은 후속, #1038 결정).
-const SHELF_DESTS = [
-  { value: 'completed', label: '읽은 책', hint: '다 읽은 책으로 추가' },
-  { value: 'wish', label: '읽고싶어요', hint: '위시리스트로 추가' },
-  { value: 'reading', label: '읽는 중', hint: '읽는 중으로 추가' },
-];
+// 검토함 적재 시 제안 status(suggested_status). **책장 선택은 모달이 아니라 검토함에서 항목별로** 한다
+// (#1060: 모달↔검토함 '2번 검토' 중복 마찰 축소 — 모달은 "맞는 책인지 확인"만, 목적지·이동 결정은 검토함).
+// 스샷 복원은 대개 '읽은 책'이라 기본 제안만 completed 로 보내고, 유저는 검토함 토글로 책별로 바꾼다.
+const STAGE_SUGGESTED_STATUS = 'completed';
 
 // 보강(카탈로그/알라딘)으로 ISBN이 채워진 뒤, 행을 isbn13 으로 한 번 더 dedup — 제목 표기가
 // 달라도 같은 책(같은 ISBN)이면 한 권으로. ISBN 없는 행(미확인)은 보존(과병합 방지). 첫 등장 유지.
@@ -310,7 +308,6 @@ function _dedupRowsByIsbn(rows) {
 function ShelfImportModal({ onClose }) {
   const [phase, setPhase] = useState('upload');   // upload | loading | review
   const [rows, setRows] = useState([]);           // [{title, author, rating, book|null, checked, source}]
-  const [dest, setDest] = useState('completed');  // 목적지 토글(기본 '읽은 책')
   const [enriching, setEnriching] = useState(false); // 알라딘 보강 진행 표시
   const [progress, setProgress] = useState(null);  // 타일링 진행 {done,total} — 큰 이미지일 때만(#1045)
   const [err, setErr] = useState('');
@@ -384,25 +381,26 @@ function ShelfImportModal({ onClose }) {
   const edit = (i, k, v) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
 
   // 검수 "등록" → 책장 직행이 아니라 **검토함(import_staging)** 으로 적재(#1048). 사용자가 서재
-  // "📦 가져온 책 · 검토"에서 한 번 더 보고 [내 서재로 이동]/[제외]. 비전 오인식·UI 잡음이 실계정
-  // 책장에 바로 영속되지 않게 한다. dest(목적지 토글)는 suggested_status 로 보존(검토함서 항목별 변경 가능),
+  // "가져온 책 · 검토"에서 책장(읽고 싶은 책/읽는 중/읽은 책)을 고르고 [내 서재로 이동]/[제외].
+  // 비전 오인식·UI 잡음이 실계정 책장에 바로 영속되지 않게 한다. **목적지는 모달이 아니라 검토함에서**
+  // 항목별로 고른다(#1060 중복 마찰 축소) — 모달은 제안값(STAGE_SUGGESTED_STATUS)만 보낸다(검토함서 변경).
   // 별점(#1042)도 보존. 게스트는 RG_openShelfImport 게이트(app.js)로 차단돼 여기 도달하지 않음.
   const register = () => {
     const picked = rows.filter((r) => r.checked && (r.title || '').trim());
     if (!picked.length) { setErr('등록할 책을 한 권 이상 선택해요.'); return; }
     const DS = window.DataStore || {};
     if (!(DS.importStaging && DS.importStaging.add)) { setErr('검토함이 준비되지 않았어요.'); return; }
-    // 매칭/보강된 책은 어댑터 표면 메타(정규화 완료), 미확인은 제목·저자만. status=목적지 토글값.
+    // 매칭/보강된 책은 어댑터 표면 메타(정규화 완료), 미확인은 제목·저자만. status=제안값(검토함서 책별 변경).
     const items = picked.map((r) => ({
       book: r.book ? r.book : { title: r.title.trim(), author: (r.author || '').trim() },
-      status: dest,
+      status: STAGE_SUGGESTED_STATUS,
       rating: (typeof r.rating === 'number' && r.rating > 0) ? r.rating : null,
     }));
     Promise.resolve(DS.importStaging.add(items))
       .then((res) => {
         const n = Array.isArray(res) ? res.length : 0;
         if (!n) { setErr('검토함에 담지 못했어요 — 다시 시도해요.'); return; }   // 로컬 no-op/실패도 여기로
-        if (window.rgTrack) window.rgTrack('shelf_import_staged', { count: n, status: dest });
+        if (window.rgTrack) window.rgTrack('shelf_import_staged', { count: n, status: STAGE_SUGGESTED_STATUS });
         try { window.dispatchEvent(new CustomEvent('rg:import-staged')); } catch (e) {}
         if (window.showToast) window.showToast(`검토함에 ${n}권 담았어요 — 책장에서 검토하세요`);
         onClose();
@@ -412,7 +410,6 @@ function ShelfImportModal({ onClose }) {
 
   const checkedCount = rows.filter((r) => r.checked).length;
   const matchedCount = rows.filter((r) => r.book).length;
-  const destLabel = (SHELF_DESTS.find((d) => d.value === dest) || {}).label || '읽은 책';
   // 별점 표시 문자열(#1042) — ★ 정수 + 반점(½)은 ⯨ 대신 0.5 텍스트로 간결히. 0/없음이면 '' .
   const fmtStars = (n) => {
     const v = Number(n);
@@ -420,8 +417,9 @@ function ShelfImportModal({ onClose }) {
     const full = Math.floor(v);
     return '★'.repeat(full) + (v - full >= 0.5 ? '½' : '');
   };
-  // 별점은 '읽은 책'/'읽는 중' 맥락에서만 의미(위시는 아직 안 읽음) — wish 목적지면 표시 숨김.
-  const showRating = dest !== 'wish';
+  // 별점은 추출된 정보 표시(결정 아님) — 인식되면 항상 보여 "맞는 책인지" 확인을 돕는다.
+  // 목적지는 검토함에서 고르므로(#1060) 여기선 wish 분기 불필요.
+  const showRating = true;
 
   return (
     <div className="modal-backdrop show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -459,23 +457,12 @@ function ShelfImportModal({ onClose }) {
 
           {phase === 'review' && (
             <div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 8 }}>
-                {rows.length}권 찾았어요 (서가 매칭 {matchedCount}권){enriching ? ' · 표지 채우는 중…' : ''}. 등록할 책을 확인하세요.
-              </div>
-
-              {/* 목적지 토글 — 일괄 status 선택([P2-3]/#1038 결정) */}
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                {SHELF_DESTS.map((d) => (
-                  <button key={d.value} type="button" onClick={() => setDest(d.value)} title={d.hint}
-                    style={{
-                      flex: 1, padding: '7px 4px', borderRadius: 9, fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                      border: dest === d.value ? '1.5px solid var(--brand, #2a7)' : '1.5px solid var(--line)',
-                      background: dest === d.value ? 'var(--brand-tint, rgba(42,119,119,0.1))' : 'var(--card)',
-                      color: dest === d.value ? 'var(--brand, #2a7)' : 'var(--ink-2)',
-                    }}>
-                    {d.label}
-                  </button>
-                ))}
+              {/* #1060: 모달은 "맞는 책인지 확인"만(추출 검증). 목적지(책장) 토글은 제거 — 그 결정은
+                  검토함에서 항목별로 한다(모달↔검토함 '2번 검토' 중복 마찰 축소). 검토함이 다중 책장
+                  선택을 드러내도록 카피에 책장 종류를 미리 안내. */}
+              <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 12, lineHeight: 1.55 }}>
+                {rows.length}권 찾았어요 (서가 매칭 {matchedCount}권){enriching ? ' · 표지 채우는 중…' : ''}.<br />
+                <b>맞는 책인지 확인</b>하세요 — 아닌 책은 체크를 풀어요. 책장(읽고 싶은 책·읽는 중·읽은 책)은 다음 <b>검토함</b>에서 골라요.
               </div>
 
               {err && <div style={{ fontSize: 12.5, color: 'var(--danger, #d23)', marginBottom: 10 }}>{err}</div>}
@@ -509,7 +496,7 @@ function ShelfImportModal({ onClose }) {
                 {enriching ? '책 정보 찾는 중… 잠시만요' : `${checkedCount}권 검토함에 담기`}
               </button>
               <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, textAlign: 'center', lineHeight: 1.5 }}>
-                바로 책장에 넣지 않고 <b>검토함</b>에 담아요 · 책장(서재)에서 확인하고 옮기세요 ({destLabel} 기본)
+                바로 책장에 넣지 않고 <b>검토함</b>에 담아요 · 책장(읽고 싶은 책·읽는 중·읽은 책)은 <b>검토함</b>에서 골라요
               </p>
             </div>
           )}
