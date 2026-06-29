@@ -113,6 +113,21 @@ Key routing rules:
 - Code quality dashboard → invoke /health
 - Mine session patterns to update CLAUDE.md → invoke /insights (마일스톤마다, 최소 월 1회. 근거: [LF: /insights](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week6-insights))
 
+## 서브에이전트 운용 (Agent · Workflow)
+
+서브에이전트를 띄울 때 두 가지를 반드시 지킨다 (근거: 2026-06-29 계휴 피드백).
+
+**1. 맥락을 최대한 자세히 — 재발견하게 두지 말 것.** 에이전트 프롬프트에 미리 박는다:
+
+- 정확한 **파일·라인**, 참고할 **기존 예시·패턴**(아이콘셋·컴포넌트 등)
+- 관련 **결정·이력**(이전 PR/이슈 번호 + *왜*)과 convert/keep 같은 **판단 기준**("애매하면 KEEP")
+- **worktree 격리 동작**: "너는 격리된 worktree에서 작업·커밋한다 — 공유 체크아웃(repo 루트)을 main에서 벗어나게 하지 말 것"
+- 거버넌스(브랜치 네이밍·이슈 링크·spec-coverage·design_lint·markdownlint·빌드·Conventional Commits·머지 금지)
+
+**2. 결과를 비판적으로 평가 — green = 끝이 아니다.** CI green은 최소 통과선일 뿐. `gh pr diff`로 ① 의미 정확성(아이콘↔라벨·네이밍·일관성) ② 과/미변환 ③ 엣지케이스 ④ 시각 품질을 실측한다. 문제가 보이면 SendMessage로 에이전트에 **개선시키거나** 직접 고친다. 수용할 땐 **무엇을 봤고 왜 괜찮은지** 근거를 댄다(빈 "OK" 금지).
+
+끝나면 agent worktree 잔재(`.claude/worktrees/agent-*`)를 정리한다.
+
 ## Health Stack
 
 `/health` 가 측정하는 도구 등록. 자동 감지 우회 — 이 섹션이 source of truth.
