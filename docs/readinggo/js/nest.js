@@ -757,6 +757,11 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
           // 재키 대화 턴 수 (#654) — my_note의 Q. 블록 수. 축적 신호(분수 표기 안 함), 0이면 숨김.
           const turns = q.note ? q.note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
+          // 내 감상(자유 메모) — my_note 의 비-Q/A 블록 (#1070). 카드에 미리보기 + '감상 수정' 진입.
+          const noteFree = window.rgSplitNote ? window.rgSplitNote(q.note).free : '';
+          // 문장별 성찰 진입 (#1070) — 모드를 명시해 연다: 'note'(내 감상만) / 'jacky'(재키와 대화).
+          const openReflect = (m) => window.RG_openCompanion && window.RG_openCompanion(
+            { id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind }, { mode: m });
           return (
             <window.QuoteCard key={q.id || i} q={q} variant="home">
               {/* 한 문장 액션 계약 (#610) — 공용 SentenceActions(공개범위+좋아요+수정+삭제). 삭제는 rg:sentence-removed 이벤트로 자동 갱신. */}
@@ -764,17 +769,33 @@ function NestView({ state, onCheckin, onOpenSearch }) {
                 <SentenceActions sentence={{ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }} mine fav={favIds.has(q.id)} />
               )}
               {q.id && (
-                <button className="q-ai" onClick={() => window.RG_openCompanion && window.RG_openCompanion({ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind })}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
-                    <ellipse cx="7" cy="9" rx="5" ry="4" fill="currentColor" opacity="0.55"/>
-                    <circle cx="9.5" cy="5" r="3" fill="currentColor" opacity="0.75"/>
-                    <circle cx="11" cy="4" r="1" fill="currentColor"/>
-                    <path d="M12.5 5.5l2 .4-1.5 1.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M4.5 11.5l-2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
-                    <path d="M7 12.5l-1 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
-                  </svg>
-                  {turns ? `재키와 대화 (${turns})` : '재키와 대화하기'}
-                </button>
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {/* 내 감상 미리보기 — 적어둔 감상을 카드에서 바로 본다(탭하면 수정). */}
+                  {noteFree ? (
+                    <div onClick={() => openReflect('note')}
+                      style={{ background: 'var(--paper-2)', borderRadius: 12, padding: '8px 11px', fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5, cursor: 'pointer', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{noteFree}</div>
+                  ) : null}
+                  {/* 문장별 선택 (#1070): 내 감상(재키 없이) · 재키와 대화 — 한 탭으로 분명히. */}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* 내 감상 = 2차 tonal(brand-soft 채움, ghost 아님 — DESIGN.md 위계) */}
+                    <button onClick={() => openReflect('note')}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--brand-soft)', border: '1px solid var(--brand-soft)', color: 'var(--brand-3)', borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                      {window.rgIcon('pen', 13)}{noteFree ? '감상 수정' : '내 감상'}
+                    </button>
+                    {/* 재키와 대화 = 기존 q-ai(현행 유지) — 명시적으로 jacky 모드로 진입. */}
+                    <button className="q-ai" style={{ marginTop: 0 }} onClick={() => openReflect('jacky')}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+                        <ellipse cx="7" cy="9" rx="5" ry="4" fill="currentColor" opacity="0.55"/>
+                        <circle cx="9.5" cy="5" r="3" fill="currentColor" opacity="0.75"/>
+                        <circle cx="11" cy="4" r="1" fill="currentColor"/>
+                        <path d="M12.5 5.5l2 .4-1.5 1.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M4.5 11.5l-2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
+                        <path d="M7 12.5l-1 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
+                      </svg>
+                      {turns ? `재키와 대화 (${turns})` : '재키와 대화'}
+                    </button>
+                  </div>
+                </div>
               )}
             </window.QuoteCard>
           );

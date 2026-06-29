@@ -674,32 +674,35 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                             "{q.text}"
                           </div>
                         )}
-                        {/* 참새 대화로 통일 (#404) — 둥지와 동일 진입(CompanionModal). 자유 감상 편집은
-                            폐지: 참새 Q/A 와 같은 my_note 칸을 공유해 서로 덮어쓰던 충돌 제거. */}
+                        {/* 문장별 "내 감상만" vs "재키와 대화" (#1070) — 둥지와 동일 진입(CompanionModal, 모드 명시).
+                            과거(#404) 자유 감상 편집 폐지는 my_note 덮어쓰기 충돌 탓이었고, 이제 감상/Q/A 를
+                            블록 분리(rgSplitNote/rgJoinNote)해 서로 보존하므로 자유 감상을 다시 둔다. */}
                         {q.id && (() => {
-                          const note = q.note || '';
-                          const turns = note ? note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
-                          const openChat = () => window.RG_openCompanion && window.RG_openCompanion({
+                          const parts = window.rgSplitNote ? window.rgSplitNote(q.note) : { free: (q.note || ''), qa: '' };
+                          const turns = parts.qa ? parts.qa.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
+                          const open = (m) => window.RG_openCompanion && window.RG_openCompanion({
                             id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author,
                             page: q.page, note: q.note, kind: q.kind,
-                          });
-                          return note ? (
-                            <div style={{marginTop:8}}>
-                              <div onClick={openChat}
-                                style={{padding:'8px 10px', background:'var(--paper-2)', borderRadius:8, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer', whiteSpace:'pre-wrap', maxHeight:96, overflow:'hidden'}}>
-                                💬 {note}
+                          }, { mode: m });
+                          const tonal = { display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:999, border:'1px solid var(--brand-soft)', background:'var(--brand-soft)', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer' };
+                          return (
+                            <div style={{marginTop:8, display:'flex', flexDirection:'column', gap:6}}>
+                              {/* 내 감상 미리보기 — 자유 감상 블록만(재키 Q/A 제외). 탭하면 감상 수정. */}
+                              {parts.free ? (
+                                <div onClick={() => open('note')}
+                                  style={{padding:'8px 10px', background:'var(--paper-2)', borderRadius:12, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer', whiteSpace:'pre-wrap', maxHeight:96, overflow:'hidden'}}>
+                                  {parts.free}
+                                </div>
+                              ) : null}
+                              <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+                                <button onClick={() => open('note')} style={tonal}>
+                                  {window.rgIcon('pen', 12)}{parts.free ? '감상 수정' : '내 감상'}
+                                </button>
+                                <button onClick={() => open('jacky')} style={tonal}>
+                                  <window.SparrowInline size={13} /> {turns ? `재키와 대화 (${turns})` : '재키와 대화'}
+                                </button>
                               </div>
-                              <button onClick={openChat}
-                                style={{marginTop:4, background:'none', border:'none', color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:'pointer', padding:'2px 0'}}>
-                                <window.SparrowInline size={13} /> 재키와 대화 이어가기{turns ? ' (' + turns + ')' : ''}
-                              </button>
                             </div>
-                          ) : (
-                            // 재키와 대화하기 = 2차 tonal(DESIGN.md #1032: ghost 점선 투명 금지 → brand-soft 채움)
-                            <button onClick={openChat}
-                              style={{marginTop:6, padding:'5px 12px', borderRadius:8, border:'1px solid var(--brand-soft)', background:'var(--brand-soft)', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer'}}>
-                              <window.SparrowInline size={13} /> 재키와 대화하기
-                            </button>
                           );
                         })()}
                       </>

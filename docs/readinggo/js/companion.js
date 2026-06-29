@@ -62,10 +62,53 @@ function parseNoteToExchanges(note) {
   });
   return out;
 }
+
+/* ── 문장별 "내 감상만" vs "재키와 대화" (#1070) ───────────────────────────────
+   하나의 my_note 칸을 두 성찰이 블록으로 나눠 쓴다 — 자유 감상 블록(Q. 로 시작하지 않음)과
+   재키 Q/A 블록(`Q. …\nA. …`). 과거(#404)에 자유 감상 편집을 폐지했던 이유가 "둘이 같은
+   my_note 를 서로 덮어쓰던 충돌"이었으므로, 저장 시 **상대 영역을 항상 보존**한다:
+   재키 턴 저장이 감상을 지우지 않고, 감상 저장이 대화를 지우지 않는다. parseNoteToExchanges 는
+   이미 Q/A 블록만 뽑으므로(감상 블록 무시) 재키 화면은 영향 없음. */
+function rgSplitNote(note) {
+  const free = [], qa = [];
+  String(note || '').split(/\n\n+/).forEach((b) => {
+    const t = b.trim();
+    if (!t) return;
+    (/^Q\.\s/.test(t) ? qa : free).push(t);
+  });
+  return { free: free.join('\n\n'), qa: qa.join('\n\n') };
+}
+function rgJoinNote(free, qa) {
+  return [String(free || '').trim(), String(qa || '').trim()].filter(Boolean).join('\n\n');
+}
+// 문장이 이미 가진 성찰 종류 — 'jacky'(재키 대화 있음) > 'note'(감상만) > ''(없음). 진입 기본 모드 추정용.
+function rgNoteKind(note) {
+  const { free, qa } = rgSplitNote(note);
+  if (qa) return 'jacky';
+  if (free) return 'note';
+  return '';
+}
+// 문장별 성찰 기본 모드 (#1070) — ⚠️ 계휴 확정 필요(companion.md §4.6). 카드 버튼은 모드를 명시해
+// 열기 때문에, 이 기본값은 '모드 미지정 + 빈 문장' 진입(되감기·모아보기 등)에만 적용된다.
+//   'jacky' = 현행 유지(재키를 먼저 노출하되 '내 감상' 토글이 한 탭) · 'note' = 감상 우선.
+const RG_REFLECT_DEFAULT = 'jacky';
+window.rgSplitNote = rgSplitNote;
+window.rgJoinNote = rgJoinNote;
+window.rgNoteKind = rgNoteKind;
+
 function CompanionModal({ sentence, onClose }) {
+  // 성찰 모드 (#1070): 'note'(내 감상만) | 'jacky'(재키와 대화). 카드가 _openMode 로 명시,
+  // 미지정이면 그 문장이 이미 가진 성찰(rgNoteKind) → 없으면 기본값(RG_REFLECT_DEFAULT).
+  const _startMode = (sentence._openMode === 'note' || sentence._openMode === 'jacky')
+    ? sentence._openMode
+    : (rgNoteKind(sentence.note) || RG_REFLECT_DEFAULT);
+  const [mode, setMode] = _useState(_startMode === 'note' ? 'note' : 'jacky');
+  // 내 감상(자유 메모) 초안 — my_note 의 비-Q/A 블록(rgSplitNote.free). 저장 시 재키 Q/A 보존.
+  const [noteDraft, setNoteDraft] = _useState(() => rgSplitNote(sentence.note).free);
+  const [noteSaving, setNoteSaving] = _useState(false);
   const [exchanges, setExchanges] = _useState(() => parseNoteToExchanges(sentence.note));
   const [question, setQuestion] = _useState(null);
-  const [loading, setLoading] = _useState(true);
+  const [loading, setLoading] = _useState(_startMode !== 'note');   // 감상 모드 진입 시 재키 로딩 스피너 숨김
   const [answer, setAnswer] = _useState('');
   const [done, setDone] = _useState(false);
   const [rated, setRated] = _useState(null);               // 질문 평가 👍/👎 (#371)
@@ -87,13 +130,19 @@ function CompanionModal({ sentence, onClose }) {
     // 종류 변경(#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 수정.
     sentence.text = v; setEditing(false); showToast('문장 수정됨');
   };
+  // 재키 질문 생성 — 재키 모드에서만(감상 모드는 LLM 호출 안 함, #1070). 감상→재키 전환으로
+  // 처음 재키에 들어올 때 1회 생성. 이미 질문이 있거나 종료(done)면 재생성하지 않는다.
   _useEffect(() => {
+    if (mode !== 'jacky' || question || done) return;
+    let alive = true;
+    setLoading(true);
     const past = parseNoteToExchanges(sentence.note);
     const gen = (consent !== 'yes')
       ? Promise.resolve(pickCompanionQ(sentence.text))
       : (past.length ? genCompanionFollowup(sentence.text, past, bt, au, sentence.kind) : genCompanionQuestion(sentence.text, bt, au, sentence.kind));
-    gen.then((q) => { setQuestion(q); setLoading(false); });
-  }, []);
+    gen.then((q) => { if (alive) { setQuestion(q); setLoading(false); } });
+    return () => { alive = false; };
+  }, [mode]);
   // 새 질문·답변·로딩 변화 시 대화 말단을 view로 — 답변 생성에 의한 화면 점프·오탭 방지 (#407)
   _useEffect(() => {
     try { _compTailRef.current && _compTailRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch (e) {}
@@ -101,10 +150,26 @@ function CompanionModal({ sentence, onClose }) {
   const persist = (ex) => {
     if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return;
     if (!ex || !ex.length) return;   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
-    const note = ex.map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
+    const qa = ex.map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
+    const note = rgJoinNote(rgSplitNote(sentence.note).free, qa);   // 내 감상 블록 보존 (#1070)
     Promise.resolve(DataStore.sentences.setNote(sentence.id, note)).catch(() => {});
     sentence.note = note; // 모달 내 즉시 정합
     window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+  };
+  // 내 감상만 저장 (#1070) — 재키 Q/A 는 보존하고 자유 감상 블록만 교체. 빈 감상 저장 = 감상 블록 제거.
+  // 재키를 강제하지 않고 이 한 번으로 성찰이 완결된다(데이터=my_note, 양 어댑터 setNote 표면 일치).
+  const saveFreeNote = () => {
+    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) { onClose(); return; }
+    const free = noteDraft.trim();
+    const note = rgJoinNote(free, rgSplitNote(sentence.note).qa);   // 재키 대화 보존
+    setNoteSaving(true);
+    Promise.resolve(DataStore.sentences.setNote(sentence.id, note || null)).then(() => {
+      sentence.note = note;
+      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+      if (window.rgTrack) window.rgTrack('reflection_note_saved', { book_id: sentence.bookId || '', chars: free.length });
+      showToast(free ? '내 감상을 저장했어요' : '감상을 비웠어요');
+      setNoteSaving(false);
+    }).catch(() => { setNoteSaving(false); showToast('저장 실패 — 잠시 후 다시'); });
   };
   // 한 문장 삭제 (#1) — 둥지 한 문장 상세에도 삭제. 이벤트로 둥지·서재 목록 즉시 반영.
   const delQuote = () => {
@@ -154,21 +219,49 @@ function CompanionModal({ sentence, onClose }) {
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ background: 'var(--card)', width: '100%', maxWidth: 430, height: '90vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* ── 헤더 ── */}
+        {/* ── 헤더 (모드별, #1070) — 감상 모드면 재키 브랜딩 대신 '내 감상'(재키 없이). ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px 12px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-          <_JackAvatar size={38} />
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>재키</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, marginTop: 2 }}>독서 동반자</div>
-          </div>
+          {mode === 'note' ? (
+            <>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--brand-tint)', color: 'var(--brand-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{rgIcon('pen', 19)}</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>내 감상</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, marginTop: 2 }}>재키 없이 내 생각만</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <_JackAvatar size={38} />
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', lineHeight: 1 }}>재키</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, marginTop: 2 }}>독서 동반자</div>
+              </div>
+            </>
+          )}
           <button onClick={onClose} aria-label="닫기" style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.06)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-2)' }}>
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
           </button>
         </div>
 
+        {/* ── 성찰 모드 토글 (#1070) — 문장별로 '내 감상' ↔ '재키와 대화'. 한 탭으로 전환.
+             선택=브랜드 솔리드 / 비선택=라인(프리셋 칩과 동일 패턴, DESIGN.md 위계 일관). ── */}
+        <div role="group" aria-label="성찰 방식" style={{ display: 'flex', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+          {[['note', '내 감상', 'pen'], ['jacky', '재키와 대화', 'chat']].map(([id, label, ico]) => {
+            const on = mode === id;
+            return (
+              <button key={id} onClick={() => setMode(id)} aria-pressed={on}
+                style={{ flex: 1, padding: '7px 12px', borderRadius: 999, border: on ? 'none' : '1px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--ink-2)', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                {rgIcon(ico, 14)} {label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* ── 질문 결 프리셋 전환 (#935, #922 후속) — 설정에만 있던 결 선택을 대화 화면에도.
              대화 맥락에서 '작가의 시선' 등으로 즉시 전환 → 다음 질문부터 반영(RG_companionPreset 공유).
-             칩: 선택=브랜드 솔리드 / 비선택=라인(설정 SettingsModal 칩과 동일 패턴 — DESIGN.md 위계 일관). 가로 스크롤. ── */}
+             칩: 선택=브랜드 솔리드 / 비선택=라인(설정 SettingsModal 칩과 동일 패턴 — DESIGN.md 위계 일관). 가로 스크롤.
+             #1070: 재키 모드에서만 노출(감상 모드엔 질문 결이 무의미). ── */}
+        {mode === 'jacky' && (
         <div role="group" aria-label="재키 질문 결 선택" style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {(window.RG_COMPANION_PRESETS || []).map((p) => {
             const on = qPreset === p.key;
@@ -180,6 +273,7 @@ function CompanionModal({ sentence, onClose }) {
             );
           })}
         </div>
+        )}
 
         {/* ── 스크롤 영역 ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px 8px' }}>
@@ -218,6 +312,23 @@ function CompanionModal({ sentence, onClose }) {
             </div>
           )}
 
+          {mode === 'note' ? (
+            /* ── 내 감상 모드 (#1070) — 재키 질문 없이 자유롭게 내 생각만. 저장은 하단 '내 감상 저장'. ── */
+            <div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)', fontWeight: 600, lineHeight: 1.6, marginBottom: 8 }}>
+                재키 없이, 이 문장에 대한 내 감상만 남겨요.
+              </div>
+              <textarea value={noteDraft} onChange={(e) => { if (e.target.value.length <= 2000) setNoteDraft(e.target.value); }}
+                placeholder="이 문장에서 떠오른 생각·감정을 자유롭게 적어요…" rows={7} aria-label="내 감상"
+                style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 14, padding: '11px 13px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', background: 'var(--paper-2)', color: 'var(--ink)', outline: 'none' }} />
+              {rgSplitNote(sentence.note).qa ? (
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.5 }}>
+                  재키와 나눈 대화는 그대로 보관돼요 — '재키와 대화'에서 볼 수 있어요.
+                </div>
+              ) : null}
+            </div>
+          ) : (
+          <>
           {/* 말풍선 채팅 UI (#435) — 좌=재키 질문(아바타), 우=내 답 */}
           {exchanges.map((e, ei) => (
             <div key={ei}>
@@ -269,14 +380,25 @@ function CompanionModal({ sentence, onClose }) {
               </div>
             </div>
           ) : null}
+          </>
+          )}
 
           {/* 말단 anchor (#407) */}
           <div ref={_compTailRef} />
         </div>
 
-        {/* ── 입력바 (고정) ── */}
-        {/* '마치기' 버튼 제거(#655) — 종료는 모달 이탈(✕/바깥)로만. */}
-        {!done && !loading && question && (
+        {/* ── 하단 바 (고정, 모드별 #1070) ── */}
+        {mode === 'note' ? (
+          /* 내 감상 저장 — 이 화면의 단일 1차 액션(솔리드). 재키를 강제하지 않고 한 번에 성찰 완결. */
+          <div style={{ padding: '10px 16px 20px', borderTop: '1px solid var(--line)', flexShrink: 0, background: 'var(--card)' }}>
+            <button onClick={saveFreeNote} disabled={noteSaving}
+              style={{ width: '100%', padding: '12px', borderRadius: 14, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: noteSaving ? 'default' : 'pointer', opacity: noteSaving ? 0.6 : 1 }}>
+              {noteSaving ? '저장 중…' : '내 감상 저장'}
+            </button>
+          </div>
+        ) : (
+          /* ── 재키 입력바 ── '마치기' 버튼 제거(#655) — 종료는 모달 이탈(✕/바깥)로만. */
+          !done && !loading && question && (
           <div style={{ padding: '10px 16px 20px', borderTop: '1px solid var(--line)', flexShrink: 0, background: 'var(--card)' }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
@@ -289,6 +411,7 @@ function CompanionModal({ sentence, onClose }) {
               </button>
             </div>
           </div>
+          )
         )}
       </div>
     </div>, document.body);
