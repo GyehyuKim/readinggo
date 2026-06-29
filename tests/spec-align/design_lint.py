@@ -54,6 +54,16 @@ FUNCTIONAL_ICON_EMOJI = {
     0x2B50,                  # ⭐ → ★/☆ 글리프
     0x1F517,                 # 🔗 link → share
     0x2764,                  # ❤️ heart (좋아요)
+    # 같이읽기(숲) 방 UI 기능 이모지 → RG_ICONS (#1062 잔여 청소). 모두 RG_ICONS 대응 존재.
+    0x1F522,                 # 🔢 → hash (초대 코드 복사)
+    0x1F6AA,                 # 🚪 → logout (나가기)
+    0x1F465,                 # 👥 → users (멤버 진척 탭)
+    0x1F5D3,                 # 🗓️ → calendar (일정 탭·빈 상태)
+    0x1F310,                 # 🌐 → globe (공개·책으로 검색 탭)
+    0x1F510,                 # 🔐 → lock (코드·링크 탭)
+    # 🔒(0x1F512)는 의도적으로 제외: RoomPreviewSheet 비밀번호 input 의 placeholder 텍스트 장식이라
+    # rgIcon(JSX SVG)을 placeholder 속성(문자열)에 끼울 수 없다 — §5.2 텍스트 장식은 KEEP(#1062).
+    # 공개/비공개 버튼의 🔒 는 lock 아이콘으로 변환됨(placeholder 한 곳만 이모지 유지).
     # 🔔(0x1F514)은 의도적으로 제외: RG_ICONS 에 bell 대응이 없어 "통일"할 SVG 가 없다.
     # 이 린트의 계약은 'RG_ICONS 대응이 존재하는' 기능 아이콘만 플래그한다(위 주석). bell 아이콘이
     # icons.js 에 추가되면 그때 여기 0x1F514 를 되살린다. (#1062 후속, settings-modal 헤딩)
