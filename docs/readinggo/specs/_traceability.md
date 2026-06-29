@@ -80,9 +80,10 @@
 |---|---|---|
 | §7.2 DataStore 계약 전반 | ✅ | datastore-supabase.js 메서드 표면 일치 |
 | RLS 17테이블·SECURITY DEFINER(search_path+is_admin) | ✅ | /cso 검증 |
-| §7 알라딘(검색≠쪽수, ISBN 보강) | ✅ | aladin.js·worker (#233) |
+| §7 알라딘(검색≠쪽수, ISBN 보강) | ✅현행 | aladin.js·worker (#233). **#1044 로 소스 이전 예정**(§7.2.1) — 알라딘 OpenAPI ToS(영리·캐싱 금지) 회피 |
 | ai.recommendBooks·extractBook (다음책 추천/추출) | ✅ | Phase 0 하드코딩 시뮬(#946) — data.js `recommendNextBooks`/`extractBookSummary`(L482-555) + 양 어댑터 위임 + book-detail-modal.js L139-149 UI 연결. 실 Gemini는 Phase 1+(§7.9). 구 "⏳ stub"는 #946 머지로 해소 |
 | inquiries 자동 응답(LLM) | ⏳보류 | parking-lot §3(#208) — 컬럼만. 코어 아님, 재개조건 미충족 |
+| §7.2.1 책 데이터 소스 이전(알라딘 ToS 회피, #1044) | ⏳스펙선행/코드후속 | 방향 확정(국중도 ISBN 서지=쪽수·표지 + 카카오 책검색=검색·표지, 외서 Google 실시간만). worker 재배선(`aladinProxy`·`normalize`·`imgProxy`·`googleBooksSearch` upsert·`archive` 인기시드)·출시 전 실계정 ToS 확인 게이트 4건은 §7.2.1. 코드는 후속 PR(#1044) |
 
 ## design.md — owner 승원
 | 디자인 토큰·컴포넌트 | ⏳ 미심층 | owner 승원 — 토큰(index.html `:root`) vs design.md 대조는 승원이 |
