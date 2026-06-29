@@ -810,13 +810,21 @@ function App() {
               <span>Reading<span className="go">Go</span></span>
             </div>
             <div className="topbar-stats">
-              {/* 상단바 XP 수치 표시 (#493) — Lv 왼쪽에 현재 보유 XP. appState.xp 라 변경 시 즉시 반영. */}
-              <span className="stat xp" title="현재 XP (systems.md §6.3)">
-                <span>XP {(appState.xp || 0).toLocaleString()}</span>
+              {/* #1086 v10: XP·Lv 숫자 폐지 → 진행은 둥지·성·스트릭으로 일원화(systems.md §6.3 v10). XP는 둥지를 키우는 내부 연료(숫자 비노출). */}
+              <span className="stat nest" title={`둥지 — ${window.getNestStageByXp(appState.xp).name}`}>
+                <span className="ico">{window.nestArt(window.getNestStageByXp(appState.xp).lv, 20)}</span>
               </span>
-              <span className="stat lv" title="레벨 (systems.md §6.3)">
-                <span>Lv.{calcLevel(appState.xp)}</span>
-              </span>
+              {window.nestCastleCount(appState.xp) > 0 && (
+                <span className="stat castle" title="성 — 1,600 XP 주기 완료 수">
+                  <span className="ico">{window.nestArt(5, 16)}</span>
+                  <span>{window.nestCastleCount(appState.xp)}</span>
+                </span>
+              )}
+              {(appState.streak || 0) > 0 && (
+                <span className="stat fire" title="연속 — 스트릭">
+                  <span>🔥 {appState.streak}</span>
+                </span>
+              )}
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               {/* #790: 돋보기 아이콘만으론 '책 추가' 동선 발견성이 낮음 → '도서 찾기' 라벨 + 틴트 배경칩으로 강조. */}
               <button
