@@ -108,6 +108,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const [quickOcrFile, setQuickOcrFile] = _useState(null);
   const _quickOcrInputRef = _useRef(null);
   const _quickAlbumInputRef = _useRef(null);  // #792 앨범(갤러리) 불러오기 — capture 없는 input
+  const _quickSentRef = _useRef(null);        // #1068 빈 상태 CTA → 한 문장 입력창 포커스 타깃
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
   const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
@@ -468,6 +469,13 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       const rank = (q) => (q.when === '방금' ? 'ZZZZ-99' : String(q.createdAt || q.when || ''));
       return rank(b).localeCompare(rank(a));  // 동일 페이지는 최신순
     });
+  // #1068 빈 상태(이 책 0문장) CTA — 위 '한 문장' 입력창으로 스크롤 + 포커스해 '짹'(문장 남기기) 진입을 단순화.
+  const focusSentenceInput = () => {
+    const el = _quickSentRef.current;
+    if (!el) return;
+    try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { el.scrollIntoView(); }
+    setTimeout(() => { try { el.focus(); } catch (e) { /* 포커스 실패 무해 */ } }, 320);
+  };
   // 좋아요(❤️ = claps) 상태 — claps.list 로 favIds 로드 (#499→#641: 자기 문장 좋아요=저장 단일화)
   const [favIds, setFavIds] = _useState(() => new Set());
   _useEffect(() => {
@@ -652,7 +660,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       <div style={{ marginTop: 8, background: 'var(--card)', border: '1.5px solid var(--brand-soft)', borderRadius: 'var(--r-md)', padding: '14px 14px 12px', position: 'relative', transition: 'opacity 0.2s, transform 0.3s', opacity: sentFlip ? 0 : 1, transform: sentFlip ? 'translateY(-10px) scale(0.97)' : 'none' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)', marginBottom: 10 }}>마음에 남은 문장이 있나요?</div>
         {/* OCR(사진 입력)은 하단 툴바의 카메라 아이콘 버튼으로 이동 — '···' 메뉴 제거(2026 UI). */}
-        <textarea value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); }}
+        <textarea ref={_quickSentRef} value={quickText} onChange={(e) => { if (e.target.value.length > 1000) return; setQuickText(e.target.value); }}
           placeholder="오늘 읽은 문장을 남겨요…" rows={4}
           style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', resize: 'none', padding: 0, fontFamily: 'inherit' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
@@ -727,27 +735,21 @@ function NestView({ state, onCheckin, onOpenSearch }) {
 
       {/* 이 책, 한 문장 (#499) — 현재 책 전체 기간 최신순 + 날짜·좋아요·삭제. */}
       <div className="section-head">
-        <h3>내가 남긴 흔적 <span className="my-q-count">{bookQuotes.length}</span></h3>
-        {nestState.myQuotes.length > 0 && (
+        {/* #1068: 0문장이면 카운트('0')·'전체 문장 보기'(빈 동선)를 숨겨 헤더를 비우고, 아래 빈 상태가 유도를 전담한다 */}
+        <h3>내가 남긴 흔적 {bookQuotes.length > 0 && <span className="my-q-count">{bookQuotes.length}</span>}</h3>
+        {bookQuotes.length > 0 && (
           <button className="more" onClick={() => window.RG_openCollection && window.RG_openCollection()}>
             전체 문장 보기 →
           </button>
         )}
       </div>
       {bookQuotes.length === 0 ? (
+        // #1068: 임시 참새 SVG → 브랜드 마크(SparrowMark) + 유도 카피 + '한 문장 남기기' CTA(위 입력창 포커스).
         <div className="my-q-empty">
-          <span className="ico">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <ellipse cx="16" cy="20" rx="9" ry="7" fill="var(--brand-soft)"/>
-              <circle cx="21" cy="11" r="5.5" fill="var(--brand-soft)"/>
-              <circle cx="23" cy="9.5" r="1.4" fill="var(--ink-2)"/>
-              <path d="M25.5 12l3 .8-2.5 1.8" stroke="var(--ink-2)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M10 22l-3 2.5" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M14 25l-1.5 3" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </span>
-          이 책에서 만난 한 줄을 짹 해보세요.<br />
-          남긴 문장이 여기 쌓여요.
+          <span className="ico" aria-hidden="true"><window.SparrowMark size={36} /></span>
+          <div className="my-q-empty-lead">이 책에서 만난 한 줄을 짹 해보세요.</div>
+          <div className="my-q-empty-sub">남긴 문장이 여기 쌓여요.</div>
+          <button type="button" className="my-q-empty-cta" onClick={focusSentenceInput}>한 문장 남기기</button>
         </div>
       ) : (
         bookQuotes.slice(0, 10).map((q, i) => {

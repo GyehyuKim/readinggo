@@ -755,7 +755,22 @@ input,textarea{font-family:inherit;}
   font-size: 13px; color: var(--ink-2); font-weight: 700;
   margin-bottom: 10px;
 }
-.my-q-empty .ico{ font-size: 24px; display:block; margin-bottom: 6px; }
+.my-q-empty .ico{ display:flex; justify-content:center; margin-bottom: 10px; }
+/* #1068 빈 상태: 유도 카피(lead/sub) + tonal CTA(2차 버튼 위계 — DESIGN.md). ghost 금지 → brand-soft 배경 채움 */
+.my-q-empty-lead{ font-size: 13.5px; font-weight: 800; color: var(--ink); line-height: 1.5; }
+.my-q-empty-sub{ font-size: 12.5px; font-weight: 700; color: var(--ink-3); margin-top: 2px; }
+.my-q-empty-cta{
+  margin-top: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--brand-soft); color: var(--brand-3);
+  border: 1px solid var(--brand-soft); border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13px; font-weight: 800; letter-spacing: -0.2px;
+  font-family: inherit; cursor: pointer;
+  transition: filter .15s ease, transform .1s ease;
+}
+.my-q-empty-cta:hover{ filter: brightness(0.97); }
+.my-q-empty-cta:active{ transform: translateY(1px); }
 
 .book-jump{
   flex:none;
