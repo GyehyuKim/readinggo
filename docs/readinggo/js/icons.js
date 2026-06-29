@@ -34,6 +34,14 @@ const RG_ICONS = {
   box: <g stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 11V5a1 1 0 0 0-.5-.87l-4.5-2.6a1 1 0 0 0-1 0L3 4.13A1 1 0 0 0 2.5 5v6a1 1 0 0 0 .5.87l4.5 2.6a1 1 0 0 0 1 0l4.5-2.6A1 1 0 0 0 13.5 11z"/><path d="M2.7 4.9L8 7.9l5.3-3"/><path d="M8 14V7.9"/></g>,
   // 붙여넣기/파일 가져오기 진입점 (#1039) — 클립보드+텍스트 라인. 모노라인 16x16, currentColor 상속.
   paste: <g stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 4h2M10.5 4h2a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h0"/><rect x="5" y="2.5" width="6" height="2.8" rx="0.9"/><path d="M5.2 8.3h5.6M5.2 10.8h3.6"/></g>,
+  // 같이읽기(숲) 방 UI 기능 이모지 대체(#1062) — Feather 모노라인 16x16, currentColor 상속·둥근 끝.
+  // 🔢→hash · 🚪→logout · 👥→users · 🗓→calendar · 🔒/🔐→lock · 🌐→globe.
+  hash: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M2.4 6h11.2M2.4 10h11.2"/><path d="M6.6 2.4 5.4 13.6M10.6 2.4 9.4 13.6"/></g>,
+  logout: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3"/><path d="M10.3 11l3-3-3-3"/><path d="M13.3 8H6"/></g>,
+  users: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 13.5v-1a2.5 2.5 0 0 0-2.5-2.5H4a2.5 2.5 0 0 0-2.5 2.5v1"/><circle cx="6" cy="5" r="2.5"/><path d="M14.5 13.5v-1a2.5 2.5 0 0 0-1.9-2.42"/><path d="M10.5 2.58a2.5 2.5 0 0 1 0 4.84"/></g>,
+  calendar: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M10.5 1.8v2.4M5.5 1.8v2.4M2.5 6.5h11"/></g>,
+  lock: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="2.8" y="7" width="10.4" height="7" rx="1.6"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></g>,
+  globe: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6.3"/><path d="M1.7 8h12.6"/><path d="M8 1.7a9.7 9.7 0 0 1 2.6 6.3 9.7 9.7 0 0 1-2.6 6.3 9.7 9.7 0 0 1-2.6-6.3A9.7 9.7 0 0 1 8 1.7z"/></g>,
 };
 function rgIcon(name, size) {
   const s = size || 16;

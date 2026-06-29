@@ -574,6 +574,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 - `index.html` — `.rg-btn-primary`/`.rg-btn-tonal`(DESIGN.md 버튼 위계: 1차 솔리드/2차 tonal, ghost 금지) + `.rg-room-*` + `.rg-coread-*` 클래스.
 - `render-smoke.mjs` — 탭 라벨(함께) 검증. 탭은 "함께"라 명칭 변경 무관.
 - **멤버 그리드 둥지 이모지** = 숲 책 진척% 5구간 매핑(🌿🪹🪺🐣🏰, `NEST_STAGES` 이모지 재사용, `rgRoomNestEmoji`). 오늘 불빛(●/○) = 오늘 어떤 책이든 기록(스트릭 동일 기준).
+- **방 UI 아이콘 rgIcon 통일(#1062)** — `RoomModal` 설정 메뉴·탭·세그먼트의 반쯤 변환된 기능 이모지(🔢→hash·🚪→logout·👥→users·🗓→calendar·🌐→globe·🔐/🔒→lock)를 `rgIcon` 모노라인으로 통일(`icons.js` `RG_ICONS` 에 hash·logout·users·calendar·lock·globe 6개 추가, Feather 지오메트리). 둥지 단계(🌿🪹🪺🐣🏰)·🌳숲·💪응원·비밀번호 `placeholder` 🔒(텍스트 장식, SVG 불가)는 KEEP — `tests/spec-align/design_lint.py` denylist 동반 갱신.
 
 ### 10.4 명칭 "숲" 확정 (이 PR, §8)
 

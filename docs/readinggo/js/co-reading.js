@@ -179,8 +179,8 @@ function FindRoomSheet({ onClose, onPreview }) {
           <button className="rg-room-x" onClick={onClose} aria-label="닫기">×</button>
         </div>
         <div className="rg-room-segor" style={{ margin: '0 0 14px' }}>
-          <button className={'rg-seg' + (tab === 'code' ? ' on' : '')} onClick={() => setTab('code')}>🔐 코드·링크</button>
-          <button className={'rg-seg' + (tab === 'book' ? ' on' : '')} onClick={() => setTab('book')}>🌐 책으로 검색</button>
+          <button className={'rg-seg' + (tab === 'code' ? ' on' : '')} onClick={() => setTab('code')}>{window.rgIcon('lock', 14)} 코드·링크</button>
+          <button className={'rg-seg' + (tab === 'book' ? ' on' : '')} onClick={() => setTab('book')}>{window.rgIcon('globe', 14)} 책으로 검색</button>
         </div>
         {tab === 'code' ? (
           <div>
@@ -323,8 +323,8 @@ function CreateRoomSheet({ onClose, onCreated }) {
 
             <p className="rg-room-label" style={{ marginTop: 14 }}>공개 설정</p>
             <div className="rg-room-segor">
-              <button className={'rg-seg' + (visibility === 'public' ? ' on' : '')} onClick={() => setVisibility('public')}>🌐 공개</button>
-              <button className={'rg-seg' + (visibility === 'private' ? ' on' : '')} onClick={() => setVisibility('private')}>🔒 비공개</button>
+              <button className={'rg-seg' + (visibility === 'public' ? ' on' : '')} onClick={() => setVisibility('public')}>{window.rgIcon('globe', 14)} 공개</button>
+              <button className={'rg-seg' + (visibility === 'private' ? ' on' : '')} onClick={() => setVisibility('private')}>{window.rgIcon('lock', 14)} 비공개</button>
             </div>
             <p className="rg-room-hint" style={{ marginTop: 6 }}>
               {visibility === 'public' ? '책으로 검색하면 누구나 이 숲을 찾을 수 있어요.' : '초대 링크·코드를 받은 사람만 들어와요.'}
@@ -837,7 +837,7 @@ function RoomSchedule({ roomId, room, members, totalPages }) {
   if (!parts.length) {
     return (
       <div className="rg-part-empty">
-        <div style={{ fontSize: 30, marginBottom: 6 }}>🗓️</div>
+        <div style={{ marginBottom: 6, color: 'var(--brand-3)' }}>{window.rgIcon('calendar', 30)}</div>
         {isHost ? (
           <>
             <p style={{ margin: 0, fontWeight: 800, color: 'var(--ink-2)' }}>아직 함께 읽기 일정이 없어요</p>
@@ -1045,15 +1045,15 @@ function RoomModal({ roomId, onClose }) {
         {settingsOpen && (
           <div className="rg-room-settings">
             <button className="rg-room-set-item" onClick={() => copy(tokenUrl, '초대 링크')} disabled={!tokenUrl}>{window.rgIcon('share', 15)} 초대 링크 복사</button>
-            <button className="rg-room-set-item" onClick={() => copy(room && room.invite_code, '초대 코드')} disabled={!(room && room.invite_code)}>🔢 초대 코드 복사{room && room.invite_code ? ` (${room.invite_code})` : ''}</button>
-            <button className="rg-room-set-item rg-danger" onClick={doLeave}>🚪 나가기</button>
+            <button className="rg-room-set-item" onClick={() => copy(room && room.invite_code, '초대 코드')} disabled={!(room && room.invite_code)}>{window.rgIcon('hash', 15)} 초대 코드 복사{room && room.invite_code ? ` (${room.invite_code})` : ''}</button>
+            <button className="rg-room-set-item rg-danger" onClick={doLeave}>{window.rgIcon('logout', 15)} 나가기</button>
           </div>
         )}
 
         {/* 3탭 (멤버 진척 · 일정 · 한 문장) */}
         <div className="rg-room-tabs">
-          <button className={'rg-room-tab' + (tab === 'members' ? ' on' : '')} onClick={() => setTab('members')}>👥 멤버 진척</button>
-          <button className={'rg-room-tab' + (tab === 'schedule' ? ' on' : '')} onClick={() => setTab('schedule')}>🗓️ 일정</button>
+          <button className={'rg-room-tab' + (tab === 'members' ? ' on' : '')} onClick={() => setTab('members')}>{window.rgIcon('users', 14)} 멤버 진척</button>
+          <button className={'rg-room-tab' + (tab === 'schedule' ? ' on' : '')} onClick={() => setTab('schedule')}>{window.rgIcon('calendar', 14)} 일정</button>
           <button className={'rg-room-tab' + (tab === 'sentences' ? ' on' : '')} onClick={() => setTab('sentences')}>{window.rgIcon('book', 14)} 한 문장</button>
         </div>
 
