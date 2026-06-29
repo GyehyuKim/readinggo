@@ -382,7 +382,8 @@ function App() {
   useEffect(() => { window.RG_openSearchWith = (q) => { setSearchPrefill(q || ''); setIsSearchOpen(true); }; return () => { window.RG_openSearchWith = null; }; }, []);
   // 한 문장 대화 모달 (#326) — 내 한 문장 탭으로 열림.
   const [companionSentence, setCompanionSentence] = useState(null);
-  useEffect(() => { window.RG_openCompanion = (s) => setCompanionSentence(s); return () => { window.RG_openCompanion = null; }; }, []);
+  // #1070: 두 번째 인자로 진입 모드 지정 — { mode: 'note'|'jacky' }. 카드 버튼이 문장별 선택을 전달(없으면 모달이 자체 추정).
+  useEffect(() => { window.RG_openCompanion = (s, opts) => setCompanionSentence((opts && opts.mode) ? { ...s, _openMode: opts.mode } : s); return () => { window.RG_openCompanion = null; }; }, []);
   // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState(null); // 저장(❤️) 진입 시 'fav' (#510)
