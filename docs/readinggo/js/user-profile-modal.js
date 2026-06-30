@@ -103,7 +103,7 @@ function UserProfileModal({ handle, onClose }) {
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{s.page}p</div>
                     {blinded
                       ? <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>
-                      : <div style={{ fontSize: 14, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>}
+                      : <div style={{ fontFamily: 'var(--font-quote)', fontSize: 14, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>}
                   </div>
                 );
               })}
@@ -213,7 +213,7 @@ function UserProfileModal({ handle, onClose }) {
                 {blinded ? (
                   <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>
                 ) : (
-                  <div style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
+                  <div style={{ fontFamily: 'var(--font-quote)', fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
                 )}
               </div>
             );

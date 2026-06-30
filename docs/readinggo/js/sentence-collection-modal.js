@@ -81,7 +81,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
       <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>
         {s.bookTitle ? s.bookTitle + ' · ' : ''}{s.page != null ? s.page + 'p' : ''}{s.when ? ' · ' + s.when : ''}
       </div>
-      <div style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
+      <div style={{ fontFamily: 'var(--font-quote)', fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>
       {/* 한 문장 액션 계약 (#610·#641) — 공용 SentenceActions: 내 문장=공개범위+좋아요+수정/삭제, 타인=좋아요 */}
       <SentenceActions sentence={s} mine={!s.saved} fav={favIds.has(s.id)}
         onRemoved={(rid) => { setMine(m => (m || []).filter(x => x.id !== rid)); setSaved(v => (v || []).filter(x => x.id !== rid)); }} />

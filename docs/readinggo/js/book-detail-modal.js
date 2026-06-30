@@ -482,7 +482,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               {aiExtract.topQuote && aiExtract.topQuote.text && (
                 <div style={{marginBottom:10}}>
                   <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:800, marginBottom:4}}>가장 인상 깊었던 한 문장</div>
-                  <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, fontStyle:'italic', lineHeight:1.55, padding:'8px 10px', background:'var(--card)', borderRadius:8}}>
+                  <div style={{fontFamily:'var(--font-quote)', fontSize:13, color:'var(--ink)', fontWeight:400, fontStyle:'italic', lineHeight:1.55, padding:'8px 10px', background:'var(--card)', borderRadius:8}}>
                     "{aiExtract.topQuote.text}"
                     {typeof aiExtract.topQuote.page === 'number' && <span style={{fontStyle:'normal', fontSize:11, color:'var(--ink-3)', fontWeight:700, marginLeft:6}}>p.{aiExtract.topQuote.page}</span>}
                   </div>
@@ -670,7 +670,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                         {q.kind === 'thought' ? (
                           <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5'}}>💭 {q.text}</div>
                         ) : (
-                          <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
+                          <div style={{fontFamily:'var(--font-quote)', fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
                             "{q.text}"
                           </div>
                         )}

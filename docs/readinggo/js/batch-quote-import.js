@@ -60,7 +60,7 @@ function BatchQuoteImport({ onCancel, onSave, busy, initialItems }) {
                 <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: 'var(--ink-3)', marginTop: 8, minWidth: 18, textAlign: 'right' }}>{i + 1}</span>
                 <textarea value={t} onChange={(e) => editItem(i, e.target.value)}
                   rows={Math.min(5, Math.max(1, Math.ceil(((t || '').length || 1) / 26)))}
-                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: "'Noto Serif KR', serif", fontSize: 14, lineHeight: 1.55, color: 'var(--ink)', resize: 'none', padding: 0 }} />
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-quote)', fontSize: 14, lineHeight: 1.55, color: 'var(--ink)', resize: 'none', padding: 0 }} />
                 {over && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: 'var(--fire)', marginTop: 8 }}>{(t || '').trim().length}/{_BQI_MAX}</span>}
                 <button onClick={() => removeItem(i)} aria-label="삭제" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px', marginTop: 4 }}>×</button>
               </div>

@@ -126,6 +126,10 @@
   --r-md: 16px;
   --r-lg: 18px;
   --r-xl: 18px;
+  /* Quote / 흔적·발췌 폰트(DESIGN.md Typography): 사용자가 옮긴 책 글귀 = Noto Serif KR.
+     모든 인용구(.sentence-card .quote·.my-q-card .quote·.saved-quote·.sentence-area 와
+     피처 인라인 흔적 카드)가 이 한 토큰만 참조해 화면마다 폰트가 어긋나지 않게 한다(#1104·#1090). */
+  --font-quote: 'Noto Serif KR', Georgia, 'Times New Roman', serif;
 }
 
 *{box-sizing:border-box;}
@@ -188,10 +192,10 @@ input,textarea{font-family:inherit;}
 }
 /* Quote / 책 발췌·"내가 남긴 흔적": Noto Serif KR — 따옴표로 감싼 흔적·발췌 문장에만.
    (헤딩·버튼·라벨·로고 등 UI 텍스트는 Noto Sans 유지)
-   개별 .quote/.saved-quote/.sentence-area 블록도 각자 동일 세리프 스택을 명시(아래)해
+   개별 .quote/.saved-quote/.sentence-area 블록도 각자 동일 var(--font-quote) 토큰을 참조(아래)해
    한 곳만 봐도 폰트 의도가 보이게 한다. 여기 그룹 규칙은 폰트 미명시 흔적 카드 안전망. */
 .my-q-card .quote{
-  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-quote);
 }
 
 .stage{
@@ -920,7 +924,7 @@ input,textarea{font-family:inherit;}
 .sentence-card .nick{ font-size: 13px; font-weight: 800; color: var(--ink); }
 .sentence-card .meta{ font-size: 11px; color: var(--ink-3); margin-left: auto; }
 .sentence-card .quote{
-  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif; font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
+  font-family: var(--font-quote); font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
   font-size: 14px; line-height: 1.55;
   color: var(--ink); padding-left: 10px;
   border-left: 3px solid var(--brand-soft);
@@ -1226,7 +1230,7 @@ input,textarea{font-family:inherit;}
   padding: 12px 14px;
   border-radius: var(--r-md);
   border: 1.5px solid var(--line);
-  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif; font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
+  font-family: var(--font-quote); font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
   font-size: 14px; line-height: 1.55;
   resize: none;
   background: var(--card-soft);
@@ -1324,7 +1328,7 @@ input,textarea{font-family:inherit;}
   border-left: 4px solid var(--brand);
   padding: 12px 14px;
   border-radius: 0 12px 12px 0;
-  font-family: 'Noto Serif KR', Georgia, 'Times New Roman', serif; font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
+  font-family: var(--font-quote); font-weight: 400;  /* 흔적·발췌 = 세리프(DESIGN.md #1032) */
   font-size: 14px; line-height: 1.55; color: var(--ink);
   text-align: left;
   margin-bottom: 18px;

@@ -183,7 +183,7 @@ function BookInfoModal({ bookId, onClose }) {
                 <SectionLabel icon="mine">내 한 문장</SectionLabel>
                 {mySents.map(s => (
                   <div key={s.id} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
-                    <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6 }}>"{decodeEntities(s.text)}"</div>
+                    <div style={{ fontFamily: 'var(--font-quote)', fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6 }}>"{decodeEntities(s.text)}"</div>
                     {typeof s.page === 'number' && s.page > 0 ? <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>{s.page}p</div> : null}
                     <SentenceActions sentence={s} mine onRemoved={(rid) => setMySents(m => (m || []).filter(x => x.id !== rid))} />
                   </div>
