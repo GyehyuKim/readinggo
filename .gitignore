@@ -74,3 +74,4 @@ keystore.properties
 
 # 디자인 스크래치 (아이콘 스튜디오·렌더 WIP — 커밋 금지, #1050)
 design-scratch/
+collector/logs/
