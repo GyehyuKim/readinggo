@@ -73,6 +73,13 @@
   font-display: swap;
 }
 :root{
+  /* #1106 네이티브 safe-area 전역 변수 (노치·status bar·home indicator) — viewport-fit=cover 전제.
+     모든 시트·모달·고정요소가 이 변수로 일괄 처리(개별 env() 하드코딩 대신). 구형 Android(Chromium<140)
+     Edge-to-Edge 0px 버그 폴백 플러그인은 향후(Stack Lock). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   --paper:        #FAF6F0;
   --paper-2:      #F4EFE6;
   --card:         #FFFFFF;
@@ -1136,9 +1143,9 @@ input,textarea{font-family:inherit;}
   position: relative;       /* 우상단 닫기(✕) 버튼 기준 (QA #169) */
   background: var(--card);
   border-radius: 28px 28px 0 0;
-  padding: 14px 18px 24px;
+  padding: max(14px, var(--safe-top)) 18px calc(24px + var(--safe-bottom));
   animation: slideUp .3s cubic-bezier(.2,.8,.2,1) both;
-  max-height: 90vh; overflow-y: auto; overflow-x: hidden;
+  max-height: 90vh; max-height: calc(90svh - var(--safe-top)); overflow-y: auto; overflow-x: hidden;  /* #1106 status bar 침범 방지 (svh 미지원 iOS<15.4 는 90vh 폴백) */
 }
 @keyframes slideUp{
   from { transform: translateY(100%); }
@@ -1586,7 +1593,7 @@ input,textarea{font-family:inherit;}
 
 /* 시트(찾기·만들기·미리보기) */
 .rg-room-sheet-backdrop{ position:fixed; inset:0; z-index:60; background:rgba(20,20,30,.45); backdrop-filter:blur(2px); display:flex; align-items:flex-end; justify-content:center; animation:fadeIn .2s ease both; }
-.rg-room-sheet{ width:100%; max-width:430px; background:var(--card); border-radius:20px 20px 0 0; padding:18px 18px 24px; max-height:88vh; overflow-y:auto; animation:slideUp .28s cubic-bezier(.2,.8,.2,1) both; }
+.rg-room-sheet{ width:100%; max-width:430px; background:var(--card); border-radius:20px 20px 0 0; padding:max(18px, var(--safe-top)) 18px calc(24px + var(--safe-bottom)); max-height:88vh; max-height:calc(88svh - var(--safe-top)); overflow-y:auto; animation:slideUp .28s cubic-bezier(.2,.8,.2,1) both; }  /* #1106 safe-area */
 .rg-room-sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
 .rg-room-sheet-head strong{ font-size:17px; font-weight:900; color:var(--ink); letter-spacing:-.3px; }
 .rg-room-x{ background:rgba(0,0,0,.06); border:none; border-radius:50%; width:30px; height:30px; font-size:17px; line-height:1; color:var(--ink-2); cursor:pointer; }

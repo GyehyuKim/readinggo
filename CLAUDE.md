@@ -42,6 +42,7 @@ Other agents (Cursor, Continue, Aider) should enter via [`AGENTS.md`](./AGENTS.m
 - **백엔드**: Phase 0 `localStorage` / Phase 1+ **Supabase** (Google OAuth). **DataStore 계약**으로 추상화 — 피처 코드는 저장소를 직접 호출하지 않음 (`docs/readinggo/specs/backend.md` §7.2).
 - **AI (v9 갱신 2026-06-20)**: **Gemini Flash 무료 티어 + 서버리스 프록시** — **텍스트·vision 모두 자유 사용**(도서 추천, 사진 밑줄/강조 추출 등 용도 추가에 별도 lock 결정 불필요). 클라이언트에 API 키 노출 금지(키는 서버 보관). OCR(글자 추출)은 Upstage Document OCR 유지, 이미지 의미 이해(vision)는 Gemini.
 - **데이터 (canonical 갱신, #490 결정 2026-06-15 · 정적 TSV 제거 #972 2026-06-24)**: 책 데이터의 canonical source는 **Supabase `books`**. `getBook(id)` 동기 API는 부팅 시 Supabase 책을 메모리 캐시에 적재해 보존하고, `loadBooks()`도 Supabase 1순위, 게스트 검색도 publishable key + RLS read 로 같은 카탈로그를 쓴다. **구 정적 `books.tsv`(542권)는 제거됨(#972)** — 과도기 잔재이자 stale(542≠canonical) 드리프트 원인. Supabase 미설정/장애 시 폴백은 `data.js` 인라인 `RG_BOOKS`(12권) 최소치뿐(데모 무중단). (이전 "TSV 포맷 유지 #90"·"Phase 0 정적 TSV"를 본 결정들로 갱신.)
+- **Safe-area (결정 2026-06-30, #1106)**: 네이티브 노치·status bar·home indicator 대응 = **CSS `env(safe-area-inset-*)` 전역 변수**(`:root` 의 `--safe-top`/`--safe-bottom`, `viewport-fit=cover` 전제). 모든 시트·모달·고정요소에 이 변수로 일괄 적용(개별 하드코딩 대신). 구형 Android(Chromium<140 Edge-to-Edge 에서 `env()` 가 0px 되는 버그) 폴백 플러그인(`@capacitor-community/safe-area`)은 **현재 미도입 — 향후 구형 보고 시 도입**(새 의존성이라 이 lock 갱신 필요).
 - 변경 제안 시 해당 피처의 `docs/readinggo/specs/<feature>.md` spec PR 먼저, 코드 PR 나중 ([LF: Spec only PR](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)).
 
 새 프레임워크/라이브러리/언어 도입 제안이 들어오면 위 룰을 먼저 안내하고 사용자에게 확인.
