@@ -121,7 +121,8 @@ const INQ_EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 //   이슈 가독성·트리아지를 높인다(예: #1104 앱 화면 복붙으로 의도 불명). callLLM(텍스트 프록시)
 //   재사용·키 서버보관. 실패/미설정/JSON 깨짐 시 null → 호출부가 원문만으로 폴백(graceful).
 //   환각 가드: 원문에 없는 사실 추가 금지. 원문(masked)은 호출부가 본문에 항상 별도 보존.
-const INQUIRY_CATEGORY_LABELS = { 버그: 'type:bug', 기능요청: 'type:feature', UX: 'type:ux', 문의: 'type:question', 기타: 'type:feedback' };
+// 라벨은 레포에 실재하는 것만 — GitHub POST /issues 의 미존재 라벨은 기존 택소노미를 오염시킨다(#1112).
+const INQUIRY_CATEGORY_LABELS = { 버그: 'type:bug', 기능요청: 'type:feat', UX: 'ux', 문의: 'question', 기타: 'type:feedback' };
 const INQUIRY_TRIAGE_SYSTEM = '너는 오픈베타 앱의 사용자 문의를 운영자 트리아지용으로 정돈하는 분류기다. 입력은 사용자가 보낸 문의 원문(앱 화면 텍스트가 섞여 불명확할 수 있음)이다. 다음 형태의 JSON 객체 하나만 출력한다: {"title":"한 줄 제목","summary":"핵심 요약과 추정 의도","category":"버그"}. 규칙: (1) title 은 한국어 한 줄, 40자 이내, 무엇에 대한 문의인지 드러나게. 원문이 화면 텍스트 복붙이라 불명확하면 "[불명확]"로 시작. (2) summary 는 1~2문장으로 핵심과 사용자가 무엇을 원하는지(추정 의도)를 적되, 원문에 없는 사실을 지어내지 말 것. 불명확하면 "원문만으로는 의도 불명확"이라고 솔직히 적는다. (3) category 는 정확히 다음 중 하나: 버그, 기능요청, UX, 문의, 기타. (4) 개인정보(이름·전화번호·이메일)는 제목·요약에 옮기지 말 것. (5) 설명·코드펜스 없이 JSON 객체 하나만 출력.';
 
 async function triageInquiry(masked, env) {
