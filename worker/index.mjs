@@ -109,6 +109,7 @@ export default {
     }
     ctx.waitUntil(archive(env));
     ctx.waitUntil(prewarmSeeds(env));   // #774 인기 우선 시드 선충전(sales_point 상위 N권, idempotent)
+    ctx.waitUntil(backfillPages(env));  // #1117 쪽수 보강 — 검색(ItemSearch) 업서트는 itemPage 가 없어 null 로 남는다. 일일 ItemLookUp 보강(재발 방지)
   },
 };
 
@@ -1339,6 +1340,44 @@ async function archive(env) {
       try {
         const lk = await aladinFetch(`${ALADIN}ItemLookUp.aspx?ttbkey=${KEY}&itemIdType=ISBN13&ItemId=${isbn}&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`);
         if (lk[0]) await upsertBook(SB, SRK, normalize(lk[0]));
+      } catch (e) { /* skip */ }
+    }
+  };
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+}
+
+/* 쪽수 백필 (#1117) — total_pages 가 null 인 책을 ItemLookUp(subInfo.itemPage)으로 채운다.
+   사용자 검색은 Aladin ItemSearch 로 들어와 itemPage 가 없어 null 로 남는다(ItemLookUp 만 쪽수 제공) →
+   화면에서 "/ 1p" 로 보였다. 일일 cron 으로 유효 isbn13 인 null 책을 보강해 신규 null 재발 방지
+   (과거 대량 null 은 1회 collector/backfill-pages.mjs 로 해소). 비-ISBN id 행은 조회 불가라 건너뛴다. */
+async function backfillPages(env) {
+  const KEY = env.ALADIN_TTB_KEY, SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!KEY || !SB || !SRK) return;
+  const cap = parseInt(env.BACKFILL_DAILY_CAP || '300', 10);
+  const start = Date.now();
+  const sbAuth = { apikey: SRK, Authorization: `Bearer ${SRK}` };
+  let rows = [];
+  try {
+    // null + 신규 우선(created_at desc). cap*2 가져와 13자리 isbn13 만 추림.
+    const r = await fetch(`${SB}/rest/v1/books?select=id,isbn13&total_pages=is.null&order=created_at.desc&limit=${cap * 2}`, { headers: sbAuth });
+    rows = (await r.json()) || [];
+  } catch (e) { return; }
+  const todo = rows.filter((b) => /^\d{13}$/.test(b.isbn13 || '')).slice(0, cap);
+  let idx = 0;
+  const worker = async () => {
+    while (idx < todo.length && Date.now() - start < TIME_BUDGET_MS) {
+      const b = todo[idx++];
+      try {
+        const lk = await aladinFetch(`${ALADIN}ItemLookUp.aspx?ttbkey=${KEY}&itemIdType=ISBN13&ItemId=${b.isbn13}&output=js&Version=20131101&OptResult=packing`);
+        const p = lk[0] && lk[0].subInfo && lk[0].subInfo.itemPage;
+        if (p && Number(p) > 1) {
+          // total_pages=is.null 가드 — 그 사이 다른 경로가 채웠으면 덮지 않음(멱등).
+          await fetch(`${SB}/rest/v1/books?id=eq.${b.id}&total_pages=is.null`, {
+            method: 'PATCH',
+            headers: { ...sbAuth, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ total_pages: Number(p) }),
+          });
+        }
       } catch (e) { /* skip */ }
     }
   };

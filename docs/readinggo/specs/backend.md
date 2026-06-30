@@ -66,9 +66,9 @@ profile.update({display_name, avatar_url, bio})
 settings.get() / settings.update({reminder_hour, ...})
 
 // 책 / 검색
-books.search(query)                        → Book[]          // DB ilike(즉시) — 클라에서 데모 Fuse + 알라딘 결과와 병합·중복제거(isbn13). 외국 작가 표기변이는 알라딘 위임 (QA3 #148)
+books.search(query)                        → Book[]          // DB ilike(즉시) — 클라에서 데모 Fuse + 알라딘 결과와 병합·중복제거(isbn13). 외국 작가 표기변이는 알라딘 위임 (QA3 #148). 클라 `fuzzySearch`(data.js)는 **토큰 기반**(#1118) — 질의를 단어로 쪼개 제목+저자+출판사 합본에 모든 토큰 AND 매칭(예: "민음사 시지프 신화" = 출판사+제목 가로질러 매칭. 구버전 통짜 substring 은 0건)
 // ⚠️ 데이터 소스 이전(#1044, §7.2.1): canonical 소스를 알라딘 → 국중도(쪽수·표지)+카카오(검색·표지)로 옮긴다. 아래 알라딘 서술은 *이전 전 현행*(코드 후속 PR 에서 재배선).
-// 도서 프록시(Cloudflare Worker `worker/index.mjs` `/aladin`, 별칭 `/.netlify/functions/aladin`): **ItemSearch(검색)는 packing을 줘도 itemPage 미제공** — 쪽수는 **ItemLookUp(?isbn=)만** 반환. 등록 시 쪽수 없으면 isbn 개별 조회로 1회 보강 (QA7 #233). 그래도 없으면 total_pages=null → 수동 입력 폴백(#204)
+// 도서 프록시(Cloudflare Worker `worker/index.mjs` `/aladin`, 별칭 `/.netlify/functions/aladin`): **ItemSearch(검색)는 packing을 줘도 itemPage 미제공** — 쪽수는 **ItemLookUp(?isbn=)만** 반환. ISBN 단건 등록은 즉시 보강하나 **검색 일괄 upsert 는 비용상 미보강**이라 total_pages=null 로 남았다(과거 ~894권이 화면에 "/ 1p"로 표시 #1117). → **일일 cron `backfillPages`(#1117)** 가 null·유효 isbn13 책을 ItemLookUp 으로 보강(`BACKFILL_DAILY_CAP` 기본 300, 멱등). 비-ISBN id·Aladin 미보유는 null 잔존 → 수동 입력 폴백(#204). 대량 과거 null 은 1회 `collector/backfill-pages.mjs` 로 해소. (#1044 이전 후엔 쪽수 보강 소스가 국중도 `PAGE` 로 교체)
 // 외서 균형 보강(#302): 검색이면 **국내(알라딘) 최대 5 + 외서(Google Books) 최대 5 = 총 ≤10**, isbn13/title 중복제거. Google 키는 `GOOGLE_BOOKS_API_KEY`(무키 시 레이트리밋). ISBN 단건 조회엔 미적용.
 // 책 소개·풀 메타(#316→#489): 검색·ISBN 조회 응답에 알라딘 풀 메타(`description` 등) 첨부. **#489: `normalize()` 가 books 풀 메타 컬럼(위 테이블)을 채워 upsert** → archive·검색 양 경로 공통 반영(이전엔 description 컬럼 부재로 미반영).
 // 검색 도서 자동 저장(#489): `aladinProxy` 가 알라딘 결과를 `ctx.waitUntil` 백그라운드로 books upsert(`on_conflict=isbn13`). 검색(ItemSearch)은 itemPage 누락 잦아 **저장 직전 ISBN 보강**(위 QA7). Google 외서는 우리 컬럼 매핑분만 + `source='google'`. 응답 지연 0(upsert는 응답과 분리).

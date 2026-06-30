@@ -364,12 +364,14 @@ async function loadBooks() {
 
 function fuzzySearch(books, query) {
   if (!query || !query.trim()) return books;
-  const q = query.trim().toLowerCase();
-  return books.filter(b =>
-    b.title.toLowerCase().includes(q) ||
-    b.author.toLowerCase().includes(q) ||
-    b.pub.toLowerCase().includes(q)
-  );
+  // 토큰 기반(#1118) — 질의를 단어로 쪼개, 모든 토큰이 제목+저자+출판사 합본에 들어가면 매칭.
+  // 구버전은 질의 전체를 한 필드에 substring 검사해 "민음사 시지프 신화"(출판사+제목)를 0건으로
+  // 떨궜다(title="시지프 신화"·pub="민음사" 분리). 합본 + 토큰 AND 로 필드를 가로지르는 질의도 잡는다.
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return books.filter(b => {
+    const hay = (b.title + ' ' + b.author + ' ' + b.pub).toLowerCase();
+    return tokens.every(t => hay.includes(t));
+  });
 }
 
 // 검색/폴백용 ALL_BOOKS: 인라인 RG_BOOKS(12)를 평탄 row 형식으로 변환
