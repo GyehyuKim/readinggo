@@ -291,6 +291,13 @@ input,textarea{font-family:inherit;}
 .stat.league{ color: var(--brand-3); border-color: var(--brand-soft); background: var(--brand-tint); }
 .stat.lv{ color: var(--ink-2); border-color: var(--line); background: var(--paper); padding: 4px 8px; }
 
+/* #1096 인앱 브라우저(카카오 등) 안내 배너 — 외부 기본 브라우저로 빼는 CTA */
+.rg-inapp-banner{ display:flex; align-items:center; gap:8px; padding:9px 12px; background:#FFF7EE; border-bottom:1px solid var(--gold-soft); font-size:12px; color:var(--ink-2); line-height:1.4; }
+.rg-inapp-msg{ flex:1; min-width:0; }
+.rg-inapp-open{ flex-shrink:0; padding:6px 12px; border:none; border-radius:999px; background:var(--brand-3); color:#fff; font-weight:800; font-size:12px; cursor:pointer; white-space:nowrap; }
+.rg-inapp-tip{ flex-shrink:0; font-size:11px; color:var(--ink-3); }
+.rg-inapp-x{ flex-shrink:0; padding:2px 6px; border:none; background:none; color:var(--ink-3); font-size:16px; line-height:1; cursor:pointer; }
+
 .main{
   flex: 1;
   overflow-y: auto;
