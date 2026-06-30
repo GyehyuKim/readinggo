@@ -129,7 +129,8 @@ function FindRoomSheet({ onClose, onPreview }) {
   const parseToken = (raw) => {
     const t = (raw || '').trim();
     if (!t) return { token: '', code: '' };
-    const m = t.match(/\/r\/([A-Za-z0-9]+)/);
+    // #1094: 초대 링크 ?r=<token>(쿼리) 우선, 구 /r/<token>(경로)도 호환 추출.
+    const m = t.match(/[?&]r=([A-Za-z0-9]+)/) || t.match(/\/r\/([A-Za-z0-9]+)/);
     if (m) return { token: m[1], code: '' };
     // 6자리 영숫자면 코드, 그 외 긴 문자열은 토큰으로 시도
     if (/^[A-Za-z0-9]{6}$/.test(t)) return { token: '', code: t };
@@ -1025,7 +1026,10 @@ function RoomModal({ roomId, onClose }) {
   const copy = (text, label) => {
     try { navigator.clipboard.writeText(text); if (window.showToast) window.showToast(label + ' 복사했어요'); } catch (e) {}
   };
-  const tokenUrl = room && room.invite_token ? `https://rgo.app/r/${room.invite_token}` : '';
+  // #1094: 초대 링크는 실제 앱 도메인 + ?r=<token> 쿼리 — 구 rgo.app 은 죽은 파킹 도메인이었음.
+  //   쿼리(루트 /)라 base './'(Capacitor) 자산이 정상 로드된다(/r/ 경로는 상대자산이 /r/assets 로 깨짐).
+  //   app.js 부팅이 ?r 토큰을 읽어 숲 미리보기를 띄운다.
+  const tokenUrl = room && room.invite_token ? `${location.origin}/?r=${room.invite_token}` : '';
 
   return ReactDOM.createPortal(
     <div className="rg-room-modal-backdrop" onClick={onClose}>
@@ -1098,6 +1102,7 @@ function RoomModal({ roomId, onClose }) {
 }
 
 window.RoomsView = RoomsView;
+window.RoomPreviewSheet = RoomPreviewSheet;   // #1094: 초대 딥링크가 앱 최상위에서 미리보기를 띄우는 데 사용
 window.RoomModal = RoomModal;
 window.rgRoomNestEmoji = rgRoomNestEmoji;
 // P2(§7.5) 같이읽기 모드 + 공개 숲 자동합류 — 등록 글루(app.js)·토글에서 사용.

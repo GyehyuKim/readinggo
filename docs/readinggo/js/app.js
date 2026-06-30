@@ -349,6 +349,27 @@ function App() {
   // 같이읽기 방 모달(co-reading.md §5.3) — 방 카드·badge·미리보기에서 window.RG_openRoom(roomId) 로 열림.
   const [roomOpenId, setRoomOpenId] = useState(null);
   useEffect(() => { window.RG_openRoom = (id) => setRoomOpenId(id); return () => { window.RG_openRoom = null; }; }, []);
+  // #1094: 초대 딥링크 — ?r=<token> 으로 진입하면 토큰으로 숲을 찾아 미리보기를 띄운다(참여 전).
+  //   쿼리(루트 /)라 base './'(Capacitor) 자산이 정상 로드된다(/r/ 경로는 상대자산이 /r/assets 로 깨짐).
+  //   게스트도 공개 숲은 anon read 로 조회되도록 SupabaseDataStore.findByToken 우선(게스트 기본 DataStore 는
+  //   로컬이라 남의 숲을 모름). 토큰은 즉시 정리 — 새로고침·공유 시 재처리/노출 방지.
+  const [invitePreview, setInvitePreview] = useState(null);
+  useEffect(() => {
+    const token = new URLSearchParams(location.search).get('r');
+    if (!token || !/^[A-Za-z0-9]+$/.test(token)) return;
+    history.replaceState(null, '', location.pathname);
+    (async () => {
+      try {
+        const ds = (window.SupabaseDataStore && window.SupabaseDataStore.rooms && window.SupabaseDataStore.rooms.findByToken)
+          ? window.SupabaseDataStore : DataStore;
+        const room = (ds.rooms && ds.rooms.findByToken) ? await ds.rooms.findByToken(token) : null;
+        if (room) setInvitePreview(room);
+        else if (window.showToast) window.showToast('초대받은 숲을 찾을 수 없어요');
+      } catch (e) {
+        if (window.showToast) window.showToast('초대 링크를 여는 데 실패했어요');
+      }
+    })();
+  }, []);
   // 로그인 화면 열기(저장 시점 트리거) — 설정/프로필/배너에서 호출.
   useEffect(() => { window.RG_login = () => setShowLogin(true); return () => { window.RG_login = null; }; }, []);
   // 책 상세 통일(#11, 통일성) — 어디서 누르든 같은 책=같은 화면. 탭이 아니라 '소유'로 라우팅:
@@ -986,6 +1007,15 @@ function App() {
         {/* 같이읽기 방 내부 (co-reading.md §5.3) — 방 카드·badge 진입 */}
         {roomOpenId && window.RoomModal && (
           <window.RoomModal roomId={roomOpenId} onClose={() => setRoomOpenId(null)} />
+        )}
+
+        {/* #1094: 초대 딥링크 미리보기 — /r/<token> 진입 시 참여 전 미리보기. 참여하면 그 숲을 연다. */}
+        {invitePreview && window.RoomPreviewSheet && (
+          <window.RoomPreviewSheet
+            room={invitePreview}
+            onClose={() => setInvitePreview(null)}
+            onJoined={(room) => { setInvitePreview(null); if (window.RG_openRoom) window.RG_openRoom(room.id); }}
+          />
         )}
 
       </div>
