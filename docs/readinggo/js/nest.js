@@ -710,7 +710,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>
             {resurfaceCard.daysAgo}일 전, 이 문장을 남겼어요{resurfaceCard.bookTitle ? ` — 《${resurfaceCard.bookTitle}》` : ''}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.55, fontStyle: resurfaceCard.kind === 'thought' ? 'normal' : 'italic', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '8px 2px', marginBottom: 8 }}>
+          <div style={{ fontFamily: 'var(--font-quote)', fontSize: 13, color: 'var(--ink)', lineHeight: 1.55, fontStyle: resurfaceCard.kind === 'thought' ? 'normal' : 'italic', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '8px 2px', marginBottom: 8 }}>
             {resurfaceCard.kind === 'thought' ? `💭 ${resurfaceCard.text}` : `"${resurfaceCard.text}"`}
           </div>
           {resurfaceCard.lastAnswer && (

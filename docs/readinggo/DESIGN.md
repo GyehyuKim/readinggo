@@ -43,6 +43,7 @@
   - **적용 범위 (design-shotgun 검증):** 세리프는 **따옴표로 감싼 흔적·발췌 문장에만** 적용한다. 헤딩·버튼·라벨·로고 등 UI 텍스트는 `Noto Sans KR` 유지. (본문 전체 세리프는 무거워서 폐기 — B안에서 확인)
 - **Accent / 보상 모먼트:** `Moneygraphy Pixel` — 화면 전반이 아니라 **작은 보상 순간 액센트로만** (게임 신호 절제).
 - **로딩:** Noto Sans/Serif KR = Google Fonts, Moneygraphy = self-hosted `fonts/`
+- **강제 (#1109):** 위 4패밀리(Noto Sans/Serif KR · Moneygraphy Rounded/Pixel)가 **앱 폰트의 전부**다. `tests/spec-align/design_lint.py` 가 `index.html`·`js/*.js` 의 `font-family`/`fontFamily` 를 스캔해, 이 4종과 표준 폴백(`serif`·`sans-serif`·`monospace`·`system-ui`·`-apple-system`·`BlinkMacSystemFont`·`Georgia`·`Times New Roman`)·`var(--token)`·JS 변수 참조 **밖의 리터럴 폰트명**을 `exit 1` 로 막는다(폴백은 웹폰트 로드 전/실패 시의 점진적 저하라 허용). 새 웹폰트(Pretendard·Roboto 등) 도입은 화이트리스트(여기 + `design_lint.FONT_WHITELIST`)를 먼저 고쳐야 가능 — 화면마다 폰트가 새는 드리프트를 차단한다.
 
 ## Color
 

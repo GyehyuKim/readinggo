@@ -109,7 +109,7 @@ function MilestoneRecap({ milestone, onClose }) {
                     {s.bookTitle ? <span style={{ color: 'var(--brand-3)' }}>· {s.bookTitle}</span> : null}
                     {typeof s.page === 'number' ? <span>· {s.page}p</span> : null}
                   </div>
-                  <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.6, fontStyle: 'italic' }}>"{s.text}"</div>
+                  <div style={{ fontFamily: 'var(--font-quote)', fontSize: 14, color: 'var(--ink)', lineHeight: 1.6, fontStyle: 'italic' }}>"{s.text}"</div>
                 </div>
               ))}
             </div>
