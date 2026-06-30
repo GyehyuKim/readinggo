@@ -693,12 +693,11 @@ function LibraryView({ state, onActivateUserBook }) {
           </div>
         )}
 
-        {/* 서비스 외부 공유 (#650 B) — 친구에게 ReadingGo 권하기. 내 공개 한 문장 1개(있으면) 동반.
+        {/* 서비스 외부 공유 (#650 B) — 친구에게 ReadingGo 권하기. 철학 한 줄 + 링크(#1092 — 책 인용 미동반).
             referral 코드·보상은 Phase 1 후속(referral.md §4) — 현재는 소개+링크만 graceful. */}
         <button onClick={() => {
-          const qs = (state.myQuotes || []).filter(q => q && q.text && (q.visibility ? q.visibility === 'public' : !q.isPrivate));
-          const rep = qs[0] || (state.myQuotes || []).find(q => q && q.text) || null;
-          if (window.shareService) window.shareService({ source: 'library', sentence: rep });
+          // 앱 초대는 특정 책 인용 없이 우리 철학 한 줄만(#1092). 미리보기는 링크 OG 카드가 담당.
+          if (window.shareService) window.shareService({ source: 'library' });
         }}
           style={{marginTop:20, width:'100%', padding:'12px', borderRadius:10, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
           {window.rgIcon('share',15)} 친구에게 ReadingGo 공유하기

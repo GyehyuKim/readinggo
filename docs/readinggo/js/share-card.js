@@ -332,35 +332,23 @@ async function shareSentence(s) {
    Phase 0/보상 미확정: referral 코드·귀속·랜딩·보상은 제외(referral.md §4.1 graceful
    degrade) — 대표 한 문장(있으면) + 서비스 소개 + 서비스 링크만. navigator.share 우선,
    미지원 시 클립보드 폴백. 프레임워크 추가 없음(A와 동일 스택, Stack Lock 준수). */
-const RG_SERVICE_TAGLINE = '하루 한 문장으로 쌓는 독서 습관, ReadingGo.';
+// 서비스(앱) 권유 문구 = 우리 철학 한 줄(책을 더 쉽게·더 깊게). 특정 책 인용은 넣지 않는다 —
+// 앱 초대의 목적은 책 한 권 공유가 아니라 '이 습관을 같이' 이기 때문(#1092). index.html 의 OG
+// description 과 같은 문장이라, 링크 미리보기 카드와 공유 텍스트가 한목소리로 들린다.
+const RG_SERVICE_TAGLINE = '책을 더 쉽게, 더 깊게 읽도록. 하루 한 문장으로 독서 습관을 만드는 ReadingGo.';
 
-// 링크 제외 본문 (대표 한 문장 + 태그라인). navigator.share 는 url 을 따로 받으므로 본문엔 링크 미포함.
-function buildServiceShareBody(opts) {
-  opts = opts || {};
-  const parts = [];
-  if (opts.sentence) {
-    const n = _normalizeSentence(opts.sentence);
-    if (n.text) {
-      if (n.kind === 'thought') {
-        const src = [n.author, n.title ? '《' + n.title + '》' : ''].filter(Boolean).join(' ');
-        parts.push('💭 ' + n.text + (src ? '\n(' + src + '을 읽고)' : ''));
-      } else {
-        const src = [n.author, n.title ? '《' + n.title + '》' : ''].filter(Boolean).join(', ');
-        parts.push('"' + n.text + '"' + (src ? '\n— ' + src : ''));
-      }
-    }
-  }
-  parts.push(RG_SERVICE_TAGLINE);  // 대표 한 문장 없으면(빈 인용 금지) 소개만 (referral.md §2)
-  return parts.join('\n\n');
+// 링크 제외 본문. navigator.share 는 url 을 따로 받으므로 본문엔 링크 미포함.
+function buildServiceShareBody() {
+  return RG_SERVICE_TAGLINE;
 }
 
 // 클립보드 폴백용 — 본문 + 링크.
-function buildServiceShareText(opts) {
-  return buildServiceShareBody(opts) + '\n\n' + RG_SHARE_LINK_FULL;
+function buildServiceShareText() {
+  return buildServiceShareBody() + '\n\n' + RG_SHARE_LINK_FULL;
 }
 
-/* 서비스 공유 진입점. opts: { source('library'|...), sentence(대표 한 문장|null) }.
-   navigator.share({text,url}) 우선 → 클립보드 복사 폴백. */
+/* 서비스 공유 진입점. opts: { source('library'|...) } (추적용). 본문은 철학 한 줄 고정(#1092).
+   navigator.share({text,url}) 우선 → 클립보드 복사 폴백. 미리보기 카드는 링크 OG 가 담당. */
 async function shareService(opts) {
   opts = opts || {};
   const toast = (typeof showToast === 'function') ? showToast : (function () {});
@@ -370,7 +358,7 @@ async function shareService(opts) {
   // 1) Web Share API — 본문(링크 제외) + url 분리(링크 프리뷰 향상).
   if (navigator.share) {
     try {
-      await navigator.share({ text: buildServiceShareBody(opts), url: RG_SHARE_LINK_FULL });
+      await navigator.share({ text: buildServiceShareBody(), url: RG_SHARE_LINK_FULL });
       track('service_share_sent', { source: opts.source || '', method: 'web_share' });
       return;
     } catch (e) {
@@ -378,7 +366,7 @@ async function shareService(opts) {
     }
   }
   // 2) 폴백: 본문+링크 클립보드 복사.
-  const copied = await _copyText(buildServiceShareText(opts));
+  const copied = await _copyText(buildServiceShareText());
   if (copied) track('service_share_sent', { source: opts.source || '', method: 'clipboard' });
   toast(copied ? '📋 초대 메시지를 복사했어요 — 친구에게 붙여넣어 보세요' : '공유를 지원하지 않는 환경이에요');
 }
