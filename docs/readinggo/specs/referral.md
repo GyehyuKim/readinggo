@@ -163,6 +163,15 @@
 - **유효하지 않은/만료 코드**: 추천인 맥락 줄만 숨기고 일반 소개 랜딩으로 폴백(에러 화면 금지).
 - **자기 자신 링크**: 이미 로그인한 사용자가 자기 링크로 오면 셀프리퍼럴 방지 — 귀속하지 않고 홈으로.
 
+### 5.2 인앱 브라우저 탈출 (#1096)
+
+카톡·인스타·페북 등으로 공유된 링크는 **인앱 브라우저(WebView)** 로 열려 전환을 막는다:
+- 외부 Chrome/Safari 와 세션 분리 → 항상 비로그인(참여·가입하려면 로그인 필요)
+- **Google 로그인 차단** — Google 이 embedded WebView OAuth 를 거부(`disallowed_useragent`, 2021-09-30~). 카카오 로그인만 가능
+- 링크 복사 막힘 → 외부로 옮길 수 없음
+
+**대응**: 부팅 시 인앱 브라우저 감지(`navigator.userAgent` 의 `KAKAOTALK`·`Instagram`·`FBAN` 등 — `inapp.js` `window.RG_inApp.detect()`) → 상단 배너로 "기본 브라우저로 열기" 유도. 카카오는 `openExternal` 스킴(iOS `kakaotalk://web/openExternal?url=`, Android `intent://…package=com.android.chrome`)으로 원클릭, 그 외(인스타·페북)는 "⋯ → 다른 브라우저로 열기" 안내만(공식 스킴 없음). 외부로 빠지면 로그인·복사·공유가 정상화된다. 초대 링크 `?r=`([co-reading.md §5.2](./co-reading.md))·데모 링크 공유 전반에 공통 적용.
+
 ---
 
 ## 6. #651 한 문장 카드와 시각 일관성

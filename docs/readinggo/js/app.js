@@ -324,6 +324,24 @@ function LoginScreen({ onLogin, onBack }) {
 }
 
 let _rgVisitGranted = false;  // 데모: 방문 XP 세션 1회 적립 가드
+/* 인앱 브라우저(카카오 등) 안내 배너 (#1096) — 외부 기본 브라우저로 빼야 로그인·복사·공유가 풀린다.
+   카카오는 openExternal 스킴으로 원클릭, 그 외(인스타·페북)는 안내만. dismiss 가능. */
+function InAppBanner() {
+  const { useState } = React;
+  const [info] = useState(() => (window.RG_inApp ? window.RG_inApp.detect() : { isAny: false, canEscape: false }));
+  const [hidden, setHidden] = useState(false);
+  if (!info.isAny || hidden) return null;
+  return (
+    <div className="rg-inapp-banner" role="alert">
+      <span className="rg-inapp-msg">로그인·링크 복사가 막히는 인앱 브라우저예요. 기본 브라우저로 열면 정상 작동해요.</span>
+      {info.canEscape
+        ? <button className="rg-inapp-open" onClick={() => window.RG_inApp.openExternal()}>브라우저로 열기</button>
+        : <span className="rg-inapp-tip">우측 상단 ⋯ → "다른 브라우저로 열기"</span>}
+      <button className="rg-inapp-x" onClick={() => setHidden(true)} aria-label="배너 닫기">×</button>
+    </div>
+  );
+}
+
 function App() {
   const { useState, useCallback, useMemo, useEffect } = React;
   // Phase 1: Supabase 설정 시 로그인 게이트 + 실데이터. 미설정/미로그인은 localStorage 폴백.
@@ -820,6 +838,8 @@ function App() {
   return (
     <div className="stage">
       <div className="app">
+
+        <InAppBanner />
 
         {/* 상단 바 */}
         <header className="topbar">

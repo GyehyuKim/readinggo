@@ -37,6 +37,7 @@ import './js/settings-modal.js';
 import './js/shelf-import.js';
 import './js/streak-reminder.js';   // #1033 스트릭 리마인더 로컬 알림 (window.RG_streakReminder)
 import './js/sheet-drag.js';        // #1046 바텀시트 글로벌 drag-to-dismiss (grip 끌어 닫기)
+import './js/inapp.js';             // #1096 인앱 브라우저(카카오 등) 감지 + 외부 브라우저 열기 (window.RG_inApp)
 
 // 4) Supabase DataStore 스왑(로그인 시) → 그 다음 app 마운트.
 //    기존 index.html IIFE 가 library.js 와 settings-modal.js 사이에서 await 하던 로직.
