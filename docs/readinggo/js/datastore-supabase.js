@@ -861,10 +861,8 @@
           }
         }
         const vis = visibility === 'private' ? 'private' : 'public';
-        const pw = (vis === 'private' && password) ? String(password) : null; // 비밀번호는 비공개 방만
         // invite_code(6자리) + invite_token(22+자) 동시 생성. UNIQUE 충돌 시 최대 5회 재시도.
-        // ⚠ 비밀번호는 평문으로 insert 하지 않는다 (#996) — 방 생성 후 room_set_password RPC 로
-        //   bcrypt 해시 저장(crypt+gen_salt('bf'), 서버 보관). password_hash 는 클라가 못 읽는다.
+        // 비공개 숲은 비번 없이 토큰=초대장만으로 입장(#1094 후속, B안 — 비밀번호 기능 폐기).
         let v = null;
         for (let attempt = 0; attempt < 5; attempt++) {
           const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -882,23 +880,16 @@
         // 생성자 멤버 등록 — 직접 insert 금지(#1022, RLS vmembers_mod = delete 만). host(created_by=나)
         // 가드를 가진 SECURITY DEFINER RPC 로 등록(정의자 권한으로 RLS 우회).
         unwrap(await sb().rpc('room_create_membership', { p_room_id: v.id }));
-        // 비밀번호 설정 — host(방금 만든 created_by=나)만 통과하는 SECURITY DEFINER RPC 로 해시 저장.
-        if (pw != null) { unwrap(await sb().rpc('room_set_password', { p_room_id: v.id, p_password: pw })); }
         // book + member count 포함해 다시 조회 (insert 응답엔 임베드 미포함)
         return unwrap(await sb().from('villages').select(this._SEL).eq('id', v.id).single()) || v;
       },
-      async join(roomId, opts) {
-        const password = (opts && opts.password) || '';
-        // 입장 권한 = **서버측 강제** (#1022, CSO HIGH). 이전엔 capacity·비번을 클라 JS 로 검사한 뒤
-        // village_members 를 직접 upsert 했으나, RLS(vmembers_mod)가 user_id=auth.uid() 만 봐서
-        // join UI 를 건너뛴 직접 insert 로 비번·정원 우회가 가능했다. 이제 클라 직접 insert 는
-        // RLS(vmembers_mod = delete 만)로 거부되고, 멤버십은 SECURITY DEFINER RPC room_join 경유만:
-        // 함수 안에서 서버가 (a)방 존재 (b)room_verify_password 비번일치 (c)현재멤버<capacity 를
-        // 검증한 뒤에만 멤버 행을 만든다. 실패는 errcode 로 구분 → 친화 메시지 매핑.
-        const res = await sb().rpc('room_join', { p_room_id: roomId, p_password: password });
+      async join(roomId) {
+        // 입장 권한 = **서버측 강제** (#1022, CSO HIGH). 멤버십은 SECURITY DEFINER RPC room_join 경유만:
+        // 함수 안에서 서버가 (a)방 존재 (b)현재멤버<capacity 를 검증한 뒤에만 멤버 행을 만든다.
+        // 비번 폐기(#1094 후속, B안) — room_join 시그니처는 유지하되 p_password 는 빈값(비번 없는 방은 통과).
+        const res = await sb().rpc('room_join', { p_room_id: roomId, p_password: '' });
         if (res && res.error) {
           const e = res.error;
-          if (e.code === '28000' || /password/i.test(e.message || '')) throw new Error('비밀번호가 맞지 않아요.');
           if (e.code === '23505' || /full/i.test(e.message || '')) throw new Error('정원이 마감되었습니다.');
           if (e.code === 'P0002' || /not found/i.test(e.message || '')) throw new Error('방을 찾을 수 없어요.');
           throw e;
@@ -995,8 +986,9 @@
       // 토큰 URL 입장 미리보기 (§5.2) — invite_token 직접 조회(전체 스캔 없음).
       async findByToken(token) {
         if (!token) return null;
-        return unwrap(await sb().from('villages').select(this._SEL)
-          .eq('invite_token', String(token).trim()).maybeSingle());
+        // 비공개 숲도 토큰=초대장으로 조회 (villages_sel RLS 가 비멤버를 막으므로 SECURITY DEFINER
+        // RPC find_room_by_token 경유 — password_hash 제외, book+멤버수 임베드. 36_find_room_by_token.sql).
+        return unwrap(await sb().rpc('find_room_by_token', { p_token: String(token).trim() })) || null;
       },
       // 6자리 코드 입장 미리보기 — invite_code 직접 조회.
       async findByCode(code) {

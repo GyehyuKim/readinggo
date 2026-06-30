@@ -3,8 +3,8 @@
    같이읽기(숲) — co-reading.md. '함께' 탭 ② 숲 레이어 + 숲 내부 + P2 등록 글루.
    - RoomsView      : 숲 목록(참여 중·추천) + 숲 찾기/만들기 진입 (§4.2)
    - FindRoomSheet  : 코드·링크 / 책으로 검색 (§4.3)
-   - CreateRoomSheet: 책·이름·공개설정·정원·비밀번호 (§5.1)
-   - RoomPreviewSheet: 참여 전 미리보기 + 비밀번호 (§4.5)
+   - CreateRoomSheet: 책·이름·공개설정·정원 (§5.1)
+   - RoomPreviewSheet: 참여 전 미리보기 (§4.5)
    - RoomModal      : 숲 내부 — 멤버 진척 그리드 + 한 문장 (§5.3)
    - P2(§7.5): 책 등록 시 기본 = 같이+공개(opt-out). rgCoReadMode/rgAutoJoinPublicRoom.
    데이터는 DataStore.rooms.* (어댑터 추상화, 직접 저장소 호출 금지 — backend.md §7.2).
@@ -225,8 +225,6 @@ function CreateRoomSheet({ onClose, onCreated }) {
   const [visibility, setVisibility] = useState('public');
   const [useCapacity, setUseCapacity] = useState(false);
   const [capacity, setCapacity] = useState(8);
-  const [usePassword, setUsePassword] = useState(false);
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -263,7 +261,6 @@ function CreateRoomSheet({ onClose, onCreated }) {
       const room = await DataStore.rooms.create({
         bookId: book.id, name: name.trim(), visibility,
         capacity: useCapacity ? Number(capacity) : null,
-        password: (visibility === 'private' && usePassword) ? password.trim() : null,
       });
       if (window.showToast) window.showToast('숲을 만들었어요', { sparrow: true });
       onCreated(room);
@@ -340,17 +337,6 @@ function CreateRoomSheet({ onClose, onCreated }) {
               )}
             </label>
 
-            {visibility === 'private' && (
-              <label className="rg-room-toggle-row">
-                <input type="checkbox" checked={usePassword} onChange={e => setUsePassword(e.target.checked)} />
-                <span>비밀번호 걸기</span>
-                {usePassword && (
-                  <input type="text" value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder="비밀번호" className="rg-room-num" style={{ width: 110 }} />
-                )}
-              </label>
-            )}
-
             {err ? <p className="rg-room-err">{err}</p> : null}
             <button className="rg-btn-primary" disabled={busy} onClick={create} style={{ marginTop: 14 }}>
               {busy ? '만드는 중…' : '숲 만들기'}
@@ -362,10 +348,9 @@ function CreateRoomSheet({ onClose, onCreated }) {
   );
 }
 
-/* ── 숲 미리보기 시트 (§4.5) — 참여 전 + 비밀번호 ─────────────── */
+/* ── 숲 미리보기 시트 (§4.5) — 참여 전 ─────────────── */
 function RoomPreviewSheet({ room, onClose, onJoined }) {
   const { useState } = React;
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const book = room.book || {};
@@ -373,19 +358,15 @@ function RoomPreviewSheet({ room, onClose, onJoined }) {
   const me = window.RG_ME && window.RG_ME.id;
   const alreadyIn = !!(me && (room._members ? room._members.includes(me) : false));
   const full = room.capacity ? cnt >= room.capacity : false;
-  // 비번 걸린 방인지 = has_password 플래그(비-비밀, #996). 해시·평문은 클라가 못 읽는다 —
-  // 입력칸 노출 여부만 이 플래그로 판단하고, 실제 검증은 서버(room_verify_password)가 한다.
-  const needsPw = !!room.has_password;
-
   const join = async () => {
     setErr(''); setBusy(true);
     try {
-      await DataStore.rooms.join(room.id, { password: needsPw ? password.trim() : undefined });
+      await DataStore.rooms.join(room.id, {});
       if (window.showToast) window.showToast('숲에 들어왔어요', { sparrow: true });
       onJoined(room);
     } catch (e) {
       const m = (e && e.message) || '';
-      setErr(m.includes('비밀번호') ? '비밀번호가 맞지 않아요.' : (m.includes('정원') ? '정원이 마감되었습니다.' : '참여하지 못했어요.'));
+      setErr(m.includes('정원') ? '정원이 마감되었습니다.' : '참여하지 못했어요.');
     } finally { setBusy(false); }
   };
 
@@ -408,12 +389,6 @@ function RoomPreviewSheet({ room, onClose, onJoined }) {
             </div>
           </div>
         </div>
-        {needsPw && !alreadyIn && (
-          <div style={{ marginBottom: 10 }}>
-            <input type="text" value={password} onChange={e => { setPassword(e.target.value); setErr(''); }}
-              placeholder="🔒 비밀번호" className="rg-room-input" />
-          </div>
-        )}
         {err ? <p className="rg-room-err">{err}</p> : null}
         <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
           <button className="rg-btn-tonal" onClick={onClose} style={{ flex: '0 0 auto', minWidth: 88 }}>취소</button>
@@ -422,7 +397,7 @@ function RoomPreviewSheet({ room, onClose, onJoined }) {
           ) : full ? (
             <button className="rg-btn-primary" disabled style={{ flex: 1 }}>정원 마감</button>
           ) : (
-            <button className="rg-btn-primary" disabled={busy || (needsPw && !password.trim())} onClick={join} style={{ flex: 1 }}>
+            <button className="rg-btn-primary" disabled={busy} onClick={join} style={{ flex: 1 }}>
               {busy ? '참여 중…' : '참여하기'}
             </button>
           )}

@@ -208,18 +208,17 @@
 
 ### 5.2 접근 제어 (제품 owner 명시 요구)
 
-> **결정됨.** 모든 방은 `invite_token` 을 갖는다. 공개 방은 책으로 검색되고, 비공개 방은 **초대 링크(토큰 URL) 또는 비밀번호**로만 들어온다.
+> **결정됨 (B안, #1094 후속 — 비밀번호 폐기).** 모든 방은 `invite_token` 을 갖는다. 공개 방은 책으로 검색되고, 비공개 방은 **초대 링크(토큰 URL)** 로만 들어온다. **비밀번호 기능은 폐기**(데모 사용 0건, 복잡도만 늘림) — 입장 경로를 토큰=초대장 한 가지로 단순화.
 
 | 공개 설정 | 발견 | 입장 경로 |
 |---|---|---|
 | **공개(public)** | ✅ 책(제목/저자/ISBN)으로 검색 노출 | 검색 → 참여 / 초대 링크·코드도 가능 |
-| **비공개(private)** | ❌ 검색 비노출 | **초대 링크(토큰 URL)** OR **비밀번호** (둘 중 하나로 입장) |
+| **비공개(private)** | ❌ 검색 비노출 | **초대 링크(토큰 URL)** 받은 사람만 입장 |
 
 - **`invite_token`** — 모든 방이 보유(공개·비공개 공통). 토큰 URL(`<앱 origin>/?r=<token>`, #1094)을 **브라우저로 직접 열면** 앱 부팅(app.js)이 `?r` 쿼리의 토큰을 읽어 입장 미리보기를 띄운다(쿼리는 루트 `/`라 `base: './'` Capacitor 자산이 정상 로드 — `/r/` 경로는 상대자산이 깨짐). 앱 내 "코드·링크" 입력란 붙여넣기도 같은 토큰을 추출(`?r=`·구 `/r/` 둘 다). 기존 `invite_code`(6자리)는 사람이 부르기 쉬운 코드로 **병행 유지**(둘 다 같은 방을 가리킴).
-- **`password`** — 비공개 방이 선택적으로 설정. 링크 없이도 코드+비밀번호로 입장 가능하게 하는 옵션. nullable.
-- 비공개 방은 "링크를 받았거나(token) 비밀번호를 아는(password)" 둘 중 하나면 입장. 둘 다 요구하지 않는다.
+- **비밀번호 폐기 (B안)**: 구 `password`/`has_password`/`room_set_password`/`room_verify_password`(§6.4, #996) 경로 제거 — CreateRoom 비번 토글·RoomPreview 비번 입력·join 비번 검증 모두 삭제. 비공개 입장 = 토큰 한 가지. (DB `password_hash`/`has_password` 컬럼은 미사용으로 잔존, drop 은 별도.)
 
-> **구현 한계 (#1094)**: 현재 토큰 입장 미리보기는 **공개 방만** 게스트/비멤버가 조회 가능하다(`villages_sel` RLS = `visibility='public'` OR 생성자 OR 멤버). 위 표가 의도한 **비공개 방의 토큰 입장**은 비멤버 조회를 RLS 가 막으므로 `SECURITY DEFINER` RPC(`find_room_by_token`, 토큰=초대장 우회)가 필요 — **후속 과제**. 구 `rgo.app` 은 ReadingGo 소유가 아닌 죽은 도메인이라 실제 앱 origin 으로 교체됨.
+> **비공개 토큰 입장 — 해소 (B안, #1094 후속).** `villages_sel` RLS(`visibility='public'` OR 생성자 OR 멤버)가 비멤버의 비공개 방 조회를 막으므로, `find_room_by_token(p_token)` **`SECURITY DEFINER` RPC**(토큰=초대장 우회, `password_hash` 제외, book+멤버수 임베드 — [`36_find_room_by_token.sql`](../supabase/36_find_room_by_token.sql))로 해소. `datastore-supabase.js rooms.findByToken` 이 이 RPC 경유(공개·비공개 공통). **Supabase 수동 1회 적용 필요**(코드 머지 ≠ DB 적용).
 
 ### 5.3 방 내부 화면
 

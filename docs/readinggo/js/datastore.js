@@ -903,16 +903,15 @@ const DataStore = {
     _shape(r) {
       const bk = (typeof window.getBook === 'function') ? window.getBook(r.book_id) : null;
       const book = bk ? { id: bk.id, isbn13: bk.isbn, title: bk.title, author: bk.author, cover_url: bk.cover, total_pages: bk.total } : { id: r.book_id };
-      const { password, ...safe } = r;   // 평문은 표면 밖으로
-      return { ...safe, has_password: !!password, book, village_members: [{ count: (r._members && r._members.length) || 1 }] };
+      const { password, ...safe } = r;   // 비번 폐기(B안, #1094 후속) — 평문 제거, has_password 는 항상 false
+      return { ...safe, has_password: false, book, village_members: [{ count: (r._members && r._members.length) || 1 }] };
     },
-    async create({ bookId, name, visibility, capacity, password }) {
+    async create({ bookId, name, visibility, capacity }) {
       const list = this._load();
       const vis = visibility === 'private' ? 'private' : 'public';
       const r = {
         id: _dsId('room'), book_id: bookId, name: name || '', visibility: vis,
         capacity: capacity != null ? capacity : null,
-        password: (vis === 'private' && password) ? String(password) : null,
         invite_code: Math.random().toString(36).slice(2, 8).toUpperCase(),
         invite_token: this._token(),
         created_by: (window.RG_ME && window.RG_ME.id) || 'me',
@@ -922,12 +921,11 @@ const DataStore = {
       list.unshift(r); this._save(list);
       return this._shape(r);
     },
-    async join(roomId, opts) {
+    async join(roomId) {
       const list = this._load();
       const r = list.find(x => x.id === roomId);
       if (r) {
         if (r.capacity && (r._members || []).length >= r.capacity) throw new Error('정원이 마감되었습니다.');
-        if (r.password && String(r.password) !== String((opts && opts.password) || '')) throw new Error('비밀번호가 맞지 않아요.');
         const me = (window.RG_ME && window.RG_ME.id) || 'me';
         r._members = r._members || []; if (!r._members.includes(me)) r._members.push(me);
         this._save(list);
