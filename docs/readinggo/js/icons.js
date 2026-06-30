@@ -24,6 +24,8 @@ const RG_ICONS = {
   pen: <g stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round" strokeLinecap="round"><path d="M10.5 2.5l3 3-7.5 7.5H3v-3l7.5-7.5z"/><path d="M9 4l3 3"/></g>,
   pause: <g fill="currentColor"><rect x="4" y="3" width="2.6" height="10" rx="1.1"/><rect x="9.4" y="3" width="2.6" height="10" rx="1.1"/></g>,
   download: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5v7.5"/><path d="M4.8 7l3.2 3.2L11.2 7"/><path d="M2.5 13h11"/></g>,
+  // 파일 업로드(가져오기) — download 화살촉을 위(∧)로. 트레이는 바닥 유지 (#1091).
+  upload: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5v7.5"/><path d="M4.8 5.5l3.2-3 3.2 3"/><path d="M2.5 13h11"/></g>,
   // 서비스 외부 공유 (#650 B) — 노드 3개 + 연결선(표준 share 아이콘).
   share: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="3.5" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12.5" r="2"/><path d="M5.8 7l4.4-2.4M5.8 9l4.4 2.4"/></g>,
   // 기능 이모지 대체(#1062) — Feather 모노라인 16x16, currentColor 상속·둥근 끝. 🔍🏠📷🗑📦 통일.

@@ -696,7 +696,7 @@ function TextImportModal({ onClose }) {
                 <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
               </div>
               <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 12, background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, border: '1.5px solid var(--brand-soft)' }}>
-                {window.rgIcon('download', 14)} CSV·TSV·TXT 파일 고르기
+                {window.rgIcon('upload', 14)} CSV·TSV·TXT 파일 고르기
                 <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values" style={{ display: 'none' }} onChange={(e) => onPickFile(e.target.files && e.target.files[0])} />
               </label>
               <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 10, lineHeight: 1.5 }}>엑셀은 셀을 복사해 위 칸에 붙여넣으면 돼요 · 텍스트는 책 인식에만 쓰고 저장하지 않아요</p>
