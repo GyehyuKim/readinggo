@@ -598,8 +598,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* Markdown Export (§5.8.4) — 내 한 문장이 1개 이상 있을 때만 노출 */}
           {bookQuotes.length > 0 && (
             <button onClick={exportMarkdown}
-              style={{display:'flex', alignItems:'center', justifyContent:'center', gap:6, width:'100%', padding:'12px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14, boxSizing:'border-box'}}>
-              {window.rgIcon('download',15)} 내 한 문장 Markdown 내보내기
+              style={{display:'flex', alignItems:'center', justifyContent:'center', gap:6, width:'100%', padding:'12px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', marginBottom:14, boxSizing:'border-box'}}>
+              {window.rgIcon('download',14)} 내 한 문장 Markdown 내보내기
             </button>
           )}
 
