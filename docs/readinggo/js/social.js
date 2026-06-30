@@ -23,7 +23,7 @@ function SocialView({ state }) {
   return (
     <section className="view active">
       <div className="rg-together-seg" style={{ display: 'flex', gap: 6, padding: '12px 16px 10px' }}>
-        {[['discover', '① 발견'], ['rooms', '② 숲']].map(([id, label]) => (
+        {[['discover', '발견'], ['rooms', '숲']].map(([id, label]) => (
           <button key={id} onClick={() => setLayer(id)}
             style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: layer === id ? 'none' : '1px solid var(--line)',
               background: layer === id ? 'var(--ink)' : 'transparent', color: layer === id ? '#fff' : 'var(--ink-2)',

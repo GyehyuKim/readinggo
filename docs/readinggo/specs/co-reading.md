@@ -570,7 +570,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 ### 10.3 UI
 
 - `js/co-reading.js` — `RoomsView`(숲 탭 §4.2: 참여 중·추천·찾기/만들기) · `FindRoomSheet`(§4.3) · `CreateRoomSheet`(§5.1) · `RoomPreviewSheet`(§4.5) · `RoomModal`(§5.3: 멤버 진척 그리드 + 한 문장 2탭 + ⚙️ 공유/나가기). `window.RoomsView`/`window.RoomModal` 노출.
-- `js/social.js` — 피드 탭을 **'함께'** 셸로 재편(§2.1): 상단 세그먼트 **① 발견 / ② 숲**, 기본=발견. 발견 = 기존 피드 그대로(`DiscoverLayer`, feed.md §5.7 보존), 숲 = `RoomsView`. 내부 탭 키 `social` 유지.
+- `js/social.js` — 피드 탭을 **'함께'** 셸로 재편(§2.1): 상단 세그먼트 **발견 / 숲**(라벨 숫자 `①②` 제거 — 불필요, #1089), 기본=발견. 발견 = 기존 피드 그대로(`DiscoverLayer`, feed.md §5.7 보존), 숲 = `RoomsView`. 내부 탭 키 `social` 유지.
 - `js/app.js` — 하단 탭 라벨 **함께**(피드→함께, P1). `window.RG_openRoom(roomId)` 등록 + `RoomModal` 포털.
 - `js/book-info-modal.js` — "📖 이 책 N명 같이 읽는 중" badge(§4.4, N≥2 일 때만 카운트) → 숲 진입.
 - `index.html` — `.rg-btn-primary`/`.rg-btn-tonal`(DESIGN.md 버튼 위계: 1차 솔리드/2차 tonal, ghost 금지) + `.rg-room-*` + `.rg-coread-*` 클래스.
@@ -580,7 +580,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 ### 10.4 명칭 "숲" 확정 (이 PR, §8)
 
-- **화면 텍스트 전부 "방" → "숲"**: `js/co-reading.js`(숲 만들기/찾기/발견 버튼·헤더·토스트·에러·빈상태·섹션) · `js/social.js`(세그먼트 `② 숲`). 탭 라벨 "함께"는 유지.
+- **화면 텍스트 전부 "방" → "숲"**: `js/co-reading.js`(숲 만들기/찾기/발견 버튼·헤더·토스트·에러·빈상태·섹션) · `js/social.js`(세그먼트 `숲`). 탭 라벨 "함께"는 유지.
 - **코드 식별자는 불변**: `rooms.*` 계약·CSS `.rg-room-*`·함수명(`RoomsView`/`RoomModal`/`rgRoomNestEmoji`/`FindRoomSheet`…)·`RG_openRoom`·내부 탭 키 `social` 그대로(회귀·churn 방지).
 - badge 카피("📖 이 책 N명 같이 읽는 중")는 "방" 단어를 안 써 변경 불필요.
 
