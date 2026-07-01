@@ -120,6 +120,19 @@ function CompanionModal({ sentence, onClose }) {
   // 바꾸면 다음 질문(genCompanionQuestion/Followup)이 현재 프리셋을 읽어 반영. '작가의 시선'(author)도 여기서 즉시.
   const [qPreset, setQPreset] = _useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced');
   const pickPreset = (k) => { setQPreset(k); if (window.RG_companionPreset) window.RG_companionPreset.set(k); rgTrack('companion_preset_set', { preset: k, where: 'chat' }); };
+  // 질문 결 가로 스크롤 어포던스 (#1116) — 프리셋 7개가 모달 폭(430)을 넘겨 이미 가로 스크롤되지만
+  // 넘침을 알 힌트(스크롤바·엣지)가 없어 화면 밖 결(작가의 시선 등)을 못 보던 문제. 스크롤 위치에 따라
+  // 좌/우 페이드 마스크를 켜 "더 있음"을 알린다. 새 의존성 없이 CSS mask 만 추가(Stack Lock 준수).
+  const _presetScrollRef = _useRef(null);
+  const [presetFade, setPresetFade] = _useState({ l: false, r: false });
+  const _syncPresetFade = () => {
+    const el = _presetScrollRef.current; if (!el) return;
+    const l = el.scrollLeft > 4;
+    const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setPresetFade((f) => (f.l === l && f.r === r) ? f : { l, r });
+  };
+  _useEffect(() => { if (mode === 'jacky') _syncPresetFade(); }, [mode]);
+  const _presetMask = `linear-gradient(to right, ${presetFade.l ? 'transparent' : '#000'} 0, #000 16px, #000 calc(100% - 16px), ${presetFade.r ? 'transparent' : '#000'} 100%)`;
   const MAX = 5; // 멀티턴 무료 캡 (#655, 이전 3). 5턴 초과 무제한은 수익화 후속(워커 exchanges slice 상향).
   const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
   const bt = sentence.bookTitle || '', au = sentence.author || '';
@@ -262,7 +275,7 @@ function CompanionModal({ sentence, onClose }) {
              칩: 선택=브랜드 솔리드 / 비선택=라인(설정 SettingsModal 칩과 동일 패턴 — DESIGN.md 위계 일관). 가로 스크롤.
              #1070: 재키 모드에서만 노출(감상 모드엔 질문 결이 무의미). ── */}
         {mode === 'jacky' && (
-        <div role="group" aria-label="재키 질문 결 선택" style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div ref={_presetScrollRef} onScroll={_syncPresetFade} role="group" aria-label="재키 질문 결 선택" style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch', maskImage: _presetMask, WebkitMaskImage: _presetMask }}>
           {(window.RG_COMPANION_PRESETS || []).map((p) => {
             const on = qPreset === p.key;
             return (
