@@ -94,6 +94,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
     }
   };
   // 계정 삭제 (#875, Apple 심사 필수) — 2단계 확인 후 워커 /api/delete-account 호출.
+  const [delOpen, setDelOpen] = useState(false); // #1115 '계정 관리' 접힘 — 삭제 진입 가시성↓(경로는 유지)
   const [delConfirm, setDelConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const deleteAccount = async () => {
@@ -177,12 +178,17 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <span style={{ position: 'absolute', top: 3, left: (isSupabase && wishPublic) ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
-          {/* 계정 삭제 (#875, Apple 심사 필수) — 로그인(Supabase) 상태에서만. 2단계 확인 후 영구 삭제. */}
+          {/* 계정 삭제 (#875, Apple 심사 필수) — 로그인(Supabase) 상태에서만.
+             #1115: 항상 노출된 danger 버튼 대신 muted '계정 관리' 토글 뒤로 접어 가시성↓
+             (삭제 경로는 Apple 심사 필수라 항상 접근 가능). 펼치면 2단계 확인 후 영구 삭제. */}
           {isSupabase && (
             <div style={{ marginTop: 8 }}>
-              {!delConfirm ? (
+              {!delOpen ? (
+                <button onClick={() => setDelOpen(true)} aria-expanded={false}
+                  style={{ padding: '8px 2px', border: 'none', background: 'transparent', color: 'var(--ink-3)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>계정 관리</button>
+              ) : !delConfirm ? (
                 <button onClick={() => setDelConfirm(true)}
-                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
+                  style={{ padding: '8px 2px', border: 'none', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
               ) : (
                 <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--danger, #E5484D)', background: 'var(--danger-tint, rgba(229,72,77,0.06))' }}>
                   <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 기록(한 문장·서재·둥지·대화)이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
