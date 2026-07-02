@@ -1130,15 +1130,19 @@ async function parseBooksProxy(request, env) {
 }
 
 /* ── 표지 이미지 프록시 (#676) ───────────────────────────
-   알라딘 표지를 동일출처로 중계해 공유 카드의 tainted canvas 회피.
-   보안: 알라딘 이미지 호스트만 허용(오픈 프록시 악용 방지), image/* 만 통과. */
+   표지를 동일출처로 중계해 공유 카드의 tainted canvas 회피.
+   보안: 표지 호스트 화이트리스트만 허용(오픈 프록시 악용 방지), image/* 만 통과.
+   #1044 소스 이전: 카카오 책검색 thumbnail(*.kakaocdn.net)·국중도 TITLE_URL(*.nl.go.kr) 추가
+   — 실제 표지 호스트는 출시 전 실계정 확인 후 확정(spec backend.md §7.2.1 게이트). */
 async function imgProxy(searchParams) {
   const raw = searchParams.get('url') || '';
   let u;
   try { u = new URL(raw); } catch { return json({ error: 'bad url' }, 400); }
   const host = u.hostname.toLowerCase();
   const allowed = (u.protocol === 'https:' || u.protocol === 'http:')
-    && (host === 'aladin.co.kr' || host.endsWith('.aladin.co.kr'));
+    && (host === 'aladin.co.kr' || host.endsWith('.aladin.co.kr')
+      || host === 'kakaocdn.net' || host.endsWith('.kakaocdn.net')
+      || host === 'nl.go.kr' || host.endsWith('.nl.go.kr'));
   if (!allowed) return json({ error: 'host not allowed' }, 403);
   let r;
   try { r = await fetch(u.toString(), { cf: { cacheTtl: 86400, cacheEverything: true } }); }
