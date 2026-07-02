@@ -556,7 +556,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
               ].map((f, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <span style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 999, background: 'var(--brand-tint)', color: 'var(--brand-3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon(f.icon, 15)}</span>
-                  <span style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.55, paddingTop: 4 }}>{f.text}</span>
+                  <span style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.55, paddingTop: 4, wordBreak: 'keep-all' }}>{f.text}</span>
                 </div>
               ))}
             </div>
