@@ -7,10 +7,22 @@
 
    env (wrangler secret put 또는 대시보드):
      ALADIN_TTB_KEY · SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · ARCHIVE_DAILY_CAP(선택)
+     KAKAO_REST_KEY(#1044 검색 프론트) · NLK_CERT_KEY(#1044 국중도 ISBN 백본)
+     BOOKS_PROVIDER(선택 — 'aladin' 이면 신규 키가 있어도 레거시 알라딘 경로 강제)
    배포: npx wrangler deploy
    ========================================================= */
 
 const ALADIN = 'http://www.aladin.co.kr/ttb/api/';
+
+/* ── 도서 데이터 provider 스위치 (#1044, spec backend.md §7.2.1) ──────────
+   알라딘 OpenAPI ToS(영리 이용 불가 + 저장·캐시 금지)가 canonical 캐시(books upsert)와 충돌 →
+   상업 출시 전 소스 이전: canonical 백본 = 국중도 서지정보(쪽수 PAGE, 저장 제한 없음),
+   검색 프론트 = 카카오 책검색(발견 전용 — 영구 적재는 ISBN 국중도 재조회분만).
+   키 자동 감지: 해당 secret 이 있으면 신규 경로, 없으면 기존 알라딘 폴백(무중단 —
+   배포 후 `wrangler secret put` 만으로 전환). BOOKS_PROVIDER='aladin' 은 명시 롤백 스위치. */
+const legacyForced = (env) => env.BOOKS_PROVIDER === 'aladin';
+const kakaoReady = (env) => !legacyForced(env) && !!env.KAKAO_REST_KEY;
+const nlkReady = (env) => !legacyForced(env) && !!env.NLK_CERT_KEY;
 
 export default {
   // ── HTTP: 정적 + 알라딘 프록시 ──────────────────────────
@@ -1140,25 +1152,150 @@ async function imgProxy(searchParams) {
   });
 }
 
-/* ── 알라딘 프록시 (aladin.js 포팅) ─────────────────────── */
+/* ── 도서 프록시 디스패처 (#1044 소스 이전) ──────────────────
+   라우트 `/aladin` 은 클라 회귀 방지 위해 과도기 유지(§7.2.1). 키 존재에 따라
+   ISBN 단건 → 국중도(nlkIsbnLookup), 키워드 검색 → 카카오(kakaoSearchProxy),
+   둘 다 없으면 기존 알라딘 경로(aladinLegacyProxy) — 현 배포 상태와 동일 동작. */
 async function aladinProxy(q, env, ctx) {
-  const key = env.ALADIN_TTB_KEY;
-  if (!key) return json({ error: 'ALADIN_TTB_KEY 미설정' }, 500);
   const isbn = (q.get('isbn') || '').trim();
   const query = (q.get('query') || q.get('q') || '').trim().slice(0, 100);
   const max = Math.min(parseInt(q.get('max'), 10) || 10, 20);
+  if (isbn && !/^\d{10,13}$/.test(isbn)) return json({ error: 'isbn 형식 오류' }, 400);
+  if (!isbn && !query) return json({ error: 'query 또는 isbn 필요' }, 400);
+  if (isbn && nlkReady(env)) return nlkIsbnLookup(isbn, env, ctx);
+  if (!isbn && kakaoReady(env)) return kakaoSearchProxy(query, max, env, ctx);
+  return aladinLegacyProxy(isbn, query, max, env, ctx);
+}
+
+/* ── 국중도 서지정보 — ISBN 단건 백본 (#1044) ─────────────────
+   canonical 영구 적재는 저장 제한 없는 소스만: 국중도 → (미보유 외서) OpenLibrary.
+   Google Books 는 응답 표시 보강에만 쓰고 영구 upsert 에서 제외(ToS §5.e 영구 캐시 금지). */
+async function nlkIsbnLookup(isbn, env, ctx) {
+  let canonical = null;
+  try { canonical = await nlkByIsbn(isbn, env); } catch (e) { /* 방어 — 폴백 진행 */ }
+  if (!canonical || !canonical.title) {
+    // 국중도 미보유(외서 등) — 영구 폴백은 OpenLibrary(무키·저장 제약 없음)만.
+    const ol = await openLibraryByIsbn(isbn);
+    if (ol && ol.title) canonical = { isbn13: isbn, ...ol };
+  }
+  // 영구 적재: canonical(국중도/OpenLibrary) 행만 — upsertBook 이 ISBN-13 게이트(#1117) 적용.
+  if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && canonical && canonical.title) {
+    ctx.waitUntil(upsertBook(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, canonical).catch(() => {}));
+  }
+  // 표시용 실시간 보강(#529 계승) — 빈 필드를 Google→OpenLibrary→LLM 으로 채우되 저장과 분리.
+  let display = canonical ? { ...canonical } : { isbn13: isbn, title: '', author: '', publisher: '', total_pages: null, cover_url: '', description: '', source: '' };
+  try { display = await enrichForeignMeta(display, env); } catch (e) { /* skip */ }
+  return json({ items: display.title ? [display] : [] }, 200, 86400);
+}
+
+// 국중도 서지정보 API 호출 (#1044) — cert_key 서버 보관(클라 노출 금지). 응답 방어적 파싱.
+async function nlkByIsbn(isbn, env) {
+  if (!env.NLK_CERT_KEY || !/^\d{10,13}$/.test(isbn)) return null;
+  const url = `https://www.nl.go.kr/seoji/SearchApi.do?cert_key=${encodeURIComponent(env.NLK_CERT_KEY)}`
+    + `&result_style=json&page_no=1&page_size=10&isbn=${encodeURIComponent(isbn)}`;
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  let d;
+  try { d = await r.json(); } catch (e) { return null; }
+  const docs = (d && (d.docs || d.doc)) || [];
+  const doc = Array.isArray(docs) ? docs[0] : docs;
+  if (!doc) return null;
+  return normalizeNLK(doc, isbn);
+}
+
+// 국중도 응답 → books 컬럼 (#1044) — 쪽수 = PAGE(알라딘 itemPage 대체), 표지 = TITLE_URL.
+// 빈 필드 키 생략(normalize 와 동일 비파괴 규약) — merge upsert 가 기존 풍부한 행을 덮지 않게.
+function normalizeNLK(doc, isbn) {
+  const s = (v) => String(v == null ? '' : v).trim();
+  const n = { isbn13: s(doc.EA_ISBN) || s(doc.SET_ISBN) || s(isbn), title: s(doc.TITLE), source: 'nlk' };
+  const set = (k, v) => { const t = s(v); if (t) n[k] = t; };
+  set('author', doc.AUTHOR);
+  set('publisher', doc.PUBLISHER);
+  const pg = (s(doc.PAGE).match(/\d+/) || [])[0];       // "376 p." 류 표기 방어
+  if (pg && Number(pg) > 1) n.total_pages = Number(pg);
+  set('cover_url', s(doc.TITLE_URL).replace(/^http:/, 'https:'));
+  const pre = s(doc.PUBLISH_PREDATE || doc.REAL_PUBLISH_DATE);
+  if (/^\d{8}$/.test(pre)) n.pub_date = `${pre.slice(0, 4)}-${pre.slice(4, 6)}-${pre.slice(6, 8)}`;
+  return n;
+}
+
+/* ── 카카오 책검색 — 검색 프론트 (#1044) ─────────────────────
+   발견 전용. 영구 적재는 카카오 응답 직접 upsert 대신 발견 ISBN 을 국중도로 재조회한 행만
+   (카카오 운영정책 캐시 조항 회피 — 리서치 #1044). 국중도 키 없으면 저장 생략(응답만). */
+async function kakaoSearchProxy(query, max, env, ctx) {
+  try {
+    let items = await kakaoBookSearch(query, max, env);
+    // 외서 균형 보강(#302 유지): 국내(카카오) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
+    // Google 결과는 실시간 응답만 — 영구 upsert 없음(ToS §5.e).
+    items = items.slice(0, 5);
+    try {
+      const gb = await googleBooksSearch(query, 10 - items.length, env);
+      const seen = new Set(items.map((it) => it.isbn13 || it.title));
+      for (const g of gb) {
+        if (items.length >= 10) break;
+        const k = g.isbn13 || g.title;
+        if (k && !seen.has(k)) { seen.add(k); items.push(g); }
+      }
+    } catch (e) { /* 보강 실패 무시 */ }
+    // 검색 도서 자동 저장(#489 계승): 카카오 발견 ISBN → 국중도 재조회 후 canonical 적재.
+    if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && nlkReady(env)) {
+      const isbns = items.filter((b) => b.source === 'kakao' && b.isbn13).map((b) => b.isbn13);
+      ctx.waitUntil((async () => {
+        for (const i of isbns) {
+          try {
+            const n = await nlkByIsbn(i, env);
+            if (n && n.title) await upsertBook(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, n);
+          } catch (e) { /* skip */ }
+        }
+      })());
+    }
+    return json({ items }, 200, 86400);
+  } catch (e) {
+    // 카카오 자체 실패 → Google 실시간 폴백(저장 없음) — 레거시 경로와 동일 무중단 규약.
+    try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb }, 200, 3600); } catch (e2) {}
+    return json({ error: '카카오 호출 실패', detail: String((e && e.message) || e) }, 502);
+  }
+}
+
+// 카카오 책검색 API 호출 (#1044) — KakaoAK 헤더, REST 키 서버 보관(클라 노출 금지).
+async function kakaoBookSearch(query, max, env) {
+  const r = await fetch(`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(query)}&size=${Math.min(max || 10, 50)}`, {
+    headers: { Authorization: `KakaoAK ${env.KAKAO_REST_KEY}` },
+  });
+  if (!r.ok) throw new Error(`kakao ${r.status}`);
+  const d = await r.json();
+  return (Array.isArray(d.documents) ? d.documents : []).map(normalizeKakao).filter((b) => b.title);
+}
+
+// 카카오 응답 → books 컬럼 (#1044) — 쪽수 미제공(total_pages 키 생략, 국중도 PAGE 로 보강).
+// isbn 필드는 "ISBN10 ISBN13" 공백 구분 — 13자리 토큰만 채택. 빈 필드 키 생략(비파괴).
+function normalizeKakao(doc) {
+  const s = (v) => String(v == null ? '' : v).trim();
+  const isbn13 = s(doc.isbn).split(/\s+/).find((t) => /^\d{13}$/.test(t)) || '';
+  const n = { isbn13, title: s(doc.title), source: 'kakao' };
+  const set = (k, v) => { const t = s(v); if (t) n[k] = t; };
+  set('author', (Array.isArray(doc.authors) ? doc.authors : []).join(', '));
+  set('publisher', doc.publisher);
+  set('cover_url', s(doc.thumbnail).replace(/^http:/, 'https:'));
+  set('description', doc.contents);
+  const dt = s(doc.datetime);                            // ISO 8601 (예: 2014-11-17T00:00:00.000+09:00)
+  if (/^\d{4}-\d{2}-\d{2}/.test(dt)) n.pub_date = dt.slice(0, 10);
+  return n;
+}
+
+/* ── 알라딘 프록시 (aladin.js 포팅) — 레거시 폴백 (#1044 과도기) ── */
+async function aladinLegacyProxy(isbn, query, max, env, ctx) {
+  const key = env.ALADIN_TTB_KEY;
+  if (!key) return json({ error: 'ALADIN_TTB_KEY 미설정' }, 500);
 
   let apiUrl;
   if (isbn) {
-    if (!/^\d{10,13}$/.test(isbn)) return json({ error: 'isbn 형식 오류' }, 400);
     apiUrl = `${ALADIN}ItemLookUp.aspx?ttbkey=${key}&itemIdType=ISBN13&ItemId=${encodeURIComponent(isbn)}`
       + `&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`;
-  } else if (query) {
+  } else {
     apiUrl = `${ALADIN}ItemSearch.aspx?ttbkey=${key}&Query=${encodeURIComponent(query)}`
       + `&QueryType=Keyword&SearchTarget=Book&MaxResults=${max}&start=1`
       + `&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`;
-  } else {
-    return json({ error: 'query 또는 isbn 필요' }, 400);
   }
 
   try {

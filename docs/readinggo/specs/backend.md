@@ -182,8 +182,8 @@ ai.extractBook(userBookId)                 → 추출 책 요약
 
 | 현행 함수 | 현재(알라딘) | 이전 후 | 비고 |
 |---|---|---|---|
-| `aladinProxy` (~:1049) | ItemSearch(검색)·ItemLookUp(ISBN) | **검색 → 카카오 책검색**, **ISBN 단건 → 카카오 + 국중도 쪽수 보강** | 함수·라우트명 리네이밍(예 `bookSearchProxy`) 검토. 클라 회귀 방지 위해 라우트 별칭 `/aladin` 은 과도기 유지 가능 |
-| `normalize` (~:1264) | 알라딘 `item` 필드 매핑 | **카카오/국중도 응답 → `books` 컬럼 재매핑**. **쪽수 = 국중도 `PAGE`**, 표지 = 카카오 `thumbnail` 또는 국중도 `TITLE_URL` | 알라딘 전용 컬럼(`sales_point`·`customer_review_rank`·`aladin_link`)은 신규소스 부재 → NULL(이미 nullable, 비파괴) |
+| `aladinProxy` (~:1049) | ItemSearch(검색)·ItemLookUp(ISBN) | ✅ **구현** — 디스패처로 전환: **검색 → 카카오(`kakaoSearchProxy`)**, **ISBN 단건 → 국중도(`nlkIsbnLookup`)**, 키 없으면 **레거시 알라딘(`aladinLegacyProxy`) 폴백** | 라우트 `/aladin` 은 클라 회귀 방지 위해 과도기 유지. 국중도 미보유 외서의 영구 폴백 = OpenLibrary(응답 표시 보강은 Google 실시간) |
+| `normalize` (~:1264) | 알라딘 `item` 필드 매핑 | ✅ **구현** — `normalizeKakao`(thumbnail·contents, 쪽수 없음→키 생략)·`normalizeNLK`(**쪽수 = `PAGE`**, 표지 = `TITLE_URL`) 추가. 빈 필드 키 생략(비파괴 merge upsert 규약 유지) | 알라딘 전용 컬럼(`sales_point`·`customer_review_rank`·`aladin_link`)은 신규소스 부재 → NULL(이미 nullable, 비파괴) |
 | `upsertBook` (~:1312) | `on_conflict=isbn13` merge upsert | **유지** — 카카오 캐시 조건(최신 유지) 위해 `enriched_at` 신선화 + 일일 cron 재보강 유지 | 카카오 §5(20) 충족 핵심: 캐시를 stale 방치하지 않음 |
 | `archive` cron (~:1220) | 알라딘 베스트셀러 ItemList → ItemLookUp | **알라딘 베스트셀러 의존 제거 — 인기 시드 소스 재설계 필요** | 카카오·국중도엔 베스트셀러 API 없음. 출시 블로커 관점상 검색·등록(P1) 먼저, 인기 시드(P2)는 후순위 |
 | `imgProxy` (~:1028) | 표지 호스트 화이트리스트 = `aladin.co.kr` 만 | **카카오·국중도 표지 호스트 추가**(카카오 `*.kakaocdn.net` 류·국중도 `TITLE_URL` 호스트) | 실제 표지 호스트는 출시 전 실계정 확인 후 확정 |
@@ -199,8 +199,13 @@ ai.extractBook(userBookId)                 → 추출 책 요약
 **Phasing:**
 
 - **P1 (출시 블로커)**: 검색·등록 경로 이전 — `aladinProxy`(→카카오+국중도)·`normalize`·`imgProxy` 화이트리스트·`googleBooksSearch` upsert 제거. **즉시 ToS 에 노출되는 상업 경로**부터.
-- **P2**: `archive` cron 인기 시드 소스 재설계(알라딘 베스트셀러 대체) + 외서 폴백 영속 정리 마무리.
-- 코드는 본 spec 머지 후 **후속 PR**(#1044 코드)로. 본 PR 은 spec-only.
+- **P2**: `archive` cron 인기 시드 소스 재설계(알라딘 베스트셀러 대체) + 외서 폴백 영속 정리 마무리(`enrichForeignMeta` 의 Google merge 가 ISBN 등록 upsert 에 섞이는 잔여 경로 포함).
+
+**구현 상태 (#1044 코드 PR, 2026-07-03)** — P1 을 **provider 스위치** 뒤로 구현:
+
+- **키 자동 감지 폴백(무중단)**: `KAKAO_REST_KEY`(검색)·`NLK_CERT_KEY`(ISBN·쪽수) secret 이 있으면 신규 경로, 없으면 기존 알라딘 경로 그대로 — 키 미발급 상태로 배포해도 현행과 동일 동작, 배포 후 `wrangler secret put` 만으로 전환. `BOOKS_PROVIDER='aladin'` 은 명시 롤백 스위치.
+- **카카오 캐시 조항 회피**: 카카오 검색 결과는 **직접 upsert 하지 않고**, 발견 ISBN 을 국중도로 재조회한 행만 canonical 적재(국중도 키 없으면 저장 생략 — 응답만).
+- **남은 일**: 카카오·국중도 키 발급/등록 → 전환 실측, 표지 호스트 실계정 확정(위 게이트), P2 인기 시드 재설계(별도 이슈).
 
 ### 7.3 데이터 모델 (관계형 — Phase 1 기준)
 
