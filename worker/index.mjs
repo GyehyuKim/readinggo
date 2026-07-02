@@ -1480,13 +1480,15 @@ async function archive(env) {
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 }
 
-/* 쪽수 백필 (#1117) — total_pages 가 null 인 책을 ItemLookUp(subInfo.itemPage)으로 채운다.
-   사용자 검색은 Aladin ItemSearch 로 들어와 itemPage 가 없어 null 로 남는다(ItemLookUp 만 쪽수 제공) →
-   화면에서 "/ 1p" 로 보였다. 일일 cron 으로 유효 isbn13 인 null 책을 보강해 신규 null 재발 방지
-   (과거 대량 null 은 1회 collector/backfill-pages.mjs 로 해소). 비-ISBN id 행은 조회 불가라 건너뛴다. */
+/* 쪽수 백필 (#1117·#1044) — total_pages 가 null 인 책을 일일 cron 으로 채운다.
+   사용자 검색 경로는 쪽수를 안 주므로(카카오 미제공 · Aladin ItemSearch 는 itemPage 없음) null 로
+   남아 화면에서 "/ 1p" 로 보였다 → 유효 isbn13 인 null 책을 보강해 재발 방지. 소스 우선순위(#1044):
+   1순위 국중도 PAGE(키 있으면) → 과도기 알라딘 itemPage(레거시 키) → OpenLibrary number_of_pages.
+   ⚠️ 구 Google pageCount 영구 PATCH 는 제거 — Google ToS §5.e 영구 캐시 금지(실시간 표시만 허용).
+   비-ISBN id 행은 조회 불가라 건너뛴다. */
 async function backfillPages(env) {
-  const KEY = env.ALADIN_TTB_KEY, SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!KEY || !SB || !SRK) return;
+  const SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SB || !SRK) return;
   const cap = parseInt(env.BACKFILL_DAILY_CAP || '300', 10);
   const start = Date.now();
   const sbAuth = { apikey: SRK, Authorization: `Bearer ${SRK}` };
@@ -1502,15 +1504,24 @@ async function backfillPages(env) {
     while (idx < todo.length && Date.now() - start < TIME_BUDGET_MS) {
       const b = todo[idx++];
       try {
-        // 1순위 Aladin itemPage → 없으면 Google Books pageCount 폴백(#1117 — 전자책·외서·Aladin 미보유 대응).
+        // 국중도 PAGE → (과도기) Aladin itemPage → OpenLibrary. Google 은 영구 경로에서 제외(#1044).
         let pages = null;
-        const lk = await aladinFetch(`${ALADIN}ItemLookUp.aspx?ttbkey=${KEY}&itemIdType=ISBN13&ItemId=${b.isbn13}&output=js&Version=20131101&OptResult=packing`);
-        const ap = lk[0] && lk[0].subInfo && lk[0].subInfo.itemPage;
-        if (ap && Number(ap) > 1) pages = Number(ap);
+        if (nlkReady(env)) {
+          try {
+            const n = await nlkByIsbn(b.isbn13, env);
+            if (n && n.total_pages > 1) pages = Number(n.total_pages);
+          } catch (e) { /* skip */ }
+        }
+        if (!pages && !nlkReady(env) && env.ALADIN_TTB_KEY) {
+          // 레거시 모드 전용 — 국중도 키 설치(이전 개시) 후엔 알라딘을 더 안 부른다(체인 = 국중도→OpenLibrary).
+          const lk = await aladinFetch(`${ALADIN}ItemLookUp.aspx?ttbkey=${env.ALADIN_TTB_KEY}&itemIdType=ISBN13&ItemId=${b.isbn13}&output=js&Version=20131101&OptResult=packing`);
+          const ap = lk[0] && lk[0].subInfo && lk[0].subInfo.itemPage;
+          if (ap && Number(ap) > 1) pages = Number(ap);
+        }
         if (!pages) {
-          const gb = await googleBooksSearch(`isbn:${b.isbn13}`, 1, env);
-          const gp = gb[0] && gb[0].total_pages;
-          if (gp && Number(gp) > 1) pages = Number(gp);
+          const ol = await openLibraryByIsbn(b.isbn13);
+          const op = ol && ol.total_pages;
+          if (op && Number(op) > 1) pages = Number(op);
         }
         if (pages) {
           // total_pages=is.null 가드 — 그 사이 다른 경로가 채웠으면 덮지 않음(멱등).
