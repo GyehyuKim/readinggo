@@ -3,6 +3,8 @@
 # 시크릿(1회): npx wrangler secret put ALADIN_TTB_KEY
 #              npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 #              npx wrangler secret put UPSTAGE_API_KEY   (LLM 독서 파트너 #287)
+#              npx wrangler secret put KAKAO_REST_KEY    (#1044 검색 프론트 — 등록 즉시 카카오 경로 전환)
+#              npx wrangler secret put NLK_CERT_KEY      (#1044 국중도 ISBN 백본 — 등록 즉시 국중도 경로 전환)
 # 마중물 시드는 큐 방식(seed_queue) — 맥미니 collector 가 Supabase 폴링. COLLECTOR_URL/TOKEN 불필요(제거됨).
 name = "readinggo"
 main = "worker/index.mjs"
