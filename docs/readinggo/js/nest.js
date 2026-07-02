@@ -83,10 +83,10 @@ function BookEditModal({ book, onClose, onSaved }) {
         <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</div>
         <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)' }}>출판사</label>
         <input value={pub} onChange={(e) => setPub(e.target.value)} placeholder="출판사"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 12px', margin: '6px 0 14px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 700 }} />
+          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 12px', margin: '6px 0 14px', borderRadius: 12, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 700 }} />
         <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)' }}>총 페이지수</label>
         <input value={total} onChange={(e) => setTotal(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="예: 341"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 12px', margin: '6px 0 16px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 700 }} />
+          style={{ width: '100%', boxSizing: 'border-box', padding: '11px 12px', margin: '6px 0 16px', borderRadius: 12, border: '1.5px solid var(--line)', fontSize: 14, fontWeight: 700 }} />
         <div style={{ display: 'flex', gap: 8 }}>
           {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 투명+보더 금지 → 텍스트만 dismiss) */}
           <button onClick={onClose} style={{ flex: '0 0 auto', padding: '12px 18px', borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>취소</button>
@@ -422,8 +422,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       return String(n);
     });
   };
-  const _stepBtn = { width: 30, height: 30, flexShrink: 0, borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-2)', fontSize: 20, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
-  const _stepBtnSm = { width: 24, height: 24, flexShrink: 0, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--ink-2)', fontSize: 15, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
+  const _stepBtn = { width: 30, height: 30, flexShrink: 0, borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-2)', fontSize: 20, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
+  const _stepBtnSm = { width: 24, height: 24, flexShrink: 0, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--ink-2)', fontSize: 15, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
 
   // 완독 세리머니에서 받은 별점/소감을 영속 (§5.8.3).
   // 활성 책의 user_book 을 status='completed' + rating/review_text 로 마감.
@@ -646,7 +646,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             ? <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>
             : <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>p</span>}
           {nestState.book.total > 0 && (
-            <span style={{ fontSize: 12, color: 'var(--brand-3)', fontWeight: 800, background: 'var(--brand-tint)', borderRadius: 20, padding: '3px 10px' }}>
+            <span style={{ fontSize: 12, color: 'var(--brand-3)', fontWeight: 800, background: 'var(--brand-tint)', borderRadius: 999, padding: '3px 10px' }}>
               {Math.min(100, Math.round((parseInt(quickPage,10)||nestState.book.cur||0) / nestState.book.total * 100))}%
             </span>
           )}
@@ -668,13 +668,13 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           {/* 사진으로 입력(OCR) — SVG 카메라 아이콘 버튼 (2026 UI, '···' 메뉴 대체) */}
           <button onClick={() => { if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }}
             disabled={quickOcrBusy} title="사진으로 입력 (OCR)" aria-label="사진으로 입력 (OCR)"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 10, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 12, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           </button>
           {/* #792 앨범에서 불러오기 — capture 없는 input → OS 갤러리. 동일 OcrCropOverlay 파이프라인 재사용 */}
           <button onClick={() => { if (!quickOcrBusy && _quickAlbumInputRef.current) _quickAlbumInputRef.current.click(); }}
             disabled={quickOcrBusy} title="앨범에서 불러오기" aria-label="앨범에서 불러오기"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 10, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 12, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
           </button>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>p</span>
@@ -682,7 +682,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <button onClick={() => _stepPage(setQuickSentPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtnSm}>−</button>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickSentPage}
               placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickSentPage(e.target.value.replace(/[^0-9]/g, ''))}
-              style={{ width: 44, textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
+              style={{ width: 44, textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 12, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
             <button onClick={() => _stepPage(setQuickSentPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtnSm}>+</button>
           </span>
           {nestState.book.total > 0 && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
@@ -722,12 +722,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 10 }}>지금은 어때요?</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={resurfaceTalk}
-              style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
               재키와 다시 대화하기
             </button>
             {/* 나중에 = 3차 텍스트(DESIGN.md #1032: ghost 금지 → 텍스트 dismiss) */}
             <button onClick={resurfaceLater}
-              style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              style={{ padding: '10px 18px', borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
               나중에
             </button>
           </div>

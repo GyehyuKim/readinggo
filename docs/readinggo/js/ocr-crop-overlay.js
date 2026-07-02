@@ -121,12 +121,12 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
           : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>이미지 준비 중…</div>}
         {hasSel && imgGeo && (
           <>
-            <div style={{ position: 'absolute', left: imgGeo.left + sel.x, top: imgGeo.top + sel.y, width: sel.w, height: sel.h, border: '2px solid var(--brand)', background: 'rgba(63,209,127,0.18)', borderRadius: 4, pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', left: imgGeo.left + sel.x, top: imgGeo.top + sel.y, width: sel.w, height: sel.h, border: '2px solid var(--brand)', background: 'rgba(63,209,127,0.18)', pointerEvents: 'none' }} />
             {/* #791: 4모서리 리사이즈 핸들(시각). 히트는 onDown 좌표계산으로 처리 → pointerEvents 불필요. */}
             {['nw', 'ne', 'sw', 'se'].map((k) => {
               const cx = imgGeo.left + sel.x + ((k === 'ne' || k === 'se') ? sel.w : 0);
               const cy = imgGeo.top + sel.y + ((k === 'sw' || k === 'se') ? sel.h : 0);
-              return <div key={k} style={{ position: 'absolute', left: cx - 9, top: cy - 9, width: 18, height: 18, borderRadius: 5, background: '#fff', border: '2px solid var(--brand)', boxShadow: '0 1px 4px rgba(0,0,0,0.45)', pointerEvents: 'none' }} />;
+              return <div key={k} style={{ position: 'absolute', left: cx - 9, top: cy - 9, width: 18, height: 18, borderRadius: 999, background: '#fff', border: '2px solid var(--brand)', boxShadow: '0 1px 4px rgba(0,0,0,0.45)', pointerEvents: 'none' }} />;
             })}
           </>
         )}

@@ -176,8 +176,8 @@ function DiscoverLayer({ state }) {
                     style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', borderTop: i === 0 ? 'none' : '1px solid var(--line-2, #f2ede2)', cursor: 'pointer', padding: '9px 2px', textAlign: 'left', width: '100%' }}>
                     <span style={{ fontSize: 13, fontWeight: 900, color: i < 3 ? 'var(--brand-3)' : 'var(--ink-3)', minWidth: 18, textAlign: 'center' }}>{i + 1}</span>
                     {b.cover_url
-                      ? <img src={b.cover_url} alt="" style={{ width: 30, height: 43, objectFit: 'cover', borderRadius: 4, flex: '0 0 auto' }} />
-                      : <span style={{ width: 30, height: 43, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--line)', borderRadius: 4, flex: '0 0 auto' }}><IcoBook /></span>}
+                      ? <img src={b.cover_url} alt="" style={{ width: 30, height: 43, objectFit: 'cover', borderRadius: 12, flex: '0 0 auto' }} />
+                      : <span style={{ width: 30, height: 43, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--line)', borderRadius: 12, flex: '0 0 auto' }}><IcoBook /></span>}
                     <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                       <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</span>
                       {b.author ? <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.author}</span> : null}
@@ -206,7 +206,7 @@ function DiscoverLayer({ state }) {
       {findOpen && (
         <div style={{ padding: '0 16px 12px' }}>
           <input value={fq} onChange={e => setFq(e.target.value)} placeholder="@닉네임으로 친구 찾기" autoFocus
-            style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+            style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
           {fres.map(u => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid var(--line-2)' }}>
               <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{(u.display_name && u.display_name[0]) || <window.SparrowMark size={18} />}</span>

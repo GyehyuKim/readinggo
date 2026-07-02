@@ -533,7 +533,7 @@ function CoReadModeToggle() {
     <div className="rg-coread-mode" role="group" aria-label="같이읽기 기본 설정">
       <button className="rg-coread-mode-btn" onClick={flip}
         aria-pressed={together} title={together ? '공개로 같이 읽는 중 — 끄면 혼자 읽어요' : '혼자 읽는 중 — 켜면 같은 책 공개 숲에 자동으로 함께해요'}>
-        <span className="rg-coread-mode-emoji" style={{ display: 'inline-flex', width: 26, height: 26, borderRadius: 8, background: 'var(--brand-tint)', color: 'var(--brand-3)', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="rg-coread-mode-emoji" style={{ display: 'inline-flex', width: 26, height: 26, borderRadius: 12, background: 'var(--brand-tint)', color: 'var(--brand-3)', alignItems: 'center', justifyContent: 'center' }}>
           {together
             ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 6.8 11H9.6L5.4 17h13.2L14.4 11H17.2L12 3Z" /><path d="M12 17v4" /></svg>
             : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}

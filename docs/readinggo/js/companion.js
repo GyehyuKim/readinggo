@@ -333,7 +333,7 @@ function CompanionModal({ sentence, onClose }) {
               </div>
               <textarea value={noteDraft} onChange={(e) => { if (e.target.value.length <= 2000) setNoteDraft(e.target.value); }}
                 placeholder="이 문장에서 떠오른 생각·감정을 자유롭게 적어요…" rows={7} aria-label="내 감상"
-                style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 14, padding: '11px 13px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', background: 'var(--paper-2)', color: 'var(--ink)', outline: 'none' }} />
+                style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 12, padding: '11px 13px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', background: 'var(--paper-2)', color: 'var(--ink)', outline: 'none' }} />
               {rgSplitNote(sentence.note).qa ? (
                 <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.5 }}>
                   재키와 나눈 대화는 그대로 보관돼요 — '재키와 대화'에서 볼 수 있어요.
@@ -357,7 +357,7 @@ function CompanionModal({ sentence, onClose }) {
 
           {/* 현재 상태 */}
           {done ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(63,209,127,0.08)', borderRadius: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(63,209,127,0.08)', borderRadius: 12 }}>
               <_JackAvatar size={28} />
               <span style={{ fontSize: 13, color: 'var(--ink-2)', fontStyle: 'italic' }}>오늘 재키랑 깊이 이야기했네요</span>
             </div>
@@ -405,7 +405,7 @@ function CompanionModal({ sentence, onClose }) {
           /* 내 감상 저장 — 이 화면의 단일 1차 액션(솔리드). 재키를 강제하지 않고 한 번에 성찰 완결. */
           <div style={{ padding: '10px 16px 20px', borderTop: '1px solid var(--line)', flexShrink: 0, background: 'var(--card)' }}>
             <button onClick={saveFreeNote} disabled={noteSaving}
-              style={{ width: '100%', padding: '12px', borderRadius: 14, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: noteSaving ? 'default' : 'pointer', opacity: noteSaving ? 0.6 : 1 }}>
+              style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: noteSaving ? 'default' : 'pointer', opacity: noteSaving ? 0.6 : 1 }}>
               {noteSaving ? '저장 중…' : '내 감상 저장'}
             </button>
           </div>
@@ -417,7 +417,7 @@ function CompanionModal({ sentence, onClose }) {
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && answer.trim()) { e.preventDefault(); submit(); } }}
                 placeholder="떠오르는 대로 답해보세요" rows={2}
-                style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 14, padding: '9px 12px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', background: 'var(--paper-2)', outline: 'none', boxSizing: 'border-box' }} />
+                style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 12, padding: '9px 12px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', background: 'var(--paper-2)', outline: 'none', boxSizing: 'border-box' }} />
               <button onClick={submit} disabled={!answer.trim()} aria-label="전송"
                 style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: answer.trim() ? 'var(--brand)' : 'var(--line)', color: '#fff', cursor: answer.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}>
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9l14-7-7 14V9H2z" fill="currentColor"/></svg>

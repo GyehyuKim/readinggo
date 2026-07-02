@@ -131,13 +131,13 @@ function NestTheatre({ xp, health = 100 }) {
               <div style={{textAlign:'center', fontSize:18, fontWeight:900, color:'var(--ink)', marginBottom:4}}>둥지가 자라는 방법</div>
               <div style={{textAlign:'center', fontSize:13, color:'var(--ink-2)', fontWeight:700, marginBottom:16}}>활동하면 XP가 쌓이고 둥지가 자라요!</div>
               {NEST_STAGES.map(s => (
-                <div key={s.lv} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, background: s.lv === stage.lv ? 'var(--brand-tint)' : 'transparent', marginBottom:4}}>
+                <div key={s.lv} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:12, background: s.lv === stage.lv ? 'var(--brand-tint)' : 'transparent', marginBottom:4}}>
                   <span style={{display:'inline-flex'}}>{window.nestArt(s.lv, 28)}</span>
                   <span style={{flex:1, fontSize:14, fontWeight:800, color:'var(--ink)'}}>{s.name}</span>
                   <span style={{fontSize:12, color:'var(--ink-3)', fontWeight:700}}>{s.maxXp == null ? `${s.minXp.toLocaleString()} XP` : `${s.minXp.toLocaleString()}–${s.maxXp.toLocaleString()} XP`}</span>
                 </div>
               ))}
-              <div style={{marginTop:14, padding:'12px 14px', background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:8, fontSize:13, color:'var(--brand-3)', fontWeight:800, lineHeight:1.6, textAlign:'center'}}>
+              <div style={{marginTop:14, padding:'12px 14px', background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:12, fontSize:13, color:'var(--brand-3)', fontWeight:800, lineHeight:1.6, textAlign:'center'}}>
                 <span style={{display:'inline-block', verticalAlign:'-4px', marginRight:4}}>{window.nestArt(5, 18)}</span>1,600 XP 달성 → 성 획득! 다시 나뭇가지 자리부터 새 둥지를 시작해요.
               </div>
             </div>

@@ -161,7 +161,7 @@ const RG_SECTION_CARD = { background: 'var(--card-soft)', border: '1.5px solid v
 function SectionLabel({ icon, children, trailing, mb = 9 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: mb }}>
-      <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 8, background: 'var(--brand-tint)', color: 'var(--brand-3)', flexShrink: 0 }}>
+      <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 12, background: 'var(--brand-tint)', color: 'var(--brand-3)', flexShrink: 0 }}>
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">{_RG_SEC_ICONS[icon] || _RG_SEC_ICONS.intro}</svg>
       </span>
       <span style={{ fontSize: 12.5, fontWeight: 900, letterSpacing: 0.2, color: 'var(--ink)' }}>{children}</span>

@@ -53,14 +53,14 @@ function AdminDashboardModal({ onClose }) {
         <div style={{padding:'16px 20px 48px'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
             <div style={{fontSize:20,fontWeight:900,color:'var(--ink)'}}>운영 대시보드</div>
-            <button onClick={onClose} aria-label="닫기" style={{background:'var(--card)',border:'1.5px solid var(--line)',borderRadius:10,padding:'8px 14px',fontSize:13,fontWeight:800,color:'var(--ink-2)',cursor:'pointer'}}>닫기</button>
+            <button onClick={onClose} aria-label="닫기" style={{background:'var(--card)',border:'1.5px solid var(--line)',borderRadius:12,padding:'8px 14px',fontSize:13,fontWeight:800,color:'var(--ink-2)',cursor:'pointer'}}>닫기</button>
           </div>
           {!stats ? (
             <div style={{textAlign:'center',color:'var(--ink-3)',padding:20}}>불러오는 중…</div>
           ) : (
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
               {rows.map(([label, val]) => (
-                <div key={label} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:10,padding:'16px 12px',textAlign:'center'}}>
+                <div key={label} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'16px 12px',textAlign:'center'}}>
                   <div style={{fontSize:24,fontWeight:900,color:'var(--brand)'}}>{val ?? '—'}</div>
                   <div style={{fontSize:11,color:'var(--ink-3)',fontWeight:700,marginTop:6}}>{label}</div>
                 </div>
@@ -91,7 +91,7 @@ function AdminDashboardModal({ onClose }) {
                     {trend.map((t) => (
                       <div key={t.date} title={`${t.date} · 체크인 ${t.sessions} · 가입 ${t.signups}`}
                         style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
-                        <div style={{ width: '60%', height: Math.round((t.sessions / sessMax) * (H - 16)) + 2, background: 'var(--brand)', borderRadius: 3, opacity: 0.88 }} />
+                        <div style={{ width: '60%', height: Math.round((t.sessions / sessMax) * (H - 16)) + 2, background: 'var(--brand)', borderRadius: 999, opacity: 0.88 }} />
                       </div>
                     ))}
                   </div>
@@ -126,11 +126,11 @@ function AdminDashboardModal({ onClose }) {
           {/* 활성 사용자 — 리텐션 프록시 (#190 C) */}
           {active && (
             <div style={{ marginTop: 22, display: 'flex', gap: 12 }}>
-              <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+              <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--brand)' }}>{active.d7}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>최근 7일 활성</div>
               </div>
-              <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px', textAlign: 'center' }}>
+              <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--brand)' }}>{active.d30}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>최근 30일 활성</div>
               </div>
@@ -151,7 +151,7 @@ function AdminDashboardModal({ onClose }) {
           )}
           {/* 완독률 (#744 ③) */}
           {completion && (
-            <div style={{ marginTop: 22, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 16px' }}>
+            <div style={{ marginTop: 22, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 8 }}>완독률</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <div style={{ fontSize: 30, fontWeight: 900, color: 'var(--brand)' }}>{completion.rate != null ? completion.rate + '%' : '—'}</div>
@@ -233,20 +233,20 @@ function AdminDashboardModal({ onClose }) {
             ) : inqs.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>접수된 문의가 없어요</div>
             ) : inqs.map((q) => (
-              <div key={q.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+              <div key={q.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>@{(q.user && q.user.handle) || '익명'} · {String(q.created_at).slice(0, 10)}</div>
-                  <button onClick={() => cycleStatus(q)} title="상태 변경" style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: _stColor[q.status] || 'var(--ink-3)', border: 'none', borderRadius: 10, padding: '2px 8px', cursor: 'pointer' }}>{q.status}</button>
+                  <button onClick={() => cycleStatus(q)} title="상태 변경" style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: _stColor[q.status] || 'var(--ink-3)', border: 'none', borderRadius: 999, padding: '2px 8px', cursor: 'pointer' }}>{q.status}</button>
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{q.message}</div>
                 {q.app_version && <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, marginRight: 8 }}>v{q.app_version}</span>}
                 {q.email && <a href={`mailto:${q.email}?subject=${encodeURIComponent('[ReadingGo] 문의 답변')}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 11, color: 'var(--brand-3)', fontWeight: 800 }}>{window.rgIcon('mail', 13)}{q.email + ' 로 답장'}</a>}
                 {/* AI 자동 답변 (#208) — 스캐폴드: LLM 연동 전까지 자리만 */}
                 {q.response ? (
-                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-2)', background: 'var(--brand-tint)', borderRadius: 6, padding: '6px 8px', whiteSpace: 'pre-wrap' }}>🤖 {q.response}</div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-2)', background: 'var(--brand-tint)', borderRadius: 12, padding: '6px 8px', whiteSpace: 'pre-wrap' }}>🤖 {q.response}</div>
                 ) : (
                   <button onClick={() => (window.showToast ? window.showToast('AI 자동 답변은 LLM 연동 후 활성화돼요 (#208)') : null)}
-                    style={{ display: 'inline-block', marginTop: 6, marginLeft: 8, fontSize: 11, fontWeight: 800, color: 'var(--ink-3)', background: 'transparent', border: '1px dashed var(--line)', borderRadius: 10, padding: '3px 8px', cursor: 'pointer' }}>🤖 AI 답변 생성 (준비중)</button>
+                    style={{ display: 'inline-block', marginTop: 6, marginLeft: 8, fontSize: 11, fontWeight: 800, color: 'var(--ink-3)', background: 'transparent', border: '1px dashed var(--line)', borderRadius: 12, padding: '3px 8px', cursor: 'pointer' }}>🤖 AI 답변 생성 (준비중)</button>
                 )}
               </div>
             ))}

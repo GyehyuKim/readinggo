@@ -371,9 +371,9 @@ function LibraryView({ state, onActivateUserBook }) {
                 onKeyDown={e => { if (e.key === 'Enter') saveHandle(); else if (e.key === 'Escape') { setHdlText((window.RG_ME && window.RG_ME.handle) || ''); setHdlEditing(false); setHdlMsg(''); } }}
                 onBlur={() => { if (!hdlBusy) { setHdlText((window.RG_ME && window.RG_ME.handle) || ''); setHdlEditing(false); setHdlMsg(''); } }}
                 placeholder="닉네임"
-                style={{fontSize:16, fontWeight:900, padding:'4px 8px', border:'1.5px solid var(--brand)', borderRadius:6, color:'var(--ink)', background:'var(--card)', width:120, textAlign:'center'}} />
+                style={{fontSize:16, fontWeight:900, padding:'4px 8px', border:'1.5px solid var(--brand)', borderRadius:12, color:'var(--ink)', background:'var(--card)', width:120, textAlign:'center'}} />
               <button onMouseDown={e => { e.preventDefault(); saveHandle(); }} disabled={hdlBusy}
-                style={{padding:'4px 12px', borderRadius:6, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:hdlBusy ? 'default' : 'pointer', opacity:hdlBusy ? 0.6 : 1}}>저장</button>
+                style={{padding:'4px 12px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:hdlBusy ? 'default' : 'pointer', opacity:hdlBusy ? 0.6 : 1}}>저장</button>
             </div>
             {hdlMsg && <div style={{fontSize:11, color: hdlMsg.indexOf('✓') === 0 ? 'var(--brand)' : '#d33', fontWeight:700}}>{hdlMsg}</div>}
           </div>
@@ -396,9 +396,9 @@ function LibraryView({ state, onActivateUserBook }) {
               onKeyDown={e => { if (e.key === 'Enter') saveBio(); else if (e.key === 'Escape') { setBioText((window.RG_ME && window.RG_ME.bio) || ''); setBioEditing(false); } }}
               onBlur={() => { setBioText((window.RG_ME && window.RG_ME.bio) || ''); setBioEditing(false); }}
               placeholder="한 줄 소개를 입력해보세요"
-              style={{flex:1, fontSize:13, padding:'4px 8px', border:'1px solid var(--line)', borderRadius:6, color:'var(--ink)', background:'var(--card)'}} />
+              style={{flex:1, fontSize:13, padding:'4px 8px', border:'1px solid var(--line)', borderRadius:12, color:'var(--ink)', background:'var(--card)'}} />
             <button onMouseDown={e => { e.preventDefault(); saveBio(); }}
-              style={{padding:'4px 12px', borderRadius:6, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
+              style={{padding:'4px 12px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
           </div>
         ) : (
           <div onClick={() => { setBioText((window.RG_ME && window.RG_ME.bio) || ''); setBioEditing(true); }}
@@ -484,14 +484,14 @@ function LibraryView({ state, onActivateUserBook }) {
         {/* 📦 검토함 (#1048) — 임포트가 책장 직행 대신 여기로 적재. 항목별 책장 토글 + [내 서재로][제외] + 일괄.
             로그인 전용(local/게스트는 stagedItems=[]로 미노출). 영속(import_staging) — 세션 넘어 유지. */}
         {stagedItems.length > 0 && (
-          <div style={{marginBottom:18, border:'1.5px solid var(--brand)', borderRadius:14, background:'var(--brand-tint)', padding:'12px 12px 14px'}}>
+          <div style={{marginBottom:18, border:'1.5px solid var(--brand)', borderRadius:12, background:'var(--brand-tint)', padding:'12px 12px 14px'}}>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8, gap:8}}>
               <div style={{fontSize:13.5, fontWeight:900, color:'var(--brand-3)', display:'inline-flex', alignItems:'center', gap:5}}>{window.rgIcon('box',15)} 가져온 책 {stagedItems.length}권 · 검토</div>
               <div style={{display:'flex', gap:6, flexShrink:0}}>
                 <button onClick={moveAllStaged}
-                  style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:8, padding:'5px 9px', cursor:'pointer'}}>전체 이동</button>
+                  style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:12, padding:'5px 9px', cursor:'pointer'}}>전체 이동</button>
                 <button onClick={excludeAllStaged}
-                  style={{fontSize:11, fontWeight:800, color:'var(--ink-2)', background:'var(--card)', border:'1px solid var(--line)', borderRadius:8, padding:'5px 9px', cursor:'pointer'}}>전체 제외</button>
+                  style={{fontSize:11, fontWeight:800, color:'var(--ink-2)', background:'var(--card)', border:'1px solid var(--line)', borderRadius:12, padding:'5px 9px', cursor:'pointer'}}>전체 제외</button>
               </div>
             </div>
             <div style={{fontSize:11, color:'var(--ink-3)', marginBottom:10, lineHeight:1.5}}>
@@ -506,8 +506,8 @@ function LibraryView({ state, onActivateUserBook }) {
                   ? { label: '매칭됨', dim: false }
                   : (it.isbn13 ? { label: '확인됨', dim: false } : { label: '미확인', dim: true });
                 return (
-                  <div key={it.id} style={{display:'flex', alignItems:'center', gap:10, background:'var(--card)', border:'1px solid var(--line)', borderRadius:10, padding:'8px 10px'}}>
-                    <BookCover title={it.title} author={it.author || ''} cover={it.cover_url || ''} fb={['#9AA7B2','#C7D0D8']} style={{width:34, height:48, borderRadius:5, flexShrink:0}} />
+                  <div key={it.id} style={{display:'flex', alignItems:'center', gap:10, background:'var(--card)', border:'1px solid var(--line)', borderRadius:12, padding:'8px 10px'}}>
+                    <BookCover title={it.title} author={it.author || ''} cover={it.cover_url || ''} fb={['#9AA7B2','#C7D0D8']} style={{width:34, height:48, borderRadius:12, flexShrink:0}} />
                     <div style={{flex:1, minWidth:0}}>
                       <div style={{fontSize:13, fontWeight:800, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{it.title}</div>
                       <div style={{fontSize:11, color:'var(--ink-3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
@@ -519,7 +519,7 @@ function LibraryView({ state, onActivateUserBook }) {
                       <div style={{display:'flex', gap:4, marginTop:6}}>
                         {STAGED_DESTS.map((d) => (
                           <button key={d.value} onClick={() => setStagedDest(it.id, d.value)}
-                            style={{fontSize:10, fontWeight:800, padding:'3px 7px', borderRadius:7, cursor:'pointer',
+                            style={{fontSize:10, fontWeight:800, padding:'3px 7px', borderRadius:999, cursor:'pointer',
                               border: dest === d.value ? '1.5px solid var(--brand)' : '1px solid var(--line)',
                               background: dest === d.value ? 'var(--brand)' : 'var(--card)',
                               color: dest === d.value ? '#fff' : 'var(--ink-2)'}}>
@@ -530,9 +530,9 @@ function LibraryView({ state, onActivateUserBook }) {
                     </div>
                     <div style={{display:'flex', flexDirection:'column', gap:5, flexShrink:0}}>
                       <button onClick={() => moveStaged(it)}
-                        style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:8, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>내 서재로</button>
+                        style={{fontSize:11, fontWeight:800, color:'#fff', background:'var(--brand)', border:'none', borderRadius:12, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>내 서재로</button>
                       <button onClick={() => excludeStaged(it)}
-                        style={{fontSize:11, fontWeight:800, color:'var(--ink-3)', background:'transparent', border:'none', borderRadius:8, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>제외</button>
+                        style={{fontSize:11, fontWeight:800, color:'var(--ink-3)', background:'transparent', border:'none', borderRadius:12, padding:'6px 9px', cursor:'pointer', whiteSpace:'nowrap'}}>제외</button>
                     </div>
                   </div>
                 );
@@ -699,7 +699,7 @@ function LibraryView({ state, onActivateUserBook }) {
           // 앱 초대는 특정 책 인용 없이 우리 철학 한 줄만(#1092). 미리보기는 링크 OG 카드가 담당.
           if (window.shareService) window.shareService({ source: 'library' });
         }}
-          style={{marginTop:20, width:'100%', padding:'12px', borderRadius:10, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
+          style={{marginTop:20, width:'100%', padding:'12px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
           {window.rgIcon('share',15)} 친구에게 ReadingGo 공유하기
         </button>
 
@@ -711,7 +711,7 @@ function LibraryView({ state, onActivateUserBook }) {
             { fn: exportMarkdown, label: 'Markdown', title: '사람이 읽기 좋은 독서 기록 문서' },
           ].map(b => (
             <button key={b.label} onClick={b.fn} title={`${b.title}로 내보내기`}
-              style={{flex:1, padding:'12px', borderRadius:10, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
+              style={{flex:1, padding:'12px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
               {window.rgIcon('download',15)} {b.label}로 내보내기
             </button>
           ))}
