@@ -14,6 +14,16 @@ function Ceremony({ data, onClose, onComplete }) {
   const [step, setStep] = _useState(0);
   // 둥지 진척도 bar — 체크인 전(prevXp) → 후(newXp) 애니메이션. mount 후 다음 프레임에 목표값으로 전환.
   const [barPct, setBarPct] = _useState(null);
+  // 게스트 여부(#1134) — 세리머니가 가입 유도 접점(onboarding.md §D·E: 세리머니 CTA가 가입 트리거).
+  // currentUser()는 async(getSession, 무네트워크)라 mount 시 1회 해소. Supabase 미설정(로컬 모드)이면 false.
+  const [isGuest, setIsGuest] = _useState(false);
+  _useEffect(() => {
+    let alive = true;
+    if (window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured()) {
+      window.RG_SB.currentUser().then((u) => { if (alive) setIsGuest(!u); }).catch(() => {});
+    }
+    return () => { alive = false; };
+  }, []);
   if (!data) return null;
   const { xpGain, xpParts, sentence, bookQuoteCount, nestUp, castleGained, castleCount, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
   // 이번 체크인에 실제로 한 문장을 등록했는가 (#685) — 페이지만 저장 시 false.
@@ -190,6 +200,14 @@ function Ceremony({ data, onClose, onComplete }) {
         >
           {isComplete ? '성에 기록 남기기 →' : '내일도 짹 →'}
         </button>
+        {/* 게스트 가입 유도(#1134) — 첫 성공(aha) 직후가 저장 동기가 가장 높은 시점(§D).
+            3차 텍스트 위계(DESIGN 버튼 위계) — 세리머니 주인공은 보상, 로그인은 조용한 한 줄. */}
+        {isGuest && (
+          <button type="button" onClick={() => { onClose(); if (window.RG_login) window.RG_login(); }}
+            style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--brand-3)', textDecoration: 'underline', padding: 6 }}>
+            이 기록, 계정에 저장하기
+          </button>
+        )}
       </div>
     </div>
   );
