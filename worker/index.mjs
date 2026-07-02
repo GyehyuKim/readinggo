@@ -1331,11 +1331,8 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
           if (k && !seen.has(k)) { seen.add(k); items.push(g); }
         }
       } catch (e) { /* 폴백 실패 무시 */ }
-      // #529: 검색 보강 Google 결과도 저장(이전엔 응답만 — source='google' 행 upsert)
-      if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
-        const gItems = items.filter((b) => b.isbn13 && b.source === 'google');
-        if (gItems.length) ctx.waitUntil(Promise.all(gItems.map((b) => upsertBook(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, b).catch(() => {}))));
-      }
+      // (#1044) 구 #529 의 Google 결과 upsert 는 제거 — Google ToS §5.e 가 영구 DB 캐시를
+      // 금지하므로 Google 은 실시간 응답 표시만. 외서 영구 저장 폴백은 OpenLibrary(ISBN 등록 경로).
     }
     return json({ items }, 200, 86400);
   } catch (e) {
