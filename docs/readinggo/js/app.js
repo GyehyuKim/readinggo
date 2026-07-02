@@ -317,7 +317,8 @@ function LoginScreen({ onLogin, onBack }) {
             </button>
           </div>
         )}
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>클로즈베타 · 지인 초대</div>
+        {/* 공개 출시(#1126): 구 "클로즈베타 · 지인 초대" 카피 제거 → 처리방침 링크(privacy-policy.md §8 노출 위치). */}
+        <a href="./privacy.html" target="_blank" rel="noopener" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4, textDecoration: 'underline' }}>개인정보처리방침</a>
       </div>
     </div></div>
   );

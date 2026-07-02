@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>개인정보처리방침 — ReadingGo</title>
+<meta name="description" content="ReadingGo 개인정보처리방침">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  /* 정본: specs/privacy-policy.md — 본문 변경은 spec PR 먼저. DESIGN.md 토큰과 동일 값. */
+  :root { --brand:#2EA86A; --ink:#1F2823; --ink-2:#55605A; --ink-3:#8A948E; --line:#E3E8E4; --paper:#FBFAF7; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:0 20px calc(48px + env(safe-area-inset-bottom)); background:var(--paper); color:var(--ink);
+         font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,system-ui,sans-serif; line-height:1.7; font-size:14.5px; }
+  main { max-width:640px; margin:0 auto; padding-top:calc(36px + env(safe-area-inset-top)); }
+  h1 { font-size:22px; font-weight:800; margin:0 0 4px; }
+  .meta { font-size:12.5px; color:var(--ink-3); margin-bottom:28px; }
+  h2 { font-size:16px; font-weight:800; margin:32px 0 10px; padding-top:16px; border-top:1px solid var(--line); }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:10px 0; }
+  th, td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#F1F4F1; font-weight:700; }
+  ul { padding-left:20px; margin:8px 0; }
+  a { color:var(--brand); font-weight:700; }
+  .foot { margin-top:40px; font-size:12px; color:var(--ink-3); text-align:center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>개인정보처리방침</h1>
+  <p class="meta">ReadingGo · 시행일 2026-07-02 (v1)</p>
+
+  <p>ReadingGo(이하 "서비스")는 개인정보 보호법에 따라 이용자의 개인정보를 보호하고 관련 고충을 신속하게 처리하기 위해 다음과 같이 개인정보처리방침을 둡니다.</p>
+
+  <h2>1. 수집하는 개인정보 항목</h2>
+  <table>
+    <tr><th>구분</th><th>항목</th></tr>
+    <tr><td>계정(로그인 시)</td><td>이메일, 표시이름·닉네임, 프로필 이미지(소셜 로그인 제공사 제공)</td></tr>
+    <tr><td>서비스 이용</td><td>독서 기록(책·쪽수·세션·스트릭·XP), 한 문장·감상, 짹(좋아요), 둥지/완독</td></tr>
+    <tr><td>문의</td><td>문의 내용, 회신용 이메일, 앱 버전</td></tr>
+    <tr><td>행동 데이터(분석)</td><td>페이지뷰·클릭·이벤트(식별자 없는 익명) / 세션 리플레이(선택 동의 시)</td></tr>
+    <tr><td>자동 생성</td><td>쿠키·기기/브라우저 정보, 접속 로그</td></tr>
+  </table>
+  <ul><li>게스트(비로그인)는 계정정보 없이 기기 내 저장소(localStorage)로만 동작하며, 로그인 시 서버(Supabase)로 적재됩니다.</li></ul>
+
+  <h2>2. 수집·이용 목적</h2>
+  <p>서비스 제공(독서 기록·소셜·둥지), 본인 식별·인증, 문의 응대, 서비스 개선·통계 분석(익명), 선택 동의 시 세션 리플레이를 통한 사용성 개선 및 LLM 독서 파트너 품질 향상.</p>
+
+  <h2>3. 보유·이용 기간</h2>
+  <p>회원 탈퇴 또는 동의 철회 시까지 보유합니다. 단, 관계 법령에 따라 보존 의무가 있는 경우 해당 기간 동안 보관합니다. 행동 분석 데이터는 PostHog 보존 정책을 따르며, 미동의 항목(리플레이·식별·LLM)은 수집하지 않습니다.</p>
+
+  <h2>4. 제3자 처리위탁 및 국외 이전</h2>
+  <p>서비스 운영을 위해 아래에 처리를 위탁하며, 일부는 국외로 이전됩니다.</p>
+  <table>
+    <tr><th>수탁사</th><th>처리 항목</th><th>목적</th><th>이전 국가</th></tr>
+    <tr><td>Supabase</td><td>계정·독서기록·문의</td><td>DB·인증 호스팅</td><td>국내(대한민국, AWS 서울 리전)</td></tr>
+    <tr><td>PostHog</td><td>행동 이벤트 / 리플레이(선택)</td><td>분석·세션 리플레이</td><td>미국</td></tr>
+    <tr><td>Google</td><td>이메일·프로필</td><td>OAuth 로그인</td><td>미국</td></tr>
+    <tr><td>Upstage</td><td>책 사진·한 문장 텍스트</td><td>OCR·LLM 독서 파트너</td><td>국내(대한민국)</td></tr>
+  </table>
+  <ul><li>이전 일시·방법: 서비스 이용 시점에 네트워크를 통한 전송. 외부 판매·광고 목적 제공은 없습니다.</li></ul>
+
+  <h2>5. 이용자의 권리</h2>
+  <p>이용자는 언제든지 개인정보의 열람·정정·삭제·처리정지·동의철회를 요구할 수 있습니다.</p>
+  <ul>
+    <li>앱 <b>설정 → 데이터 내보내기</b>(JSON)로 열람, <b>설정 → 동의 토글</b>로 선택 항목 철회(리플레이·식별·LLM 즉시 중단)</li>
+    <li>계정·데이터 삭제 및 기타 요청: 아래 연락처</li>
+  </ul>
+
+  <h2>6. 쿠키</h2>
+  <p>서비스는 분석을 위한 first-party 쿠키(PostHog distinct_id)를 사용합니다. 브라우저 설정으로 차단할 수 있으나 일부 통계가 수집되지 않을 수 있습니다. 별도의 광고·추적 제3자 쿠키는 사용하지 않습니다.</p>
+
+  <h2>7. 개인정보 보호책임자 / 연락처</h2>
+  <p>문의 및 권리 행사: <a href="mailto:readinggo.admin@gmail.com">readinggo.admin@gmail.com</a> (또는 앱 설정 → 운영자에게 문의)</p>
+
+  <p class="foot">본 방침이 변경되는 경우 앱 내 공지로 알립니다.<br>© ReadingGo</p>
+</main>
+</body>
+</html>

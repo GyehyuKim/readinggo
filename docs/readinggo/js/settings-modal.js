@@ -274,7 +274,12 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
 
           {/* ⑤ 정보 */}
           {groupLabel('정보')}
-          <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>ReadingGo · beta</div>
+          <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>
+            ReadingGo · beta
+            {/* 처리방침 공개 게시(#1126) — privacy-policy.md §8 노출 위치(설정 정보 영역). */}
+            <span style={{ margin: '0 6px' }}>·</span>
+            <a href="./privacy.html" target="_blank" rel="noopener" style={{ color: 'var(--ink-3)', textDecoration: 'underline' }}>개인정보처리방침</a>
+          </div>
         </div>
       </div>
     </div>
