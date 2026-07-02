@@ -8,6 +8,7 @@
 > **v9 갱신 (2026-06-24, #937)**: **카카오 소셜 로그인 추가** + **애플**(iOS·웹만 노출, Android 제외) + **네이버 보류**. `signInWithGoogle`을 `signInWithOAuth(provider)`로 일반화 — 같은 네이티브 딥링크 경로(#968)를 모든 provider 가 공유. provider 등록(Supabase 대시보드 + Kakao Developers + Apple Developer)은 §7.1 모바일/네이티브 끝의 체크리스트 참조.
 > **v10 갱신 (2026-06-26, #1007)**: **독서 위키 Q&A — `POST /api/wiki-ask`** 신설(§7.9.2). "내 문장에게 묻기"의 호출 경로 — companion 형제 프록시(동일출처 가드·`callLLM` 키 서버 보관). 내가 모은 문장에만 근거(그라운딩·환각 가드), 질문당 1콜(Gemini Flash 텍스트, AI lock 안), RAG 불필요(전체 문장 한 프롬프트).
 > **v11 갱신 (2026-06-29, #1044)**: **책 데이터 소스 이전(알라딘 OpenAPI ToS 회피)** — §7.2.1 신설. 알라딘 OpenAPI 약관(영리·법인 이용 불가 + 취득정보 **저장·캐시 금지**)이 우리 canonical 캐시(`books` upsert, #489)와 정면 충돌 → 상업 출시 블로커. canonical 소스를 **국립중앙도서관 ISBN 서지정보 API**(쪽수·표지, 이용허락 제한 없음)와 **카카오 책검색**(검색·표지, 캐시 조건부 허용) 페어로, 외서는 **Google Books 실시간만**(영구 upsert 중단), 네이버 비권장. worker 이전 지점·출시 전 실계정 ToS 확인 게이트·Phasing 은 §7.2.1. **본 PR 은 spec-only — 코드 재배선은 후속 PR(#1044).**
+> **v12 갱신 (2026-07-03, #1044 코드 PR)**: §7.2.1 P1 **구현** — worker 에 provider 스위치(`KAKAO_REST_KEY`/`NLK_CERT_KEY` 자동 감지, 미설치 시 알라딘 폴백 = 무중단). 검색→카카오(영구 적재는 ISBN 국중도 재조회분만)·ISBN→국중도(+OpenLibrary 외서 폴백)·Google 영구 경로 2건 제거(검색 upsert·backfillPages PATCH)·imgProxy 화이트리스트 확장·archive 시드 게이트 격리(재설계 P2). 상세 §7.2.1 구현 상태.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -68,12 +69,12 @@ settings.get() / settings.update({reminder_hour, ...})
 // 책 / 검색
 books.search(query)                        → Book[]          // DB ilike(즉시) — 클라에서 데모 Fuse + 알라딘 결과와 병합·중복제거(isbn13). 외국 작가 표기변이는 알라딘 위임 (QA3 #148). 클라 `fuzzySearch`(data.js)는 **토큰 기반**(#1118) — 질의를 단어로 쪼개 제목+저자+출판사 합본에 모든 토큰 AND 매칭(예: "민음사 시지프 신화" = 출판사+제목 가로질러 매칭. 구버전 통짜 substring 은 0건)
 // ⚠️ 데이터 소스 이전(#1044, §7.2.1): canonical 소스를 알라딘 → 국중도(쪽수·표지)+카카오(검색·표지)로 옮긴다. 아래 알라딘 서술은 *이전 전 현행*(코드 후속 PR 에서 재배선).
-// 도서 프록시(Cloudflare Worker `worker/index.mjs` `/aladin`, 별칭 `/.netlify/functions/aladin`): **ItemSearch(검색)는 packing을 줘도 itemPage 미제공** — 쪽수는 **ItemLookUp(?isbn=)만** 반환. ISBN 단건 등록은 즉시 보강하나 **검색 일괄 upsert 는 비용상 미보강**이라 total_pages=null 로 남았다(과거 ~894권이 화면에 "/ 1p"로 표시 #1117). → **일일 cron `backfillPages`(#1117)** 가 null·유효 isbn13 책을 보강: **Aladin itemPage → 없으면 Google Books `pageCount` 폴백**(전자책·외서 대응). `BACKFILL_DAILY_CAP` 기본 300, 멱등. 대량 과거 null(~894)은 1회 `collector/backfill-pages.mjs` 로 해소(894→24). **끝내 양쪽 소스에 쪽수 없는 책(문제집·사전류)** 은 앱이 `total>0` 가드로 **"현재 N쪽"만 표시**(가짜 "/ 1p"·100% 금지 — nest.js #1117). (#1044 이전 후엔 쪽수 보강 1순위가 국중도 `PAGE`)
+// 도서 프록시(Cloudflare Worker `worker/index.mjs` `/aladin`, 별칭 `/.netlify/functions/aladin`): **ItemSearch(검색)는 packing을 줘도 itemPage 미제공** — 쪽수는 **ItemLookUp(?isbn=)만** 반환. ISBN 단건 등록은 즉시 보강하나 **검색 일괄 upsert 는 비용상 미보강**이라 total_pages=null 로 남았다(과거 ~894권이 화면에 "/ 1p"로 표시 #1117). → **일일 cron `backfillPages`(#1117·#1044)** 가 null·유효 isbn13 책을 보강: **국중도 `PAGE`(NLK 키 설치 시 1순위) → Aladin itemPage(레거시 모드 전용, 키 설치 후엔 미호출) → OpenLibrary `number_of_pages` 폴백**. ~~Google Books `pageCount` 폴백~~ **(#1044 제거)** — Google ToS §5.e 영구 캐시 금지로 영구 PATCH 경로에서 삭제(실시간 표시만 허용). `BACKFILL_DAILY_CAP` 기본 300, 멱등. 대량 과거 null(~894)은 1회 `collector/backfill-pages.mjs` 로 해소(894→24). **끝내 어느 소스에도 쪽수 없는 책(문제집·사전류)** 은 앱이 `total>0` 가드로 **"현재 N쪽"만 표시**(가짜 "/ 1p"·100% 금지 — nest.js #1117).
 // 외서 균형 보강(#302): 검색이면 **국내(알라딘) 최대 5 + 외서(Google Books) 최대 5 = 총 ≤10**, isbn13/title 중복제거. Google 키는 `GOOGLE_BOOKS_API_KEY`(무키 시 레이트리밋). ISBN 단건 조회엔 미적용.
 // 책 소개·풀 메타(#316→#489): 검색·ISBN 조회 응답에 알라딘 풀 메타(`description` 등) 첨부. **#489: `normalize()` 가 books 풀 메타 컬럼(위 테이블)을 채워 upsert** → archive·검색 양 경로 공통 반영(이전엔 description 컬럼 부재로 미반영).
-// 검색 도서 자동 저장(#489): `aladinProxy` 가 알라딘 결과를 `ctx.waitUntil` 백그라운드로 books upsert(`on_conflict=isbn13`). 검색(ItemSearch)은 itemPage 누락 잦아 **저장 직전 ISBN 보강**(위 QA7). **`upsertBook` 단일 게이트(#1117): 진짜 ISBN-13(`^97[89]\d{10}$`)만 적재 — Aladin 묶음상품 K-id(`[세트]…전2권`)·EAN 바코드·ISBN-10 차단**(세트는 단일 쪽수가 없어 영구 null + 검색 노이즈. 검색·archive·seed 전 경로 공통 적용. 과거 유입분 83권 1회 정리). Google 외서는 우리 컬럼 매핑분만 + `source='google'`. 응답 지연 0(upsert는 응답과 분리).
+// 검색 도서 자동 저장(#489): `aladinProxy` 가 알라딘 결과를 `ctx.waitUntil` 백그라운드로 books upsert(`on_conflict=isbn13`). 검색(ItemSearch)은 itemPage 누락 잦아 **저장 직전 ISBN 보강**(위 QA7). **`upsertBook` 단일 게이트(#1117): 진짜 ISBN-13(`^97[89]\d{10}$`)만 적재 — Aladin 묶음상품 K-id(`[세트]…전2권`)·EAN 바코드·ISBN-10 차단**(세트는 단일 쪽수가 없어 영구 null + 검색 노이즈. 검색·archive·seed 전 경로 공통 적용. 과거 유입분 83권 1회 정리). ~~Google 외서는 우리 컬럼 매핑분만 + `source='google'`~~ **(#1044 제거)** — Google ToS §5.e 영구 캐시 금지로 검색 보강 Google 결과 upsert 를 삭제, Google 은 실시간 응답 표시만. 응답 지연 0(upsert는 응답과 분리).
 // 외서·빈필드 폴백 체인(#489): 등록 시 **알라딘 → Google Books → OpenLibrary** 순으로 빈 필드만 non-destructive merge(표지: Google thumbnail → OpenLibrary covers). 끝내 빈 `description`은 **LLM 보강 허용**(solar-pro3/Gemini, **결과를 books DB ISBN 매칭해 환각 필터**, 사실성 부담 큰 쪽수·가격엔 미적용). `source`·`enriched_at` 로 출처·재보강 추적. 신뢰 카피 차등은 [nest.md/library 추천 #496] 참조.
-// 인기도서 사전 아카이브(#239): `worker/index.mjs` `scheduled()`(cron 0 18 * * *) — 알라딘 베스트셀러→ItemLookUp→books upsert(service_role). 등록 지연 0·API 의존 감소. env: SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY·ARCHIVE_DAILY_CAP(기본3000)
+// 인기도서 사전 아카이브(#239): `worker/index.mjs` `scheduled()`(cron 0 18 * * *) — 알라딘 베스트셀러→ItemLookUp→books upsert(service_role). 등록 지연 0·API 의존 감소. env: SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY·ARCHIVE_DAILY_CAP(기본3000). **(#1044 격리)** 신규 provider 키(KAKAO_REST_KEY/NLK_CERT_KEY) 설치 시 자동 중지(`aladinSeedActive`) — 인기 시드 소스 재설계는 P2 별도 이슈.
 books.get(bookId)                          → Book
 myBooks.list()                             → UserBook[]      // 읽는 중 + 완독 + 중단(aborted). publisher/total_pages는 override 병합값(#431)
 myBooks.add({book, current_page})          → UserBook
@@ -182,12 +183,12 @@ ai.extractBook(userBookId)                 → 추출 책 요약
 
 | 현행 함수 | 현재(알라딘) | 이전 후 | 비고 |
 |---|---|---|---|
-| `aladinProxy` (~:1049) | ItemSearch(검색)·ItemLookUp(ISBN) | **검색 → 카카오 책검색**, **ISBN 단건 → 카카오 + 국중도 쪽수 보강** | 함수·라우트명 리네이밍(예 `bookSearchProxy`) 검토. 클라 회귀 방지 위해 라우트 별칭 `/aladin` 은 과도기 유지 가능 |
-| `normalize` (~:1264) | 알라딘 `item` 필드 매핑 | **카카오/국중도 응답 → `books` 컬럼 재매핑**. **쪽수 = 국중도 `PAGE`**, 표지 = 카카오 `thumbnail` 또는 국중도 `TITLE_URL` | 알라딘 전용 컬럼(`sales_point`·`customer_review_rank`·`aladin_link`)은 신규소스 부재 → NULL(이미 nullable, 비파괴) |
+| `aladinProxy` (~:1049) | ItemSearch(검색)·ItemLookUp(ISBN) | ✅ **구현** — 디스패처로 전환: **검색 → 카카오(`kakaoSearchProxy`)**, **ISBN 단건 → 국중도(`nlkIsbnLookup`)**, 키 없으면 **레거시 알라딘(`aladinLegacyProxy`) 폴백** | 라우트 `/aladin` 은 클라 회귀 방지 위해 과도기 유지. 국중도 미보유 외서의 영구 폴백 = OpenLibrary(응답 표시 보강은 Google 실시간) |
+| `normalize` (~:1264) | 알라딘 `item` 필드 매핑 | ✅ **구현** — `normalizeKakao`(thumbnail·contents, 쪽수 없음→키 생략)·`normalizeNLK`(**쪽수 = `PAGE`**, 표지 = `TITLE_URL`) 추가. 빈 필드 키 생략(비파괴 merge upsert 규약 유지) | 알라딘 전용 컬럼(`sales_point`·`customer_review_rank`·`aladin_link`)은 신규소스 부재 → NULL(이미 nullable, 비파괴) |
 | `upsertBook` (~:1312) | `on_conflict=isbn13` merge upsert | **유지** — 카카오 캐시 조건(최신 유지) 위해 `enriched_at` 신선화 + 일일 cron 재보강 유지 | 카카오 §5(20) 충족 핵심: 캐시를 stale 방치하지 않음 |
-| `archive` cron (~:1220) | 알라딘 베스트셀러 ItemList → ItemLookUp | **알라딘 베스트셀러 의존 제거 — 인기 시드 소스 재설계 필요** | 카카오·국중도엔 베스트셀러 API 없음. 출시 블로커 관점상 검색·등록(P1) 먼저, 인기 시드(P2)는 후순위 |
-| `imgProxy` (~:1028) | 표지 호스트 화이트리스트 = `aladin.co.kr` 만 | **카카오·국중도 표지 호스트 추가**(카카오 `*.kakaocdn.net` 류·국중도 `TITLE_URL` 호스트) | 실제 표지 호스트는 출시 전 실계정 확인 후 확정 |
-| `googleBooksSearch` (~:1120) | 검색 보강 + **결과 upsert**(source='google', :1102-1106) | **실시간 응답만 — 영구 upsert 라인 제거 검토** | Google ToS §5.e. `enrichForeignMeta` 의 Google·OpenLibrary merge 도 영속 대상서 제외 검토 |
+| `archive` cron (~:1220) | 알라딘 베스트셀러 ItemList → ItemLookUp | ⏸ **격리** — 신규 provider 키(카카오/국중도)가 설치되면 자동 중지(`aladinSeedActive` 게이트, `BOOKS_PROVIDER='aladin'` 명시 시에만 재개). **인기 시드 소스 재설계는 P2 별도 이슈** | 카카오·국중도엔 베스트셀러 API 없음. 출시 블로커 관점상 검색·등록(P1) 먼저, 인기 시드(P2)는 후순위 |
+| `imgProxy` (~:1028) | 표지 호스트 화이트리스트 = `aladin.co.kr` 만 | ✅ **구현** — `*.kakaocdn.net`(카카오 thumbnail)·`*.nl.go.kr`(국중도 `TITLE_URL`) 추가 | 실제 표지 호스트는 출시 전 실계정 확인 후 확정(누락 호스트 발견 시 추가) |
+| `googleBooksSearch` (~:1120) | 검색 보강 + **결과 upsert**(source='google', :1102-1106) | ✅ **구현** — 실시간 응답만, 영구 upsert 라인 제거(카카오·레거시 양 검색 경로 공통) | Google ToS §5.e. `enrichForeignMeta` 의 Google merge 가 레거시 ISBN 등록 upsert 에 섞이는 잔여 경로는 P2 정리 |
 
 **출시 전 실계정 1회 확인 게이트** (단정 금지 — 스펙은 방향만, 약관 원문 검증은 출시 전 필수):
 
@@ -199,8 +200,13 @@ ai.extractBook(userBookId)                 → 추출 책 요약
 **Phasing:**
 
 - **P1 (출시 블로커)**: 검색·등록 경로 이전 — `aladinProxy`(→카카오+국중도)·`normalize`·`imgProxy` 화이트리스트·`googleBooksSearch` upsert 제거. **즉시 ToS 에 노출되는 상업 경로**부터.
-- **P2**: `archive` cron 인기 시드 소스 재설계(알라딘 베스트셀러 대체) + 외서 폴백 영속 정리 마무리.
-- 코드는 본 spec 머지 후 **후속 PR**(#1044 코드)로. 본 PR 은 spec-only.
+- **P2**: `archive` cron 인기 시드 소스 재설계(알라딘 베스트셀러 대체) + 외서 폴백 영속 정리 마무리(`enrichForeignMeta` 의 Google merge 가 ISBN 등록 upsert 에 섞이는 잔여 경로 포함).
+
+**구현 상태 (#1044 코드 PR, 2026-07-03)** — P1 을 **provider 스위치** 뒤로 구현:
+
+- **키 자동 감지 폴백(무중단)**: `KAKAO_REST_KEY`(검색)·`NLK_CERT_KEY`(ISBN·쪽수) secret 이 있으면 신규 경로, 없으면 기존 알라딘 경로 그대로 — 키 미발급 상태로 배포해도 현행과 동일 동작, 배포 후 `wrangler secret put` 만으로 전환. `BOOKS_PROVIDER='aladin'` 은 명시 롤백 스위치.
+- **카카오 캐시 조항 회피**: 카카오 검색 결과는 **직접 upsert 하지 않고**, 발견 ISBN 을 국중도로 재조회한 행만 canonical 적재(국중도 키 없으면 저장 생략 — 응답만).
+- **남은 일**: 카카오·국중도 키 발급/등록 → 전환 실측, 표지 호스트 실계정 확정(위 게이트), P2 인기 시드 재설계(별도 이슈).
 
 ### 7.3 데이터 모델 (관계형 — Phase 1 기준)
 
