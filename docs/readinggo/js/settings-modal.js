@@ -129,14 +129,14 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           {groupLabel('계정')}
           {(window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured() && window.DataStore !== window.SupabaseDataStore) ? (
             <button onClick={() => { onClose && onClose(); if (window.RG_login) window.RG_login(); }}
-              style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+              style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
               <window.SparrowInline /> 로그인하고 내 기록 저장하기
             </button>
           ) : (
             <>
               {/* 계정 주소 표기 (#671) — 로그인 시에만 */}
               {acctEmail && (
-                <div style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--line)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 12, border: '1.5px solid var(--line)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>{rgIcon('user', 17)}</span>
                   <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acctEmail}</span>
                 </div>
@@ -148,15 +148,15 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                   if (window.RG_SB && window.RG_SB.signOutOtherDevices) {
                     Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시'));
                   }
-                }} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{rgIcon('devices', 14)} 다른 기기 로그아웃</button>
-                <button onClick={logout} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>이 기기 로그아웃</button>
+                }} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{rgIcon('devices', 14)} 다른 기기 로그아웃</button>
+                <button onClick={logout} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>이 기기 로그아웃</button>
               </div>
             </>
           )}
 
           {/* ② 개인정보·데이터 */}
           {groupLabel('개인정보·데이터')}
-          <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>독서 대화 AI·분석 활용</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>한 문장·대화를 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해요. 끄면 로컬 질문만(외부 전송·수집 없음).</div>
@@ -168,7 +168,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             </button>
           </div>
           {/* 위시리스트 공개 (#558) */}
-          <div style={{ marginTop: 8, padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ marginTop: 8, padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('bookmark', 14)} 읽고 싶은 책 공개</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
@@ -190,13 +190,13 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                 <button onClick={() => setDelConfirm(true)}
                   style={{ padding: '8px 2px', border: 'none', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
               ) : (
-                <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--danger, #E5484D)', background: 'var(--danger-tint, rgba(229,72,77,0.06))' }}>
+                <div style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--danger, #E5484D)', background: 'var(--danger-tint, rgba(229,72,77,0.06))' }}>
                   <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 기록(한 문장·서재·둥지·대화)이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={deleteAccount} disabled={deleting}
-                      style={{ flex: 1, padding: '11px', borderRadius: 10, border: 'none', background: 'var(--danger, #E5484D)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}>{deleting ? '삭제 중…' : '삭제 확정'}</button>
+                      style={{ flex: 1, padding: '11px', borderRadius: 12, border: 'none', background: 'var(--danger, #E5484D)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}>{deleting ? '삭제 중…' : '삭제 확정'}</button>
                     <button onClick={() => setDelConfirm(false)} disabled={deleting}
-                      style={{ flex: 1, padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                      style={{ flex: 1, padding: '11px', borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>취소</button>
                   </div>
                 </div>
               )}
@@ -206,26 +206,26 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           {/* ③ 읽기 환경 */}
           {groupLabel('읽기 환경')}
           {/* 스포일러 토글 — 설정에서 유지 (#3 결정) */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', marginBottom: 8 }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--ink)' }}>스포일러 모두 보기</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>안 읽은 페이지의 한 문장도 표시</div>
             </div>
             <button onClick={() => setSpoilerReveal(v => !v)} aria-pressed={spoilerReveal} title="스포일러 토글"
-              style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: 'pointer', background: spoilerReveal ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+              style={{ width: 52, height: 30, borderRadius: 999, border: 'none', cursor: 'pointer', background: spoilerReveal ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
               <span style={{ position: 'absolute', top: 3, left: spoilerReveal ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
           {/* 스트릭 리마인더 (#1033) — 네이티브 앱에서만 노출(로컬 알림). 웹/데모엔 의미 없어 숨김. */}
           {reminderNative && (
-            <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)', marginBottom: 8 }}>
+            <div style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ flex: 1, paddingRight: 10 }}>
                   <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--ink)' }}>🔔 스트릭 리마인더</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>매일 정해진 시각에 "오늘 한 줄" 알림을 보내요. 오늘 이미 읽었으면 건너뛰어요.</div>
                 </div>
                 <button onClick={toggleReminder} aria-pressed={reminderOn} title="스트릭 리마인더 토글" disabled={reminderBusy}
-                  style={{ width: 52, height: 30, borderRadius: 15, border: 'none', cursor: reminderBusy ? 'default' : 'pointer', background: reminderOn ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0, opacity: reminderBusy ? 0.6 : 1 }}>
+                  style={{ width: 52, height: 30, borderRadius: 999, border: 'none', cursor: reminderBusy ? 'default' : 'pointer', background: reminderOn ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0, opacity: reminderBusy ? 0.6 : 1 }}>
                   <span style={{ position: 'absolute', top: 3, left: reminderOn ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                 </button>
               </div>
@@ -233,13 +233,13 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--ink-2)' }}>알림 시각</span>
                   <input type="time" value={fmtTime(reminderHour, reminderMin)} onChange={changeReminderTime}
-                    style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)', border: '1.5px solid var(--line)', borderRadius: 8, padding: '6px 10px', background: 'var(--paper, #fff)' }} />
+                    style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '6px 10px', background: 'var(--paper, #fff)' }} />
                 </div>
               )}
             </div>
           )}
           {/* 참새 질문 결 프리셋 (#375) */}
-          <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
+          <div style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)' }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('chat', 15)} 재키 질문 결</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, marginBottom: 10, lineHeight: 1.4 }}>재키가 던지는 질문의 방향을 골라요. 다음 질문부터 반영돼요.</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -258,15 +258,15 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
 
           {/* ④ 지원 */}
           {groupLabel('지원')}
-          <div style={{ padding: '12px', borderRadius: 10, border: '1.5px solid var(--line)' }}>
+          <div style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)' }}>
             <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--ink-2)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('mail', 15)} 운영자에게 문의</div>
             {inqDone ? (
-              <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--card)', borderRadius: 10, padding: 12 }}>전송됐어요. 운영자가 확인 후 답변드립니다 <window.SparrowInline size={13} /> <button onClick={() => setInqDone(false)} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, cursor: 'pointer' }}>다시 쓰기</button></div>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--card)', borderRadius: 12, padding: 12 }}>전송됐어요. 운영자가 확인 후 답변드립니다 <window.SparrowInline size={13} /> <button onClick={() => setInqDone(false)} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, cursor: 'pointer' }}>다시 쓰기</button></div>
             ) : (
               <>
                 <textarea value={inqMsg} onChange={(e) => { if (e.target.value.length <= 2000) setInqMsg(e.target.value); }} placeholder="버그·불편·제안 무엇이든 적어주세요 (최대 2000자)" rows={3}
-                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 10, border: '1.5px solid var(--line)', padding: 10, fontSize: 14, lineHeight: 1.5, resize: 'none' }} />
-                <button onClick={sendInquiry} disabled={inqBusy} style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: inqBusy ? 'default' : 'pointer', opacity: inqBusy ? 0.6 : 1 }}>{inqBusy ? '보내는 중…' : '문의 보내기'}</button>
+                  style={{ width: '100%', boxSizing: 'border-box', borderRadius: 12, border: '1.5px solid var(--line)', padding: 10, fontSize: 14, lineHeight: 1.5, resize: 'none' }} />
+                <button onClick={sendInquiry} disabled={inqBusy} style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: inqBusy ? 'default' : 'pointer', opacity: inqBusy ? 0.6 : 1 }}>{inqBusy ? '보내는 중…' : '문의 보내기'}</button>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>또는 readinggo.admin@gmail.com</div>
               </>
             )}

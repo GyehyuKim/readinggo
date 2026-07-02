@@ -153,7 +153,7 @@ function BookInfoModal({ bookId, onClose }) {
         ) : (
           <div style={{ padding: '8px 20px 20px' }}>
             <div style={{ textAlign: 'center', marginBottom: 14 }}>
-              <div style={{ width: 100, height: 140, margin: '0 auto 12px', borderRadius: 8, overflow: 'hidden', background: 'var(--line)' }}>
+              <div style={{ width: 100, height: 140, margin: '0 auto 12px', borderRadius: 12, overflow: 'hidden', background: 'var(--line)' }}>
                 {bk.cover_url && <img src={bk.cover_url} alt={bk.title} referrerPolicy="no-referrer" onError={e => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
               </div>
               <h2 style={{ fontSize: 18, fontWeight: 900, margin: '0 0 4px', color: 'var(--ink)' }}>{bk.title}</h2>
@@ -166,12 +166,12 @@ function BookInfoModal({ bookId, onClose }) {
                 </button>
               )}
             </div>
-            <a href={kyoboUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '12px', background: 'var(--brand-tint)', border: '1.5px solid var(--brand)', borderRadius: 8, color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, textDecoration: 'none', marginBottom: 10 }}>교보문고에서 보기 →</a>
+            <a href={kyoboUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '12px', background: 'var(--brand-tint)', border: '1.5px solid var(--brand)', borderRadius: 12, color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, textDecoration: 'none', marginBottom: 10 }}>교보문고에서 보기 →</a>
             {/* 책 소개 (#578) — 왜 읽는지 보여 읽고 싶게. DB description 우선·알라딘 폴백, 없으면 섹션 생략. */}
             {desc && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <SectionLabel icon="intro"
-                  trailing={descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--ink-3)', background: 'var(--line)', borderRadius: 5, padding: '1px 6px', letterSpacing: 0.3 }}>AI</span>}>
+                  trailing={descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--ink-3)', background: 'var(--line)', borderRadius: 999, padding: '1px 6px', letterSpacing: 0.3 }}>AI</span>}>
                   책 소개
                 </SectionLabel>
                 <div style={{ ...RG_SECTION_CARD, fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{decodeEntities(desc)}</div>
@@ -182,7 +182,7 @@ function BookInfoModal({ bookId, onClose }) {
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <SectionLabel icon="mine">내 한 문장</SectionLabel>
                 {mySents.map(s => (
-                  <div key={s.id} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                  <div key={s.id} style={{ background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 8 }}>
                     <div style={{ fontFamily: 'var(--font-quote)', fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.6 }}>"{decodeEntities(s.text)}"</div>
                     {typeof s.page === 'number' && s.page > 0 ? <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginTop: 4 }}>{s.page}p</div> : null}
                     <SentenceActions sentence={s} mine onRemoved={(rid) => setMySents(m => (m || []).filter(x => x.id !== rid))} />
@@ -211,7 +211,7 @@ function BookInfoModal({ bookId, onClose }) {
             {popular.length === 0 && seeding && (
               <div style={{ textAlign: 'left', marginBottom: 12 }}>
                 <SectionLabel icon="sentence">🌱 이웃의 문장</SectionLabel>
-                <div style={{ background: 'var(--card)', border: '1.5px dashed var(--line)', borderRadius: 8, padding: 14, fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+                <div style={{ background: 'var(--card)', border: '1.5px dashed var(--line)', borderRadius: 12, padding: 14, fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
                   🌱 이웃의 문장을 모으는 중이에요… 둘러보는 동안 채워둘게요.
                 </div>
               </div>
@@ -222,7 +222,7 @@ function BookInfoModal({ bookId, onClose }) {
                 <span>총 쪽수 <small style={{ color: 'var(--ink-3)' }}>(선택 — 모르면 비워둬요)</small></span>
                 <input type="number" inputMode="numeric" min="0" max="99999" value={manualPages} placeholder="예: 320"
                   onChange={e => setManualPages(e.target.value)}
-                  style={{ width: 80, textAlign: 'center', padding: '6px 4px', border: '1.5px solid var(--line)', borderRadius: 8, fontSize: 14, fontWeight: 800 }} />
+                  style={{ width: 80, textAlign: 'center', padding: '6px 4px', border: '1.5px solid var(--line)', borderRadius: 12, fontSize: 14, fontWeight: 800 }} />
                 <span>p</span>
               </div>
             )}

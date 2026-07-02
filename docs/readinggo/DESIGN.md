@@ -8,7 +8,7 @@
 
 ## UI 규칙 (always-on · 린트 강제)
 
-> 아래는 **항상 적용**되는 코드 레벨 규칙이며, `tests/spec-align/design_lint.py` 가 `js/*.js`·`index.html` 을 스캔해 위반을 자동 탐지한다(이모지·raw hex·ghost = `exit 1`, 라운딩 = warning). 새 UI 코드는 예외 없이 지킨다. 상세 근거는 아래 'Color'·'Typography'·'Layout & 버튼 위계' 섹션.
+> 아래는 **항상 적용**되는 코드 레벨 규칙이며, `tests/spec-align/design_lint.py` 가 `js/*.js`·`index.html` 을 스캔해 위반을 자동 탐지한다(이모지·raw hex·ghost·라운딩 = `exit 1`). 새 UI 코드는 예외 없이 지킨다. 상세 근거는 아래 'Color'·'Typography'·'Layout & 버튼 위계' 섹션.
 
 - ❌ **기능 UI 이모지 금지** (📖 📚 📦 📸 📷 🔍 🔎 🔖 ✍️ ✏️ ⚙️ ✕ 🗑 🏠 ❤️ 등) → `RG_ICONS` + `rgIcon('name')` 모노라인 SVG(`icons.js`)로 통일. 단, **둥지 5단계(🌿🪹🪺🐣🏰)·컴패니언 동물(🦊🦝🐰🐹🐱)** 은 게임 시그니처라 허용.
 - ⭐ **평점 별은 이모지(⭐) 대신 `★`/`☆` 글리프** — 색·크기를 CSS로 제어하고 플랫폼 렌더 편차를 없앤다.

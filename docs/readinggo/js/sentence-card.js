@@ -175,7 +175,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     공유
   </button> : null;
   // #683: 인라인 편집 폼 — 문장 본문(textarea) + 페이지(number). 저장은 DataStore 계약 경유.
-  const inputBase = { width: '100%', boxSizing: 'border-box', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--card)', color: 'var(--ink)', fontSize: 13, padding: '8px 10px', fontFamily: 'inherit' };
+  const inputBase = { width: '100%', boxSizing: 'border-box', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--card)', color: 'var(--ink)', fontSize: 13, padding: '8px 10px', fontFamily: 'inherit' };
   const btnBase = { ...chip, padding: '6px 14px', fontSize: 12 };
   if (mine && editing) {
     return (

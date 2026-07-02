@@ -63,7 +63,7 @@ function UserProfileModal({ handle, onClose }) {
   const BookCard = ({ ub }) => (
     <div onClick={() => setBookView({ bookId: ub.book_id, title: ub.book && ub.book.title, cover: ub.book && ub.book.cover_url })}
       style={{ width: 84, cursor: 'pointer' }}>
-      <div style={{ width: 84, height: 118, borderRadius: 6, overflow: 'hidden', background: 'var(--line)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 84, height: 118, borderRadius: 12, overflow: 'hidden', background: 'var(--line)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {ub.book && ub.book.cover_url
           ? <img src={ub.book.cover_url} alt={ub.book.title} loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>{window.rgIcon('book', 30)}</span>}
@@ -88,7 +88,7 @@ function UserProfileModal({ handle, onClose }) {
           ) : (
             <>
               {contrib && contrib.userBook && (typeof contrib.userBook.rating === 'number' || contrib.userBook.review_text) && (
-                <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
                   {typeof contrib.userBook.rating === 'number' && <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--brand-3)', marginBottom: 4 }}>★ {contrib.userBook.rating} / 5</div>}
                   {contrib.userBook.review_text && <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.6 }}>{contrib.userBook.review_text}</div>}
                 </div>
@@ -99,7 +99,7 @@ function UserProfileModal({ handle, onClose }) {
               ) : contrib.sentences.map((s) => {
                 const blinded = !revealed[s.id] && isSentenceBlinded(bookView.bookId, s.page);
                 return (
-                  <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                  <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 8 }}>
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{s.page}p</div>
                     {blinded
                       ? <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>
@@ -135,7 +135,7 @@ function UserProfileModal({ handle, onClose }) {
             </div>
             {following !== null && (
               <button onClick={toggleFollow}
-                style={{ marginTop: 12, padding: '8px 22px', borderRadius: 20, border: 'none', background: following ? 'var(--brand-soft)' : 'var(--brand)', color: following ? 'var(--brand-3)' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                style={{ marginTop: 12, padding: '8px 22px', borderRadius: 999, border: 'none', background: following ? 'var(--brand-soft)' : 'var(--brand)', color: following ? 'var(--brand-3)' : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
                 {following ? '팔로잉 ✓' : '+ 팔로우'}
               </button>
             )}
@@ -185,7 +185,7 @@ function UserProfileModal({ handle, onClose }) {
                     <div key={wb.id || wb.book_id} style={{ flex: '0 0 auto' }}
                       onClick={() => bk.id && setBookView({ bookId: bk.id, title: bk.title, cover: bk.cover_url })}>
                       <div style={{ width: 84, cursor: bk.id ? 'pointer' : 'default' }}>
-                        <div style={{ width: 84, height: 118, borderRadius: 6, overflow: 'hidden', background: 'var(--line)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 84, height: 118, borderRadius: 12, overflow: 'hidden', background: 'var(--line)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {bk.cover_url
                             ? <img src={bk.cover_url} alt={bk.title} loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             : <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>{window.rgIcon('heart', 30)}</span>}
@@ -208,7 +208,7 @@ function UserProfileModal({ handle, onClose }) {
             const bid = s.user_book && s.user_book.book_id;
             const blinded = !revealed[s.id] && isSentenceBlinded(bid, s.page);
             return (
-              <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+              <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 8 }}>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{bt ? bt + ' · ' : ''}{s.page}p</div>
                 {blinded ? (
                   <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>

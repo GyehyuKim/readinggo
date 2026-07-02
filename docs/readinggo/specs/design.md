@@ -4,6 +4,7 @@
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 > **린트 강제 (#1062)**: DESIGN.md UI 규칙(기능 이모지→RG_ICONS·raw hex→토큰·라운딩 12/16/18·ghost 금지)을 `tests/spec-align/design_lint.py`가 코드에서 자동 검사한다(admin·test·데이터 파일 면제). #696 이모지→SVG 부채를 전면 스윕(book-detail·library·user-profile 등 88건 교체)하고 누락 RG_ICONS(검색·홈·카메라·삭제·박스)를 추가했다.
 > **CI 게이트 등록 (#1062, 2026-06-28)**: `design_lint.py`를 `.github/workflows/test.yml` 잡으로 등록 — emoji+hex+ghost 위반 1건 이상이면 PR 차단(라운딩은 warning, 비차단). 잔여 기능 이모지를 스윕(로그인 메일 안내 📬→`rgIcon('mail')`, 룸 초대 링크 🔗→`rgIcon('share')`, 둥지 토스트 📖 제거 등)해 **위반 0건** 달성. 이후 기능 이모지를 새로 넣으면 게이트가 막는다(드리프트 방지). 라운딩 warning(다회)은 후속 토큰 정리 대상.
+> **라운딩 정합 + blocking 승격 (#1130, 2026-07-03)**: 잔여 비표준 `borderRadius` 113건을 역할 기준으로 전량 정합화 — 칩·입력·카드·버튼은 `12`, 원형/알약 의도(토글 스위치·마이크로 배지·프로그레스 트랙·크롭 핸들·히트맵 도트 등 13건)는 pill `999`, OCR 크롭 선택영역 마퀴 1건은 라운딩 제거(직각이 크롭 영역을 정확히 표현). `design_lint.py` 라운딩을 warning → **blocking(exit 1)** 승격해 이후 비표준 라운딩은 CI가 차단한다.
 
 ## 11. 디자인 토큰
 

@@ -369,11 +369,11 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     <span style={{marginLeft:6, fontSize:13, fontWeight:800, color:'var(--ink-2)'}}>{rt > 0 ? rt.toFixed(1) : ''}</span>
                   </div>
                   <textarea value={rv} maxLength={1000} onChange={e => setRv(e.target.value)} placeholder="완독 소감 (최대 1000자)" rows={3}
-                    style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:8, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
+                    style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:12, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
                   <div style={{display:'flex', gap:6, marginTop:6}}>
-                    <button onClick={saveMeta} style={{padding:'6px 12px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
+                    <button onClick={saveMeta} style={{padding:'6px 12px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
                     {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
-                    <button onClick={() => setEditMeta(false)} style={{padding:'6px 12px', borderRadius:8, border:'none', background:'transparent', color:'var(--ink-2)', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
+                    <button onClick={() => setEditMeta(false)} style={{padding:'6px 12px', borderRadius:12, border:'none', background:'transparent', color:'var(--ink-2)', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
                   </div>
                 </div>
               ) : (
@@ -424,7 +424,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   {/* 다시 받기 = 2차 tonal(DESIGN.md #1032: ghost 투명+brand 보더 금지 → brand-soft 채움) */}
                   {bookQuotes.length > 0 && (
                     <button onClick={loadRecap} disabled={recapLoading}
-                      style={{marginTop:8, padding:'5px 12px', background:'var(--brand-soft)', border:'1px solid var(--brand-soft)', borderRadius:8, color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
+                      style={{marginTop:8, padding:'5px 12px', background:'var(--brand-soft)', border:'1px solid var(--brand-soft)', borderRadius:12, color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
                       {recapLoading ? '참새가 곱씹는 중…' : '🔄 다시 받기'}
                     </button>
                   )}
@@ -435,7 +435,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                 <>
                   <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5, marginBottom:8}}>이 책에서 남긴 {bookQuotes.length}개의 한 문장을 참새가 엮어 회고를 들려드려요.</div>
                   <button onClick={loadRecap} disabled={recapLoading}
-                    style={{padding:'9px 16px', background:'var(--brand)', border:'none', borderRadius:8, color:'#fff', fontSize:13, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
+                    style={{padding:'9px 16px', background:'var(--brand)', border:'none', borderRadius:12, color:'#fff', fontSize:13, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
                     {recapLoading ? '참새가 곱씹는 중…' : <><window.SparrowInline size={13} /> 회고 받기</>}
                   </button>
                 </>
@@ -450,7 +450,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               <SectionLabel icon="related" mb={3}>AI 추천 — 다음에 읽을 책</SectionLabel>
               <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:10}}>이 책을 완독한 당신에게 어울리는 다음 책이에요</div>
               {aiNextBooks.map(rb => (
-                <div key={rb.id} style={{display:'flex', gap:12, alignItems:'flex-start', background:'var(--paper-2)', borderRadius:8, padding:'10px 12px', marginBottom:8}}>
+                <div key={rb.id} style={{display:'flex', gap:12, alignItems:'flex-start', background:'var(--paper-2)', borderRadius:12, padding:'10px 12px', marginBottom:8}}>
                   <BookCover className="book-cover" title={rb.title} author={rb.author} cover={rb.cover}
                     radius={6} style={{width:48, height:68, flex:'0 0 auto'}} />
                   <div style={{flex:1, minWidth:0}}>
@@ -470,7 +470,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
 
           {/* ② AI 추출 책 — 나만의 추출 책 (내 한 문장 기반). Phase 0 = 한 문장 나열 + 고정 카피 */}
           {bookshelfEntry && aiExtract && (
-            <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:8, padding:'12px 14px', marginBottom:14}}>
+            <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:12, padding:'12px 14px', marginBottom:14}}>
               <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:8}}>✨ 나만의 추출 책</div>
               {/* 반응한 주제 TOP 3 */}
               <div style={{display:'flex', flexWrap:'wrap', gap:6, marginBottom:10}}>
@@ -482,7 +482,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               {aiExtract.topQuote && aiExtract.topQuote.text && (
                 <div style={{marginBottom:10}}>
                   <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:800, marginBottom:4}}>가장 인상 깊었던 한 문장</div>
-                  <div style={{fontFamily:'var(--font-quote)', fontSize:13, color:'var(--ink)', fontWeight:400, fontStyle:'italic', lineHeight:1.55, padding:'8px 10px', background:'var(--card)', borderRadius:8}}>
+                  <div style={{fontFamily:'var(--font-quote)', fontSize:13, color:'var(--ink)', fontWeight:400, fontStyle:'italic', lineHeight:1.55, padding:'8px 10px', background:'var(--card)', borderRadius:12}}>
                     "{aiExtract.topQuote.text}"
                     {typeof aiExtract.topQuote.page === 'number' && <span style={{fontStyle:'normal', fontSize:11, color:'var(--ink-3)', fontWeight:700, marginLeft:6}}>p.{aiExtract.topQuote.page}</span>}
                   </div>
@@ -500,7 +500,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               {book.total > 0 ? (
                 <>
                   <div style={{display:'flex', alignItems:'center', gap:10}}>
-                    <div style={{flex:1, height:8, background:'var(--line)', borderRadius:4, overflow:'hidden'}}>
+                    <div style={{flex:1, height:8, background:'var(--line)', borderRadius:999, overflow:'hidden'}}>
                       <div style={{height:'100%', background:'var(--brand)', width:`${progressPct}%`, transition:'width 0.3s ease'}} />
                     </div>
                     <span style={{fontSize:13, fontWeight:800, color:'var(--ink)', minWidth:50}}>{prog.cur} / {book.total}p</span>
@@ -528,14 +528,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {!bookshelfEntry && book.status !== 'aborted' && book.ubId && (
             <div style={{display:'flex', gap:8, marginBottom:14}}>
               <button onClick={markDone}
-                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--brand-tint)', border:'1.5px solid var(--brand-soft)', borderRadius:10, color:'var(--brand-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--brand-tint)', border:'1.5px solid var(--brand-soft)', borderRadius:12, color:'var(--brand-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 완독으로 표시
               </button>
               {/* 읽기 중단 = 중립 tonal(DESIGN.md #1032: ghost 투명+보더 금지 → 채워진 배경.
                   비긍정 액션이라 그린 tonal 대신 중립 paper-2 채움으로 '완독' 그린과 위계 구분) */}
               <button onClick={abortBook}
-                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:10, color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:12, color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
                 읽기 중단
               </button>
@@ -559,7 +559,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             <div style={{marginBottom:14}}>
               {/* 섹션 헤더 #696 — 이모지 prefix 폐기, 공용 SectionLabel(components.js, window 노출). */}
               <SectionLabel icon="intro"
-                trailing={descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{fontSize:10, fontWeight:800, color:'var(--ink-3)', background:'var(--line)', borderRadius:5, padding:'1px 6px', letterSpacing:0.3}}>AI</span>}>
+                trailing={descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{fontSize:10, fontWeight:800, color:'var(--ink-3)', background:'var(--line)', borderRadius:999, padding:'1px 6px', letterSpacing:0.3}}>AI</span>}>
                 책 소개
               </SectionLabel>
               {descLoading && !bookDesc ? (
@@ -582,9 +582,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     style={{flex:'0 0 auto', width:92, background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left'}}>
                     <div style={{position:'relative'}}>
                       <img src={rb.cover} alt={rb.title} loading="lazy"
-                        style={{width:92, height:134, objectFit:'cover', borderRadius:6, boxShadow:'0 1px 4px rgba(0,0,0,0.12)', background:'var(--paper-2)', display:'block'}} />
+                        style={{width:92, height:134, objectFit:'cover', borderRadius:12, boxShadow:'0 1px 4px rgba(0,0,0,0.12)', background:'var(--paper-2)', display:'block'}} />
                       {wished[rb.id] && (
-                        <div style={{position:'absolute', top:4, right:4, background:'var(--brand)', color:'#fff', fontSize:10, fontWeight:800, borderRadius:10, padding:'2px 6px'}}>찜 ✓</div>
+                        <div style={{position:'absolute', top:4, right:4, background:'var(--brand)', color:'#fff', fontSize:10, fontWeight:800, borderRadius:999, padding:'2px 6px'}}>찜 ✓</div>
                       )}
                     </div>
                     <div style={{fontSize:11, fontWeight:800, color:'var(--ink)', marginTop:6, lineHeight:1.3, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical'}}>{rb.title}</div>
@@ -609,16 +609,16 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               {!addOpen ? (
                 <>
                   <button onClick={() => setAddOpen(true)}
-                    style={{display:'flex', width:'100%', alignItems:'center', justifyContent:'center', gap:6, padding:'12px', borderRadius:8, border:'1.5px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer'}}>{window.rgIcon('pen',15)} 한 문장 추가</button>
+                    style={{display:'flex', width:'100%', alignItems:'center', justifyContent:'center', gap:6, padding:'12px', borderRadius:12, border:'1.5px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer'}}>{window.rgIcon('pen',15)} 한 문장 추가</button>
                   {/* #848 여러 문장 한 번에 담기 — 눈에 띄는 카드 + 사용법 안내 */}
                   <button onClick={() => setQuotePasteOpen(true)}
-                    style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:8, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
+                    style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
                     <div style={{fontWeight:800, fontSize:14, display:'flex', alignItems:'center', gap:6}}>{window.rgIcon('bookmark',15)} 여러 문장 한 번에 담기</div>
                     <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>밑줄·메모·공유한 글을 <b>한 줄에 하나씩</b> 붙여넣으면 한꺼번에 담겨요</div>
                   </button>
                   {/* #844 사진에서 여러 문장 담기 — 앨범 다중 → Gemini vision 강조 추출 */}
                   <button onClick={() => _ocrAlbumRef.current && _ocrAlbumRef.current.click()}
-                    style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:8, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
+                    style={{display:'block', width:'100%', marginTop:8, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
                     <div style={{fontWeight:800, fontSize:14, display:'flex', alignItems:'center', gap:6}}>{window.rgIcon('camera',15)} 사진에서 여러 문장 담기</div>
                     <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>밑줄·형광펜 친 페이지를 <b>여러 장</b> 올리면 강조 문장만 골라 담아요</div>
                   </button>
@@ -626,21 +626,21 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; if (fs.length) runOcrBatch(fs); }} />
                 </>
               ) : (
-                <div style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:8, padding:12}}>
+                <div style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:12, padding:12}}>
                   <textarea value={addText} onChange={e => { if (e.target.value.length <= 1000) setAddText(e.target.value); }}
                     placeholder="이 책에서 남기고 싶은 한 문장" rows={3} autoFocus
-                    style={{width:'100%', boxSizing:'border-box', border:'1.5px solid var(--line)', borderRadius:8, padding:10, fontSize:14, lineHeight:1.5, resize:'none'}} />
+                    style={{width:'100%', boxSizing:'border-box', border:'1.5px solid var(--line)', borderRadius:12, padding:10, fontSize:14, lineHeight:1.5, resize:'none'}} />
                   {/* 인용/내 생각 토글 제거 (#596) — '내 생각' 폐기, 항상 인용(quote) 저장 */}
                   <div style={{display:'flex', gap:8, alignItems:'center', marginTop:8}}>
                     <input type="number" inputMode="numeric" min="0" max="99999" value={addPage} onChange={e => setAddPage(e.target.value)} placeholder="페이지"
-                      style={{width:72, textAlign:'center', padding:'7px 4px', border:'1.5px solid var(--line)', borderRadius:8, fontSize:13, fontWeight:700}} />
+                      style={{width:72, textAlign:'center', padding:'7px 4px', border:'1.5px solid var(--line)', borderRadius:12, fontSize:13, fontWeight:700}} />
                   </div>
                   <div style={{display:'flex', gap:8, marginTop:10}}>
                     {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
                     <button onClick={() => { setAddOpen(false); setAddText(''); setAddPage(''); }}
-                      style={{flex:'0 0 auto', padding:'10px 14px', borderRadius:8, border:'none', background:'transparent', color:'var(--ink-3)', fontWeight:700, fontSize:13, cursor:'pointer'}}>취소</button>
+                      style={{flex:'0 0 auto', padding:'10px 14px', borderRadius:12, border:'none', background:'transparent', color:'var(--ink-3)', fontWeight:700, fontSize:13, cursor:'pointer'}}>취소</button>
                     <button onClick={saveNewQuote} disabled={addBusy}
-                      style={{flex:1, padding:'10px', borderRadius:8, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:addBusy?'default':'pointer', opacity:addBusy?0.6:1}}>{addBusy?'저장 중…':'저장'}</button>
+                      style={{flex:1, padding:'10px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:addBusy?'default':'pointer', opacity:addBusy?0.6:1}}>{addBusy?'저장 중…':'저장'}</button>
                   </div>
                 </div>
               )}

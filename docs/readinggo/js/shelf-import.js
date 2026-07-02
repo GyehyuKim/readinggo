@@ -499,9 +499,9 @@ function ShelfImportModal({ onClose }) {
               {err && <div style={{ fontSize: 12.5, color: 'var(--danger, #d23)', marginBottom: 10 }}>{err}</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '42vh', overflowY: 'auto', marginBottom: 14 }}>
                 {rows.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 10, padding: '8px 10px', opacity: r.checked ? 1 : 0.5 }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '8px 10px', opacity: r.checked ? 1 : 0.5 }}>
                     <input type="checkbox" checked={r.checked} onChange={() => toggle(i)} aria-label="등록 선택" style={{ width: 18, height: 18, flexShrink: 0 }} />
-                    <div style={{ width: 30, height: 42, flexShrink: 0, borderRadius: 4, overflow: 'hidden', background: 'var(--line)' }}>
+                    <div style={{ width: 30, height: 42, flexShrink: 0, borderRadius: 12, overflow: 'hidden', background: 'var(--line)' }}>
                       {r.book && r.book.cover_url && <img src={r.book.cover_url} alt="" referrerPolicy="no-referrer" onError={(e) => (e.target.style.display = 'none')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -516,7 +516,7 @@ function ShelfImportModal({ onClose }) {
                     {!r.book && (
                       <button type="button" onClick={() => enrichOne(i)} disabled={r._finding}
                         title="알라딘에서 표지·정보 찾기"
-                        style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand, #2a7)', background: 'var(--brand-tint, rgba(42,119,119,0.1))', border: 'none', borderRadius: 6, padding: '3px 7px', flexShrink: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        style={{ fontSize: 10, fontWeight: 800, color: 'var(--brand, #2a7)', background: 'var(--brand-tint, rgba(42,119,119,0.1))', border: 'none', borderRadius: 12, padding: '3px 7px', flexShrink: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         {r._finding ? '찾는 중…' : <>{window.rgIcon('search', 11)} 찾기</>}
                       </button>
                     )}

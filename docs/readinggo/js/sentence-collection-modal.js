@@ -77,7 +77,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
   if (filter === 'book') filtered.forEach(s => { const k = s.bookTitle || '기타'; (byBook[k] = byBook[k] || []).push(s); });
   const renderLine = (s) => (
     <div key={s.id} onClick={() => { if (window.RG_openCompanion) window.RG_openCompanion({ id: s.id, text: s.text, bookId: s.bookId, bookTitle: s.bookTitle, author: s.author, page: s.page, note: s.note || s.my_note || '', kind: s.kind }); }}
-      style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8, cursor: 'pointer' }}>
+      style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 10, marginBottom: 8, cursor: 'pointer' }}>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>
         {s.bookTitle ? s.bookTitle + ' · ' : ''}{s.page != null ? s.page + 'p' : ''}{s.when ? ' · ' + s.when : ''}
       </div>
@@ -145,7 +145,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
                 <textarea value={ask} onChange={e => setAsk(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && ask.trim()) { e.preventDefault(); submitAsk(); } }}
                   placeholder="내 문장에게 물어보세요" aria-label="내 문장에게 묻기" rows={2}
-                  style={{ flex: 1, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 14, border: '1.5px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink)', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', outline: 'none' }} />
+                  style={{ flex: 1, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink)', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', outline: 'none' }} />
                 <button onClick={() => submitAsk()} disabled={!ask.trim() || asking} aria-label="묻기"
                   style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: (ask.trim() && !asking) ? 'var(--brand)' : 'var(--line)', color: '#fff', cursor: (ask.trim() && !asking) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9l14-7-7 14V9H2z" fill="currentColor"/></svg>

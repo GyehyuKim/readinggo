@@ -115,14 +115,14 @@ function ConsentBanner({ onChoose }) {
   const [optional, setOptional] = useState(true); // 선택 기본 체크 → 전체 동의 유도
   // 버튼 위계(DESIGN.md #1032): ghost(투명+보더) 금지 → 2차는 채워진 중립 tonal(paper-2).
   // 동의 선택지(필수만/상세)는 비긍정 보조라 그린 tonal 대신 중립 채움으로 '전체 동의' 그린 1차와 위계 구분.
-  const tonal = { flex: '0 0 auto', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
-  const primary = { flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
+  const tonal = { flex: '0 0 auto', padding: '10px 12px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
+  const primary = { flex: 1, padding: '10px 12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, background: 'var(--card)', borderTop: '1px solid var(--line)', boxShadow: '0 -4px 16px rgba(0,0,0,0.10)', padding: '14px 16px 16px' }}>
       <div style={{ fontWeight: 900, fontSize: 14, color: 'var(--ink)', marginBottom: 6 }}>🍪 데이터 활용 동의</div>
       <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 10 }}>서비스 운영(필수)과 더 나은 독서 파트너를 위한 AI·분석 활용(선택)에 동의해 주세요. 언제든 설정에서 바꿀 수 있어요.</div>
       {detail && (
-        <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px', background: 'var(--paper-2)', borderRadius: 10 }}>
+        <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px', background: 'var(--paper-2)', borderRadius: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 800 }}>필수 — 서비스 운영 <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>(로그인·기록 저장)</span></span>
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-3)' }}>항상 켜짐</span>
@@ -252,7 +252,7 @@ function ActivityHeatmap({ days }) {
               <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {w.map((c) => (
                   <div key={c.date} title={`${c.date} · ${c.pages}쪽`}
-                    style={{ width: 11, height: 11, borderRadius: 2, background: COLOR[lvl(c.pages)], flexShrink: 0 }} />
+                    style={{ width: 11, height: 11, borderRadius: 999, background: COLOR[lvl(c.pages)], flexShrink: 0 }} />
                 ))}
               </div>
             ))}

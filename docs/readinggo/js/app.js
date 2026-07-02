@@ -217,7 +217,7 @@ class ErrorBoundary extends React.Component {
 // 소셜 로그인 버튼 (#937) — provider 브랜드 가이드 색을 따른다(DESIGN.md 그린 위계의 예외:
 // OAuth 버튼은 각 제공자 브랜드 규정 우선, 기존 Google 버튼과 동일한 형태·라운딩·폭으로 정렬).
 const SOCIAL_BTN_BASE = {
-  width: '100%', padding: '13px 18px', borderRadius: 14, fontSize: 15, fontWeight: 800,
+  width: '100%', padding: '13px 18px', borderRadius: 12, fontSize: 15, fontWeight: 800,
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
 };
 const GoogleGlyph = () => (

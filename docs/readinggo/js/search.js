@@ -202,7 +202,7 @@ const SearchModal = ({
               border: 'none',
               background: 'var(--paper)',
               padding: '8px 12px',
-              borderRadius: 8,
+              borderRadius: 12,
               font: 'inherit',
               fontSize: 14,
             }}
@@ -232,7 +232,7 @@ const SearchModal = ({
               aria-label="바코드로 등록"
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 34, height: 34, flexShrink: 0, borderRadius: 10, border: 'none',
+                width: 34, height: 34, flexShrink: 0, borderRadius: 12, border: 'none',
                 background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: 'pointer', padding: 0,
               }}
             >
