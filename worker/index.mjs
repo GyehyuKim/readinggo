@@ -1450,9 +1450,17 @@ const CATEGORIES = [0, 1, 798, 336, 656, 987, 55889, 74];
 const CONCURRENCY = 8;
 const TIME_BUDGET_MS = 25000;
 
+// ⚠️ 알라딘 베스트셀러 시드 활성 조건 (#1044) — 국중도·카카오엔 베스트셀러 API 가 없어 이 cron 만
+// 알라딘에 남는다(인기 시드 소스 재설계 = P2 별도 이슈). 신규 provider 키가 하나라도 설치되면
+// 이전 개시로 간주하고 자동 중지 — 알라딘 데이터의 신규 영구 적재를 멈춘다(ToS 저장 금지).
+// BOOKS_PROVIDER='aladin' 명시 시에만 재개(레거시 강제 롤백과 동일 스위치).
+const aladinSeedActive = (env) => !!env.ALADIN_TTB_KEY
+  && (legacyForced(env) || (!env.KAKAO_REST_KEY && !env.NLK_CERT_KEY));
+
 async function archive(env) {
+  if (!aladinSeedActive(env)) return;
   const KEY = env.ALADIN_TTB_KEY, SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!KEY || !SB || !SRK) return;
+  if (!SB || !SRK) return;
   const cap = parseInt(env.ARCHIVE_DAILY_CAP || '3000', 10);
   const start = Date.now();
 
