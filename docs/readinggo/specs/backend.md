@@ -8,6 +8,7 @@
 > **v9 갱신 (2026-06-24, #937)**: **카카오 소셜 로그인 추가** + **애플**(iOS·웹만 노출, Android 제외) + **네이버 보류**. `signInWithGoogle`을 `signInWithOAuth(provider)`로 일반화 — 같은 네이티브 딥링크 경로(#968)를 모든 provider 가 공유. provider 등록(Supabase 대시보드 + Kakao Developers + Apple Developer)은 §7.1 모바일/네이티브 끝의 체크리스트 참조.
 > **v10 갱신 (2026-06-26, #1007)**: **독서 위키 Q&A — `POST /api/wiki-ask`** 신설(§7.9.2). "내 문장에게 묻기"의 호출 경로 — companion 형제 프록시(동일출처 가드·`callLLM` 키 서버 보관). 내가 모은 문장에만 근거(그라운딩·환각 가드), 질문당 1콜(Gemini Flash 텍스트, AI lock 안), RAG 불필요(전체 문장 한 프롬프트).
 > **v11 갱신 (2026-06-29, #1044)**: **책 데이터 소스 이전(알라딘 OpenAPI ToS 회피)** — §7.2.1 신설. 알라딘 OpenAPI 약관(영리·법인 이용 불가 + 취득정보 **저장·캐시 금지**)이 우리 canonical 캐시(`books` upsert, #489)와 정면 충돌 → 상업 출시 블로커. canonical 소스를 **국립중앙도서관 ISBN 서지정보 API**(쪽수·표지, 이용허락 제한 없음)와 **카카오 책검색**(검색·표지, 캐시 조건부 허용) 페어로, 외서는 **Google Books 실시간만**(영구 upsert 중단), 네이버 비권장. worker 이전 지점·출시 전 실계정 ToS 확인 게이트·Phasing 은 §7.2.1. **본 PR 은 spec-only — 코드 재배선은 후속 PR(#1044).**
+> **v12 갱신 (2026-07-03, #1044 코드 PR)**: §7.2.1 P1 **구현** — worker 에 provider 스위치(`KAKAO_REST_KEY`/`NLK_CERT_KEY` 자동 감지, 미설치 시 알라딘 폴백 = 무중단). 검색→카카오(영구 적재는 ISBN 국중도 재조회분만)·ISBN→국중도(+OpenLibrary 외서 폴백)·Google 영구 경로 2건 제거(검색 upsert·backfillPages PATCH)·imgProxy 화이트리스트 확장·archive 시드 게이트 격리(재설계 P2). 상세 §7.2.1 구현 상태.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
