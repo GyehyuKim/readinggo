@@ -996,10 +996,19 @@ async function prewarmSeeds(env, limit = 150) {
 }
 
 // 책 맥락 한 조각 (#373) — 참새 질문에 작품 소개를 녹이기 위한 서버측 조회.
-// 알라딘 제목검색 첫 결과의 description(출판사 책 소개). best-effort, 400자 컷.
+// 제목검색 첫 결과의 소개문. best-effort, 400자 컷. 실시간 프롬프트 재료(저장 없음).
+// #1044: 카카오 키 설치 시 카카오 contents 사용, 없으면 레거시 알라딘 description 폴백.
 async function fetchBookBrief(title, env) {
+  if (!title) return '';
+  if (kakaoReady(env)) {
+    try {
+      const items = await kakaoBookSearch(title, 1, env);
+      const desc = items && items[0] && String(items[0].description || '').trim();
+      return desc ? desc.slice(0, 400) : '';
+    } catch (e) { return ''; }
+  }
   const key = env.ALADIN_TTB_KEY;
-  if (!key || !title) return '';
+  if (!key) return '';
   const url = `${ALADIN}ItemSearch.aspx?ttbkey=${key}&Query=${encodeURIComponent(title)}`
     + `&QueryType=Title&SearchTarget=Book&MaxResults=1&start=1&output=js&Version=20131101&OptResult=packing`;
   const items = await aladinFetch(url);
