@@ -544,13 +544,29 @@ function NestView({ state, onCheckin, onOpenSearch }) {
                 <window.SparrowMark size={60} />
               </div>
             </div>
-            <div style={{ fontWeight: 900, fontSize: 19, color: 'var(--ink)', marginBottom: 6 }}>아직 읽는 책이 없어요</div>
-            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.65, marginBottom: 20 }}>책을 등록하면 둥지가 자라기 시작해요.<br />하루 한 쪽, 한 문장부터.</div>
+            {/* 온보딩 승격(#1134): 부정문("없어요") → 약속 선언 + 기능 예고 3줄.
+                스토어 유입은 앱의 약속을 모른 채 이 화면을 만난다 — 둥지·재키·타인 문장의 존재를
+                등록 전에 알린다. §A 슬라이드 없음 원칙 유지: 화면 추가 없이 이 카드 하나만 승격. */}
+            <div style={{ fontWeight: 900, fontSize: 19, color: 'var(--ink)', marginBottom: 14 }}>하루 한 쪽, 한 문장이면 돼요</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', maxWidth: 290, margin: '0 auto 20px' }}>
+              {[
+                { icon: 'pen', text: <>오늘 읽은 자리의 한 줄을 남기면 <b>둥지가 자라요</b></> },
+                { icon: 'chat', text: <>문장마다 <b>재키</b>가 말을 걸어요 — AI 독서 파트너</> },
+                { icon: 'users', text: <>같은 책을 읽는 사람의 <b>한 문장</b>을 만나요</> },
+              ].map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <span style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 999, background: 'var(--brand-tint)', color: 'var(--brand-3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon(f.icon, 15)}</span>
+                  <span style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.55, paddingTop: 4, wordBreak: 'keep-all' }}>{f.text}</span>
+                </div>
+              ))}
+            </div>
             {/* 📖 이모지 → Feather 펼친 책 아이콘(탭바와 동일 결, #1056). 공개읽기 토글 제거 — 온보딩 단순화(숲 탭에 유지). */}
             <button className="checkin-cta" onClick={onOpenSearch} style={{ display: 'inline-flex', width: 'auto', padding: '15px 26px', fontSize: 16 }}>
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
               읽을 책 등록하기
             </button>
+            {/* 등록 마찰 제거 어필(#1134) — 사진(OCR)·바코드 경로 예고 */}
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>책 사진 한 장·바코드로도 등록돼요</div>
           </div>
         </div>
       </section>
