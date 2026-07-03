@@ -19,7 +19,11 @@
   'use strict';
 
   // 드래그 시작 판정: grip 자체이거나, 시트 최상단(~44px) 영역을 잡았을 때.
-  var GRAB_ZONE_PX = 44;   // grip 영역 높이(시트 상단)
+  // #1146: 44 → 120. 44px(grip 밴드)만으론 사용자가 자연스럽게 잡는 헤더(타이틀 줄,
+  // 시트 상단 ~90-140px)가 존 밖이라 "잡아도 안 내려감"으로 체감(에뮬 재현). 120px 는
+  // grip+타이틀 줄까지 커버하되 첫 컨트롤(설정 로그인 버튼 등 ~150px+)엔 안 닿는다.
+  // scrollTop==0 조건과 input/button 제외 가드(위 shouldStart)는 그대로 — X 버튼 클릭 무영향.
+  var GRAB_ZONE_PX = 120;  // grip+헤더 영역 높이(시트 상단)
   var CLOSE_PX = 120;      // 이만큼 이상 내리면 닫기
   var FLICK_VELOCITY = 0.6; // px/ms — 짧게 빠르게 튕기면(플릭) 거리 무관 닫기
 
@@ -180,6 +184,13 @@
       document.addEventListener('pointermove', onPointerMove, { passive: false });
       document.addEventListener('pointerup', onPointerUp, true);
       document.addEventListener('pointercancel', onPointerUp, true);
+      // #1146: 드래그 중 네이티브 스크롤 클레임 차단 — pointermove.preventDefault 는 스펙상
+      // 스크롤을 못 막는다(touch-action 또는 touchmove.preventDefault 만 가능). grip 은
+      // touch-action:none 으로 커버되지만(#1069) 확장 존(헤더, .sheet=overflow-y:auto 내부)은
+      // 브라우저가 세로 팬을 가로채 pointercancel 로 드래그를 죽였다. 드래그 활성일 때만 개입.
+      document.addEventListener('touchmove', function (e) {
+        if (active && e.cancelable) e.preventDefault();
+      }, { passive: false, capture: true });
     } else {
       document.addEventListener('touchstart', onTouchStart, true);
       document.addEventListener('touchmove', onTouchMove, { passive: false });
