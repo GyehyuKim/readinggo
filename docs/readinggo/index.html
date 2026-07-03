@@ -63,12 +63,17 @@
         session_recording: { maskAllInputs: true },
     })
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- DESIGN.md Typography(#1032): Body/UI = Noto Sans KR, Quote/흔적·발췌 = Noto Serif KR.
-     세리프는 따옴표 흔적·발췌 문장 전용(헤딩·버튼·라벨은 Sans 유지). -->
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Serif+KR:wght@400;500;600&display=swap" rel="stylesheet">
+     세리프는 따옴표 흔적·발췌 문장 전용(헤딩·버튼·라벨은 Sans 유지).
+     #1142: Google Fonts CDN → 셀프호스팅(woff2, korean+latin 서브셋) — 네이티브(APK) WebView에서
+     CDN 의존 시 시스템 기본체 폴백(Android는 한글 세리프 시스템폰트 부재)이라 번들 필수. 오프라인 동일 렌더. -->
 <style>
+@font-face{ font-family:'Noto Sans KR'; src:url('fonts/noto-sans-kr-v39-korean_latin-regular.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face{ font-family:'Noto Sans KR'; src:url('fonts/noto-sans-kr-v39-korean_latin-500.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face{ font-family:'Noto Sans KR'; src:url('fonts/noto-sans-kr-v39-korean_latin-700.woff2') format('woff2'); font-weight:700; font-style:normal; font-display:swap; }
+@font-face{ font-family:'Noto Sans KR'; src:url('fonts/noto-sans-kr-v39-korean_latin-900.woff2') format('woff2'); font-weight:800 900; font-style:normal; font-display:swap; }
+@font-face{ font-family:'Noto Serif KR'; src:url('fonts/noto-serif-kr-v31-korean_latin-regular.woff2') format('woff2'); font-weight:400 500; font-style:normal; font-display:swap; }
+@font-face{ font-family:'Noto Serif KR'; src:url('fonts/noto-serif-kr-v31-korean_latin-600.woff2') format('woff2'); font-weight:600; font-style:normal; font-display:swap; }
 @font-face{
   font-family: 'Moneygraphy Rounded';
   src: url('fonts/Moneygraphy-Rounded.otf') format('opentype');
@@ -154,6 +159,9 @@ body{
      전용으로 후퇴 — 브랜드 워드마크(.brand-mark)·세리머니 히어로(.ceremony h2)·큰 숫자(.pixel 군)
      에만 명시 적용한다(아래). 본문/라벨/버튼은 Noto Sans. */
   font-family: 'Noto Sans KR',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  /* #1142 한글 가독성: 단어 중간 줄바꿈 금지("저장돼\n요" 방지) + 초장문(URL 등)만 예외적 분절. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
