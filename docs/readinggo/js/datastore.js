@@ -90,7 +90,9 @@ const localStorageAdapter = (function () {
 
   function _seed() {
     // INITIAL_STATE 의 단일 활성 책을 user_books[] 한 행으로 시드.
-    const seedBook = (window.INITIAL_STATE && window.INITIAL_STATE.book) || null;
+    // #1136: 신규 게스트 빈 시작 — INITIAL_STATE.book 이 빈 센티널({id:''})이면 유령 행 방지 위해 미시드.
+    const _sb = (window.INITIAL_STATE && window.INITIAL_STATE.book) || null;
+    const seedBook = (_sb && _sb.id) ? _sb : null;
     const user_books = [];
     let active_user_book_id = null;
 

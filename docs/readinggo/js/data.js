@@ -165,34 +165,27 @@ const NPC_QUOTES = {
   ],
 };
 
-const _ab = getBook("b008");
-const _ap = INITIAL_PROGRESS["b008"];
+// 신규 게스트 = 빈 시작 (#1136, 출시 결정) — 구 데모 시드(데미안 102p·스트릭 12·XP 340·문장 2)는
+// Phase 0 시연용이었다. 스토어 유입이 "남의 기록"을 첫 화면에서 만나면 신뢰를 깎고, 빈 상태는
+// 이제 약속+기능 예고 카드(#1134)라 휑하지 않다. book 은 Supabase 무책 하이드레이션과 동일한
+// 빈 센티널({id:'', _empty:true}) — nest 빈 상태 가드(!book.id)·effect deps 접근이 그대로 안전.
 const INITIAL_STATE = {
-  book: {
-    id: _ab.id, title: _ab.title, author: _ab.author, pub: _ab.pub,
-    cur: _ap.cur, total: _ab.total, days: _ap.days,
-    cover: _ab.cover, fb: _ab.fb, toc: _ab.toc,
-  },
-  streak: 12,
-  xp: 340,
+  book: { id: '', title: '', author: '', pub: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true },
+  streak: 0,
+  xp: 0,
   shield: 2,
-  // 둥지 단계는 누적 XP에서 파생 (#313, §5.2). xp(위 340)와 동일 값 사용.
-  nest: { lv: getNestStageByXp(340).lv },
-  myQuotes: [
-    { text: "내가 갖고 싶었던 것은 사람이 아니라 진실이었다.", bookId: "b008", page: 87, when: "어제" },
-    { text: "두 세계 사이의 경계는, 결국 내 안에 있었다.",       bookId: "b008", page: 22, when: "3일 전" },
-  ],
+  // 둥지 단계는 누적 XP에서 파생 (#313, §5.2). xp(위 0)와 동일 값 사용.
+  nest: { lv: getNestStageByXp(0).lv },
+  myQuotes: [],
 };
 
 /* ── 완독 기록 (책장) ─────────────────────────── */
-// 완독 책(성 컬렉션). 활성 책(_ab=b008, 읽는 중)은 제외 — 같은 책이 읽는 중·완독 양쪽에 뜨지 않도록.
-const INITIAL_BOOKSHELF = {
-  "b105": { rating: 4, comment: "사회 비판의 대표작. 간결하면서도 강력한 메시지.", completedDate: "2026-05-18" },
-  "b037": { rating: 5, comment: "청춘의 방황과 성장. 모든 세대의 공감을 받을 책.", completedDate: "2026-05-15" },
-};
+// 신규 게스트 = 빈 시작 (#1136) — 구 데모 완독 2권(b105·b037) 제거. 소비처(datastore._seed)는 빈 객체 가드 유지.
+const INITIAL_BOOKSHELF = {};
 
 /* ── 찜 목록 (읽고 싶은 책) ──────────────────────── */
-const WISHLIST = ["b002", "b010", "b093"];
+// 신규 게스트 = 빈 시작 (#1136) — 구 데모 찜 3권 제거.
+const WISHLIST = [];
 
 /* ── NEST_TWIGS 사전 계산 ─────────────────────── */
 const NEST_GEO = { cx: 110, cy: 132, rx: 60, ry: 22, irx: 44, iry: 13 };
