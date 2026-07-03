@@ -550,8 +550,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <div style={{ fontWeight: 900, fontSize: 19, color: 'var(--ink)', marginBottom: 14 }}>하루 한 쪽, 한 문장이면 돼요</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', maxWidth: 290, margin: '0 auto 20px' }}>
               {[
-                { icon: 'pen', text: <>오늘 읽은 자리의 한 줄을 남기면 <b>둥지가 자라요</b></> },
-                { icon: 'chat', text: <>문장마다 <b>재키</b>가 말을 걸어요 — AI 독서 파트너</> },
+                { icon: 'pen', text: <>오늘 읽은 자리의 한 줄을 남기면<br /><b>둥지가 자라요</b></> },
+                { icon: 'chat', text: <>문장마다 <b>재키</b>가 말을 걸어요<br />— AI 독서 파트너</> },
                 { icon: 'users', text: <>같은 책을 읽는 사람의 <b>한 문장</b>을 만나요</> },
               ].map((f, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>

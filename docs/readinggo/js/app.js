@@ -881,7 +881,7 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
             background: 'var(--brand-tint)', borderBottom: '1px solid var(--brand-soft)', fontSize: 12.5, fontWeight: 700, color: 'var(--brand-3)' }}>
             <window.SparrowMark size={18} />
-            <span style={{ flex: 1, lineHeight: 1.35 }}>게스트로 둘러보는 중 — 로그인하면 내 기록이 저장돼요</span>
+            <span style={{ flex: 1, lineHeight: 1.35 }}>게스트로 둘러보는 중<br />로그인하면 내 기록이 저장돼요</span>
             <button onClick={() => setShowLogin(true)}
               style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 999, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>
               저장하기
