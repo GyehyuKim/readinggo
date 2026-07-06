@@ -50,20 +50,22 @@ ISBN 해석 (§2.1)
 
 ## 3. 진입점 (Phase 0)
 
-- **검색 모달 헤더** (`search.js SearchModal`): 검색 입력 옆 **"바코드로 등록"** 버튼(아이콘). **capability gate(§5) 통과 시에만 렌더** — 미지원 브라우저(iOS Safari 등)엔 아예 안 보임(깨진 버튼 0, graceful).
-- 검출 → 책 확정 → `SearchModal` 의 `onSelectBook(book, shelf)` 로 위임(책장 선택 시트 재사용). 신규 등록 UI 없음.
+- **검색 모달 헤더** (`search.js SearchModal`): 검색 입력 옆 **"바코드/ISBN으로 등록"** 버튼(아이콘). **항상 렌더**(#943 후속) — capability gate(§5)는 *진입점 노출*이 아니라 *카메라 스캔 사용 여부*만 가른다. 미지원 브라우저(iOS Safari 등)·카메라 없음이면 모달이 **ISBN 직접 입력**으로 바로 열린다(수동 폴백, §4). `cameraSupported` prop 으로 전달.
+- 검출 **또는 ISBN 직접 입력** → 책 확정 → `SearchModal` 의 `onSelectBook(book, shelf)` 로 위임(책장 선택 시트 재사용). 신규 등록 UI 없음.
+- **ISBN 직접 입력 폴백**: 카메라 검출과 **동일한 `resolveBookByIsbn` 경로**를 공유(오탐 0 규칙 §2.1 그대로). 데모(물리 책 불필요)·iOS 웹·데스크톱 웹에서도 등록 경로 확보. 스캔 중에도 "바코드가 안 잡히나요? ISBN 직접 입력" 토글로 접근.
 - **온보딩**(later): 첫 책 등록 단계에서 "바코드로 빠르게" 보조 진입. **본 PR 범위 아님**(검색 모달 우선 — 가장 재사용 경로가 짧음).
 
 ## 4. 실패·권한·엣지 (complete 의 조건)
 
 | 상황 | 처리 |
 |---|---|
-| `BarcodeDetector` 미지원 (iOS Safari·구형) | 진입점 자체를 숨김(§5). 사용자는 평소처럼 텍스트 검색. |
-| 지원하나 `ean_13` 미포함 | 동일하게 숨김(`getSupportedFormats()` 확인). |
+| `BarcodeDetector` 미지원 (iOS Safari·구형) | 모달이 **ISBN 직접 입력**으로 바로 열림(`cameraSupported=false`). 진입점은 유지 — 등록 경로 확보. |
+| 지원하나 `ean_13` 미포함 | 동일하게 ISBN 직접 입력(`getSupportedFormats()` 확인). |
 | **네이티브 권한 선언 누락 (#1103)** | AndroidManifest `CAMERA` + iOS `NSCameraUsageDescription` 가 없으면 시스템이 권한 요청을 **띄우지 못한다**(증상: "권한 요청 자체를 안 함") → 둘 다 **선언 필수**. |
-| 카메라 권한 거부 | 명확한 안내 + "직접 검색하기" 버튼(검색 모달로 폴백). 무한 로딩 금지. |
-| `getUserMedia` 실패(HTTPS 아님·장치 없음) | 동일 폴백. (프로덕션은 `https://readinggo.hyuniverse.workers.dev` — secure context OK.) |
+| 카메라 권한 거부 | 명확한 안내 + **ISBN 직접 입력** + "제목·저자로 검색하기"(검색 모달로 폴백). 무한 로딩 금지. |
+| `getUserMedia` 실패(HTTPS 아님·장치 없음) | 동일 — ISBN 직접 입력 폴백. (프로덕션은 `https://readinggo.hyuniverse.workers.dev` — secure context OK.) |
 | 검출은 됐으나 ISBN 13자리 아님(잡 바코드) | 무시하고 스캔 계속(토스트 스팸 금지). |
+| ISBN 직접 입력이 13자리 아님 | "ISBN 13자리를 정확히 입력해주세요" 토스트, 재입력 대기(자동 검색 안 함). |
 | ISBN 유효하나 책 못 찾음(§2.1-4) | 토스트 + 검색에 ISBN 프리필. |
 | 모달 닫힘/언마운트 | `track`/`getUserMedia` 스트림 **반드시 stop**(카메라 LED·배터리 누수 방지) + 폴링 루프 취소. |
 
@@ -73,7 +75,8 @@ ISBN 해석 (§2.1)
 ## 5. Capability gate (무의존 핵심)
 
 ```js
-// barcode-scan.js — 지원 여부(엔트리포인트 노출 조건). 비동기(getSupportedFormats) 1회 캐시.
+// barcode-scan.js — 카메라 스캔 사용 여부(진입점 노출 조건 아님 — #943 후속).
+//   false 면 모달이 ISBN 직접 입력으로 열림. 비동기(getSupportedFormats) 1회 캐시.
 async function barcodeScanSupported() {
   if (!('BarcodeDetector' in window)) return false;
   try {
@@ -92,7 +95,7 @@ async function barcodeScanSupported() {
 | iOS Safari / iOS 모든 브라우저(WebKit) | ❌ | **셸(#872) 위 네이티브 플러그인(§6 옵션 c)로만 해결** → Phase 2. |
 | 데스크톱 Firefox | ❌(플래그) | 숨김 처리. |
 
-→ **결론**: Phase 0 웹에서 *지원 환경엔 무의존 delightful*, *미지원 환경엔 무해(숨김)*. iOS 풀커버는 셸 단계에서 별도 결정.
+→ **결론**: Phase 0 웹에서 *지원 환경엔 무의존 delightful(카메라 스캔)*, *미지원 환경엔 ISBN 직접 입력으로 등록 경로 유지*(더는 숨기지 않음 — #943 후속). iOS 풀커버(네이티브 스캔)는 셸 단계에서 별도 결정.
 
 ## 6. 옵션 비교 + 권장안
 

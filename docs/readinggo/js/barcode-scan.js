@@ -66,14 +66,17 @@ async function resolveBookByIsbn(isbn13) {
   return { book: null, matched: 'none' };
 }
 
-const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
+// cameraSupported=false(iOS Safari·카메라 없는 웹) → 카메라 없이 'manual' 로 바로 진입.
+const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = true }) => {
   const videoRef = React.useRef(null);
   const streamRef = React.useRef(null);
   const detectorRef = React.useRef(null);
   const rafRef = React.useRef(0);
   const lockRef = React.useRef(false);  // 검출/해석 중 재진입 방지
-  const [status, setStatus] = React.useState('starting'); // starting | scanning | denied | error | resolving
+  const [status, setStatus] = React.useState('starting'); // starting | scanning | denied | error | resolving | manual
   const [pendingBook, setPendingBook] = React.useState(null); // 책장 선택 대기 (search.js 와 동일 UX)
+  const [manualIsbn, setManualIsbn] = React.useState('');     // 수동 ISBN 입력값 (폴백)
+  const [showManual, setShowManual] = React.useState(false);  // 스캔 중 "직접 입력" 펼침
 
   // 카메라·루프 정지 — 닫힘/언마운트/검출성공 공통. 카메라 LED·배터리 누수 방지(spec §4).
   const stopCamera = React.useCallback(() => {
@@ -87,11 +90,9 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
 
   const handleClose = React.useCallback(() => { stopCamera(); if (onClose) onClose(); }, [stopCamera, onClose]);
 
-  // 검출 → 책 확정. 성공 시 책장 시트, 실패 시 토스트 + 검색 폴백.
-  const onDetectedIsbn = React.useCallback(async (raw) => {
-    if (lockRef.current) return;
-    const isbn = (window.normalizeIsbn13 ? window.normalizeIsbn13(raw) : String(raw || '').replace(/[^0-9]/g, ''));
-    if (!isbn || isbn.length !== 13) return;  // 잡 바코드 — 무시하고 계속(토스트 스팸 금지)
+  // ISBN 1개 확정 → 책 해석 → 라우팅. 카메라 검출·수동 입력 공용 경로.
+  //   성공 시 책장 시트, 실패 시 토스트 + 검색 폴백. (기존 onDetectedIsbn 본체를 추출 — #943 후속)
+  const resolveAndRoute = React.useCallback(async (isbn) => {
     lockRef.current = true;
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
     setStatus('resolving');
@@ -109,18 +110,40 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
         if (window.RG_openSearchWith) window.RG_openSearchWith(isbn);
       }
     } catch (e) {
-      if (window.showToast) window.showToast('스캔 처리에 실패했어요 — 다시 시도해요');
+      if (window.showToast) window.showToast('책을 찾지 못했어요 — 다시 시도해요');
       lockRef.current = false;
-      setStatus('scanning');
+      setStatus(cameraSupported ? 'scanning' : 'manual');
     }
-  }, [stopCamera, handleClose]);
+  }, [stopCamera, handleClose, cameraSupported]);
 
-  // 카메라 시작 + 디코드 루프 (모달 열릴 때).
+  // 카메라 검출 콜백 — 잡 바코드는 조용히 무시하고 계속 스캔.
+  const onDetectedIsbn = React.useCallback(async (raw) => {
+    if (lockRef.current) return;
+    const isbn = (window.normalizeIsbn13 ? window.normalizeIsbn13(raw) : String(raw || '').replace(/[^0-9]/g, ''));
+    if (!isbn || isbn.length !== 13) return;  // 잡 바코드 — 무시하고 계속(토스트 스팸 금지)
+    resolveAndRoute(isbn);
+  }, [resolveAndRoute]);
+
+  // 수동 입력 제출 — 13자리 검증 후 공용 경로. Enter·버튼 공통.
+  const submitManual = React.useCallback(() => {
+    if (lockRef.current) return;
+    const isbn = (window.normalizeIsbn13 ? window.normalizeIsbn13(manualIsbn) : String(manualIsbn || '').replace(/[^0-9]/g, ''));
+    if (!isbn || isbn.length !== 13) {
+      if (window.showToast) window.showToast('ISBN 13자리를 정확히 입력해주세요');
+      return;
+    }
+    resolveAndRoute(isbn);
+  }, [manualIsbn, resolveAndRoute]);
+
+  // 카메라 시작 + 디코드 루프 (모달 열릴 때). 미지원이면 카메라 없이 수동 입력으로.
   React.useEffect(() => {
     if (!isOpen) return undefined;
     let cancelled = false;
     lockRef.current = false;
     setPendingBook(null);
+    setManualIsbn('');
+    setShowManual(false);
+    if (!cameraSupported) { setStatus('manual'); return undefined; }
     setStatus('starting');
 
     (async () => {
@@ -168,7 +191,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
     })();
 
     return () => { cancelled = true; stopCamera(); };
-  }, [isOpen, stopCamera, onDetectedIsbn]);
+  }, [isOpen, stopCamera, onDetectedIsbn, cameraSupported]);
 
   if (!isOpen) return null;
 
@@ -187,7 +210,33 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
         ? '책을 찾는 중…'
         : status === 'starting'
           ? '카메라를 준비하는 중…'
-          : '책 뒤표지의 바코드를 비춰주세요';
+          : status === 'manual'
+            ? 'ISBN으로 책을 등록해요'
+            : '책 뒤표지의 바코드를 비춰주세요';
+
+  // 수동 ISBN 입력 블록 — 카메라 미지원/거부/실패, 또는 스캔 중 "직접 입력" 공용.
+  //   책 뒤표지 바코드 위 숫자(978…)를 그대로 입력. 데모·아이폰 웹에서도 등록 경로 확보.
+  const manualBlock = (
+    <div style={{ width: '100%', maxWidth: 340 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={manualIsbn}
+          onChange={(e) => setManualIsbn(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submitManual(); }}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="ISBN 13자리 (예: 9788937460449)"
+          aria-label="ISBN 직접 입력"
+          style={{ flex: 1, minWidth: 0, padding: '12px 14px', borderRadius: 12, border: 'none', fontSize: 15, color: 'var(--ink)', background: '#fff', outline: 'none' }}
+        />
+        <button onClick={submitManual} aria-label="ISBN으로 찾기"
+          style={{ flexShrink: 0, background: '#fff', color: 'var(--ink)', border: 'none', borderRadius: 12, padding: '0 18px', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>찾기</button>
+      </div>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 8, lineHeight: 1.5 }}>책 뒤표지 바코드 위 13자리 숫자예요</div>
+    </div>
+  );
+
+  const showManualView = status === 'denied' || status === 'error' || status === 'manual';
 
   return (
     <div onClick={(e) => e.stopPropagation()}
@@ -195,7 +244,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
       {/* 헤더 — 닫기 */}
       <div style={{ width: '100%', maxWidth: 430, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', color: '#fff', zIndex: 2 }}>
         <button onClick={handleClose} aria-label="닫기" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 34, height: 34, borderRadius: 999, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 18)}</button>
-        <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.2px' }}>바코드로 등록</span>
+        <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.2px' }}>{cameraSupported ? '바코드로 등록' : 'ISBN으로 등록'}</span>
         <span style={{ width: 34 }} />
       </div>
 
@@ -207,27 +256,35 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook }) => {
         {(status === 'scanning' || status === 'resolving') && (
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '74%', height: 120, border: '2px solid rgba(255,255,255,0.9)', borderRadius: 12, boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)' }} />
         )}
-        {/* 권한 거부·오류 — 직접 검색 폴백 (3차/텍스트 위계) */}
-        {(status === 'denied' || status === 'error') && (
+        {/* 카메라 미지원·거부·오류 — ISBN 직접 입력 폴백(전면). */}
+        {showManualView && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24, textAlign: 'center', color: '#fff' }}>
-            <div style={{ display: 'inline-flex' }}>{window.rgIcon('camera', 40)}</div>
+            <div style={{ display: 'inline-flex' }}>{window.rgIcon(status === 'manual' ? 'search' : 'camera', 40)}</div>
             <div style={{ fontSize: 15, fontWeight: 800 }}>{overlayMsg}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
-              {status === 'denied' ? '브라우저 설정에서 카메라를 허용하거나,\n제목·저자로 직접 검색할 수 있어요.' : '제목·저자로 직접 검색할 수 있어요.'}
-            </div>
+            {status === 'denied' && (
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>브라우저 설정에서 카메라를 허용하거나,{'\n'}아래에 ISBN을 직접 입력해요.</div>
+            )}
+            {manualBlock}
             <button onClick={() => { handleClose(); if (window.RG_openSearchWith) window.RG_openSearchWith(''); }}
-              style={{ marginTop: 6, background: 'rgba(255,255,255,0.14)', border: 'none', color: '#fff', borderRadius: 999, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
-              직접 검색하기
+              style={{ marginTop: 2, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+              제목·저자로 검색하기
             </button>
           </div>
         )}
       </div>
 
-      {/* 하단 안내 */}
+      {/* 하단 안내 — 스캔 중 + "직접 입력" 폴백 토글 */}
       {(status === 'scanning' || status === 'resolving' || status === 'starting') && (
         <div style={{ width: '100%', maxWidth: 430, padding: '16px 16px 28px', textAlign: 'center', color: 'rgba(255,255,255,0.92)', zIndex: 2 }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{overlayMsg}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>한 컷에 책이 정확히 잡혀요</div>
+          {showManual ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 12 }}>{manualBlock}</div>
+          ) : (
+            <button onClick={() => setShowManual(true)}
+              style={{ marginTop: 6, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+              바코드가 안 잡히나요? ISBN 직접 입력
+            </button>
+          )}
         </div>
       )}
 
