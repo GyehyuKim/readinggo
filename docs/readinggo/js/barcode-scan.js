@@ -227,10 +227,10 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
           autoComplete="off"
           placeholder="ISBN 13자리 (예: 9788937460449)"
           aria-label="ISBN 직접 입력"
-          style={{ flex: 1, minWidth: 0, padding: '12px 14px', borderRadius: 12, border: 'none', fontSize: 15, color: '#111', background: '#fff', outline: 'none' }}
+          style={{ flex: 1, minWidth: 0, padding: '12px 14px', borderRadius: 12, border: 'none', fontSize: 15, color: 'var(--ink)', background: '#fff', outline: 'none' }}
         />
         <button onClick={submitManual} aria-label="ISBN으로 찾기"
-          style={{ flexShrink: 0, background: '#fff', color: '#111', border: 'none', borderRadius: 12, padding: '0 18px', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>찾기</button>
+          style={{ flexShrink: 0, background: '#fff', color: 'var(--ink)', border: 'none', borderRadius: 12, padding: '0 18px', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>찾기</button>
       </div>
       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 8, lineHeight: 1.5 }}>책 뒤표지 바코드 위 13자리 숫자예요</div>
     </div>
