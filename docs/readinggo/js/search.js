@@ -224,12 +224,12 @@ const SearchModal = ({
               {window.rgIcon('close', 16)}
             </button>
           )}
-          {/* 바코드로 등록 (#943) — 지원 환경(BarcodeDetector+ean_13)에서만. 책 뒤표지 ISBN 스캔 → 정확 매칭. */}
-          {scanSupported && (
+          {/* 바코드·ISBN으로 등록 (#943) — 항상 노출. 카메라 지원 시 스캔, 미지원(iOS Safari 등)이면 ISBN 직접 입력. */}
+          {window.BarcodeScanModal && (
             <button
               onClick={() => setScanOpen(true)}
-              title="바코드로 등록"
-              aria-label="바코드로 등록"
+              title={scanSupported ? '바코드로 등록' : 'ISBN으로 등록'}
+              aria-label={scanSupported ? '바코드로 등록' : 'ISBN으로 등록'}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 34, height: 34, flexShrink: 0, borderRadius: 12, border: 'none',
@@ -349,6 +349,7 @@ const SearchModal = ({
       {scanOpen && window.BarcodeScanModal && (
         <window.BarcodeScanModal
           isOpen={scanOpen}
+          cameraSupported={scanSupported}
           onClose={() => setScanOpen(false)}
           onSelectBook={(book, shelf) => { setScanOpen(false); setQuery(''); onClose(); onSelectBook(book, shelf); }}
         />
