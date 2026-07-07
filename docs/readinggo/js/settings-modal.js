@@ -33,7 +33,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
         showToast('스트릭 리마인더를 껐어요');
       } else {
         const ok = await reminderApi.enable();
-        if (ok) { setReminderOn(true); showToast(`매일 ${fmtTime(reminderHour, reminderMin)}에 알려드릴게요 🐦`, { sparrow: true }); }
+        if (ok) { setReminderOn(true); showToast(`매일 ${fmtTime(reminderHour, reminderMin)}에 알려드릴게요`, { sparrow: true }); }
         else { showToast('알림 권한이 꺼져 있어요. 기기 설정에서 허용해주세요'); }
       }
     } finally { setReminderBusy(false); }
