@@ -10,6 +10,7 @@ const SearchModal = ({
   onSelectBook,
   topRecommendations,
   initialQuery,
+  initialScan,   // 온보딩 '바코드로 바로 등록' → 열리자마자 스캔 모달 (#1155)
 }) => {
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState([]);
@@ -35,6 +36,11 @@ const SearchModal = ({
   React.useEffect(() => {
     if (isOpen && initialQuery) setQuery(initialQuery);
   }, [isOpen, initialQuery]);
+
+  // 온보딩 '바코드로 바로 등록'(#1155) — 검색이 스캔 열린 상태로 진입. 열릴 때 1회.
+  React.useEffect(() => {
+    if (isOpen && initialScan) setScanOpen(true);
+  }, [isOpen, initialScan]);
 
   // Fuse.js 인덱싱 (최초 1회)
   React.useEffect(() => {

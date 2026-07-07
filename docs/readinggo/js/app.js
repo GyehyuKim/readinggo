@@ -354,6 +354,7 @@ function App() {
   const [showConsent, setShowConsent] = useState(() => !!(window.RG_consent && window.RG_consent.get() === null)); // 진입 동의 배너 (#331)
   const [activeTab, setActiveTab] = useState('nest');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInitialScan, setSearchInitialScan] = useState(false); // 온보딩 '바코드로 바로 등록' → 검색을 스캔 열린 상태로 (#1155)
   // 스포일러 전역 토글 (§5.7.1): true 면 모든 페이지 블라인드 해제.
   const [spoilerReveal, setSpoilerReveal] = useState(false);
   // 저장된 동의 적용 (analytics.md §5.4, #752) — 복귀 'yes' 유저면 세션 리플레이 시작(init은 기본 off).
@@ -903,6 +904,7 @@ function App() {
               state={appState}
               onCheckin={handleCheckin}
               onOpenSearch={() => setIsSearchOpen(true)}
+              onOpenScan={() => { setSearchInitialScan(true); setIsSearchOpen(true); }}
             />
           )}
           {activeTab === 'social' && (
@@ -975,11 +977,12 @@ function App() {
         {/* 도서 검색 모달 */}
         <SearchModal
           isOpen={isSearchOpen}
-          onClose={() => { setIsSearchOpen(false); setSearchPrefill(''); }}
+          onClose={() => { setIsSearchOpen(false); setSearchPrefill(''); setSearchInitialScan(false); }}
           books={ALL_BOOKS}
           onSelectBook={handleSearchSelectBook}
           topRecommendations={popularBooks || ALL_BOOKS.slice(0, 8)}
           initialQuery={searchPrefill}
+          initialScan={searchInitialScan}
         />
 
         {/* 타인 프로필 모달 (§5.8.2) — @핸들 탭으로 열림 */}

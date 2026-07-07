@@ -96,7 +96,7 @@ function BookEditModal({ book, onClose, onSaved }) {
     </div>, document.body);
 }
 
-function NestView({ state, onCheckin, onOpenSearch }) {
+function NestView({ state, onCheckin, onOpenSearch, onOpenScan }) {
   const [modalOpen, setModalOpen] = _useState(false);
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
@@ -565,8 +565,17 @@ function NestView({ state, onCheckin, onOpenSearch }) {
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
               읽을 책 등록하기
             </button>
-            {/* 등록 마찰 제거 어필(#1134) — 사진(OCR)·바코드 경로 예고 */}
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10 }}>책 사진 한 장·바코드로도 등록돼요</div>
+            {/* 바코드로 바로 등록 (#1155) — 스캔을 첫 화면에 노출(2차 tonal, DESIGN.md 위계).
+                심사 피드백: "타이핑 없는 스캔"이 서비스 성격 — 첫 화면에서 한 탭으로 보이게. */}
+            {window.BarcodeScanModal && (
+              <button onClick={onOpenScan || onOpenSearch}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'auto', margin: '10px auto 0', padding: '12px 22px', fontSize: 14.5, fontWeight: 800, borderRadius: 12, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: 'pointer' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 5v14M7 5v14M11 5v14M14 5v14M18 5v14M21 5v14" /></svg>
+                바코드로 바로 등록
+              </button>
+            )}
+            {/* 타이핑 없는 기록 정체성 강조(#1155) — 스캔/검색 둘 다 예고 */}
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 12 }}>타이핑 없이 — 책을 스캔하거나 제목으로 찾아요</div>
           </div>
         </div>
       </section>
