@@ -18,6 +18,22 @@ const RG_REMINDER_KEY = 'rg_streak_reminder';
 const RG_REMINDER_NOTIF_ID = 8001;            // 고정 id — 재스케줄이 항상 같은 알림을 교체.
 const RG_REMINDER_DEFAULT = { enabled: false, hour: 21, minute: 0 };
 
+// 재키 목소리 리마인더 문구 로테이션 — 매일 같은 알림은 배너 블라인드가 된다(데모 피드백:
+// "인게이지먼트 다양화"). 재키=최고 호평 자산이라 그 목소리로. 날짜 기반 인덱스라 하루 안엔
+// 고정, 매일 순환. ponytail: repeats:true 는 재스케줄 전까지 같은 문구를 재사용 —
+//   앱 진입/복귀마다 _rmReschedule 이 돌아 그날 문구로 갱신됨(며칠 미실행 시만 직전 문구 반복).
+const RG_REMINDER_LINES = [
+  { title: '오늘의 한 줄, 아직이에요 🐦', body: '잠깐이면 돼요. 오늘 읽은 한 문장으로 둥지를 이어가요.' },
+  { title: '재키가 기다려요 🐦', body: '오늘 읽은 자리의 한 문장, 같이 곱씹어볼까요?' },
+  { title: '한 문장이면 충분해요', body: '한 쪽만 펼쳐도 돼요. 마음에 걸린 한 줄을 남겨요.' },
+  { title: '둥지가 오늘을 기다려요 🐦', body: '오늘의 한 문장이 쌓여 내가 돼요. 잠깐 들러요.' },
+  { title: '오늘 만난 문장 있어요?', body: '재키가 물어볼 게 있대요 — 오늘 읽은 한 줄로요.' },
+];
+function _rmPickLine() {
+  const dayNum = Math.floor(Date.now() / 86400000);   // 실제 시계 기준 일수
+  return RG_REMINDER_LINES[((dayNum % RG_REMINDER_LINES.length) + RG_REMINDER_LINES.length) % RG_REMINDER_LINES.length];
+}
+
 function _rmIsNative() { return !!window.RG_NATIVE; }
 function _rmPlugin() { return window.CapLocalNotifications || null; }
 
@@ -103,13 +119,14 @@ async function _rmReschedule() {
 
   const readToday = await _rmAlreadyReadToday();
   const at = _rmNextFireAt(s.hour, s.minute, readToday);
+  const line = _rmPickLine();                         // 재키 목소리 로테이션(#인게이지먼트)
   await _rmCancel();                                 // 항상 교체(중복 누적 방지)
   try {
     await P.schedule({
       notifications: [{
         id: RG_REMINDER_NOTIF_ID,
-        title: '오늘의 한 줄, 아직이에요 🐦',
-        body: '잠깐이면 돼요. 오늘 읽은 한 문장으로 스트릭을 이어가요.',
+        title: line.title,
+        body: line.body,
         schedule: { at, repeats: true, allowWhileIdle: true }, // at=다음 발생, repeats=이후 매일 같은 시각
         smallIcon: 'ic_stat_icon_config_sample',         // 안드로이드 기본 알림 아이콘(미존재 시 앱 아이콘 폴백)
       }],
