@@ -1,6 +1,6 @@
 # 시간차 되감기 (Resurface) 스펙
 
-> 🅿️ **보류 (Phase later, #639, 2026-06-16)**: 본격 구현은 나중. 현 스펙은 참고·보존용이며 **현 단계 추가 작업 대상 아님**. spec-align invariant 미부여(보류 상태). 추적: [open-issues.md](./meta/open-issues.md).
+> ✅ **구현됨 (#346, 드리프트 정정 2026-07-09)**: 이전 "보류(#639)" 상태는 낡음 — Resurface는 **출시됨**. 홈 둥지 카드(`nest.js` `resurfaceCard`), `DataStore.sentences.resurfaceCandidate()`/`markResurfaced()`(양 어댑터), 1일 1회 게이트(localStorage `rg_resurface_last`, `shownToday`/`markToday`), 분석 `resurface_shown`/`resurface_answered`/`resurface_skipped`, 마이그레이션 `21_resurface.sql`(`sentences.last_resurfaced_at`)까지 반영됐다. **미구현 잔여**: §2.1 "같은 책 7일" 2차 트리거(14일 트리거만 빌드됨).
 >
 > **신규 (v7.4, 2026-06-10)**: companion.md §5 플레이스홀더 구체화.
 > 근거: whytree-team-synthesis.md ("ChatGPT·북모리가 줄 수 없는 edge"), companion.md §5.
@@ -22,8 +22,8 @@
 ### 2.1 발동 시점
 - 앱 진입(둥지 로드) 시 백그라운드 체크
 - **발동 조건**: 아래 중 하나 이상 충족한 문장·대화가 있을 때
-  - 대화(Q/A)가 저장된 문장 중 마지막 대화로부터 **14일 이상** 경과
-  - 같은 책의 다른 문장과 대화한 이후 **7일 이상** 경과 (책 안에서 생각 연결)
+  - 대화(Q/A)가 저장된 문장 중 마지막 대화로부터 **14일 이상** 경과 ✅ 구현(#346)
+  - ~~같은 책의 다른 문장과 대화한 이후 **7일 이상** 경과 (책 안에서 생각 연결)~~ ⚠️ **미구현** (14일 트리거만 빌드됨 — 후속, 드리프트 정정 2026-07-09)
 - **최대 노출 빈도**: 1일 1회 (매 진입마다 뜨지 않음)
 - **조건**: 대화(Q/A)가 1개 이상 저장된 문장만 대상 (답변 없는 문장 제외)
 
@@ -76,9 +76,9 @@
 
 ### 4.1 필요한 필드 (sentences / companion_sessions)
 ```
-sentences.last_resurfaced_at  TIMESTAMPTZ  -- 마지막 재소환 일시
-companion_sessions.resurfaced  BOOLEAN     -- 재소환 세션 여부
+sentences.last_resurfaced_at  TIMESTAMPTZ  -- 마지막 재소환 일시  ✅ 구현(21_resurface.sql)
 ```
+> **드리프트 정정 2026-07-09**: 실제 구현은 `sentences.last_resurfaced_at`(재소환 억제용) 한 컬럼만 쓴다. 스펙이 적었던 별도 `companion_sessions.resurfaced BOOLEAN`은 **재소환 세션 표시로 쓰이지 않는다** — 1일 1회 노출 게이트는 컬럼이 아니라 **localStorage `rg_resurface_last`**(양 어댑터 `shownToday`/`markToday`, §4.2)로 처리한다. (`companion_sessions.is_resurface`는 18_ 마이그레이션에 존재하나 이 넛지 게이트에는 미사용.)
 
 ### 4.2 로컬 폴백
 - Supabase 미연결(게스트) 시: localStorage에 `rg_resurface_last` 저장, 동일 로직

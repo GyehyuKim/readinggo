@@ -88,6 +88,8 @@
 - **런타임**: Node.js + 헤드리스 브라우저(Playwright). 인바운드 HTTP 없음 — `seed_queue` 폴링 데몬(`poller.mjs`).
 - **폴링**: `seed_queue?status=pending&order=priority.desc,created_at.asc&limit=3`, 5초 간격. high(온디맨드) 먼저.
 - **직렬화**: 브라우저 1개로 순차 처리(동시 크롤 금지 — 차단·자원). 책 사이 딜레이 2~3초.
+
+> ⚠️ **코드 불일치 (드리프트 정정 2026-07-09)**: 현재 `collector/poller.mjs`는 `POLL_BATCH=4` + `Promise.all`로 **4-병렬 크롤**, 배치 딜레이 1초로 돈다. spec의 동시성-1·딜레이 2~3초 안티차단 의도와 어긋남 — 차단 리스크. **정합 결정 필요**(코드를 동시성 1로 낮출지, spec을 병렬로 갱신할지). spec 은 임의로 4를 승인하지 않고 결정 대기.
 - **적재**: 발췌 → `book_id` 해석(없으면 `books` auto-upsert) → distinct NPC 명의 `sentences`(kind='quote') + `seed_sentences` 원장. 멱등(그 책 기존 문장 텍스트 제외).
 - **상태전이**: ok→`done`. not-found/no-excerpt→`failed`(영구). blocked/timeout→attempts++ 후 재시도(≤3).
 
@@ -99,7 +101,7 @@
 
 ## 7. 예의 / 레이트리밋 / 차단 대응
 
-- 요청 간 **딜레이 2~3초**, 동시성 1.
+- 요청 간 **딜레이 2~3초**, 동시성 1. (⚠️ 코드 불일치 — §5 노트 참조: `poller.mjs`는 현재 4-병렬·딜레이 1초, 정합 결정 필요.)
 - robots/약관 best-effort 존중, 식별 가능한 UA.
 - **차단 감지**: 수율 급락·캡차·403 → 백오프 + 로그/알림. DOM 변경 시 셀렉터 보정 신호.
 - 주기 배치는 트래픽 적은 새벽, 소량씩.
@@ -135,11 +137,13 @@
 
 ## 12. 구현 체크리스트 (맥미니, 후속 코드 PR)
 
+> ⚠️ **초안(동기·터널 방식) 폐기 — 큐 설계로 대체 (드리프트 정정 2026-07-09)**: 아래 체크리스트는 `POST /collect`·토큰 검증·Cloudflare Tunnel·`COLLECTOR_URL`/`COLLECTOR_TOKEN` 워커 호출을 전제한 **구 동기 아키텍처**의 잔재다. §2/§6/§11에서 **큐 폴링(아웃바운드만·인바운드 0·터널/토큰 불필요)**로 개정됐고 실제 코드(`collector/poller.mjs`)에도 그 엔드포인트·시크릿·터널은 존재하지 않는다. 유효 항목만 남기고 폐기 항목은 취소선 표기.
+
 - [ ] 맥미니에 Node + 헤드리스 브라우저 환경
-- [ ] collector 데몬(`POST /collect`, 토큰 검증, 브라우저 큐, 예스24 파이프라인 §4)
+- [ ] collector 폴링 데몬(`poller.mjs` — `seed_queue` 폴링, 브라우저, 예스24 파이프라인 §4). ~~`POST /collect`·토큰 검증~~ **폐기(큐 폴링으로 대체)**
 - [ ] `seed_sentences` 적재 로직(service role, book_key, 출처·상한)
-- [ ] Cloudflare Tunnel 설정 + 고정 URL
+- [ ] ~~Cloudflare Tunnel 설정 + 고정 URL~~ **폐기(§6 — 인바운드·터널 불필요)**
 - [ ] launchd 등록(주기 배치 §3.2)
-- [ ] 워커 측: `/api/seed` 가 stored 없을 때 collector 호출(`COLLECTOR_URL`/`COLLECTOR_TOKEN`), 폴백 처리
+- [ ] ~~워커 측: `/api/seed` 가 stored 없을 때 collector 호출(`COLLECTOR_URL`/`COLLECTOR_TOKEN`), 폴백 처리~~ **폐기(워커는 `seed_queue` upsert만, collector와 직접 통신 없음 §2/§6)**
 - [ ] 예의/레이트리밋/차단 대응(§7) + 모니터링 로그(§10)
 - [ ] 저작권 가드(출처·상한·삭제대응 §8)

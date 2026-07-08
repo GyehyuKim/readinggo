@@ -11,12 +11,12 @@
 
 | 층 | 무엇 | 핵심 |
 |---|---|---|
-| **프론트엔드** | React 18 + **Vite**(빌드타임 JSX, #871) | esbuild가 `.js`의 JSX를 classic 변환. `main.js` 진입. 모듈 27개 |
+| **프론트엔드** | React 18 + **Vite**(빌드타임 JSX, #871) | esbuild가 `.js`의 JSX를 classic 변환. `main.js` 진입. `js/` 모듈 ~33개 |
 | **모듈 공유** | `window.X` 전역 | import/export 없음. 로드 순서가 계약 |
 | **상태/데이터** | DataStore 계약 | 미로그인=localStorage / 로그인=Supabase (부팅 스왑) |
-| **백엔드** | Cloudflare Worker (`worker/index.mjs`) | 정적 서빙 + 8개 API 프록시 + cron |
-| **DB/인증** | Supabase (Postgres·Auth·RLS·pg_cron) | 테이블 22개, 마이그레이션 30개 |
-| **외부 연동** | 알라딘·구글북스·오픈라이브러리·네이버·Upstage·PostHog | 키는 워커(서버)에만 |
+| **백엔드** | Cloudflare Worker (`worker/index.mjs`) | 정적 서빙 + 12개 API/프록시 라우트 + cron 2종 |
+| **DB/인증** | Supabase (Postgres·Auth·RLS·pg_cron) | 테이블 약 22개, 마이그레이션 ~39개 |
+| **외부 연동** | 알라딘·구글북스·오픈라이브러리·네이버·Upstage·**Gemini(vision)**·PostHog | 키는 워커(서버)에만 |
 | **배포** | Cloudflare Workers Build | `main` 머지 시 자동. 키 캐시버스트 `_RG_V` |
 | **CI** | GitHub Actions 3종 | test · spec-drift · deploy-verify |
 
@@ -30,24 +30,28 @@
 - **캐시버스트**: Vite 해시 파일명(`assets/index-<hash>.js`) — 수동 `_RG_V` 폐기.
 - **암묵적 전역 주의(#884)**: 파일 간 공유 심볼은 반드시 정의 파일에서 `window.X = X` 노출(ES 모듈 스코프라 옛 eval-전역 누수 없음). render-smoke CI(#886)가 탭 렌더 회귀 차단.
 
-### 2.1 부팅 로드 순서 (index.html, 의존 먼저)
+### 2.1 부팅 로드 순서 (`main.js` ES import, 의존 먼저 — #871 Vite)
 
 ```
-[plain script] config.js → supabase-client.js → datastore-supabase.js
-[loadBabel 순서] data → datastore → icons → components → sentence-card →
-  book-info-modal → user-profile-modal → sentence-collection-modal →
-  share-card → search → ocr-crop-overlay → ceremony → nest → companion →
-  social → admin-dashboard → book-detail-modal → nest-theatre →
-  follow-list-modal → library → settings-modal → shelf-import → app
+setup-globals → config → supabase-client → datastore-supabase →
+  data → datastore → icons → components → sentence-card → book-info-modal →
+  user-profile-modal → sentence-collection-modal → share-card → search →
+  barcode-scan → ocr-crop-overlay → batch-quote-import → ceremony →
+  milestone-recap → nest → companion → co-reading → social →
+  admin-dashboard → book-detail-modal → nest-theatre → follow-list-modal →
+  library → settings-modal → shelf-import → streak-reminder → sheet-drag →
+  inapp → (Supabase 스왑) → app (동적 import 마운트)
 ```
 
-> 로그인 상태면 `app.js` 직전에 `window.DataStore`를 `SupabaseDataStore`로 스왑(§4).
+> `main.js`가 위 순서로 정적 `import` 한다(로드 순서 = 의존 계약). 런타임 Babel/`loadBabel`/`index.html` IIFE는 폐기(#871). 로그인 상태면 `app.js` 동적 import 직전에 `window.DataStore`를 `SupabaseDataStore`로 스왑(§4).
 
-### 2.2 모듈 맵 (27개, `window.X` export)
+### 2.2 모듈 맵 (~33개 로드 + `onboarding.js` 미사용, `window.X` export)
+
+> **드리프트 정정 2026-07-09**: `main.js`가 import하는 모듈 전수 반영. `config.js`는 `RG_VERSION`을 export하지 않음(제거됨 #799). barcode-scan·batch-quote-import·milestone-recap·co-reading·streak-reminder·sheet-drag·inapp 추가.
 
 | 파일 | 줄 | export(주요) | 역할 |
 |---|---|---|---|
-| `config.js` | 69 | `RG_CONFIG`·`RG_VERSION`·`RG_VALIDATE`·`RG_COMPANION_PRESETS` | 설정·버전·검증 |
+| `config.js` | 90 | `RG_CONFIG`·`RG_VALIDATE`·`RG_COMPANION_PRESETS`·`RG_companionPreset`·`RG_flag` | 설정·검증·플래그 |
 | `data.js` | 495 | `ALL_BOOKS`·`getBook`·`loadBooks`·`fuzzySearch`·`NEST_STAGES`·`XP_RULES`·`computeCheckinXp`·`nest*` | 시드·도서·XP/둥지 로직 |
 | `datastore.js` | 732 | `localStorageAdapter`·`DataStore`·`getBook` | localStorage 어댑터 |
 | `datastore-supabase.js` | 992 | `SupabaseDataStore` | Supabase 어댑터 |
@@ -61,17 +65,24 @@
 | `sentence-collection-modal.js` | 118 | `SentenceCollectionModal` | 한 문장 모음 |
 | `share-card.js` | 379 | `shareSentence`·`shareService`·`renderSentenceCardBlob` | 외부 공유 카드(html-to-image) |
 | `search.js` | 405 | `SearchModal`·`SearchResultItem` | 도서 검색 UI |
+| `barcode-scan.js` | 328 | `BarcodeScanModal`·`barcodeScanSupported`·`resolveBookByIsbn` | ISBN 바코드 스캔 |
 | `ocr-crop-overlay.js` | 137 | `OcrCropOverlay` | 사진 글귀 크롭 |
+| `batch-quote-import.js` | 91 | `BatchQuoteImport` | 사진 밑줄 일괄 가져오기 |
 | `ceremony.js` | 197 | `Ceremony` | 체크인/진화 세리머니 |
+| `milestone-recap.js` | 151 | `MilestoneRecap`·`RG_openMilestoneRecap` | 마일스톤 회고 |
 | `nest.js` | 631 | `NestView` | 홈 탭(읽기·체크인) |
 | `nest-theatre.js` | 151 | `NestTheatre` | 둥지 캐릭터(프로필) |
 | `companion.js` | 276 | `CompanionModal` | 재키(LLM 독서 파트너) |
+| `co-reading.js` | 1096 | `RoomsView`·`RoomModal`·`CoReadModeToggle` 등 | 함께 읽기(방·파트) |
 | `social.js` | 222 | `SocialView` | 소셜 피드 |
 | `admin-dashboard.js` | 259 | `AdminDashboardModal` | 운영자 대시보드 |
 | `follow-list-modal.js` | 63 | `FollowListModal` | 팔로우 목록 |
 | `library.js` | 546 | `LibraryView` | 서재(프로필) 탭 |
 | `settings-modal.js` | 189 | `SettingsModal` | 설정 |
 | `shelf-import.js` | 148 | `ShelfImportModal` | 서가 가져오기(#772) |
+| `streak-reminder.js` | 181 | `RG_streakReminder` | 스트릭 로컬 알림(#1033) |
+| `sheet-drag.js` | 201 | (전역 부수효과) | 바텀시트 drag-to-dismiss(#1046) |
+| `inapp.js` | 38 | `RG_inApp` | 인앱 브라우저 감지·외부 열기(#1096) |
 | `app.js` | 837 | `RG_*` 핸들러·`createRoot` | 최상위 앱·라우팅 |
 | `onboarding.js` | 402 | `OnboardingFlow` | ⚠️ **index.html 부팅에 미로드 — 미사용 추정**(§11) |
 
@@ -81,13 +92,12 @@
 
 | 라이브러리 | 출처 | 용도 |
 |---|---|---|
-| React 18 / ReactDOM 18 (`development`) | unpkg | UI |
-| `@babel/standalone@7.29.7` | **자체 호스팅** `vendor/babel.min.js` | 인브라우저 JSX 변환 |
-| `fuse.js@7.0.0` | jsdelivr | 퍼지 검색 |
-| `html-to-image@1.11.11` | jsdelivr | 공유 카드 이미지화 |
-| `@supabase/supabase-js@2` | jsdelivr | DB·인증 클라이언트 |
+| React 18 / ReactDOM 18 | npm | UI |
+| `fuse.js@7.0.0` | npm | 퍼지 검색 |
+| `html-to-image@1.11.11` | npm | 공유 카드 이미지화 |
+| `@supabase/supabase-js@2` | npm | DB·인증 클라이언트 |
 
-> 빌드/번들러 **없음**(Stack Lock). React는 dev 빌드 사용 중.
+> **드리프트 정정 2026-07-09**: **Vite 번들 빌드**(#871). 이전 "인브라우저 `@babel/standalone`(`vendor/babel.min.js`)·번들러 없음" 서술은 폐기 — JSX는 Vite/esbuild 빌드타임 변환, 의존성은 `setup-globals.js`가 `window`에 노출한다.
 
 ---
 
@@ -105,17 +115,24 @@
 
 정적 사이트(`[assets]`)를 서빙하고, 키가 필요한 호출을 대행(동일출처만 허용, 키 클라 비노출).
 
+> **드리프트 정정 2026-07-09**: `/js/config.js` 버전주입 라우트는 코드에 없음(제거) — 대신 라이브 엔드포인트 5개(`/api/wiki-ask`·`/api/parse-books`·`/api/delete-account`·`/api/extract-highlights`·`/api/ota`) 추가. cron 2종.
+
 | 라우트 | 무엇 | 외부 호출 |
 |---|---|---|
-| `/js/config.js` | 배포 버전 ID 주입(#748) | — (`CF_VERSION`) |
 | `/aladin` (+`/.netlify/functions/aladin`) | 도서 검색·메타 프록시 | 알라딘 TTB API |
 | `/api/img` | 표지 이미지 프록시(CORS 우회) | image.aladin.co.kr |
 | `/api/companion` | 재키 질문 생성 | Upstage LLM |
+| `/api/wiki-ask` | 내 문장 기반 위키/책 질문 | Upstage LLM |
+| `/api/parse-books` | 붙여넣기 텍스트 → 도서 목록 구조화(#1039) | Upstage LLM |
+| `/api/delete-account` | 계정 삭제(본인 토큰 검증) | Supabase(service_role) |
 | `/api/ocr` | 책 사진 → 한 문장 | Upstage Document OCR |
+| `/api/extract-highlights` | 사진 밑줄/강조 일괄 추출(#844) | **Gemini vision** |
 | `/api/related` | 관련 도서(함께 읽을 책) | Upstage LLM(+검색 소스) |
-| `/api/shelf-import` | 서가 가져오기(#772) | 검색 소스·Supabase |
+| `/api/shelf-import` | 서가 가져오기(#772) | 검색 소스·Supabase(+Gemini vision) |
 | `/api/seed` | 시드 데이터 | Supabase(service_role) |
+| `/api/ota` | OTA 번들 매니페스트 체크(#876) | — (OTA_KV) |
 | **cron** `0 18 * * *`(UTC)=KST 03:00 | 일일 인기도서 아카이브(#239) | 알라딘·Supabase |
+| **cron** `*/10 * * * *` | 문의 → GitHub 이슈 동기화(#701) | GitHub API |
 
 도서 검색/메타는 **다중 소스**: 알라딘(주) + 구글북스(`books/v1/volumes`) + 오픈라이브러리(`api/books`, 표지 폴백 `covers.openlibrary.org`) + 네이버 블로그검색(보강). 정확한 폴백 순서는 `worker/index.mjs` 참조.
 
@@ -130,19 +147,20 @@
 | `www.googleapis.com/books` | 도서 검색·메타 | `GOOGLE_BOOKS_API_KEY`(선택) | worker | 무키 시 레이트리밋 |
 | `openlibrary.org` / `covers.openlibrary.org` | 메타·표지 폴백 | — | worker | |
 | `openapi.naver.com` | 블로그검색(보강) | `NAVER_CLIENT_ID`/`SECRET` | worker | |
-| `api.upstage.ai` | **유일 AI** — 재키·OCR·관련도서 | `UPSTAGE_API_KEY`(Bearer) | worker | model `solar-pro3` |
+| `api.upstage.ai` | AI(텍스트) — 재키·OCR·관련도서·위키·파싱 | `UPSTAGE_API_KEY`(Bearer) | worker | model `solar-pro3` (`LLM_MODEL`) |
+| `generativelanguage.googleapis.com` | **AI(vision)** — 사진 밑줄/강조 추출·서가 가져오기 | `GEMINI_API_KEY` | worker | `callVision()`, model `gemini-2.5-flash` (`VISION_MODEL`) |
 | `*.supabase.co` | DB·인증 | `SUPABASE_SERVICE_ROLE_KEY`(서버)·publishable(클라) | worker·client | |
 | `us.posthog.com` | 사용 분석 | (클라 토큰) | client·admin | 어드민 링크아웃 |
 | `search.kyobobook.co.kr` | **구매처 링크아웃** | — | book-detail/info-modal | ⚠️ API 아님, `<a href>` |
 | `cdn.jsdelivr.net`·`unpkg.com` | 라이브러리 CDN | — | index.html | |
 
-> **Gemini는 코드에 없음** — `datastore-supabase.js`에 "프록시 붙기 전 **stub**" 주석 1곳뿐(§11).
+> **드리프트 정정 2026-07-09**: **Gemini는 코드에 있다** — 워커가 `GEMINI_API_KEY` + `VISION_BASE_URL`/`VISION_MODEL`(gemini-2.5-flash) + `callVision()`로 `/api/extract-highlights`·`/api/shelf-import`의 이미지 의미 이해(vision)를 구동한다(#844). 텍스트 AI는 Upstage `solar-pro3`, vision AI는 Gemini로 이원화.
 
 ---
 
 ## 7. Supabase 스키마
 
-- 마이그레이션 **30개**(`docs/readinggo/supabase/*.sql`), 테이블 약 **22개**:
+- 마이그레이션 **~39개**(`docs/readinggo/supabase/`, `02`→`38`+`39` 번호 파일 — `36_*` 두 개 포함 — 및 `schema.sql`; 드리프트 정정 2026-07-09), 테이블 약 **22개**:
   `users·books·user_books·sentences·claps·follows·pokes·reading_sessions·streak·shield_log·wish_books·sentence_bookmarks·inquiries·companion_sessions·npc_sentence_seeds·seed_sentences·villages·village_members·village_opinions·village_parts·village_topics`
 - **RLS**(행 단위 보안) 정책 다수, `create or replace function`(admin insights·stats 등) 포함.
 - 마이그레이션은 **자동 적용 안 됨** — 수동 적용 + CI `migrations_applied.py`(라이브 DB 대조, 토큰 있을 때).
@@ -151,13 +169,15 @@
 
 ## 8. 배포 (`wrangler.toml`)
 
-- **Cloudflare Worker** `readinggo`, `main = worker/index.mjs`.
-- `[assets] directory = docs/readinggo` → 워커가 정적 사이트 서빙.
-- `[version_metadata] binding = CF_VERSION` → 버전 자동 주입(#748).
-- `[vars]`: `SUPABASE_URL`·`ARCHIVE_DAILY_CAP`·`LLM_BASE_URL`(upstage)·`LLM_MODEL`(solar-pro3).
-- `[triggers] crons = ["0 18 * * *"]`.
+> **드리프트 정정 2026-07-09**: `[version_metadata]/CF_VERSION` 바인딩 없음(제거). cron 2종. `[vars]`에 `VISION_BASE_URL`/`VISION_MODEL` 추가. `OTA_KV` KV 바인딩 존재. `[assets]`는 Vite 산출물 `dist`.
+- **Cloudflare Worker** `readinggo`, `main = worker/index.mjs`. `preview_urls = true`(#899).
+- `[build] command = "cd docs/readinggo && npm ci && npm run build"` → 배포 전 Vite 빌드(#871).
+- `[assets] directory = docs/readinggo/dist` → 워커가 Vite 산출물 정적 서빙.
+- `[[kv_namespaces]] binding = OTA_KV` → OTA 번들 매니페스트(#876).
+- `[vars]`: `SUPABASE_URL`·`ARCHIVE_DAILY_CAP`·`LLM_BASE_URL`(upstage)·`LLM_MODEL`(solar-pro3)·`VISION_BASE_URL`(gemini)·`VISION_MODEL`(gemini-2.5-flash).
+- `[triggers] crons = ["0 18 * * *", "*/10 * * * *"]` (인기도서 아카이브 + 문의→GitHub 동기화).
 - **자동 배포**: `main` 푸시 시 Cloudflare Workers Build. (수동 폴백 `npx wrangler deploy`)
-- **시크릿**(`wrangler secret`): `ALADIN_TTB_KEY`·`SUPABASE_SERVICE_ROLE_KEY`·`UPSTAGE_API_KEY`·`NAVER_CLIENT_ID/SECRET`·`GOOGLE_BOOKS_API_KEY`.
+- **시크릿**(`wrangler secret`): `ALADIN_TTB_KEY`·`SUPABASE_SERVICE_ROLE_KEY`·`UPSTAGE_API_KEY`·`GEMINI_API_KEY`·`NAVER_CLIENT_ID/SECRET`·`GOOGLE_BOOKS_API_KEY`·`KAKAO_REST_KEY`·`NLK_CERT_KEY`·`GITHUB_TOKEN`.
 
 ---
 
@@ -183,7 +203,7 @@
 
 코드 실측이 계획 문서와 어긋난 지점 — **이 문서가 사실**:
 
-1. **Gemini 미구현**: Stack Lock·ROADMAP 등은 "도서 추천 = Gemini"라 적었으나 **코드엔 stub 주석뿐**. 실 AI는 Upstage `solar-pro3` 하나(재키·OCR·관련도서).
+1. **AI 이원화(Upstage + Gemini)** (드리프트 정정 2026-07-09): 예전 이 문서는 "Gemini 미구현·stub 주석뿐"이라 적었으나 **틀림**. 현재 텍스트 AI는 Upstage `solar-pro3`(재키·OCR·관련도서·위키·파싱), **vision AI는 Gemini `gemini-2.5-flash`**(`callVision()`, `/api/extract-highlights`·`/api/shelf-import`, #844)로 이원화돼 있다.
 2. **검색 다중 소스**: 문서엔 알라딘 중심으로만 보이나, 실제론 **알라딘+구글북스+오픈라이브러리+네이버**.
 3. **교보문고**: 데이터 연동이 아니라 **구매처 링크아웃**(`<a href>`).
 4. **모듈화 진행됨**: `components.js` 1626→307줄. #761/#762로 27개 모듈로 분리 완료(부팅 순서 §2.1).
@@ -201,8 +221,8 @@
 grep -rhoE "https?://[a-zA-Z0-9.\-]+" worker/ docs/readinggo/js/ | sort | uniq -c | sort -rn
 # 워커 라우트 / env(시크릿)
 grep -nE "p ?===" worker/index.mjs ; grep -oE "env\.[A-Za-z_]+" worker/index.mjs | sort -u
-# 모듈 export / 부팅 순서
-grep -oE "window\.[A-Za-z_]+ ?=" docs/readinggo/js/*.js ; grep -n "loadBabel(" docs/readinggo/index.html
+# 모듈 export / 부팅 순서 (Vite — main.js 의 import 순서가 계약)
+grep -oE "window\.[A-Za-z_]+ ?=" docs/readinggo/js/*.js ; grep -n "^import '\./js/" docs/readinggo/main.js
 # Supabase 테이블
 grep -rhoE "create table (if not exists )?[a-z_.]+" docs/readinggo/supabase/*.sql | sort -u
 ```
