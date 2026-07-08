@@ -683,6 +683,8 @@ function App() {
         if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: ns.book.cur, text: sentence, kind: kind || 'quote' }));
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ubId + ')');
+        // 오늘 기록 완료 → 리마인더 재무장(오늘치 취소, 내일로). '읽었는데 알림 발화' 방지(#1163). 웹/비네이티브 no-op.
+        try { if (window.RG_streakReminder) window.RG_streakReminder.reschedule(); } catch (e) {}
         // DB 권위값으로 스트릭·XP·내 한 문장 정합 (낙관 표시 어긋남 + 새 문장 id 부재 → 감상 버튼 지연 방지, H2/§5.8.4)
         const [stDb, xpDb, mineDb] = await Promise.all([
           Promise.resolve(DataStore.streak.get()).catch(() => null),
