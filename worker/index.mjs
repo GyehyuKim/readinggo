@@ -1154,14 +1154,22 @@ async function imgProxy(searchParams) {
       || host === 'nl.go.kr' || host.endsWith('.nl.go.kr'));
   if (!allowed) return json({ error: 'host not allowed' }, 403);
   let r;
-  try { r = await fetch(u.toString(), { cf: { cacheTtl: 86400, cacheEverything: true } }); }
+  // redirect: 'manual' — allowlist 호스트의 오픈 리다이렉트를 타고 비-allowlist 타깃을 fetch 하는
+  //   SSRF/오픈프록시를 차단(#1160). 3xx 는 따르지 않고 거부.
+  try { r = await fetch(u.toString(), { redirect: 'manual', cf: { cacheTtl: 86400, cacheEverything: true } }); }
   catch (e) { return json({ error: 'upstream fetch failed' }, 502); }
+  if (r.status >= 300 && r.status < 400) return json({ error: 'redirect not allowed' }, 502);
   if (!r.ok) return new Response(null, { status: r.status });
-  const ct = r.headers.get('content-type') || 'image/jpeg';
-  if (!ct.toLowerCase().startsWith('image/')) return json({ error: 'not an image' }, 415);
+  const ct = (r.headers.get('content-type') || 'image/jpeg').toLowerCase();
+  // 실제 래스터 이미지만 — svg 는 스크립트 캐리어라 배제(#1160).
+  if (!ct.startsWith('image/') || ct.includes('svg')) return json({ error: 'not an image' }, 415);
   return new Response(r.body, {
     status: 200,
-    headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' },
+    headers: {
+      'Content-Type': ct,
+      'Cache-Control': 'public, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',   // 콘텐츠 스니핑 차단
+    },
   });
 }
 

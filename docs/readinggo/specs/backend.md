@@ -187,7 +187,7 @@ ai.extractBook(userBookId)                 → 추출 책 요약
 | `normalize` (~:1264) | 알라딘 `item` 필드 매핑 | ✅ **구현** — `normalizeKakao`(thumbnail·contents, 쪽수 없음→키 생략)·`normalizeNLK`(**쪽수 = `PAGE`**, 표지 = `TITLE_URL`) 추가. 빈 필드 키 생략(비파괴 merge upsert 규약 유지) | 알라딘 전용 컬럼(`sales_point`·`customer_review_rank`·`aladin_link`)은 신규소스 부재 → NULL(이미 nullable, 비파괴) |
 | `upsertBook` (~:1312) | `on_conflict=isbn13` merge upsert | **유지** — 카카오 캐시 조건(최신 유지) 위해 `enriched_at` 신선화 + 일일 cron 재보강 유지 | 카카오 §5(20) 충족 핵심: 캐시를 stale 방치하지 않음 |
 | `archive` cron (~:1220) | 알라딘 베스트셀러 ItemList → ItemLookUp | ⏸ **격리** — 신규 provider 키(카카오/국중도)가 설치되면 자동 중지(`aladinSeedActive` 게이트, `BOOKS_PROVIDER='aladin'` 명시 시에만 재개). **인기 시드 소스 재설계는 P2 별도 이슈** | 카카오·국중도엔 베스트셀러 API 없음. 출시 블로커 관점상 검색·등록(P1) 먼저, 인기 시드(P2)는 후순위 |
-| `imgProxy` (~:1028) | 표지 호스트 화이트리스트 = `aladin.co.kr` 만 | ✅ **구현** — `*.kakaocdn.net`(카카오 thumbnail)·`*.nl.go.kr`(국중도 `TITLE_URL`) 추가 | 실제 표지 호스트는 출시 전 실계정 확인 후 확정(누락 호스트 발견 시 추가) |
+| `imgProxy` (~:1146) | 표지 호스트 화이트리스트 = `aladin.co.kr` 만 | ✅ **구현** — `*.kakaocdn.net`(카카오 thumbnail)·`*.nl.go.kr`(국중도 `TITLE_URL`) 추가 · **SSRF 하드닝(#1160)**: `redirect:'manual'`(allowlist 호스트 오픈 리다이렉트 경유 비-allowlist fetch 차단, 3xx 거부) + svg 배제(스크립트 캐리어) + `X-Content-Type-Options: nosniff` | 실제 표지 호스트는 출시 전 실계정 확인 후 확정(누락 호스트 발견 시 추가) |
 | `googleBooksSearch` (~:1120) | 검색 보강 + **결과 upsert**(source='google', :1102-1106) | ✅ **구현** — 실시간 응답만, 영구 upsert 라인 제거(카카오·레거시 양 검색 경로 공통) | Google ToS §5.e. `enrichForeignMeta` 의 Google merge 가 레거시 ISBN 등록 upsert 에 섞이는 잔여 경로는 P2 정리 |
 
 **출시 전 실계정 1회 확인 게이트** (단정 금지 — 스펙은 방향만, 약관 원문 검증은 출시 전 필수):
