@@ -33,18 +33,18 @@
 **✅ 발화 중 (실측):**
 
 ```js
-rgTrack('sentence_added',      { book_id, kind })                // 한 문장 저장 (library.js)
-rgTrack('sentence_deleted',    { book_id })                      // 한 문장 삭제 (nest.js)
+rgTrack('sentence_added',      { book_id, kind })                // 한 문장 저장 (book-detail-modal.js · 드리프트 정정 2026-07-09)
+rgTrack('sentence_deleted',    { book_id })                      // 한 문장 삭제 (companion.js · 드리프트 정정 2026-07-09)
 rgTrack('sentence_shared',     { id, kind })                     // 외부 공유 카드 (share-card.js, #650)
-rgTrack('answer_saved',        { book_id, lens, answer_length }) // 독서모임 답변 (nest.js)
-rgTrack('companion_recap',     { bookId, n })                    // 완독 회고 받기 (library.js, #259)
+rgTrack('answer_saved',        { book_id, lens, answer_length }) // 독서모임 답변 (companion.js · 드리프트 정정 2026-07-09)
+rgTrack('companion_recap',     { bookId, n })                    // 완독 회고 받기 (book-detail-modal.js, #259 · 드리프트 정정 2026-07-09)
 rgTrack('companion_q_rated',   { book_id, value })               // 참새 질문 평가 (nest.js, #371)
 rgTrack('companion_q_regen',   { book_id })                      // 참새 질문 재생성 (nest.js, #372)
 rgTrack('resurface_shown',     { sentence_id, days })            // 되감기 카드 노출 (nest.js, #346)
 rgTrack('resurface_answered',  { sentence_id, days })            // 다시 대화하기 탭 (nest.js, #346)
 rgTrack('resurface_skipped',   { sentence_id })                  // 나중에 탭 (nest.js, #346)
 rgTrack('ocr_extracted',       { ... })                          // 사진 글귀 추출 (OCR)
-rgTrack('related_book_wished', { from, to })                     // 추천책 찜 (library.js)
+rgTrack('related_book_wished', { from, to })                     // 추천책 찜 (book-detail-modal.js · 드리프트 정정 2026-07-09)
 rgTrack('data_consent',        { value, source })                // 데이터 활용 동의 (app.js, #294)
 rgTrack('app_error',           { message, tab })                 // 컴포넌트 크래시 (app.js, #310)
 rgTrack('book_opened',         { book_id, entry_point })         // 책 읽기 시작 = 활성책 등록·전환 (app.js, #736)
@@ -52,6 +52,29 @@ rgTrack('reading_session_end', { book_id, pages_logged, is_complete }) // 체크
 rgTrack('service_share_open',  { source })                       // 서비스 공유 진입 (share-card.js, #650 B/#729)
 rgTrack('service_share_sent',  { source, method })               // 서비스 공유 완료 (share-card.js, #729)
 ```
+
+**➕ 추가 발화 이벤트 (실측 · 카탈로그 보강 · 드리프트 정정 2026-07-09):** 위 목록이 누락하고 있었으나 코드가 실제 발화 중인 이벤트들. props 상세는 코드 grep 참조.
+
+```js
+rgTrack('text_import_saved',      { book_id, saved })            // 붙여넣기 텍스트 임포트 저장 (book-detail-modal.js)
+rgTrack('wiki_ask',               { n, q_len })                  // 문장 모음 위키 질문 (sentence-collection-modal.js)
+rgTrack('companion_preset_set',   { preset, where })             // 재키 프리셋 선택 (companion.js)
+rgTrack('reflection_note_saved',  { book_id, chars })            // 자유 감상 메모 저장 (companion.js)
+rgTrack('shelf_import_started',   {})                            // 서재 스캔 임포트 시작 (shelf-import.js)
+rgTrack('shelf_import_extracted', { count })                     // 서재 스캔 추출 (shelf-import.js)
+rgTrack('shelf_import_staged',    { count, status })             // 서재 스캔 스테이징 (shelf-import.js)
+rgTrack('flexible_import_started',{})                            // 유연 임포트 시작 (shelf-import.js)
+rgTrack('flexible_import_parsed', { count })                     // 유연 임포트 파싱 (shelf-import.js)
+rgTrack('flexible_import_staged', { count, status })             // 유연 임포트 스테이징 (shelf-import.js)
+rgTrack('streak_repair_shown',    { lost, broken_days })         // 스트릭 복구 카드 노출 (nest.js)
+rgTrack('streak_repaired',        { restored })                  // 스트릭 복구 실행 (nest.js)
+rgTrack('streak_repair_skipped',  { lost })                      // 스트릭 복구 건너뜀 (nest.js)
+rgTrack('milestone_recap_shown',  { type, value })              // 마일스톤 회고 노출 (nest.js)
+rgTrack('barcode_scan_opened',    {})                            // 바코드 스캔 진입 (barcode-scan.js)
+rgTrack('barcode_detected',       { isbn | matched })            // 바코드 인식 (barcode-scan.js)
+```
+
+_참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen`도 현재 **companion.js**에서 발화(위 ✅ 목록은 nest.js로 표기 — 추가 드리프트, 코드 정합 확인 필요)._
 
 > 📌 **퍼널 완성 (#736 구현)**: `book_opened`(활성책 등록·전환, app.js)·`reading_session_end`(체크인, nest.js `handleCheckin`) 발화 추가로 **"책 시작 → 체크인 → 한 문장 → 완독" 퍼널**을 PostHog에서 끝까지 그릴 수 있다. 읽기모드(타이머) 폐기(#505) 반영 — `book_opened`='읽기 모드 진입'은 무효 → '읽기 시작'으로 재정의, `duration_sec`는 타이머 부재로 보류. 부팅 복원(activeBook.set)에선 미발화(사용자 액션만).
 
@@ -77,6 +100,8 @@ posthog.identify(supabase_user_id, {
 ### 3.3 Admin 대시보드 — 데이터 소스 (하이브리드, #725)
 
 인앱 `AdminDashboardModal` 은 현재 **Supabase 집계만**(`DS.admin.stats/inquiries/popularBooks/activeUsers`) 표시하고, 행동 퍼널·세션 리플레이는 PostHog 콘솔(외부)에만 있다. 고도화는 **(C) 하이브리드**로 간다.
+
+> 📎 **RPC 소스 파일 (드리프트 정정 2026-07-09)**: `admin.stats` RPC 정의는 **`13_admin_stats.sql`**(`admin_stats()`)에 있다. `12_admin_insights.sql`은 `popularBooks`/`activeUsers`(`admin_popular_books`/`admin_active_users`)만 정의 — admin.stats를 `12_...`로 가리키던 참조(admin-dashboard.md §제목·profile.md 등)는 stale.
 
 | 용도 | 소스 | 비고 |
 |---|---|---|

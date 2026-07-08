@@ -199,9 +199,10 @@
 |---|---|
 | 책 선택 | 내 책장 또는 검색에서 1권 (`book_id`) |
 | 방 이름 | 필수 |
-| 공개 설정 | **공개**(책으로 검색 노출) / **비공개**(초대 링크·코드, 선택적 비밀번호) |
+| 공개 설정 | **공개**(책으로 검색 노출) / **비공개**(초대 링크·코드) |
 | 정원 | 선택 — 기본 제한 없음. 설정 시 최소 2명 (기존 `capacity` 컬럼 재사용) |
-| 비밀번호 | 선택 — 비공개 방에 한해 설정 가능. **bcrypt 해시 + 서버 RPC 검증**(`password_hash`, 클라 비노출 — §6.4, #996) |
+<!-- 드리프트 정정 2026-07-09: 비밀번호 입력 행 제거 — #1094 B안으로 방 비밀번호 폐기. CreateRoomSheet 에 비번 필드 없음(§5.2). -->
+
 
 > **만든 사람(생성자)**: 방 생성자 자동 기록(`created_by`). P1 에서 생성자에게 별도 *권한*은 없다(역할·공동관리자·강퇴는 P2). 단 방 삭제는 생성자만(어댑터 `delete` 가 `created_by` 가드 — §6.3).
 > **마일스톤(`village_parts`) 미사용**: P1 방 만들기에 챕터·마감 입력 단계 **없음**. 테이블은 존재하나 쓰지 않는다(P2 마일스톤에서 활성화).
@@ -222,7 +223,7 @@
 
 ### 5.3 방 내부 화면
 
-마을의 3탭(멤버·한 문장·게시판)에서 **게시판을 떼고 2영역**으로 단순화. 헤더는 1줄(마감·파트 압박 제거).
+마을의 3탭(멤버·한 문장·게시판)에서 **게시판을 떼고** 단순화. 헤더는 1줄(마감·파트 압박 제거). **드리프트 정정 2026-07-09**: 마일스톤(#999, §5.6) 추가로 `RoomModal` 은 이제 **3영역/3탭 — 멤버 진척 · 🗓️ 일정 · 한 문장**(아래 다이어그램은 P1 당시 2탭 골격, 일정 탭이 세 번째로 붙는다).
 
 ```
 ┌─────────────────────────────────────────┐
@@ -407,8 +408,10 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 | 멤버십 생성(insert) | **`room_join` / `room_create_membership` SECURITY DEFINER RPC 만** — 클라 직접 `village_members` insert 는 RLS(`vmembers_mod` = **delete(본인 탈퇴)만**)로 거부. `36_room_join_rpc.sql` |
 | 열람권 | RLS(`is_village_member`) — 멤버 행이 곧 접근권. 그 행은 위 RPC 경유로만 생김 |
 
-### 6.4 보안 메모 — 비밀번호 해시화 + 서버측 검증 (#996, 평문 후속)
+### 6.4 보안 메모 — 비밀번호 해시화 + 서버측 검증 (#996, 평문 후속 → #1094 폐기)
 
+> **드리프트 정정 2026-07-09 (#1094 B안 — 비밀번호 폐기).** 이 절이 기술하는 방 비밀번호(해시·`room_set_password`·`room_verify_password`)는 **폐기됐다**(§5.2). **as-built**: `rooms.create` 는 비번 저장 없이 `room_create_membership` RPC 로 생성자 멤버 등록만, `rooms.join` 은 `room_join(p_password='')`(빈 비번)로 입장한다 — `room_set_password`/`room_verify_password` **호출처 0**. `password_hash`/`has_password` 컬럼과 두 RPC 는 미사용으로 잔존(drop 별도). 아래 표는 #996 당시 설계 기록(historical) — 신규 재배선 금지.
+>
 > **결정·구현됨 (#996).** P1 의 평문 `password` 컬럼을 **bcrypt 해시 + 서버측 검증**으로 격상한다. 클라이언트에 해시·평문 모두 노출 금지 — 검증은 서버(Supabase RPC)에서만.
 
 | 항목 | 방식 |
@@ -420,7 +423,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 | 비번 검증 | `room_verify_password(room_id, password)` — **SECURITY DEFINER** RPC, `crypt(input, stored) = stored` 로 서버 비교, **boolean 만 반환**(해시 비노출). 비번 없는 방은 항상 `true`(입장 자유). |
 | **입장 강제 (#1022)** | `room_join(room_id, password)` — **SECURITY DEFINER** RPC. 함수 안에서 ①방 존재 ②`room_verify_password`=true ③`count(village_members) < capacity` 를 검증한 **뒤에만** `insert into village_members(... auth.uid()) on conflict do nothing`. 실패는 `raise exception`(errcode 로 비번/정원/없는 방 구분). 생성자 등록은 `room_create_membership(room_id)`(`created_by=auth.uid()` 가드). |
 | **직접 insert 차단 (#1022)** | `vmembers_mod` 를 `for all` → **`for delete`(본인 탈퇴)만** 으로 좁힘 → 클라 직접 `village_members` insert/upsert 거부. 멤버십은 위 두 RPC(정의자 권한 RLS 우회) 경유만. `36_room_join_rpc.sql`. |
-| 어댑터 (supabase) | `rooms.create` 는 평문 insert 안 함 — 방 생성 후 `room_set_password` RPC 로 해시 저장, **멤버 등록도 `room_create_membership` RPC**(직접 insert 제거). `rooms.join` 은 `password` select·직접 upsert 제거 → **`room_join` RPC** 호출(서버가 비번·정원 최종 검증). |
+| 어댑터 (supabase) | **드리프트 정정 2026-07-09 (#1094 B안)**: `rooms.create` 는 `room_set_password` 를 부르지 않고 `room_create_membership` RPC 로 생성자 멤버 등록만 한다. `rooms.join` 은 `room_join(p_password='')`(빈 비번) 호출 — 서버가 정원·멤버십만 검증(비번 검증 없음). (이전 설계: create→`room_set_password` 해시 저장, join→내부 `room_verify_password`.) |
 | 어댑터 (local, Phase 0) | 서버 부재 → 평문 비교 불가피(한계 명시). 저장 레코드엔 평문 유지하되 **반환 표면에선 `password` 제거 + `has_password` 만 노출**(supabase 표면 일치). 멤버십 강제는 로컬(단일 사용자)이라 무의미. |
 
 - `invite_token` 은 추측 불가한 충분 길이(예: 22+ 문자) 랜덤. unique 충돌 시 재시도(기존 `invite_code` 5회 재시도 패턴 재사용).
@@ -554,6 +557,8 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 `docs/readinggo/supabase/36_room_join_rpc.sql` (#1022, CSO HIGH) — 입장 권한 **서버측 강제**(§6.3). SECURITY DEFINER RPC 2개(`room_join(room_id, password)` = 방존재·비번·정원 검증 후에만 멤버 insert; `room_create_membership(room_id)` = 생성자 host 가드 자기등록) + RLS `vmembers_mod` 를 `for all` → **`for delete`(본인 탈퇴)만** 으로 좁혀 클라 직접 `village_members` insert/upsert 차단. `room_verify_password`(#35)에 의존하므로 **35 를 먼저 적용**한 뒤 36 을 **수동 1회 적용**(Dashboard/Management API). `migrations_applied.py` 는 컬럼/테이블만 검사 — RPC·정책 변경은 적용 후 수동 확인. (둘 다 미적용 시 `migrations` CI 가 빨간불 — 의도된 "적용 필요" 신호, #633.)
 
+> **드리프트 정정 2026-07-09 — `36_` 접두 중복 주의**: 마이그레이션 파일 두 개가 접두사 `36_` 를 공유한다 — `36_room_join_rpc.sql`(#1022)·`36_find_room_by_token.sql`(#1094 B안, §5.2 토큰 입장). 번호 정렬만으로는 **적용 순서가 모호**하다(둘 다 `35` 뒤 독립 적용이면 무해하나, 순서 의존 도구 사용 시 파일명 명시 권장). 후속 마이그레이션은 접두 충돌을 피한다.
+
 ### 10.2 DataStore 계약 `rooms.*` (양 어댑터 대칭)
 
 `js/datastore.js`(localStorage) · `js/datastore-supabase.js`(supabase) 양쪽에 동일 시그니처 구현(§6.2):
@@ -561,7 +566,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 `create({bookId,name,visibility,capacity?,password?})` · `join(roomId,{password?})` · `leave(roomId)` · `byBook(bookId,{limit?})` · `myRooms()` · `get(roomId)` · `members(roomId)` · `findByToken(token)` · `findByCode(code)` · **`listParts(roomId)` · `setParts(roomId,parts[])`**(마일스톤 #999, §10.7).
 
 - `invite_token` = 26자 랜덤(crypto, §6.4). `invite_code` 6자리 병행. UNIQUE 충돌 5회 재시도.
-- `password` = **bcrypt 해시 + 서버측 검증**(#996, §6.4). supabase: `create` 후 `room_set_password` RPC 로 해시 저장, `join` 은 `room_verify_password` RPC(boolean)로 검증(평문·해시 클라 비노출). local(Phase 0): 서버 부재로 평문 비교 불가피하되 반환 표면은 `has_password` 만(평문 제거 — supabase 표면 일치).
+- `password` = **폐기(드리프트 정정 2026-07-09, #1094 B안, §5.2·§6.4).** as-built: supabase `create` 는 비번 저장 없이 `room_create_membership` RPC 로 생성자 멤버 등록만, `join` 은 `room_join(p_password='')`(빈 비번) 호출 — `room_set_password`/`room_verify_password` 호출처 0. local(Phase 0)도 비번 분기 없음. (이전 설계: bcrypt 해시 + 서버 RPC 검증 #996.)
 - supabase `rooms.*` 는 폐기 `villages.*` 구현 재사용(rename·slim, 게시판 메서드는 P1 계약에서 제외). `parts` 는 #999 에서 `village_parts` 로 활성화(§10.7). 구 `villages.*` 블록은 잔존(데드, 호환).
 - **`pokes`** — 마일스톤 응원용. supabase 는 기존 `pokes.send(toUserId)`, local 은 no-op 어댑터 추가(대칭, 새 테이블 없음).
 - local 어댑터: 타 사용자 부재 → `members` 는 나 1명, `byBook`/`myRooms` 는 `rg_rooms_v1` 키 로컬 방. 표면 일치만 보장.
@@ -591,7 +596,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
   - `rgAutoJoinPublicRoom(book)` — together 모드 시 `rooms.byBook`→없으면 `rooms.create({visibility:'public'})`. `myRooms` 교차 확인으로 멱등(중복 숲 방지). `window.RG_autoJoinPublicRoom`.
   - `CoReadModeToggle` — 2차 tonal 카드 + 스위치(ghost 금지). 프라이버시 트레이드오프 안내문 포함. `window.CoReadModeToggle`.
 - `js/app.js` — `handleSearchSelectBook`(읽는중 등록 단일 퍼널)에서 등록 성공 후 `RG_autoJoinPublicRoom` **fire-and-forget**(solo·실패는 no-op, 등록 안 막음). 합류 시 토스트. **#1035 P2: 로그인 유저만** — call-time 에 `RG_SB.currentUser()` 로 세션 확인, 게스트(미로그인)면 자동합류·토스트 skip(유령 1인 로컬 숲·오해 토스트 방지, §7.5).
-- `js/nest.js` — 홈 빈 상태(첫 등록 전)에 `CoReadModeToggle` 노출(등록 전 기본 선택).
+- `js/nest.js` — **드리프트 정정 2026-07-09**: 홈 빈 상태의 `CoReadModeToggle` 노출은 **#1056 에서 제거됨**(온보딩 단순화 — 책도 없는 신규 유저에게 "숲/공개"는 이르다, §7.5). opt-out 토글은 이제 숲 탭 상단(`RoomsView`)·등록 후 책 상세/숲에서만.
 - `js/co-reading.js` `RoomsView` 상단 상주 토글 + `RG_roomsChanged`/`rg:rooms-changed` 수신해 자동합류·나가기 후 목록 갱신.
 - `index.html` — `.rg-coread-mode*`/`.rg-coread-switch`/`.rg-coread-knob` CSS.
 - **검증**(로컬 게스트, render-smoke + 브라우저 JS): together 자동 create 공개 숲 ✅ · 기존 공개 숲 있으면 join(새로 안 만듦) ✅ · 멱등(같은 책 2회 호출 1개) ✅ · solo no-op ✅ · 토글 together↔solo 되돌림·스위치 반영 ✅.

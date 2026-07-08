@@ -24,7 +24,7 @@
 
 ### 3.1 운영 카운트 (Supabase, 현행 유지·정리)
 
-기존 RPC(`admin.stats/inquiries/popularBooks/activeUsers`, SECURITY DEFINER + is_admin 가드, `12_admin_insights.sql`)를 풀페이지 레이아웃으로 재배치.
+기존 RPC(`admin.stats/inquiries/popularBooks/activeUsers`, SECURITY DEFINER + is_admin 가드, `12_admin_insights.sql` — 단 `admin.stats`는 `13_admin_stats.sql`, 드리프트 정정 2026-07-09)를 풀페이지 레이아웃으로 재배치.
 
 - 핵심 수치: 가입자·활성 유저·완독·오늘 체크인·인기책 Top·문의(상태 토글, [inquiry-sync.md](./inquiry-sync.md)).
 
