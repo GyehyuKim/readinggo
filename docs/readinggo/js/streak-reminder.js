@@ -30,7 +30,9 @@ const RG_REMINDER_LINES = [
   { title: '오늘 만난 문장 있어요?', body: '재키가 물어볼 게 있대요 — 오늘 읽은 한 줄로요.' },
 ];
 function _rmPickLine() {
-  const dayNum = Math.floor(Date.now() / 86400000);   // 실제 시계 기준 일수
+  // 로컬 일자 기준(자정 경계) — UTC로 하면 KST는 09:00에 문구가 바뀌는 버그(#1163).
+  const d = new Date();
+  const dayNum = Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000);
   return RG_REMINDER_LINES[((dayNum % RG_REMINDER_LINES.length) + RG_REMINDER_LINES.length) % RG_REMINDER_LINES.length];
 }
 
@@ -106,7 +108,7 @@ async function _rmCancel() {
 
 // 스케줄 재무장 — 끄면 취소, 켜면 '다음 발생' + 매일 반복으로 1건. 권한 없으면 스킵.
 // 앱 부팅/복귀마다 호출돼 '오늘 읽음' 상태를 반영한다(중복 알림 방지).
-async function _rmReschedule() {
+async function _rmRescheduleImpl() {
   const P = _rmPlugin();
   if (!_rmIsNative() || !P) return;                 // 웹/비네이티브 no-op
   const s = _rmGetSettings();
@@ -132,6 +134,14 @@ async function _rmReschedule() {
       }],
     });
   } catch (e) { /* 스케줄 실패 무시(데모 무중단) */ }
+}
+
+// 재스케줄 직렬화(#1163) — boot/resume/설정변경/체크인이 동시에 부르면 cancel↔schedule 이
+//   인터리브해 마지막 상태와 불일치할 수 있다. 프로미스 체인으로 순차 실행(항상 다음 것 실행).
+let _rmChain = Promise.resolve();
+function _rmReschedule() {
+  _rmChain = _rmChain.then(_rmRescheduleImpl, _rmRescheduleImpl).catch(() => {});
+  return _rmChain;
 }
 
 // 설정에서 토글 ON — 권한 요청 후 성공 시 저장+스케줄. 반환 boolean(=실제 켜졌는지).
