@@ -563,10 +563,9 @@
     xp: {
       async get() { const u = await A.profile.get(); return (u && u.xp) || 0; },
       async add(amount) {
-        const id = await uid();
-        const cur = await A.xp.get();
-        const out = unwrap(await sb().from('users').update({ xp: cur + (amount || 0) }).eq('id', id).select('xp').single());
-        return out ? out.xp : null;   // 동시성 정확도 필요 시 RPC(원자 increment)로 교체
+        // 원자 increment RPC(#1161) — 구 read-modify-write(cur+amount)는 두 탭/경로 경쟁 시 증가분 유실.
+        const out = unwrap(await sb().rpc('increment_xp', { p_amount: amount || 0 }));
+        return typeof out === 'number' ? out : null;
       },
     },
 
