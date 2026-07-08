@@ -48,7 +48,7 @@
 
 1. **매칭**([integrated-shelf.md §4.3](./integrated-shelf.md)): `RG_shelfImport.matchRows(books)` → 카탈로그(`loadBooks`) **랭크 매칭**(`rankMatch`, 제목 정확도 + 저자 가산, 보수 가드). 매칭 성공 → 카탈로그 `Book`(표지·메타). 미매칭 → **알라딘 보강**(`aladinLookup`, 표지·쪽수·ISBN, 비파괴 upsert #489). 끝까지 미매칭이면 "미확인"으로 최소 등록.
 2. **검수**: 카드 목록(체크박스 + 제목·저자 인라인 편집 + 별점 ★ + "🔍 찾기" 재보강). [integrated-shelf.md §4.7](./integrated-shelf.md)의 매칭상태 3단계(매칭됨/확인됨/미확인, #1066) 표기 재사용.
-3. **목적지 토글**(#1038 재사용): 검수 단계에서 **읽은 책(`completed`) / 읽고싶어요(`wish`) / 읽는 중(`reading`)** 선택. **파싱이 행별 `status`를 줬으면 그 값을 기본 선택**으로 채우고(붙여넣기·파일은 상태가 데이터에 있을 때가 많음 — 이미지보다 강점), **`status` 없는 행은 기본값 없이 사용자가 1회 선택**해야 적재(미선택 시 "담기" 비활성, §8). 행별 status는 후속.
+3. **목적지 토글**(#1038 재사용): 검수 단계에서 **읽은 책(`completed`) / 읽고싶어요(`wish`) / 읽는 중(`reading`)** 선택. 선택지는 `shelf-import.js` 모듈 상수 `SHELF_DESTS`(value=책장 키)로 정의 — 미정의로 인한 렌더 크래시 방지. **파싱이 행별 `status`를 줬으면 그 값을 기본 선택**으로 채우고(붙여넣기·파일은 상태가 데이터에 있을 때가 많음 — 이미지보다 강점), **`status` 없는 행은 기본값 없이 사용자가 1회 선택**해야 적재(미선택 시 "담기" 비활성, §8). 행별 status는 후속.
 4. **검토함 적재**([integrated-shelf.md §4.7](./integrated-shelf.md) B 재사용): 검수 "담기" → `DataStore.importStaging.add(items)`로 **검토함(import_staging)** 적재(책장 직행 아님). 서재 "📦 가져온 책 · 검토" 뷰에서 항목별/일괄 **[내 서재로 이동]**(`commit` → `myBooks.addBatch`) / **[제외]**(`remove`). 어댑터·테이블·RLS 전부 재사용(신규 스키마 0, 단 §5.1 날짜 컬럼은 예외).
 
 ### 5.1 보존 — 상태·별점·날짜
