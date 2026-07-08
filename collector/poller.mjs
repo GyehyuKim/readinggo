@@ -12,7 +12,7 @@ import { env } from './lib/env.mjs';
 
 const POLL_INTERVAL_MS = parseInt(env('POLL_INTERVAL_MS', '5000'), 10);   // 큐 폴링 간격
 const BATCH_DELAY_MS = parseInt(env('COLLECTOR_DELAY_MS', '1000'), 10);   // 배치 사이 딜레이
-const BATCH = parseInt(env('POLL_BATCH', '4'), 10);                       // 동시 크롤 수(병렬)
+const BATCH = parseInt(env('POLL_BATCH', '1'), 10);                       // 동시 크롤 수(기본 1=순차, 브라우저 컨텍스트 경합·차단 방지 — spec §5/§7)
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 if (!dbConfigured()) { console.error('✘ SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 필요(collector/.env)'); process.exit(2); }
