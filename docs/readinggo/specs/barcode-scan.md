@@ -68,6 +68,8 @@ ISBN 해석 (§2.1)
 | ISBN 직접 입력이 13자리 아님 | "ISBN 13자리를 정확히 입력해주세요" 토스트, 재입력 대기(자동 검색 안 함). |
 | ISBN 유효하나 책 못 찾음(§2.1-4) | 토스트 + 검색에 ISBN 프리필. |
 | 모달 닫힘/언마운트 | `track`/`getUserMedia` 스트림 **반드시 stop**(카메라 LED·배터리 누수 방지) + 폴링 루프 취소. |
+| **해석 중 닫힘/재열림 (#1162)** | `resolveAndRoute`가 세대 토큰(`tokenRef`)을 잡고 await 후 재확인 — 닫힘/재열림이면 결과 폐기(닫힌 모달에 setState 금지). `handleClose`·open effect 가 토큰 증가. |
+| **해석 예외 후 스캐너 정지 (#1162)** | catch 에서 카메라면 `scanNonce`++ 로 open effect 재실행 → 카메라·디코드 루프 재시작(예외로 죽은 스캐너 부활). 미지원이면 'manual' 유지. |
 
 - **개인정보**: 프레임은 **클라이언트에서만** BarcodeDetector 로 디코드 — **이미지 업로드 0**. (OCR 과 달리 서버 왕복 없음.) 분석엔 ISBN·성공여부만.
 - **분석 이벤트**(systems/analytics 합류): `barcode_scan_opened`, `barcode_detected`(matched: local|catalog|aladin|none), `barcode_register`(book_id).

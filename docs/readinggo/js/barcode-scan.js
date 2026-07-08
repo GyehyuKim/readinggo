@@ -73,10 +73,12 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
   const detectorRef = React.useRef(null);
   const rafRef = React.useRef(0);
   const lockRef = React.useRef(false);  // 검출/해석 중 재진입 방지
+  const tokenRef = React.useRef(0);     // 열림 세대 토큰(#1162) — 닫힘/재열림 시 대기 중 async 결과 폐기
   const [status, setStatus] = React.useState('starting'); // starting | scanning | denied | error | resolving | manual
   const [pendingBook, setPendingBook] = React.useState(null); // 책장 선택 대기 (search.js 와 동일 UX)
   const [manualIsbn, setManualIsbn] = React.useState('');     // 수동 ISBN 입력값 (폴백)
   const [showManual, setShowManual] = React.useState(false);  // 스캔 중 "직접 입력" 펼침
+  const [scanNonce, setScanNonce] = React.useState(0);        // 예외 후 디코드 루프 재시작 트리거(#1162)
 
   // 카메라·루프 정지 — 닫힘/언마운트/검출성공 공통. 카메라 LED·배터리 누수 방지(spec §4).
   const stopCamera = React.useCallback(() => {
@@ -88,17 +90,19 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     if (videoRef.current) { try { videoRef.current.srcObject = null; } catch (e) {} }
   }, []);
 
-  const handleClose = React.useCallback(() => { stopCamera(); if (onClose) onClose(); }, [stopCamera, onClose]);
+  const handleClose = React.useCallback(() => { tokenRef.current += 1; stopCamera(); if (onClose) onClose(); }, [stopCamera, onClose]);
 
   // ISBN 1개 확정 → 책 해석 → 라우팅. 카메라 검출·수동 입력 공용 경로.
   //   성공 시 책장 시트, 실패 시 토스트 + 검색 폴백. (기존 onDetectedIsbn 본체를 추출 — #943 후속)
   const resolveAndRoute = React.useCallback(async (isbn) => {
+    const myToken = tokenRef.current;   // 이 해석의 세대 — await 후 닫힘/재열림이면 폐기(#1162)
     lockRef.current = true;
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
     setStatus('resolving');
     if (window.rgTrack) window.rgTrack('barcode_detected', { isbn });
     try {
       const { book, matched } = await resolveBookByIsbn(isbn);
+      if (myToken !== tokenRef.current) return;   // 닫힘/재열림 후 도착 — stale, 무시
       if (window.rgTrack) window.rgTrack('barcode_detected', { matched });
       if (book) {
         stopCamera();
@@ -110,9 +114,12 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
         if (window.RG_openSearchWith) window.RG_openSearchWith(isbn);
       }
     } catch (e) {
+      if (myToken !== tokenRef.current) return;   // stale 폐기
       if (window.showToast) window.showToast('책을 찾지 못했어요 — 다시 시도해요');
       lockRef.current = false;
-      setStatus(cameraSupported ? 'scanning' : 'manual');
+      // 카메라면 디코드 루프 재시작(예외로 죽은 스캐너 부활 — nonce 로 effect 재실행), 아니면 수동.
+      if (cameraSupported) setScanNonce((n) => n + 1);
+      else setStatus('manual');
     }
   }, [stopCamera, handleClose, cameraSupported]);
 
@@ -139,6 +146,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
   React.useEffect(() => {
     if (!isOpen) return undefined;
     let cancelled = false;
+    tokenRef.current += 1;   // 새 세대 — 직전 대기 async 결과 폐기(#1162)
     lockRef.current = false;
     setPendingBook(null);
     setManualIsbn('');
@@ -191,7 +199,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     })();
 
     return () => { cancelled = true; stopCamera(); };
-  }, [isOpen, stopCamera, onDetectedIsbn, cameraSupported]);
+  }, [isOpen, stopCamera, onDetectedIsbn, cameraSupported, scanNonce]);
 
   if (!isOpen) return null;
 
