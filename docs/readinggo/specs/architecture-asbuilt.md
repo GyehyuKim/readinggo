@@ -195,7 +195,9 @@ setup-globals → config → supabase-client → datastore-supabase →
 
 - 모든 외부 키는 **워커(서버)에만**. 브라우저엔 publishable/anon 키만.
 - 프록시 라우트는 **동일출처(Origin)만** 허용(쿼터 남용 차단). Origin은 non-브라우저(curl)가 우회 가능 → 고비용 LLM/OCR 엔드포인트(companion·wiki-ask·parse-books·ocr·extract-highlights·shelf-import·seed·related)는 **per-IP·분 단위 레이트리밋**(OTA_KV 재사용, fail-open)으로 키드레인 상한을 건다(#1158/#1159). 봇 차단 Turnstile 게이트는 후속.
-- Supabase **RLS**로 행 단위 접근 제어. 게스트(anon)는 **공개 카탈로그(`books`)·NPC 시드만** read; 사용자 PII 테이블(`users`·`user_books`·`reading_sessions`·`streak`·`sentences`·`follows`·`claps`)은 **로그인 사용자 전용**(`auth.uid() is not null`) + anon grant 회수(#1165, `40_rls_anon_lockdown.sql`). 인증 사용자 간 컬럼/행 프라이버시(예: 남의 `my_note`)는 #1166 후속(view/RPC).
+- Supabase **RLS**로 행 단위 접근 제어. 게스트(anon)는 **공개 카탈로그(`books`)·NPC 시드만** read; 사용자 PII 테이블(`users`·`user_books`·`reading_sessions`·`streak`·`follows`·`claps`)은 **로그인 사용자 전용**(`auth.uid() is not null`) + anon grant 회수(#1165, `40_rls_anon_lockdown.sql`).
+- **`sentences` 프라이버시(#1166, `41_sentences_public_view.sql`)**: base 테이블 `sentences` select 는 **본인 행만**(`user_id = auth.uid()`) — 개인 사후 감상 `my_note` 를 타 인증사용자가 못 읽게. 피드·프로필의 *남의* 문장 본문은 `my_note` 를 뺀 뷰 **`public.sentences_public`**(security-definer, authenticated 전용)로 노출. 본인 문장 읽기(`listMine`·`listByBook`·resurface)만 base 테이블(=`my_note` 포함). 클라 피드 읽기는 모두 뷰로 전환.
+- **`books` 쓰기(#1166 미해결·범위 플래그)**: 현재 `authenticated` 가 전역 `books`(canonical 카탈로그) insert/update 가능 → 임의 로그인 사용자가 ISBN 메타 오염 가능. 단, 클라 `books.upsert` 가 검색 raw id→canonical id 확보에 **실사용 중**(#552, start/wish/room 흐름)이라 단순 회수 불가 — 워커 프록시 경유 재설계 후속 필요.
 
 ---
 

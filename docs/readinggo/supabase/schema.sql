@@ -289,11 +289,19 @@ create policy streak_sel on public.streak for select using (auth.uid() is not nu
 drop policy if exists streak_mod on public.streak;
 create policy streak_mod on public.streak for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
--- sentences: 로그인 사용자만 select(#1165 anon 차단; my_note 등 인증 간 프라이버시는 #1166 view/RPC), 본인만 write
+-- sentences: 본인 행만 select(#1166 — my_note 는 개인 사후 감상, 타 인증사용자 유출 차단), 본인만 write.
+--   피드/프로필의 *남의* 문장 본문은 아래 public.sentences_public 뷰로 노출(my_note 제외).
 drop policy if exists sent_sel on public.sentences;
-create policy sent_sel on public.sentences for select using (auth.uid() is not null);
+create policy sent_sel on public.sentences for select using (user_id = auth.uid());
 drop policy if exists sent_mod on public.sentences;
 create policy sent_mod on public.sentences for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- #1166 공개 뷰 — my_note(비공개 사후 감상) 제외한 비민감 컬럼만. 소유자(postgres) 권한 실행(security
+--   definer 기본)이라 base RLS 우회 → 전 공개 문장 본문 노출하되 my_note 컬럼 자체가 없다. FK 컬럼
+--   (user_id·user_book_id·id)을 모두 노출해 PostgREST 임베드(users·user_books·claps)가 해소되게 한다.
+create or replace view public.sentences_public as
+  select id, user_id, user_book_id, session_id, page, text, created_at
+  from public.sentences;
 
 -- shield_log: 본인만
 drop policy if exists shield_all on public.shield_log;
@@ -455,9 +463,11 @@ grant usage, select on all sequences in schema public to authenticated;
 
 -- #1165 방어심층 — anon 은 PII 테이블 select 자체를 못 하게 회수(정책 회귀 대비).
 -- 공개 유지: books·npc_sentence_seeds(게스트 카탈로그·시드), villages(자체 visibility 정책).
+-- #1166 sentences_public 뷰도 authenticated 전용(anon 문장 접근 불가) — 위 blanket grant 회수.
 revoke select on
   public.users, public.user_books, public.reading_sessions,
-  public.streak, public.sentences, public.follows, public.claps
+  public.streak, public.sentences, public.follows, public.claps,
+  public.sentences_public
 from anon;
 
 -- 숲 비밀번호 해시는 클라이언트가 절대 읽지 못한다 (#996, co-reading §6.4).
