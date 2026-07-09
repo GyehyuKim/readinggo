@@ -40,6 +40,7 @@ export default {
     if (p === '/api/companion') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'companion'); if (rl) return rl; }
       return companionProxy(request, env);
     }
     // 독서 위키 Q&A — "내 문장에게 묻기" (#1007). 사용자가 모은 한 문장(+감상)에만 근거해 답.
@@ -47,6 +48,7 @@ export default {
     if (p === '/api/wiki-ask') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'wiki-ask'); if (rl) return rl; }
       return wikiAskProxy(request, env);
     }
     // 유연 도서기록 임포트 — 붙여넣기/파일 텍스트 → 책 목록 구조화 (#1039). wiki-ask 형제.
@@ -54,6 +56,7 @@ export default {
     if (p === '/api/parse-books') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'parse-books'); if (rl) return rl; }
       return parseBooksProxy(request, env);
     }
     // 계정 삭제 (#875, Apple 심사 필수) — 호출자 토큰으로 본인 확인 후 service_role 로 admin 삭제.
@@ -68,12 +71,14 @@ export default {
     if (p === '/api/ocr') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'ocr'); if (rl) return rl; }
       return ocrProxy(request, env);
     }
     // 배치 OCR — 사진에서 강조(밑줄/형광펜) 문장 추출 (#844). Gemini Flash vision(이미지 이해). 키 서버만, 동일출처만.
     if (p === '/api/extract-highlights') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'extract-highlights'); if (rl) return rl; }
       return extractHighlightsProxy(request, env);
     }
     // 통합 서가 ① 스샷 서가 복원 (#772·#1042) — 구매내역/서재 캡쳐 → 책 목록 구조화 추출.
@@ -82,6 +87,7 @@ export default {
     if (p === '/api/shelf-import') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'shelf-import'); if (rl) return rl; }
       return shelfImportProxy(request, env);
     }
     // 통합 서가 ② 마중물 시드 (#774) — 빈 책에 '남이 읽은 한 문장'. 네이버 블로그 검색(준공식·출처제공)
@@ -89,6 +95,7 @@ export default {
     if (p === '/api/seed') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'seed'); if (rl) return rl; }
       return seedProxy(request, env);
     }
     // 관련 도서 추천 — 이 책과 함께 읽을 책 (#496). LLM은 제목·저자만 제시하고,
@@ -96,6 +103,7 @@ export default {
     if (p === '/api/related') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'related'); if (rl) return rl; }
       return relatedProxy(request, env);
     }
     // 표지 이미지 프록시 (#676) — 알라딘 CDN은 CORS 헤더가 없어 클라가 캔버스로 그리면 tainted canvas.
@@ -1669,4 +1677,28 @@ function json(obj, status, maxAge) {
   const headers = { 'content-type': 'application/json; charset=utf-8' };
   if (maxAge) headers['cache-control'] = `public, max-age=${maxAge}`;
   return new Response(JSON.stringify(obj), { status, headers });
+}
+
+// ── per-IP 레이트리밋 (#1158/#1159) — 고비용 LLM/OCR 엔드포인트 남용·키드레인 규모 차단.
+//   Origin 체크는 non-브라우저(curl)가 헤더 생략/위조로 우회 가능 → 실비용 상한을 IP·분 단위로 건다.
+//   OTA_KV 재사용(새 바인딩 없음, Stack Lock). Turnstile(봇 차단) 게이트는 후속 — 이건 상한선.
+//   ponytail: KV 최종일관성이라 창 경계에서 약간 초과 가능·per-key 쓰기비용이 한계.
+//     지속 남용 시 Durable Object/네이티브 rate-limit 바인딩으로 격상. 지금은 KV 최소안.
+//   fail-open: KV 미바인딩/오류 시 통과(가용성 우선 — 정상 사용자를 막지 않는다).
+const RL_LIMITS = {
+  seed: 20, ocr: 30, 'extract-highlights': 20, 'shelf-import': 12,
+  companion: 40, 'wiki-ask': 40, 'parse-books': 20, related: 40,
+};
+async function rateLimited(request, env, name) {
+  try {
+    if (!env.OTA_KV) return null;
+    const ip = request.headers.get('CF-Connecting-IP') || 'noip';
+    const limit = RL_LIMITS[name] || 30;
+    const bucket = Math.floor(Date.now() / 60000);            // 1분 창
+    const key = `rl:${name}:${ip}:${bucket}`;
+    const cur = parseInt((await env.OTA_KV.get(key)) || '0', 10) || 0;
+    if (cur >= limit) return json({ error: 'rate limited', retryAfter: 60 }, 429);
+    await env.OTA_KV.put(key, String(cur + 1), { expirationTtl: 120 });
+    return null;
+  } catch (e) { return null; }   // fail-open
 }
