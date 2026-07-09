@@ -6,6 +6,18 @@
 
 ---
 
+## ReadingGo Feeling Guardrail
+
+> **ReadingGo는 생산성 대시보드가 아니라, 다시 책으로 돌아오는 작은 둥지다.** 모든 시각·카피·인터랙션 결정은 이 감성을 먼저 통과한다. (상세는 아래 Product Context · Aesthetic Direction.)
+
+| Always | Avoid |
+|---|---|
+| 하루 한 페이지면 충분하다는 **안도감** | Duolingo식 **압박·죄책감** |
+| 한 문장을 남겼다는 **작은 성취** | SaaS **대시보드** 느낌 |
+| 놓쳐도 다시 돌아올 수 있는 **부드러움** (나타남을 축하) | 과한 보상 **폭죽** · 숫자·랭킹 중심 화면 |
+
+---
+
 ## UI 규칙 (always-on · 린트 강제)
 
 > 아래는 **항상 적용**되는 코드 레벨 규칙이며, `tests/spec-align/design_lint.py` 가 `js/*.js`·`index.html` 을 스캔해 위반을 자동 탐지한다(이모지·raw hex·ghost·라운딩 = `exit 1`). 새 UI 코드는 예외 없이 지킨다. 상세 근거는 아래 'Color'·'Typography'·'Layout & 버튼 위계' 섹션.
