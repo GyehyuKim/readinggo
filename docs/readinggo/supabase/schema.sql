@@ -257,9 +257,9 @@ alter table public.villages           enable row level security;
 alter table public.village_parts      enable row level security;
 alter table public.village_members    enable row level security;
 
--- users: 모두 select(피드 공개정보), 본인 row 만 insert/update
+-- users: 로그인 사용자만 select(#1165 anon PII 차단), 본인 row 만 insert/update
 drop policy if exists users_sel on public.users;
-create policy users_sel on public.users for select using (true);
+create policy users_sel on public.users for select using (auth.uid() is not null);
 drop policy if exists users_ins on public.users;
 create policy users_ins on public.users for insert with check (id = auth.uid());
 drop policy if exists users_upd on public.users;
@@ -273,25 +273,25 @@ create policy books_ins on public.books for insert with check (auth.uid() is not
 drop policy if exists books_upd on public.books;
 create policy books_upd on public.books for update using (auth.uid() is not null);
 
--- user_books / reading_sessions / streak: select 모두(마을·완독 공개), 본인만 write
+-- user_books / reading_sessions / streak: 로그인 사용자만 select(#1165 anon 차단), 본인만 write
 drop policy if exists ub_sel on public.user_books;
-create policy ub_sel on public.user_books for select using (true);
+create policy ub_sel on public.user_books for select using (auth.uid() is not null);
 drop policy if exists ub_mod on public.user_books;
 create policy ub_mod on public.user_books for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 drop policy if exists sess_sel on public.reading_sessions;
-create policy sess_sel on public.reading_sessions for select using (true);
+create policy sess_sel on public.reading_sessions for select using (auth.uid() is not null);
 drop policy if exists sess_mod on public.reading_sessions;
 create policy sess_mod on public.reading_sessions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 drop policy if exists streak_sel on public.streak;
-create policy streak_sel on public.streak for select using (true);
+create policy streak_sel on public.streak for select using (auth.uid() is not null);
 drop policy if exists streak_mod on public.streak;
 create policy streak_mod on public.streak for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
--- sentences: 모두 select(스포일러는 클라 페이지 블라인드), 본인만 write
+-- sentences: 로그인 사용자만 select(#1165 anon 차단; my_note 등 인증 간 프라이버시는 #1166 view/RPC), 본인만 write
 drop policy if exists sent_sel on public.sentences;
-create policy sent_sel on public.sentences for select using (true);
+create policy sent_sel on public.sentences for select using (auth.uid() is not null);
 drop policy if exists sent_mod on public.sentences;
 create policy sent_mod on public.sentences for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -301,13 +301,13 @@ create policy shield_all on public.shield_log for all using (user_id = auth.uid(
 
 -- follows: select 모두, 본인이 follower 인 행만 insert/delete
 drop policy if exists follows_sel on public.follows;
-create policy follows_sel on public.follows for select using (true);
+create policy follows_sel on public.follows for select using (auth.uid() is not null);
 drop policy if exists follows_mod on public.follows;
 create policy follows_mod on public.follows for all using (follower_id = auth.uid()) with check (follower_id = auth.uid());
 
 -- claps: select 모두(카운트), 본인 from 만 insert/delete
 drop policy if exists claps_sel on public.claps;
-create policy claps_sel on public.claps for select using (true);
+create policy claps_sel on public.claps for select using (auth.uid() is not null);
 drop policy if exists claps_mod on public.claps;
 create policy claps_mod on public.claps for all using (from_user_id = auth.uid()) with check (from_user_id = auth.uid());
 
@@ -452,6 +452,13 @@ grant usage on schema public to anon, authenticated;
 grant select on all tables in schema public to anon, authenticated;
 grant insert, update, delete on all tables in schema public to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
+
+-- #1165 방어심층 — anon 은 PII 테이블 select 자체를 못 하게 회수(정책 회귀 대비).
+-- 공개 유지: books·npc_sentence_seeds(게스트 카탈로그·시드), villages(자체 visibility 정책).
+revoke select on
+  public.users, public.user_books, public.reading_sessions,
+  public.streak, public.sentences, public.follows, public.claps
+from anon;
 
 -- 숲 비밀번호 해시는 클라이언트가 절대 읽지 못한다 (#996, co-reading §6.4).
 -- `grant select on all tables` 가 password_hash 까지 열어주므로 컬럼 단위로 회수 — 검증은 RPC 만.
