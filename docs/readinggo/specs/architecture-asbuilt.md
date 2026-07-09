@@ -195,7 +195,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 
 - 모든 외부 키는 **워커(서버)에만**. 브라우저엔 publishable/anon 키만.
 - 프록시 라우트는 **동일출처(Origin)만** 허용(쿼터 남용 차단).
-- Supabase **RLS**로 행 단위 접근 제어. 게스트는 publishable key + RLS read.
+- Supabase **RLS**로 행 단위 접근 제어. 게스트(anon)는 **공개 카탈로그(`books`)·NPC 시드만** read; 사용자 PII 테이블(`users`·`user_books`·`reading_sessions`·`streak`·`sentences`·`follows`·`claps`)은 **로그인 사용자 전용**(`auth.uid() is not null`) + anon grant 회수(#1165, `40_rls_anon_lockdown.sql`). 인증 사용자 간 컬럼/행 프라이버시(예: 남의 `my_note`)는 #1166 후속(view/RPC).
 
 ---
 
