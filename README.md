@@ -22,18 +22,19 @@
 
 ---
 
-## 지금 상태 (v7 · 2026-06)
+## 지금 상태 (v8 · 2026-07)
 
-- **web-first.** Phase 0 = 순수 정적 웹 데모, Phase 1 = Supabase. 네이티브(Capacitor)는 Phase 3로 보류.
-- **Phase 0 데모 완성·배포 중** — 둥지 / 마을 / 소셜 / 프로필 4탭.
-- Phase 0↔1은 **DataStore 계약**([backend.md §7.2](./docs/readinggo/specs/backend.md))으로 추상화 → 어댑터 교체만으로 이행.
+- **플랫폼 = Capacitor 채택**(런칭 결정, 2026-06). 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드는 **Vite 전환 완료**(#871 — 런타임 Babel 폐기, `main.js` 진입). *이전 web-first·Capacitor Phase 3 보류는 해제.* 상세: [`CLAUDE.md` Stack Lock](./CLAUDE.md) · [`iOS-PLAN.md`](./docs/readinggo/iOS-PLAN.md).
+- **Phase 0 데모 배포 중** — 둥지 / 마을 / 소셜 / 프로필 4탭.
+- 저장소는 **DataStore 계약**([backend.md §7.2](./docs/readinggo/specs/backend.md))으로 추상화 → 어댑터 교체만으로 Phase 0(localStorage)↔1(Supabase) 이행.
+- 책 데이터 canonical = **Supabase `books`**(#490). 구 정적 `books.tsv`는 **제거됨**(#972) — 폴백은 인라인 `RG_BOOKS`(12)뿐.
 
 | Phase | 산출물 | 데이터 |
 |---|---|---|
-| **0** (발표용) | 정적 웹 데모 (React 18 CDN + Babel) | `localStorage` + 정적 TSV |
-| **1** (MVP) | Supabase + Google 로그인 + 실 Gemini 추천 | Postgres + RLS + pg_cron |
-| **2** | PWA + 웹푸시 알림 + AI 고도화 | + 로컬 캐시 |
-| **3** (학기 후) | Capacitor 재검토 (OCR·STT·앱스토어) | 동일 |
+| **0** (데모) | 웹 데모 (React 18 · Vite 빌드) | `localStorage` + 폴백 인라인 `RG_BOOKS`(12) |
+| **1** (MVP) | Supabase + Google/카카오 로그인 + Gemini 추천 | Postgres + RLS + pg_cron · canonical `books` |
+| **2** | 웹푸시 알림 + AI 고도화(OCR·vision) | + 로컬 캐시 |
+| **출시** | **Capacitor iOS+Android 앱스토어** (Vite 셸) | 동일 |
 
 ---
 
@@ -54,7 +55,8 @@
 ```
 docs/
   readinggo/                 ← ReadingGo (현재 메인 프로젝트)
-    index.html               진입점 (React 18 CDN, 빌드 없음)
+    index.html               HTML 셸 (CSS 토큰·부트) — main.js 로드
+    main.js                   Vite 진입 (#871) — js/* import + 마운트
     js/                       데모 코드 (data·datastore·nest·social·library·village·…)
     (도서 데이터)             Supabase books — canonical (#490, 정적 TSV 제거 #972)
     specs/                    ★ 스펙 (정본) — README.md가 인덱스

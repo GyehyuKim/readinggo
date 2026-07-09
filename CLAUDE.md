@@ -22,7 +22,7 @@ Before making any git/PR operation, read and follow **[`CONTRIBUTING.md`](./CONT
 
 **이슈 먼저 (필수)**: 새 PR을 만들기 **전에** GitHub 이슈를 먼저 생성하고(`gh issue create`), PR 본문에서 `Closes/Refs #N`로 연결한다. 의미 있는 작업(feat·fix·docs·perf·refactor)은 예외 없이 이슈를 먼저 연다. `no-issue:`는 **오타·포맷 같은 진짜 사소한 변경에만** 쓴다(상시 사용 금지). 이유: 이슈가 작업을 추적·정렬하고 정리 부담을 한 사람에게 몰리지 않게 한다 (CONTRIBUTING §4.2).
 
-**Priority on conflict**: `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > other docs.
+**Priority on conflict**: `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > `specs/README.md` > `DESIGN.md` > `ROADMAP.md` > other docs.
 
 Other agents (Cursor, Continue, Aider) should enter via [`AGENTS.md`](./AGENTS.md) — same governance, same rules.
 
