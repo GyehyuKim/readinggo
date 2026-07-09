@@ -1,8 +1,12 @@
 # ReadingGo Roadmap — 북모리 전체 벤치마크 × Phase 매트릭스
 
-> ## ⚠️ v7 갱신 필요 (2026-06-01)
-> 아래 매트릭스는 **v5.1 기준이라 다수 항목이 폐기/이동**됐다. v7 변경 요지:
-> - **Capacitor·앱스토어·OCR·STT·위젯·푸시 → Phase 3 보류** (web-first 전환). Phase 0/1은 순수 웹.
+> ## ⚠️ ARCHIVE — 아래 §0~§6 매트릭스는 히스토리컬 (정본 아님, 2026-06-01)
+> Phase·스택의 **정본은 [`specs/README.md` §3](./specs/README.md)** + [`CLAUDE.md` Stack Lock](../../CLAUDE.md)다. 아래 표는 v5.1 기준이라 다수 항목이 폐기/이동됐고 **참고용으로만** 남긴다.
+>
+> **v8 반전 (2026-06, 런칭 결정)**: **Capacitor 채택 — iOS+Android 앱스토어 출시**(선행 = Vite 전환 완료 #871). 아래 "Phase 3 보류/web-first" 문구는 **해제됨**. OCR도 웹 기반 허용(#972 이후). STT만 여전히 Phase 3.
+>
+> 이하 v7 요지(2026-06-01):
+> - ~~**Capacitor·앱스토어·OCR → Phase 3 보류** (web-first)~~ → **v8에서 반전**(위 참조). 위젯·STT·푸시는 계속 후순위.
 > - **폐기**: 운영자 짹(전 단계), 첫 7일 둥지 가속, 주간 리그, 결정 마찰 카피, 메가스트림/서브모임, chapter_id 자동매핑.
 > - **복귀**: 마을(파트 마일스톤). **신규**: AI 도서 추천(Gemini 무료), 성 컬렉션, 페이지 블라인드, 휴식코스, DataStore 계약.
 > - Phase 정의·스택은 [`specs/README.md` §3](./specs/README.md), 결정 근거는 [`specs/meta/decisions.md`](./specs/meta/decisions.md)를 정본으로 본다.

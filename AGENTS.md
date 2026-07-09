@@ -17,7 +17,7 @@
 2. **[`CLAUDE.md`](./CLAUDE.md)** — Claude Code 전용 보조 지침 + Stack Lock + Pages. 다른 에이전트도 참고.
 3. **[`docs/readinggo/specs/README.md`](./docs/readinggo/specs/README.md)** — ReadingGo 스펙 인덱스 (v7). 용어 사전(§0.5)·Phase(§3)·파일 소유권.
 
-우선순위 (모순이 있을 때): `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타 문서.
+우선순위 (모순이 있을 때): `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > `specs/README.md` > `DESIGN.md` > `ROADMAP.md` > 기타 문서.
 
 ---
 
@@ -26,7 +26,7 @@
 - **코스**: KAIST IMMS BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습 (2026 Spring, 이지수 교수)
 - **프로젝트**: **ReadingGo** — 독서 습관 앱. "하루 한 페이지, 한 문장"을 게이미피케이션(스트릭·XP·둥지 진화·성 컬렉션)과
   소셜(마을·전체 공개 피드·짹·NPC)로 매일 읽게 만든다. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
-- **형태**: **web-first** — Phase 0 정적 웹(데모) / Phase 1 Supabase. **Capacitor·네이티브 앱은 Phase 3으로 보류** (`CLAUDE.md` Stack Lock).
+- **형태**: **Capacitor 채택**(런칭 결정, 2026-06) — 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드 = **Vite 전환 완료**(#871). Phase 0 데모(현행) → Phase 1 Supabase. *이전 web-first·Capacitor Phase 3 보류는 해제* (`CLAUDE.md` Stack Lock · `iOS-PLAN.md`).
 - **팀 (dev 3인)**: 김계휴(`gyehyu`, 백엔드·소셜·내서재), 이승원(`seungwon`, 둥지·XP·디자인), 정윤지(`yunji`, 마을).
 - **주요 산출물**: `docs/readinggo/` (Phase 0 데모), `docs/readinggo/specs/` (피처별 spec, v7).
 - **언어**: 모든 커뮤니케이션과 문서는 **한국어**가 기본. 코드 식별자만 영어.
@@ -77,7 +77,7 @@ gh pr create --title "..." --body "..."
 **금지**: `main` 직접 push · `git push --force` · `--no-verify` · `.env`/API 키 커밋 ·
 임의 `feat/`·`fix/` type-prefix 브랜치 · **spec과 코드를 한 PR에 묶기** (CONTRIBUTING §4.1).
 
-**Stack Lock**: 새 프레임워크/라이브러리 도입(Capacitor 재도입, Vite 전환 등) 제안 시 사용자에게 먼저 확인. 임의 도입 금지.
+**Stack Lock**: 플랫폼 = **Capacitor 단일**(RN/Expo/Flutter 등 다른 네이티브 프레임워크 금지), 빌드 = **Vite**. 이 외 **새** 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 상세는 [`CLAUDE.md` Stack Lock](./CLAUDE.md).
 
 **이슈 동기화**: PR은 관련 이슈를 연결(`Closes #N` 완료 / `Refs #N` 관련)하고, 작업 중 발견한 새 일은 이슈로 만든다 (CONTRIBUTING §4.2–4.3).
 
