@@ -108,7 +108,7 @@
 
 **v7.4.1 갱신 (2026-06-10, post-merge)**: 외서 검색 5+5 ✅(#302/#343), export 책 소개 ✅(#316/#344), 공개전환 체크리스트 ✅(#178/#344), 참새 완독 회고 ✅(#259/#345). spec-align: nest.py v7.2 현실로 갱신(getNestStage·NestView=function 선언형, ActiveBookSheet→캐러셀 #185, MissionModal→CheckinModal) → 10/10. backend.md Netlify→Cloudflare Worker 잔재 정정.
 
-**남은 이슈 후보 (2026-06 감사 #877, 갱신)**: ✅ **inquiry-sync.md(#701)** — #890 구현(worker 크론 */10 + 32_*.sql, GITHUB_TOKEN 필요) · ✅ **companion-reading-end.md(#347)** — 이미 구현(nest.js handleCheckin→companion #438, 감사 오판 정정) · ✅ **seed-collector** — `collector/` poller + 멀티NPC(#841 등) · ⏳ AI 다음책 추천·추출(stub, Phase1) · ⏳ companion 질문품질(#371-375) · ✅ onboarding.js 데드코드 삭제(#888).
+**남은 이슈 후보 (2026-06 감사 #877, 갱신)**: ✅ **inquiry-sync.md(#701)** — #890 구현(worker 크론 */10 + 32_*.sql, GITHUB_TOKEN 필요) · ❌ **companion-reading-end(#347)** — 읽기 종료 자동 진입 미출시(읽기모드 #505 폐기), **도입 안 함·스펙 삭제(2026-07-09)** · ✅ **seed-collector** — `collector/` poller + 멀티NPC(#841 등) · ⏳ AI 다음책 추천·추출(stub, Phase1) · ⏳ companion 질문품질(#371-375) · ✅ onboarding.js 데드코드 삭제(#888).
 > 해소됨: companion_sessions 실행·실증 ✅ · spec-drift CI ✅(#351, drift.py PASS) · 스포일러 spec 문구(#177).
 
 ---
