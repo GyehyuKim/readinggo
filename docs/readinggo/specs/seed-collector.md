@@ -89,7 +89,7 @@
 - **폴링**: `seed_queue?status=pending&order=priority.desc,created_at.asc&limit=3`, 5초 간격. high(온디맨드) 먼저.
 - **직렬화**: 브라우저 1개로 순차 처리(동시 크롤 금지 — 차단·자원). 책 사이 딜레이 2~3초.
 
-> ⚠️ **코드 불일치 (드리프트 정정 2026-07-09)**: 현재 `collector/poller.mjs`는 `POLL_BATCH=4` + `Promise.all`로 **4-병렬 크롤**, 배치 딜레이 1초로 돈다. spec의 동시성-1·딜레이 2~3초 안티차단 의도와 어긋남 — 차단 리스크. **정합 결정 필요**(코드를 동시성 1로 낮출지, spec을 병렬로 갱신할지). spec 은 임의로 4를 승인하지 않고 결정 대기.
+> ✅ **정합됨 (2026-07-09)**: `collector/poller.mjs` 기본 `POLL_BATCH=1`(순차)로 낮춤 + 배포본(.env) 도 1로 재시작. 이전 병렬(2~4)에서 관측된 `browserContext.newPage: ...has been closed`(브라우저 컨텍스트 경합) 제거 + spec 동시성-1 안티차단 의도와 일치. (2주 라이브에서 예스24 차단 0건이었으나, 컨텍스트 경합 에러가 있어 순차로 안정화.)
 - **적재**: 발췌 → `book_id` 해석(없으면 `books` auto-upsert) → distinct NPC 명의 `sentences`(kind='quote') + `seed_sentences` 원장. 멱등(그 책 기존 문장 텍스트 제외).
 - **상태전이**: ok→`done`. not-found/no-excerpt→`failed`(영구). blocked/timeout→attempts++ 후 재시도(≤3).
 
@@ -101,7 +101,7 @@
 
 ## 7. 예의 / 레이트리밋 / 차단 대응
 
-- 요청 간 **딜레이 2~3초**, 동시성 1. (⚠️ 코드 불일치 — §5 노트 참조: `poller.mjs`는 현재 4-병렬·딜레이 1초, 정합 결정 필요.)
+- 요청 간 **딜레이 2~3초**, 동시성 1. (✅ 정합됨 2026-07-09 — `poller.mjs` 기본 `POLL_BATCH=1`, §5 노트 참조.)
 - robots/약관 best-effort 존중, 식별 가능한 UA.
 - **차단 감지**: 수율 급락·캡차·403 → 백오프 + 로그/알림. DOM 변경 시 셀렉터 보정 신호.
 - 주기 배치는 트래픽 적은 새벽, 소량씩.
