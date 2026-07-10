@@ -265,13 +265,14 @@ create policy users_ins on public.users for insert with check (id = auth.uid());
 drop policy if exists users_upd on public.users;
 create policy users_upd on public.users for update using (id = auth.uid());
 
--- books: 공개 카탈로그 select, 로그인 사용자 insert/update (알라딘 등록·upsert)
+-- books: 공개 카탈로그 select(게스트 포함). 쓰기는 워커(service_role)만 — #1191.
+--   옛 books_ins/books_upd(auth.uid() is not null)는 로그인만 하면 누구나 카탈로그를 오염시켜 제거.
+--   클라의 books.upsert(캐노니컬 id 해소)는 워커 /api/book-upsert 경유(입력검증·캡·레이트리밋).
+--   authenticated write grant 회수는 아래 grants 섹션 참조(42_books_write_lockdown.sql).
 drop policy if exists books_sel on public.books;
 create policy books_sel on public.books for select using (true);
 drop policy if exists books_ins on public.books;
-create policy books_ins on public.books for insert with check (auth.uid() is not null);
 drop policy if exists books_upd on public.books;
-create policy books_upd on public.books for update using (auth.uid() is not null);
 
 -- user_books / reading_sessions / streak: 로그인 사용자만 select(#1165 anon 차단), 본인만 write
 drop policy if exists ub_sel on public.user_books;
@@ -473,6 +474,10 @@ from anon;
 -- 숲 비밀번호 해시는 클라이언트가 절대 읽지 못한다 (#996, co-reading §6.4).
 -- `grant select on all tables` 가 password_hash 까지 열어주므로 컬럼 단위로 회수 — 검증은 RPC 만.
 revoke select (password_hash) on public.villages from anon, authenticated;
+
+-- #1191 books 는 전역 공유 카탈로그 — authenticated 쓰기 회수(위 `grant insert,update,delete` 상쇄).
+-- 쓰기는 워커(service_role, RLS·grant 우회)의 /api/book-upsert 만. read(books_sel)는 공개 유지.
+revoke insert, update, delete on public.books from authenticated;
 
 -- =====================================================================
 -- 끝. 재실행 안전. 다음: supabaseAdapter(§7.2) + config.js + 알라딘 프록시.
