@@ -400,7 +400,7 @@
       },
       // 전체 공개 피드 (§social). 책 제목은 user_books→books 중첩 embed.
       async feed({ cursor, limit } = {}) {
-        let q = sb().from('sentences')
+        let q = sb().from('sentences_public')
           .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author))')
           .order('created_at', { ascending: false }).limit(limit || 30);
         if (cursor) q = q.lt('created_at', cursor);
@@ -412,7 +412,7 @@
         const f = unwrap(await sb().from('follows').select('following_id').eq('follower_id', id)) || [];
         const ids = f.map(x => x.following_id);
         if (!ids.length) return [];
-        return unwrap(await sb().from('sentences')
+        return unwrap(await sb().from('sentences_public')
           .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author))')
           .in('user_id', ids).order('created_at', { ascending: false }).limit(limit || 30));
       },
@@ -425,7 +425,7 @@
         // (임베드 aggregate 정렬은 PostgREST에서 불안정 → 후보 풀을 넉넉히 받아 JS 정렬). 기본 'recent'(최신순).
         const likes = sort === 'likes';
         const pool = likes ? 50 : (limit || 10);
-        let q = sb().from('sentences')
+        let q = sb().from('sentences_public')
           .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author)), clap_count:claps(count)')
           .eq('user_book.book_id', bookId)
           .order('created_at', { ascending: false }).limit(pool);
@@ -459,7 +459,7 @@
         const mine = unwrap(await sb().from('user_books').select('book_id').eq('user_id', me));
         const bookIds = [...new Set((mine || []).map(r => r.book_id).filter(Boolean))];
         if (bookIds.length) {
-          let q = sb().from('sentences').select(SEL_CORE)
+          let q = sb().from('sentences_public').select(SEL_CORE)
             .in('user_book.book_id', bookIds)
             .order('created_at', { ascending: false }).limit(pool);
           if (me) q = q.neq('user_id', me);
@@ -468,7 +468,7 @@
         }
         // Tier 2 — 부족분 충전: 전체 공개 문장 중 좋아요 많은 순(동률 최신). RLS가 공개범위 필터.
         if (out.length < N) {
-          let q = sb().from('sentences').select(SEL_POP)
+          let q = sb().from('sentences_public').select(SEL_POP)
             .order('created_at', { ascending: false }).limit(pool);
           if (me) q = q.neq('user_id', me);
           const rows = (unwrap(await q) || []).slice()
@@ -787,7 +787,7 @@
           .eq('user_id', userId).eq('status', 'completed').order('completed_at', { ascending: false }));
       },
       async publicSentences(userId) {
-        return unwrap(await sb().from('sentences').select('*, user_book:user_books(book_id, book:books(title))')
+        return unwrap(await sb().from('sentences_public').select('*, user_book:user_books(book_id, book:books(title))')
           .eq('user_id', userId).order('created_at', { ascending: false }).limit(50));
       },
       // 공개 스트릭(streak 테이블 select using(true)) — 타인 프로필 표시용 (#10)
@@ -814,7 +814,7 @@
       async bookContrib(userId, bookId) {
         const ub = unwrap(await sb().from('user_books').select('id, rating, review_text, status, current_page')
           .eq('user_id', userId).eq('book_id', bookId).maybeSingle());
-        const sents = unwrap(await sb().from('sentences').select('id, text, page, my_note, created_at')
+        const sents = unwrap(await sb().from('sentences_public').select('id, text, page, created_at')
           .eq('user_id', userId).eq('user_book_id', ub ? ub.id : '00000000-0000-0000-0000-000000000000')
           .order('page', { ascending: true }));
         return { userBook: ub || null, sentences: sents || [] };
@@ -959,7 +959,7 @@
           : [];
         const todayUserSet = new Set(todaySessions.map(s => s.user_id));
         const sentRows = userBookIds.length
-          ? unwrap(await sb().from('sentences')
+          ? unwrap(await sb().from('sentences_public')
               .select('user_id, user_book_id, text, page')
               .in('user_book_id', userBookIds)
               .order('created_at', { ascending: false })
