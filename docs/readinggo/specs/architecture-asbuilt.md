@@ -130,6 +130,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `/api/related` | 관련 도서(함께 읽을 책) | Upstage LLM(+검색 소스) |
 | `/api/shelf-import` | 서가 가져오기(#772) | 검색 소스·Supabase(+Gemini vision) |
 | `/api/seed` | 시드 데이터 | Supabase(service_role) |
+| `/api/book-upsert` | 책 캐노니컬 upsert — 검색 raw id → books id(#1191) | Supabase(service_role) |
 | `/api/ota` | OTA 번들 매니페스트 체크(#876) | — (OTA_KV) |
 | **cron** `0 18 * * *`(UTC)=KST 03:00 | 일일 인기도서 아카이브(#239) | 알라딘·Supabase |
 | **cron** `*/10 * * * *` | 문의 → GitHub 이슈 동기화(#701) | GitHub API |
@@ -197,7 +198,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 - 프록시 라우트는 **동일출처(Origin)만** 허용(쿼터 남용 차단). Origin은 non-브라우저(curl)가 우회 가능 → 고비용 LLM/OCR 엔드포인트(companion·wiki-ask·parse-books·ocr·extract-highlights·shelf-import·seed·related)는 **per-IP·분 단위 레이트리밋**(OTA_KV 재사용, fail-open)으로 키드레인 상한을 건다(#1158/#1159). 봇 차단 Turnstile 게이트는 후속.
 - Supabase **RLS**로 행 단위 접근 제어. 게스트(anon)는 **공개 카탈로그(`books`)·NPC 시드만** read; 사용자 PII 테이블(`users`·`user_books`·`reading_sessions`·`streak`·`follows`·`claps`)은 **로그인 사용자 전용**(`auth.uid() is not null`) + anon grant 회수(#1165, `40_rls_anon_lockdown.sql`).
 - **`sentences` 프라이버시(#1166, `41_sentences_public_view.sql`)**: base 테이블 `sentences` select 는 **본인 행만**(`user_id = auth.uid()`) — 개인 사후 감상 `my_note` 를 타 인증사용자가 못 읽게. 피드·프로필의 *남의* 문장 본문은 `my_note` 를 뺀 뷰 **`public.sentences_public`**(security-definer, authenticated 전용)로 노출. 본인 문장 읽기(`listMine`·`listByBook`·resurface)만 base 테이블(=`my_note` 포함). 클라 피드 읽기는 모두 뷰로 전환.
-- **`books` 쓰기(#1166 미해결·범위 플래그)**: 현재 `authenticated` 가 전역 `books`(canonical 카탈로그) insert/update 가능 → 임의 로그인 사용자가 ISBN 메타 오염 가능. 단, 클라 `books.upsert` 가 검색 raw id→canonical id 확보에 **실사용 중**(#552, start/wish/room 흐름)이라 단순 회수 불가 — 워커 프록시 경유 재설계 후속 필요.
+- **`books` 쓰기는 워커(service_role)만**(#1191, `42_books_write_lockdown.sql`). `books` 는 전역 공유 카탈로그라 옛 정책(`books_ins`/`books_upd` = `auth.uid() is not null`)은 로그인만 하면 누구나 임의 책의 title/author/cover 를 덮어써 카탈로그를 오염시킬 수 있었다. authenticated 의 insert/update/delete grant·정책을 회수하고, 클라의 load-bearing `books.upsert`(검색 raw id → 캐노니컬 id 해소)는 워커 **`/api/book-upsert`**(service_role·입력검증·길이 캡·per-IP 레이트리밋) 경유로 이전. `books_sel using(true)`(공개 read)는 유지.
 
 ---
 

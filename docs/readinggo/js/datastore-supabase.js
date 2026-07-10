@@ -124,17 +124,21 @@
       async get(bookId) {
         return unwrap(await sb().from('books').select('*').eq('id', bookId).single());
       },
-      // 알라딘 결과 등 외부 책을 books 에 upsert (isbn13 기준) → 등록 흐름
+      // 알라딘 결과 등 외부 책을 books 에 upsert (isbn13 기준) → 등록 흐름.
+      // #1191: 옛 클라 직접 RLS write(books_ins/upd = auth.uid() is not null)는 로그인만 하면
+      //   누구나 카탈로그를 오염시킬 수 있었다. 이제 워커 /api/book-upsert(service_role, 입력검증·캡·
+      //   레이트리밋) 경유. 반환 shape(캐노니컬 books 행 전체 + id)은 동일 — 호출부 4곳 무변경.
       async upsert(book) {
-        // isbn13 없으면 제목으로 기존 책 매칭 (null isbn 은 conflict 안 되어 중복 생성됨, architect H1).
-        if (!book.isbn13) {
-          const found = unwrap(await sb().from('books').select('*').eq('title', book.title).limit(1).maybeSingle());
-          if (found) return found;
-        }
-        return unwrap(await sb().from('books').upsert({
-          isbn13: book.isbn13, title: book.title, author: book.author,
-          publisher: book.publisher, total_pages: book.total_pages, cover_url: book.cover_url,
-        }, { onConflict: 'isbn13' }).select().single());
+        const res = await fetch('/api/book-upsert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            isbn13: book.isbn13, title: book.title, author: book.author,
+            publisher: book.publisher, total_pages: book.total_pages, cover_url: book.cover_url,
+          }),
+        });
+        if (!res.ok) throw new Error('book-upsert 실패: ' + res.status);
+        return await res.json();
       },
       // 완독 → status='completed' (+rating/review_text). 성 직접 지급 없음 — 성(🏰)은 XP 주기 파생(castles.list, #520/#521).
       async complete(userBookId, opts) {

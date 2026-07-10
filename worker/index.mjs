@@ -106,6 +106,15 @@ export default {
       { const rl = await rateLimited(request, env, 'related'); if (rl) return rl; }
       return relatedProxy(request, env);
     }
+    // 책 캐노니컬 upsert (#1191) — 검색 raw id(b001/외서/aladin)를 books 캐노니컬 id 로 해소.
+    // 예전엔 클라가 books RLS(auth.uid() is not null)로 직접 upsert → 로그인만 하면 아무나 카탈로그
+    // 오염 가능. 이제 service_role 로만 쓰는 이 엔드포인트 경유(입력 검증·캡·레이트리밋). 동일출처만.
+    if (p === '/api/book-upsert') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'book-upsert'); if (rl) return rl; }
+      return bookUpsertProxy(request, env);
+    }
     // 표지 이미지 프록시 (#676) — 알라딘 CDN은 CORS 헤더가 없어 클라가 캔버스로 그리면 tainted canvas.
     // 서버가 대신 받아 동일출처로 돌려주면 공유 카드가 표지를 taint 없이 인라인 가능. 알라딘 호스트만 허용(오픈 프록시 방지).
     if (p === '/api/img') {
@@ -1649,6 +1658,62 @@ async function upsertBook(SB, SRK, book) {
   });
 }
 
+// ── 책 캐노니컬 upsert (#1191) ─────────────────────────────
+// 클라의 옛 books.upsert(직접 RLS write)를 대체 — service_role 로만 쓰는 controlled write.
+// 클라의 두-갈래 로직을 그대로 보존해 반환 shape(캐노니컬 books 행 전체 + id)이 동일:
+//   ① 유효 ISBN-13(978/979) → 기존 upsertBook(#1117 게이트 + merge-duplicates) 후 행 재조회.
+//   ② ISBN-13 없음/무효 → 제목 매칭(있으면 반환), 없으면 삽입(client parity: null isbn 은 충돌 없음).
+// 입력 검증·길이 캡으로 오염을 원천 제한(열린 RLS 와 달리 통제된 쓰기).
+async function bookUpsertProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  const SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SB || !SRK) return json({ error: 'supabase unconfigured' }, 503);
+  let b = {};
+  try { b = await request.json(); } catch (e) {}
+  const cap = (v, n) => { const s = (v == null ? '' : String(v)).trim(); return s ? s.slice(0, n) : ''; };
+  const title = cap(b.title, 300);
+  if (!title) return json({ error: 'title required' }, 400);
+  const isbn13 = cap(b.isbn13, 13);
+  let total_pages = Number(b.total_pages);
+  if (!Number.isFinite(total_pages) || total_pages <= 0 || total_pages > 100000) total_pages = null;
+  const book = {
+    isbn13: isbn13 || null, title,
+    author: cap(b.author, 300) || null,
+    publisher: cap(b.publisher, 200) || null,
+    total_pages,
+    cover_url: cap(b.cover_url, 1000) || null,
+  };
+  const H = { apikey: SRK, Authorization: `Bearer ${SRK}` };
+
+  // ① 유효 ISBN-13 → 기존 헬퍼로 merge-upsert(#1117 게이트) 후 캐노니컬 행 재조회
+  if (/^97[89]\d{10}$/.test(isbn13)) {
+    await upsertBook(SB, SRK, book);
+    const r = await fetch(`${SB}/rest/v1/books?isbn13=eq.${isbn13}&select=*&limit=1`, { headers: H });
+    const rows = await r.json().catch(() => []);
+    if (Array.isArray(rows) && rows[0]) return json(rows[0]);
+    // 게이트에 걸려 미적재된 경우만 아래 삽입 폴백으로
+  }
+
+  // ② ISBN-13 없음/무효 → 제목 매칭(client parity)
+  {
+    const r = await fetch(`${SB}/rest/v1/books?title=eq.${encodeURIComponent(title)}&select=*&limit=1`, { headers: H });
+    const rows = await r.json().catch(() => []);
+    if (Array.isArray(rows) && rows[0]) return json(rows[0]);
+  }
+  // 없으면 삽입 — isbn 있으면 merge-duplicates(중복 충돌 무해화), 없으면 순삽입
+  const path = book.isbn13 ? '/rest/v1/books?on_conflict=isbn13' : '/rest/v1/books';
+  const prefer = book.isbn13 ? 'resolution=merge-duplicates,return=representation' : 'return=representation';
+  const ins = await fetch(`${SB}${path}`, {
+    method: 'POST',
+    headers: { ...H, 'Content-Type': 'application/json', Prefer: prefer },
+    body: JSON.stringify(book),
+  });
+  const created = await ins.json().catch(() => null);
+  const row = Array.isArray(created) ? created[0] : created;
+  if (!row || !row.id) return json({ error: 'upsert failed' }, 500);
+  return json(row);
+}
+
 // ── OTA Live Updates (#876) ───────────────────────────────
 // 설치 앱(Capgo @capgo/capacitor-updater)이 POST 로 현재 상태를 보내면 채널 매니페스트(KV)와 비교해
 // 업데이트면 {version,url,checksum}, 없으면 {} 반환(Capgo 규약: url 생략 = no update).
@@ -1688,6 +1753,7 @@ function json(obj, status, maxAge) {
 const RL_LIMITS = {
   seed: 20, ocr: 30, 'extract-highlights': 20, 'shelf-import': 12,
   companion: 40, 'wiki-ask': 40, 'parse-books': 20, related: 40,
+  'book-upsert': 30,
 };
 async function rateLimited(request, env, name) {
   try {
