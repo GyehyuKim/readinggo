@@ -551,7 +551,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     let alive = true;
     let timer = null;
     setOthersSeeding(true);
-    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: nestState.book.title, author: nestState.book.author || '', isbn: nestState.book.isbn || '', have: 0 }) }).catch(() => {});
+    window.RG_apiFetch('/api/seed', { method: 'POST', rgQuiet: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: nestState.book.title, author: nestState.book.author || '', isbn: nestState.book.isbn || '', have: 0 }) }).catch(() => {});
     const MAX = 5, DELAY = 4000;
     let tries = 0;
     const poll = () => {
