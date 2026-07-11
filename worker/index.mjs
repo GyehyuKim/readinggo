@@ -1347,21 +1347,26 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
   try {
     // normalize()가 풀 메타(description 등) 매핑 (#489).
     let items = (await aladinFetch(apiUrl)).map(normalize);
-    // #529: ISBN 단건 등록 경로 — 알라딘 빈필드를 Google→OpenLibrary→LLM 으로 비파괴 보강(외서 대응).
+    // #529: ISBN 단건 등록 경로 — 알라딘 빈필드를 OpenLibrary→LLM 으로 비파괴 보강(외서 대응).
+    // #1133/#1044 §5.e: 영속 행(persistItems)은 Google 제외(Google Books ToS 가 영구 DB 캐시 금지),
+    // 표시 행(items)만 Google 로 보강해 클라 응답에만 사용(저장 안 함). 저장·표시 분리.
+    let persistItems = null;   // ISBN 경로 전용 — Google 미포함 영속 행(비어 있으면 저장 없음)
     if (isbn) {
-      if (items.length) {
-        items[0] = await enrichForeignMeta(items[0], env);
-      } else {
-        // 알라딘 미보유 외서 — Google→OpenLibrary 로 신규 생성
-        const made = await enrichForeignMeta({ isbn13: isbn, title: '', author: '', publisher: '', total_pages: null, cover_url: '', description: '', source: '' }, env);
-        if (made.title) items = [made];
-      }
+      const seed = items.length ? items[0] : { isbn13: isbn, title: '', author: '', publisher: '', total_pages: null, cover_url: '', description: '', source: '' };
+      // 영속용 — Google 제외(OpenLibrary/LLM 만). books 테이블 영구 적재 대상.
+      const persist = await enrichForeignMeta(seed, env, { allowGoogle: false });
+      persistItems = persist.title ? [persist] : [];
+      // 표시용 — persist 를 재사용해 남은 빈 필드만 Google 로 보강(클라 응답 전용, 저장 안 함).
+      const display = await enrichForeignMeta(persist, env);
+      if (display.title) items = [display];
     }
     // 검색 도서 자동 저장 (#489) — 알라딘 결과를 백그라운드 비파괴 upsert.
     // normalize가 빈 필드 키를 생략하므로 검색(쪽수 등 누락)이 기존 풍부한 행을 덮지 않음.
+    // #1133: ISBN 경로는 Google 제외 persistItems 를 저장(표시행 items 아님), 검색 경로는 items(알라딘).
     if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
       const SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
-      ctx.waitUntil(Promise.all(items.filter((b) => b.isbn13).map((b) => upsertBook(SB, SRK, b).catch(() => {}))));
+      const toPersist = persistItems || items;
+      ctx.waitUntil(Promise.all(toPersist.filter((b) => b.isbn13).map((b) => upsertBook(SB, SRK, b).catch(() => {}))));
     }
     // 외서 균형 보강 (#302) — 검색이면 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
     // 결과 홍수 방지: 알라딘 5칸으로 자르고, 외서 5칸을 항상 채워 균형. ISBN 단건 조회엔 미적용.
@@ -1468,11 +1473,14 @@ async function llmDescribe(book, env) {
 
 // 외서·빈필드 보강 체인 (#529) — 알라딘 → Google → OpenLibrary 빈필드 비파괴 merge,
 // 끝내 빈 description 은 LLM best-effort. 단건(ISBN) 등록 경로에서만 호출(검색 결과 일괄엔 미적용 — 비용).
-async function enrichForeignMeta(book, env) {
+// #1133/#1044 §5.e: opts.allowGoogle=false 면 Google 단계 생략 — Google Books ToS 가 영구 DB 캐시를
+// 금지하므로 books 영속 대상 행은 반드시 allowGoogle:false 로 호출(표시 전용 행만 Google 허용).
+async function enrichForeignMeta(book, env, opts = {}) {
+  const allowGoogle = opts.allowGoogle !== false;
   let b = { ...book };
   const isbn = b.isbn13 || '';
   const needs = () => !b.title || !b.author || !b.publisher || !b.total_pages || !b.cover_url || !b.description;
-  if (isbn && needs()) {
+  if (allowGoogle && isbn && needs()) {
     try { const gb = await googleBooksSearch(`isbn:${isbn}`, 1, env); if (gb && gb[0]) b = mergeBookMeta(b, gb[0]); } catch (e) { /* skip */ }
   }
   if (isbn && needs()) {
