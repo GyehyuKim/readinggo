@@ -456,6 +456,86 @@ end; $$;
 grant execute on function public.room_join(uuid, text)        to authenticated;
 grant execute on function public.room_create_membership(uuid) to authenticated;
 
+-- 체크인 원자 RPC (#1161, 43_checkin_atomic.sql) — user_books.current_page /
+-- reading_sessions upsert / streak bump 을 한 트랜잭션으로. 스트릭 규칙은
+-- datastore.js `_nextStreak`(systems.md §6.1) 복제 — 변경 시 함께 갱신.
+-- p_today = 클라 로컬 날짜(_today()); 서버 current_date(UTC) 는 KST 자정~오전9시 하루 어긋남.
+create or replace function public.checkin_atomic(
+  p_user_book_id uuid,
+  p_page int,
+  p_duration int,
+  p_today date default current_date
+)
+returns public.reading_sessions
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_uid            uuid := auth.uid();
+  v_owner          uuid;
+  v_ub_page        int;
+  v_dur_base       int := greatest(coalesce(p_duration, 0), 0);
+  v_pages_today    int := 0;
+  v_duration_today int;
+  v_delta          int;
+  v_prev_pages     int;
+  v_prev_dur       int;
+  v_streak         public.streak%rowtype;
+  v_cur            int;
+  v_longest        int;
+  v_session        public.reading_sessions%rowtype;
+begin
+  v_duration_today := v_dur_base;
+
+  select user_id, current_page into v_owner, v_ub_page
+    from public.user_books where id = p_user_book_id;
+  if v_owner is null then
+    raise exception 'checkin_atomic: user_book % not found', p_user_book_id;
+  end if;
+  if v_owner is distinct from v_uid then
+    raise exception 'checkin_atomic: not owner';
+  end if;
+
+  if p_page is not null then
+    v_delta := greatest(0, p_page - coalesce(v_ub_page, 0));
+    select pages_read_today, duration_sec into v_prev_pages, v_prev_dur
+      from public.reading_sessions
+      where user_book_id = p_user_book_id and session_date = p_today;
+    v_pages_today := coalesce(v_prev_pages, 0) + v_delta;
+    v_duration_today := v_dur_base + coalesce(v_prev_dur, 0);
+    update public.user_books set current_page = p_page where id = p_user_book_id;
+  end if;
+
+  insert into public.reading_sessions
+      (user_book_id, user_id, session_date, current_page, pages_read_today, duration_sec)
+    values
+      (p_user_book_id, v_uid, p_today, p_page, v_pages_today, v_duration_today)
+  on conflict (user_book_id, session_date) do update
+    set current_page     = excluded.current_page,
+        pages_read_today = excluded.pages_read_today,
+        duration_sec     = excluded.duration_sec,
+        user_id          = excluded.user_id
+  returning * into v_session;
+
+  select * into v_streak from public.streak where user_id = v_uid;
+  if found and v_streak.last_check_in_date is distinct from p_today then
+    v_cur := 1;
+    if v_streak.last_check_in_date is not null
+       and (p_today - v_streak.last_check_in_date) = 1 then
+      v_cur := coalesce(v_streak.current, 0) + 1;
+    end if;
+    v_longest := greatest(coalesce(v_streak.longest, 0), v_cur);
+    update public.streak
+      set current = v_cur, longest = v_longest, last_check_in_date = p_today
+      where user_id = v_uid;
+  end if;
+
+  return v_session;
+end;
+$$;
+grant execute on function public.checkin_atomic(uuid, int, int, date) to authenticated;
+
 -- ── 권한(grant) — RLS 가 행 단위 통제. anon=읽기, authenticated=쓰기 ──────
 grant usage on schema public to anon, authenticated;
 grant select on all tables in schema public to anon, authenticated;

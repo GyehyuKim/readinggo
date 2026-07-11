@@ -286,28 +286,17 @@
     /* 일일 기록 (세션) — 그날 1행 upsert + 스트릭 bump */
     sessions: {
       async addToday({ userBookId, page, duration_sec }) {
-        const id = await uid();
-        const today = _today();
-        // 활동 히트맵(#195)용 일별 읽은 쪽수: 직전 current_page 대비 증분을 그날 누적.
-        // #1203 재독: 입력 page 가 현재 진도보다 낮아도 current_page 를 그 값으로 덮어씀(아래).
-        //   증분(delta)은 0으로 클램프해 히트맵에 음수가 들어가지 않게 한다(재독은 쪽수 추가 아님).
-        let pagesToday = 0;
-        let durationToday = (typeof duration_sec === 'number' && duration_sec > 0) ? duration_sec : 0;
-        if (typeof page === 'number') {
-          try {
-            const ub = unwrap(await sb().from('user_books').select('current_page').eq('id', userBookId).maybeSingle());
-            const delta = Math.max(0, page - ((ub && ub.current_page) || 0));
-            const prev = unwrap(await sb().from('reading_sessions').select('pages_read_today, duration_sec').eq('user_book_id', userBookId).eq('session_date', today).maybeSingle());
-            pagesToday = ((prev && prev.pages_read_today) || 0) + delta;
-            durationToday += (prev && prev.duration_sec) || 0;
-          } catch (e) {}
-          await sb().from('user_books').update({ current_page: page }).eq('id', userBookId);
-        }
-        const row = unwrap(await sb().from('reading_sessions').upsert({
-          user_book_id: userBookId, user_id: id, session_date: today, current_page: page, pages_read_today: pagesToday, duration_sec: durationToday,
-        }, { onConflict: 'user_book_id,session_date' }).select().single());
-        await A.streak.bumpOnCheckIn();
-        return row;
+        // 원자 체크인 (#1161) — user_books.current_page / reading_sessions upsert /
+        // streak bump 를 한 트랜잭션으로(43_checkin_atomic.sql). 부분상태 방지.
+        // 쪽수 증분·재독 하향(#1203)·같은날 누적·스트릭 규칙(_nextStreak)은 RPC 안에서 계산.
+        // p_today=클라 로컬 날짜(_today()) — 서버 UTC 어긋남 방지, 기존 동작 보존.
+        // 반환: reading_sessions 행(기존 addToday 와 동일 shape).
+        return unwrap(await sb().rpc('checkin_atomic', {
+          p_user_book_id: userBookId,
+          p_page: (typeof page === 'number') ? page : null,
+          p_duration: (typeof duration_sec === 'number' && duration_sec > 0) ? duration_sec : 0,
+          p_today: _today(),
+        }));
       },
       async list(userBookId) {
         return unwrap(await sb().from('reading_sessions').select('*').eq('user_book_id', userBookId)

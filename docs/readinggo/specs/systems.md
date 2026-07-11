@@ -14,7 +14,7 @@
 | 항목 | 규칙 |
 |---|---|
 | 갱신 조건 | "한 문장" 1개 이상 + 페이지 입력 1회 (= ReadingSession 1행 생성) |
-| 갱신 시점 | 입력 즉시 `streak.current += 1`, `last_check_in_date = today` (`DataStore.streak.bumpOnCheckIn`) |
+| 갱신 시점 | 입력 즉시 `streak.current += 1`, `last_check_in_date = today` (`DataStore.streak.bumpOnCheckIn`). 규칙 SSOT = `_nextStreak`(datastore.js). **Supabase 는 체크인 원자 RPC `checkin_atomic`(#1161)** 안에서 세션 기록과 한 트랜잭션으로 bump — 그 RPC 의 SQL 이 `_nextStreak` 규칙을 복제하므로 **규칙 변경 시 43_checkin_atomic.sql 도 함께 갱신** |
 | 미참여 정산 | Phase 0: 날짜 시뮬레이터 / Phase 1: pg_cron (UTC 15:00 = KST 00:00) |
 | 활성 책 무관 | 어느 책에 기록하든 1세션 = 스트릭 +1 (책별 아님, 사용자 단위) |
 
