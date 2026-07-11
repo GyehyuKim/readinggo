@@ -1007,11 +1007,14 @@ async function seedProxy(request, env) {
 
 // 인기 우선 선충전 (#774, spec §3.2) — 일일 cron. 인기 카탈로그책을 seed_queue 에 low 우선순위로 큐잉.
 // 실제 크롤은 맥미니 collector(poller)가 한가할 때(high=온디맨드 처리 후) 소진. 워커는 큐잉만(브라우저 없음).
+// #1133 Part 1: 알라딘 베스트셀러(sales_point) 의존 재설계 — 카카오/국중도엔 베스트셀러 API 가 없어
+//   archive cron 이 중지되면 sales_point 가 freeze 된다. 대신 내부 유기적 신호(우리 유저의 책 채택 수
+//   = user_books 수) 를 1순위, 남은 sales_point 를 부트스트랩 tiebreak 로 book_prewarm_rank 뷰에서 뽑는다.
 async function prewarmSeeds(env, limit = 150) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
   let books = [];
   try {
-    const u = `${env.SUPABASE_URL}/rest/v1/books?select=isbn13,title,author&sales_point=not.is.null&order=sales_point.desc.nullslast&limit=${limit}`;
+    const u = `${env.SUPABASE_URL}/rest/v1/book_prewarm_rank?select=isbn13,title,author&order=adoption.desc,sales_point.desc.nullslast&limit=${limit}`;
     const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
     if (r.ok) books = await r.json();
   } catch (e) { return; }

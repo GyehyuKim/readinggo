@@ -559,6 +559,16 @@ revoke select (password_hash) on public.villages from anon, authenticated;
 -- 쓰기는 워커(service_role, RLS·grant 우회)의 /api/book-upsert 만. read(books_sel)는 공개 유지.
 revoke insert, update, delete on public.books from authenticated;
 
+-- #1133 Part 1 — 인기 시드 선충전 랭크(내부 채택 수 + sales_point 부트스트랩). 크론(service_role) 전용.
+create or replace view public.book_prewarm_rank as
+  select b.isbn13, b.title, b.author, count(ub.id) as adoption, b.sales_point
+    from public.books b
+    left join public.user_books ub on ub.book_id = b.id
+   where b.isbn13 is not null
+   group by b.id;
+revoke select on public.book_prewarm_rank from anon, authenticated;
+grant  select on public.book_prewarm_rank to service_role;
+
 -- =====================================================================
 -- 끝. 재실행 안전. 다음: supabaseAdapter(§7.2) + config.js + 알라딘 프록시.
 -- =====================================================================
