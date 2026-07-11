@@ -104,6 +104,21 @@ setup-globals → config → supabase-client → datastore-supabase →
   (범위: 신고된 "모달 열고 뒤로가기 → 모달 닫힘, 로그아웃 안 됨"에 한정).
 - `sheet-drag.js`(grip 드래그 닫기)와 독립 — 둘 다 각 모달의 `onClose`로 수렴(충돌 없음).
 
+### 2.4 모바일 스크롤·입력 포커스 (`index.html` 전역 CSS, #1197)
+
+모바일 Safari의 두 가지 스크롤 불편을 전역 CSS로 완화(피처별 하드코딩 대신 공용 규칙에 집중):
+
+- **입력 포커스 줌 점프**: iOS는 실효 `font-size < 16px` 입력에 포커스하면 자동 확대하며 문서를
+  위로 스크롤(점프)시킨다. 피처 코드가 인라인 `fontSize:14`(등)를 광범위하게 쓰므로,
+  `input(텍스트 계열):not(.rg-noscale-input), textarea, select { font-size:16px !important }`
+  단일 규칙으로 인라인 값까지 덮어 최소 16px 강제 → 줌 자체를 차단. file/checkbox/radio/
+  range/color/버튼형은 제외. 의도적으로 큰 입력(둥지 진도 큰 숫자, 26px)은 `.rg-noscale-input`
+  예외(이미 ≥16px라 줌 무관, 디자인 크기 보존).
+- **중첩 스크롤 체이닝**: 스크롤 가능한 오버레이가 끝에 닿아도 배경 페이지로 스크롤을 넘기지
+  않게 `overscroll-behavior:contain`을 스크롤 컨테이너에 적용 — `.main`(모든 탭 페이지),
+  `.sheet`(책상세·문장모음 등 바텀시트), `.rg-room-sheet`·`.rg-room-modal-body`(마을).
+  (검색 오버레이 `search.js`는 기존부터 `overscrollBehavior:'contain'` 인라인 보유.)
+
 ---
 
 ## 3. 라이브러리 (CDN·고정 버전)

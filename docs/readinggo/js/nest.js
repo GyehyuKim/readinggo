@@ -659,6 +659,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <button onClick={() => _stepPage(setQuickPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtn}>−</button>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickPage} placeholder={String(nestState.book.cur||0)}
+              className="rg-noscale-input"
               onChange={e => setQuickPage(e.target.value.replace(/[^0-9]/g, ''))}
               style={{ width: 60, textAlign: 'center', fontSize: 26, fontWeight: 900, color: 'var(--ink)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand)', outline: 'none', padding: '0 4px 2px', fontFamily: 'inherit' }} />
             <button onClick={() => _stepPage(setQuickPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtn}>+</button>
