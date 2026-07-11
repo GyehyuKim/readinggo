@@ -72,6 +72,7 @@
 - 관심 책 추가: 소셜 피드 한 문장 → 책 상세 → "관심 책에 추가" (`DataStore.wishBooks.add`)
 - **책 중단 동선 (#593)**: 읽는 중 책의 상세(`BookDetailModal`)에서 **"읽기 중단"** → `DataStore.myBooks.abort(ubId)` → status='aborted'. 중단 책은 "읽는 중"·"완독"에서 빠지고 **"중단" 탭**으로 이동한다. 진척(`current_page`)은 보존되어 "다시 읽기"(`resume`) 시 그대로 이어진다. **`resume`은 status='reading' 갱신에 더해 그 책을 활성 책(`active_user_book_id`)으로 승계**(#1203) — 홈이 즉시 이 책을 띄우고 새로고침 후에도 '읽는 중'에 남는다(중단 탭에 잔류하지 않음). 양 어댑터 동일. 중단은 **삭제가 아니며**(책장에서 사라지지 않음) 완독 카운트·XP 주기에 영향 없다.
 - **책 완전 삭제 동선 (#1195, Edgar 피드백)**: 잘못 담은 책을 되돌릴 수 없게 **영구 삭제**. 책 상세(`BookDetailModal`)에 중단과 **구분되는 3차 danger 텍스트 버튼 "이 책 삭제"** → `DataStore.myBooks.remove(ubId)`. 모든 상태(읽는 중·중단·완독)에서 노출된다. **확인창은 기록 유무를 알린다**: 한 문장이 N개 있으면 "한 문장 N개도 함께 삭제…", 문장 없이 읽은 진척만 있으면 "읽은 기록도 함께 삭제…", 아무 기록도 없으면 단순 확인. 삭제 시 그 책의 문장·세션도 함께 사라진다(Supabase는 `sentences`·`reading_sessions` FK `on delete cascade`, localStorage는 `user_book`에 내포). **활성 책을 삭제하면 남은 reading 책으로 active 승계**([nest.md §5.3](./nest.md)) — 홈이 빈 상태로 떨어지지 않는다. 중단(되돌리기 가능)과 삭제(영구)는 별개 액션이다.
+- **책 완독 시 active 승계 (#1217)**: 활성 책을 완독(`DataStore.myBooks.complete` → status='completed')하면 그 책이 활성으로 남지 않게 **남은 '읽는 중' 책으로 active 승계**(없으면 null) — abort(#643)·resume(#1203)·remove(#1195)와 같은 불변식(`active_user_book_id` 는 항상 reading 책 또는 null). 누락 시 완독책이 활성으로 남아 홈이 완독책을 '읽는 중'으로 계속 띄우고 완독 탭에도 동시 노출되던 버그. 양 어댑터 동일.
 
 #### 5.8.3 완독 별점 + 소감 (v7 신설)
 

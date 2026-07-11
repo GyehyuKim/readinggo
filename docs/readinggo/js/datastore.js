@@ -791,6 +791,13 @@ const DataStore = {
         ub.completed_at = _today();
         if (typeof opts.rating !== 'undefined') ub.rating = opts.rating;
         if (typeof opts.review_text !== 'undefined') ub.review_text = opts.review_text;
+        // 완독한 책이 활성이면 남은 '읽는 중' 책으로 active 승계 (abort #643 동일, #1217).
+        if (s.active_user_book_id === userBookId) {
+          const next = s.user_books
+            .filter(x => x.status === 'reading' && x.id !== userBookId)
+            .sort((a, b) => (Date.parse(b.started_at || 0) || 0) - (Date.parse(a.started_at || 0) || 0))[0];
+          s.active_user_book_id = next ? next.id : null;
+        }
         return ub;
       });
     },
