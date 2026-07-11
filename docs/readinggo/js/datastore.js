@@ -340,7 +340,7 @@ const DataStore = {
     list() {
       return localStorageAdapter.mutate(s => (s.user_books || []).map(_applyBookOverrides));
     },
-    add({ book, current_page, status, rating }) {
+    add({ book, current_page, status, rating, activate }) {
       book = book || {};
       // #772 서가 복원: status='completed'면 완독으로 등록(completed_at·진척 100%). 기본 'reading'.
       const st = (status === 'completed' || status === 'reading') ? status : 'reading';
@@ -371,6 +371,9 @@ const DataStore = {
           // 기존 책이고 아직 별점이 없으면 스샷 별점으로 채움(기존 평가는 덮어쓰지 않음).
           ub.rating = rt;
         }
+        // 새 '읽기 시작' 책은 자동으로 활성 책 전환 (#1196, Edgar 피드백) — 이전 책이 남아 홈에서 화살표로
+        // 겨우 바꾸던 문제 해소. status='reading' 만(완독 담기·찜 제외). addBatch 는 activate:false 로 대량복원 하이재킹 방지.
+        if (st === 'reading' && activate !== false) s.active_user_book_id = ub.id;
         return ub;
       });
     },
@@ -390,7 +393,7 @@ const DataStore = {
             const w = DataStore.wishBooks.addOne(it.book);
             if (w) out.push(w);
           } else {
-            out.push(this.add({ book: it.book, status: it.status, rating: it.rating }));
+            out.push(this.add({ book: it.book, status: it.status, rating: it.rating, activate: false }));
           }
         } catch (e) { /* 개별 실패 스킵 */ }
       }
@@ -432,6 +435,21 @@ const DataStore = {
         ub.status = 'reading';
         s.active_user_book_id = ub.id;   // #1203: 다시 읽기 = 활성 책으로 (홈 즉시 표시·새로고침 유지)
         return _applyBookOverrides(ub);
+      });
+    },
+    // 잘못 담은 책 완전 삭제 (#1195, Edgar 피드백) — abort(중단, 되돌리기 가능)와 달리 영구 제거.
+    // 문장·세션은 ub 에 내포돼 user_book 행과 함께 사라진다(Supabase 는 FK on delete cascade 로 대응).
+    // 활성 책 삭제 시 남은 '읽는 중' 책으로 active 승계 (#643 abort 동일) — 홈이 빈 상태로 떨어지지 않게.
+    remove(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) return null;
+        s.user_books = (s.user_books || []).filter(u => u.id !== userBookId);
+        if (s.active_user_book_id === userBookId) {
+          const next = (s.user_books || []).find(u => (u.status || 'reading') === 'reading');
+          s.active_user_book_id = next ? next.id : null;
+        }
+        return { id: userBookId };
       });
     },
   },

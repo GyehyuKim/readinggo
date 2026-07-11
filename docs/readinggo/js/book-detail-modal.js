@@ -237,6 +237,26 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .then(() => { showToast('읽기를 중단했어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
       .catch(() => showToast('중단 처리 실패 — 다시 시도'));
   };
+  // 잘못 담은 책 완전 삭제 (#1195): abort(중단, 되돌리기 가능)와 달리 user_book+문장·세션 영구 제거.
+  // 기록(한 문장/읽은 진척) 있으면 함께 삭제됨을 확인창에 명시. 삭제된 문장은 홈·서재 피드에서도 즉시 제거.
+  const deleteBook = () => {
+    if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.remove)) return;
+    const recCount = bookQuotes.length;
+    let msg;
+    if (recCount > 0) msg = `'${book.title}'을(를) 삭제할까요?\n이 책에 남긴 한 문장 ${recCount}개도 함께 삭제되고 되돌릴 수 없어요.`;
+    else if ((book.cur || 0) > 0) msg = `'${book.title}'을(를) 삭제할까요?\n읽은 기록도 함께 삭제되고 되돌릴 수 없어요.`;
+    else msg = `'${book.title}'을(를) 삭제할까요? 되돌릴 수 없어요.`;
+    if (!window.confirm(msg)) return;
+    Promise.resolve(DataStore.myBooks.remove(book.ubId))
+      .then(() => {
+        // 삭제된 책의 한 문장을 홈(nest)·서재 피드에서 즉시 제거 (rg:sentence-removed 리스너, app.js/nest.js).
+        bookQuotes.forEach(q => { if (q.id) window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id: q.id } })); });
+        showToast('책을 삭제했어요');
+        window.dispatchEvent(new CustomEvent('rg:wish-changed'));
+        onClose();
+      })
+      .catch(() => showToast('삭제 실패 — 다시 시도'));
+  };
   // 다시 읽기 (#593): 중단 책을 '읽는 중'으로 복귀. current_page 그대로 이어감.
   const resumeBook = () => {
     if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.resume)) return;
@@ -546,6 +566,15 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                 읽기 중단
               </button>
             </div>
+          )}
+
+          {/* 잘못 담은 책 완전 삭제 (#1195) — 중단(되돌리기 가능)과 구분되는 영구 삭제.
+              3차 danger 텍스트 버튼(DESIGN.md §버튼위계, settings 계정삭제와 동일 위계). 모든 상태(읽는중·중단·완독)에서 노출. */}
+          {book.ubId && (
+            <button onClick={deleteBook}
+              style={{display:'block', width:'100%', textAlign:'center', padding:'10px 12px', marginBottom:14, border:'none', background:'transparent', color:'var(--danger, #E5484D)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+              이 책 삭제
+            </button>
           )}
 
           <a href={kyoboUrl} target="_blank" rel="noopener noreferrer"

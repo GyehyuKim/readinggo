@@ -175,7 +175,7 @@
           .eq('user_id', id).order('started_at', { ascending: false }));
         return (rows || []).map(_applyBookOverrides);
       },
-      async add({ book, current_page, status, rating }) {
+      async add({ book, current_page, status, rating, activate }) {
         const id = await uid();
         const bk = book && book.id ? book : await A.books.upsert(book);
         // #772 서가 복원: status='completed'면 완독으로(completed_at·진척 100%). 기본 'reading'.
@@ -190,6 +190,12 @@
         const rn = Number(rating);
         if (Number.isFinite(rn) && rn > 0) ins.rating = Math.min(5, Math.max(0.5, Math.round(rn * 2) / 2));
         const row = unwrap(await sb().from('user_books').insert(ins).select('*, book:books(*)').single());
+        // 새 '읽기 시작' 책은 자동으로 활성 책 전환 (#1196, Edgar 피드백) — resume 처럼 profile.update.
+        // status='reading' 만(완독 담기·찜 제외). addBatch 는 activate:false 로 대량복원 하이재킹 방지.
+        // active-set 실패가 등록 자체를 되돌리지 않게 방어(책은 이미 저장됨).
+        if (st === 'reading' && activate !== false) {
+          try { await A.profile.update({ active_user_book_id: row.id }); } catch (e) {}
+        }
         return _applyBookOverrides(row);
       },
       // 스샷 서가 복원 (#772·#1038·#1042) — 책 목록 일괄 등록. items: [{book, status, rating?}]. 개별 실패는 스킵(무중단).
@@ -208,7 +214,7 @@
               const bk = isUuid ? it.book : await A.books.upsert(it.book);
               if (bk && bk.id) { await A.wishBooks.add(bk.id); out.push({ book_id: bk.id, book: bk }); }
             } else {
-              out.push(await this.add({ book: it.book, status: it.status, rating: it.rating }));
+              out.push(await this.add({ book: it.book, status: it.status, rating: it.rating, activate: false }));
             }
           } catch (e) { /* 개별 실패 스킵 */ }
         }
@@ -249,6 +255,22 @@
         // #1203: 다시 읽기 = 이 책을 활성으로 승계 — 홈이 즉시 이 책을 띄우고 새로고침 후에도 유지(중단 탭에 남지 않음).
         if (row) { try { await A.profile.update({ active_user_book_id: userBookId }); } catch (e) {} }
         return row ? _applyBookOverrides(row) : null;
+      },
+      // 잘못 담은 책 완전 삭제 (#1195, Edgar 피드백) — abort(중단, 되돌리기)와 달리 user_books 행 영구 삭제.
+      // 문장(sentences)·세션(reading_sessions)은 FK on delete cascade 로 함께 제거된다(schema.sql).
+      // 활성 책이면 **삭제 전에** 남은 '읽는 중' 책으로 active 승계(#643 abort 동일) —
+      // 그냥 지우면 active_user_book_id FK 가 set null 로 떨어져 홈이 빈 상태가 된다.
+      async remove(userBookId) {
+        const u = await A.profile.get();
+        if (u && u.active_user_book_id === userBookId) {
+          const id = await uid();
+          const next = unwrap(await sb().from('user_books').select('id')
+            .eq('user_id', id).eq('status', 'reading').neq('id', userBookId)
+            .order('started_at', { ascending: false }).limit(1).maybeSingle());
+          await A.profile.update({ active_user_book_id: next ? next.id : null });
+        }
+        await sb().from('user_books').delete().eq('id', userBookId);
+        return { id: userBookId };
       },
     },
     activeBook: {

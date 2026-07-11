@@ -100,6 +100,7 @@ bar pct  = cycleXp / next.minXp * 100       # 숫자와 동일 기준
 여러 책을 동시에 읽을 수 있으나, **항상 한 권이 "활성 책"**.
 
 - 활성 책 = 홈 탭이 그리는 책
+- **새 책 등록 시 active 자동 전환 (#1196, Edgar 피드백)**: 새 책을 **'읽기 시작'(status='reading')** 으로 등록하면 그 책이 **자동으로 활성 책**이 된다 — 이전 책이 남아 유저가 캐러셀 화살표를 찾아 직접 바꾸던 문제 해소. 데이터층(`myBooks.add`)이 등록과 동시에 `active_user_book_id`를 새 `user_book`으로 지정한다(양 어댑터). **찜('읽고 싶어요')·완독 담기는 전환 대상 아님**(reading 만) — 찜은 `add`를 타지 않고, 완독 담기는 `add({status:'completed'})`. 대량 서가 복원(`addBatch`)도 `activate:false`로 마지막 책이 active를 하이재킹하지 않게 한다.
 - **현재 구현 = 좌우 리볼빙 캐러셀 (#185, v7.2)**: 홈 책 카드에 `‹ ›` 화살표 + 하단 점 인디케이터. 읽는 중 책이 2권 이상이면 노출, 좌우로 넘겨 **즉시 활성 책 전환**. 전환 = `window.RG_activateBook` → `activeBook.set` + 둥지 재계산
 - **좌우 스와이프 제스처 (#1001)**: 화살표 버튼과 **동일 전환 로직(`switchBook(dir)`)을 재사용**하는 터치·드래그 제스처를 책 카드에 추가(버튼은 접근성용으로 유지 — 제스처는 *대체가 아니라 추가*).
   - **방향**: **왼쪽으로 밀기 → 다음 책(`dir=+1`)**, **오른쪽으로 밀기 → 이전 책(`dir=-1`)**. 화살표(`‹`=−1·`›`=+1)·"내용이 손가락을 따라온다" 규칙과 일치.
@@ -110,7 +111,7 @@ bar pct  = cycleXp / next.minXp * 100       # 숫자와 동일 기준
   - **책 1권 이하면 비활성**(스와이프 no-op, `touch-action: auto`로 복귀). 끝 책에서 더 밀면 `switchBook`의 모듈러 순환을 따른다(화살표 버튼과 동일).
 - **각 책의 세션·진척·한 문장은 독립 보존**(책 전환 시 데이터 초기화 금지)
 - 데이터: `users.active_user_book_id` ([backend.md §7.8](./backend.md)). 전환 = `DataStore.activeBook.set`
-- **활성 책 중단 시 active 승계 (#643, #593 후속)**: 활성 책을 중단(`status='aborted'`)하면 active를 `null`로 해제만 하지 않고, 남아 있는 `reading` 책으로 **자동 승계**한다(승계 대상 = 캐러셀 첫 책 = `myBooks.list` 순서 첫 reading). 남은 reading 책이 없을 때만 `null` 유지(빈 상태가 올바름). 미승계 시 홈이 "책 등록하기" 빈 상태로 떨어지던 회귀 차단. 양 어댑터(localStorage `abort()` / Supabase `abort()`) 동일 보장.
+- **활성 책 중단/삭제 시 active 승계 (#643, #593 후속 · #1195)**: 활성 책을 중단(`status='aborted'`)하거나 **완전 삭제(`myBooks.remove`, #1195)** 하면 active를 `null`로 해제만 하지 않고, 남아 있는 `reading` 책으로 **자동 승계**한다(승계 대상 = 캐러셀 첫 책 = `myBooks.list` 순서 첫 reading). 남은 reading 책이 없을 때만 `null` 유지(빈 상태가 올바름). 미승계 시 홈이 "책 등록하기" 빈 상태로 떨어지던 회귀 차단. 삭제(Supabase)는 **행 삭제 전에** active를 승계해야 `active_user_book_id` FK가 `set null`로 떨어지지 않는다. 양 어댑터(localStorage / Supabase 의 `abort()`·`remove()`) 동일 보장.
 - ~~구 설계: 표지/제목 탭 → 전환 **시트** 슬라이드업~~ → **캐러셀로 대체(시트 폐기, v7.2)**. 별도 `ActiveBookSheet` 컴포넌트 없음.
 
 ### 5.4 일일 미션 — [§4](./onboarding.md) D 참조
