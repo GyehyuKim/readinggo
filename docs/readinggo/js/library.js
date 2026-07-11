@@ -34,6 +34,7 @@ function LibraryView({ state, onActivateUserBook }) {
   const [followModal, setFollowModal] = _useState(null); // null | 'following' | 'followers' — 유저 목록 모달 (#509)
   // 좋아요한 문장은 내 한 문장 "전체 보기" 컬렉션 모달 내 필터로 이동 (#12)
   const [adminOpen, setAdminOpen] = _useState(false); // 운영 대시보드 (#161)
+  const [importOpen, setImportOpen] = _useState(false); // 타사 앱 밑줄 가져오기 (#1150)
   // 한 줄 소개 인라인 편집 (#515) — 설정 탭에서 이동, 프로필 헤더에서 직접 수정.
   const [bioEditing, setBioEditing] = _useState(false);
   const [bioText, setBioText] = _useState((window.RG_ME && window.RG_ME.bio) || '');
@@ -93,6 +94,47 @@ function LibraryView({ state, onActivateUserBook }) {
       downloadBlob([JSON.stringify(payload, null, 2)], 'application/json',
         `readinggo-export-${(meRow && meRow.handle) || me.handle || 'me'}.json`);
       showToast('데이터를 내보냈어요 (JSON)');
+    } catch (e) { showToast('내보내기 실패'); }
+  };
+  // CSV 내보내기 (#1150) — 한 문장을 스프레드시트로. 한 행=한 문장(책제목·저자·페이지·문장·메모·작성일).
+  const exportCsv = async () => {
+    try {
+      const me = window.RG_ME || {};
+      const { meRow, books, sents } = await collectExport();
+      const handle = (meRow && meRow.handle) || me.handle || 'me';
+      const fmtDate = (v) => {
+        if (!v) return '';
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+        const t = (typeof v === 'number') ? v : Date.parse(v);
+        if (!t || isNaN(t)) return '';
+        const d = new Date(t);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+      const bookMeta = {};
+      books.forEach(ub => {
+        const b = (ub && ub.book) || {};
+        const key = ub.book_id || b.id || ub.id;
+        if (key) bookMeta[key] = { title: b.title || '', author: b.author || '' };
+      });
+      const esc = (v) => {
+        const s = String(v == null ? '' : v);
+        const needsQuote = s.indexOf(',') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0;
+        return needsQuote ? '"' + s.split('"').join('""') + '"' : s;
+      };
+      const rows = [['책제목', '저자', '페이지', '문장', '메모', '작성일']];
+      (sents || []).forEach(s => {
+        const key = s.book_id || (s.user_book && s.user_book.book_id) || '';
+        const meta = bookMeta[key] || {};
+        const eb = (s.user_book && s.user_book.book) || {};
+        rows.push([
+          meta.title || eb.title || '', meta.author || eb.author || '',
+          (typeof s.page === 'number') ? s.page : '', s.text || '',
+          s.my_note || s.note || '', fmtDate(s.created_at || s.createdAt || s.when),
+        ]);
+      });
+      const csv = rows.map(r => r.map(esc).join(',')).join('\r\n');
+      downloadBlob(['﻿', csv], 'text/csv;charset=utf-8', `readinggo-export-${handle}.csv`);
+      showToast('데이터를 내보냈어요 (CSV)');
     } catch (e) { showToast('내보내기 실패'); }
   };
   // Markdown 내보내기 (#920) — 책·완독·한 문장·감상을 사람이 읽기 좋은 .md 로 직렬화.
@@ -703,19 +745,31 @@ function LibraryView({ state, onActivateUserBook }) {
           {window.rgIcon('share',15)} 친구에게 ReadingGo 공유하기
         </button>
 
-        {/* 데이터 내보내기 (#568 설정→서재 이동 · #920 JSON+Markdown 두 포맷)
-            2차 tonal 버튼(DESIGN.md §버튼 위계 — ghost 금지). 한 줄에 나란히. */}
-        <div style={{marginTop:10, display:'flex', gap:8}}>
+        {/* 내 데이터 (#568 설정→서재 이동 · #920 JSON+Markdown · #1150 CSV + 가져오기)
+            데이터 주권 — 내보내기(JSON/CSV/Markdown) + 타사 앱 밑줄 가져오기.
+            2차 tonal 버튼(DESIGN.md §버튼 위계 — ghost 금지). */}
+        <div style={{marginTop:24, marginBottom:4}}>
+          <div style={{fontWeight:800, fontSize:14, color:'var(--ink)'}}>내 데이터</div>
+          <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:3, lineHeight:1.5}}>기록은 당신 것 — 언제든 가져가고, 다른 앱에 흩어진 밑줄도 불러올 수 있어요.</div>
+        </div>
+        <div style={{marginTop:8, display:'flex', gap:8}}>
           {[
             { fn: exportData, label: 'JSON', title: '구조화 데이터(백업·재가져오기용)' },
+            { fn: exportCsv, label: 'CSV', title: '스프레드시트(엑셀·구글시트)' },
             { fn: exportMarkdown, label: 'Markdown', title: '사람이 읽기 좋은 독서 기록 문서' },
           ].map(b => (
             <button key={b.label} onClick={b.fn} title={`${b.title}로 내보내기`}
-              style={{flex:1, padding:'12px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
-              {window.rgIcon('download',15)} {b.label}로 내보내기
+              style={{flex:1, padding:'12px 8px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, fontSize:13.5, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
+              {window.rgIcon('download',15)} {b.label}
             </button>
           ))}
         </div>
+        {/* 타사 앱 밑줄 가져오기 (#1150) — 교보·밀리 등 저장한 밑줄 스크린샷 → vision 추출 → 담기 */}
+        <button onClick={() => setImportOpen(true)}
+          style={{marginTop:8, display:'block', width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
+          <div style={{fontWeight:800, fontSize:14, display:'flex', alignItems:'center', gap:6}}>{window.rgIcon('upload',15)} 타사 앱 밑줄 가져오기</div>
+          <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>교보·밀리 등에서 저장한 밑줄 <b>스크린샷</b>을 올리면 문장만 골라 담아요</div>
+        </button>
       </div>
 
       {/* 책 상세 모달 */}
@@ -726,6 +780,10 @@ function LibraryView({ state, onActivateUserBook }) {
           onClose={() => setSelectedBookId(null)}
           onActivate={onActivateUserBook}
         />,
+        document.body
+      )}
+      {importOpen && ReactDOM.createPortal(
+        <DataImport onClose={() => setImportOpen(false)} />,
         document.body
       )}
       {adminOpen && ReactDOM.createPortal(
