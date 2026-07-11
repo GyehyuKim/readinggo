@@ -76,7 +76,7 @@ function BookInfoModal({ bookId, onClose }) {
     const DS = window.DataStore || {};
     setSeeding(true);
     // 1) 큐잉 트리거(동기 대기 안 함). 워커가 seed_queue 에 high 우선순위로 upsert.
-    fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: bk.title, author: bk.author || '', isbn: bk.isbn13 || bk.isbn || '', have: popular.length }) }).catch(() => {});
+    window.RG_apiFetch('/api/seed', { method: 'POST', rgQuiet: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: bk.title, author: bk.author || '', isbn: bk.isbn13 || bk.isbn || '', have: popular.length }) }).catch(() => {});
     // 2) byBook 폴링(최대 5회 × 4초) — 채워지면 popular 갱신·중단, 아니면 '모으는 중' 유지.
     const MAX = 5, DELAY = 4000;
     let tries = 0;

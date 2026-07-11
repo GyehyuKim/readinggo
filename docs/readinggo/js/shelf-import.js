@@ -147,7 +147,7 @@ const RG_shelfImport = (function () {
     if (!t) return { books: [], empty: true };
     let data = null;
     try {
-      const r = await fetch('/api/parse-books', {
+      const r = await window.RG_apiFetch('/api/parse-books', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: t.slice(0, 32 * 1024) }),   // 32KB 상한(워커도 동일 컷)
@@ -186,7 +186,7 @@ const RG_shelfImport = (function () {
   async function _postImage(blob, filename) {
     const fd = new FormData();
     fd.append('document', blob, filename);
-    const r = await fetch('/api/shelf-import', { method: 'POST', body: fd });
+    const r = await window.RG_apiFetch('/api/shelf-import', { method: 'POST', body: fd });
     let data = null;
     try { data = await r.json(); } catch (e) { data = null; }
     return { ok: r.ok, status: r.status, data };

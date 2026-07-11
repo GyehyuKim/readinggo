@@ -23,7 +23,7 @@ function pickCompanionQ(text) {
 // 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 목 질문 폴백 — 데모 무중단.
 async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid) {
   try {
-    const r = await fetch('/api/companion', {
+    const r = await window.RG_apiFetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote', avoid: avoid || '', preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : '') }),
     });
@@ -34,7 +34,7 @@ async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid) {
 // 멀티턴 후속 질문 (#327) — 이전 대화(exchanges) 전달 → 한 걸음 더 깊은 되물음. 실패 시 목 폴백. avoid(#372) 재생성용.
 async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind, avoid) {
   try {
-    const r = await fetch('/api/companion', {
+    const r = await window.RG_apiFetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote', avoid: avoid || '', preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : '') }),
     });

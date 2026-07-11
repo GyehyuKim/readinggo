@@ -430,7 +430,7 @@ async function recommendRelated(book, limit = 6) {
   if (_relatedCache[ck]) return _relatedCache[ck];
   let suggestions = [];
   try {
-    const res = await fetch('/api/related', {
+    const res = await window.RG_apiFetch('/api/related', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: book.title, author: book.author || '', isbn: book.isbn || '' }),
@@ -522,7 +522,7 @@ function ocrExtractSentence(file) {
   if (file.size && file.size > OCR_MAX_BYTES) return Promise.resolve({ text: '', error: 'too_large' });
   const fd = new FormData();
   fd.append('document', file, file.name || 'page.jpg');
-  return fetch('/api/ocr', { method: 'POST', body: fd })
+  return window.RG_apiFetch('/api/ocr', { method: 'POST', body: fd })
     .then((r) => r.json().catch(() => ({})))
     .then((d) => {
       if (d && d.text) return { text: String(d.text).slice(0, 1000) };

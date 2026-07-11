@@ -41,6 +41,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'companion'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return companionProxy(request, env);
     }
     // 독서 위키 Q&A — "내 문장에게 묻기" (#1007). 사용자가 모은 한 문장(+감상)에만 근거해 답.
@@ -49,6 +50,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'wiki-ask'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return wikiAskProxy(request, env);
     }
     // 유연 도서기록 임포트 — 붙여넣기/파일 텍스트 → 책 목록 구조화 (#1039). wiki-ask 형제.
@@ -57,6 +59,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'parse-books'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return parseBooksProxy(request, env);
     }
     // 계정 삭제 (#875, Apple 심사 필수) — 호출자 토큰으로 본인 확인 후 service_role 로 admin 삭제.
@@ -72,6 +75,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'ocr'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return ocrProxy(request, env);
     }
     // 배치 OCR — 사진에서 강조(밑줄/형광펜) 문장 추출 (#844). Gemini Flash vision(이미지 이해). 키 서버만, 동일출처만.
@@ -79,6 +83,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'extract-highlights'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return extractHighlightsProxy(request, env);
     }
     // 통합 서가 ① 스샷 서가 복원 (#772·#1042) — 구매내역/서재 캡쳐 → 책 목록 구조화 추출.
@@ -88,6 +93,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'shelf-import'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return shelfImportProxy(request, env);
     }
     // 통합 서가 ② 마중물 시드 (#774) — 빈 책에 '남이 읽은 한 문장'. 네이버 블로그 검색(준공식·출처제공)
@@ -96,6 +102,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'seed'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return seedProxy(request, env);
     }
     // 관련 도서 추천 — 이 책과 함께 읽을 책 (#496). LLM은 제목·저자만 제시하고,
@@ -104,6 +111,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'related'); if (rl) return rl; }
+      { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return relatedProxy(request, env);
     }
     // 책 캐노니컬 upsert (#1191) — 검색 raw id(b001/외서/aladin)를 books 캐노니컬 id 로 해소.
@@ -1767,4 +1775,27 @@ async function rateLimited(request, env, name) {
     await env.OTA_KV.put(key, String(cur + 1), { expirationTtl: 120 });
     return null;
   } catch (e) { return null; }   // fail-open
+}
+
+/* ── Turnstile 봇 검증 (#1158/#1159) — 레이트리밋 다음 2번째 계층 ─────────────
+   staged rollout·fail-open: env.TURNSTILE_SECRET 이 없으면 코드가 있어도 무동작(null 반환)이라
+   배포해도 inert. ops 가 secret 을 넣는 순간부터 강제(클라가 토큰 보내는 걸 확인한 뒤). rateLimited 형제.
+   siteverify 자체가 죽으면(Cloudflare outage) fail-open 으로 앱을 안 죽인다. */
+async function verifyTurnstile(request, env) {
+  if (!env.TURNSTILE_SECRET) return null;   // 시크릿 미설정 → fail-open(무동작)
+  const token = request.headers.get('cf-turnstile-token') || request.headers.get('x-turnstile-token') || '';
+  if (!token) return json({ error: 'turnstile required' }, 403);
+  try {
+    const body = new URLSearchParams();
+    body.set('secret', env.TURNSTILE_SECRET);
+    body.set('response', token);
+    const ip = request.headers.get('CF-Connecting-IP');
+    if (ip) body.set('remoteip', ip);
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST', body,
+    });
+    const d = await r.json();
+    if (d.success !== true) return json({ error: 'turnstile failed' }, 403);
+    return null;
+  } catch (e) { return null; }   // siteverify 네트워크 실패 → fail-open
 }

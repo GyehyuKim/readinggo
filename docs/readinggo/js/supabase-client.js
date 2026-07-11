@@ -208,7 +208,7 @@ window.RG_wikiAsk = async function RG_wikiAsk(question, mine) {
       page: (s.page != null) ? s.page : '',
     }))
     .filter((it) => it.text);
-  const r = await fetch('/api/wiki-ask', {
+  const r = await window.RG_apiFetch('/api/wiki-ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question: String(question || '').trim(), items }),

@@ -7,6 +7,9 @@ window.RG_CONFIG = {
   SUPABASE_URL: 'https://cttllwwkaddghqttyhkg.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_R-f42NFOGq3dxqMlootNlQ_Us4AdUd-',
   ALADIN_PROXY: '/.netlify/functions/aladin',   // 서버리스 프록시 (TTBKey 서버에만)
+  // Cloudflare Turnstile 봇 검증 (#1158/#1159) — Site Key 는 공개 안전(공개용). Secret 은 워커에만.
+  // 이 키로 클라가 invisible 위젯을 렌더·execute 해 토큰을 얻고, 고비용 호출에 헤더로 실어 보낸다(js/turnstile.js).
+  TURNSTILE_SITE_KEY: '0x4AAAAAADzohLLzr5rxFSbM',
   // 추천 피드 점수 (#787) — 신선도 반감기(일)·좋아요 가중·후보 풀 크기.
   // 데이터가 적으면 좋아요=0 → log항=0 → 신선도(최신순)로 수렴하므로 빈 단계에서도 안전.
   FEED_RECOMMEND: { halfLifeDays: 10, clapWeight: 1.2, poolSize: 120 },

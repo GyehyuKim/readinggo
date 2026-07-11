@@ -5,6 +5,7 @@ import './setup-globals.js';
 
 // 2) 백엔드 계층(순수 JS) — 기존 plain <script> 순서.
 import './js/config.js';
+import './js/turnstile.js';   // #1158/#1159 Turnstile 봇 검증 — RG_apiFetch/RG_turnstileToken (config 다음, app 이전)
 import './js/supabase-client.js';
 import './js/datastore-supabase.js';
 

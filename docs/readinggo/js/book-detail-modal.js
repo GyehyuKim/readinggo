@@ -93,7 +93,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       try {
         const fd = new FormData();
         fd.append('document', files[i], files[i].name || ('p' + i + '.jpg'));
-        const r = await fetch('/api/extract-highlights', { method: 'POST', body: fd });
+        const r = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
         if (!r.ok) { failed++; }              // 503(미설정)·502(vision 실패, 지역 flap 포함) 등 → 실패로 집계
         else { const d = await r.json(); if (d && Array.isArray(d.sentences)) all.push(...d.sentences); }
       } catch (e) { failed++; /* 네트워크 실패 — 부분 완료 */ }
@@ -189,7 +189,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     setRecapLoading(true);
     try {
       const sentences = (bookQuotes || []).map(q => ({ text: q.text }));
-      const r = await fetch('/api/companion', {
+      const r = await window.RG_apiFetch('/api/companion', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'recap', bookTitle: book.title, author: book.author || '',
