@@ -748,6 +748,7 @@ function App() {
           ub = await Promise.resolve(DataStore.myBooks.add({
             book: { isbn13: isbn13, title: book.title, author: book.author, publisher: book.publisher, total_pages: totalPages, cover_url: book.cover_url },
             current_page: shelf === 'completed' ? totalPages : 0,
+            status: shelf,   // 'reading'|'completed' — 완독 담기는 active 자동전환 제외(#1196)
           }));
         }
         if (!ub || !ub.id) return;

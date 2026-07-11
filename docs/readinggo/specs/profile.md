@@ -69,6 +69,7 @@
 - **타인 프로필 = 전체 페이지 (v7.2, #3·4·5)**: 피드 @닉 탭 → 풀스크린 프로필. ① 헤더(닉·완독/읽는중/스트릭/XP·팔로우 버튼) ② **책장 6권+더보기**(읽은/읽는중 필터 토글) ③ **❤️ 읽고 싶어하는 책**(대상 user의 `wishlist_public=true`일 때만 노출 — [feed.md §5.7.2](./feed.md)) ④ 공개 한 문장. **책 카드 탭 → 그 사람의 그 책 평점·후기·한 문장 드릴다운**(`users.bookContrib`). DataStore: `users.publicShelf`/`users.publicWishlist`/`bookContrib` ([backend.md §7.2](./backend.md))
 - 관심 책 추가: 소셜 피드 한 문장 → 책 상세 → "관심 책에 추가" (`DataStore.wishBooks.add`)
 - **책 중단 동선 (#593)**: 읽는 중 책의 상세(`BookDetailModal`)에서 **"읽기 중단"** → `DataStore.myBooks.abort(ubId)` → status='aborted'. 중단 책은 "읽는 중"·"완독"에서 빠지고 **"중단" 탭**으로 이동한다. 진척(`current_page`)은 보존되어 "다시 읽기"(`resume`) 시 그대로 이어진다. **`resume`은 status='reading' 갱신에 더해 그 책을 활성 책(`active_user_book_id`)으로 승계**(#1203) — 홈이 즉시 이 책을 띄우고 새로고침 후에도 '읽는 중'에 남는다(중단 탭에 잔류하지 않음). 양 어댑터 동일. 중단은 **삭제가 아니며**(책장에서 사라지지 않음) 완독 카운트·XP 주기에 영향 없다.
+- **책 완전 삭제 동선 (#1195, Edgar 피드백)**: 잘못 담은 책을 되돌릴 수 없게 **영구 삭제**. 책 상세(`BookDetailModal`)에 중단과 **구분되는 3차 danger 텍스트 버튼 "이 책 삭제"** → `DataStore.myBooks.remove(ubId)`. 모든 상태(읽는 중·중단·완독)에서 노출된다. **확인창은 기록 유무를 알린다**: 한 문장이 N개 있으면 "한 문장 N개도 함께 삭제…", 문장 없이 읽은 진척만 있으면 "읽은 기록도 함께 삭제…", 아무 기록도 없으면 단순 확인. 삭제 시 그 책의 문장·세션도 함께 사라진다(Supabase는 `sentences`·`reading_sessions` FK `on delete cascade`, localStorage는 `user_book`에 내포). **활성 책을 삭제하면 남은 reading 책으로 active 승계**([nest.md §5.3](./nest.md)) — 홈이 빈 상태로 떨어지지 않는다. 중단(되돌리기 가능)과 삭제(영구)는 별개 액션이다.
 
 #### 5.8.3 완독 별점 + 소감 (v7 신설)
 
@@ -90,7 +91,7 @@
   - **Phase 0 소스**: worker `POST /api/related`(LLM, `{isbn,title,author}` → `{books:[{isbn,title,author}]}`)가 ISBN-13 포함 후보를 제시 → 클라 `filterRelatedCandidates` 가 **books DB의 ISBN과 정확 일치(+정규화 제목 일치)** 일 때만 통과시키는 **ISBN 환각 필터**로 지어낸 책을 버리고 실제 책만 노출. LLM ISBN 은 신뢰하지 않으며 제목 prefix 매칭은 쓰지 않음. 매칭 0이면 섹션 자체를 숨김(빈 캐러셀·허위 없음).
   - **신뢰 카피 차등 (§5.8.6 정직성)**: Phase 0은 실제 '함께 읽은 사람들' 집계가 없으므로 **"N명이 함께 읽었어요" 류 허위 카피 금지** — "함께 읽으면 좋은 책"으로만 표기. 실제 공동독서 집계('이 책 읽은 사람들이 읽은 책')는 **Phase 1**에 Supabase `user_books` 기반 RPC로 강화(backend.md §7.9). 관련: [backend.md #489 환각 필터](./backend.md)
 - **Export (v7.4, #315 — 북모리 양식 벤치마킹)**: Markdown 다운로드. **책 메타**(제목·저자/역자·출판사·쪽수·ISBN·표지) + **완독 정보**(별점·소감·완독일, 완독 시) + **한 문장**(`### p.N · YYYY-MM-DD` + `> 문장` + 감상). 날짜는 `created_at` 복원(미파싱 시 생략). 단일 책·책별 일괄 Markdown은 **UTF-8 BOM**을 포함해 Windows 자동 인코딩 감지에서도 한글이 깨지지 않아야 한다. **책 소개(description)는 후속**(알라딘 ItemLookUp OptResult 확장, #302 합류). Phase 2 이미지 카드
-- 책 삭제: 길게 누름 → 확인 모달. 누적 기록 soft delete
+- 책 삭제(#1195): 상세 하단 3차 "이 책 삭제" 버튼 → 기록 유무 확인창 → **hard delete**(문장·세션 cascade, 활성 책이면 active 승계). 상세 동선은 §5.8.2 "책 완전 삭제 동선"
 
 #### 5.8.5 좋아요한 문장 (저장 = 좋아요 단일화, #641)
 
