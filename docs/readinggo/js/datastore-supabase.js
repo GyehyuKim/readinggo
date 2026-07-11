@@ -246,6 +246,8 @@
       async resume(userBookId) {
         const row = unwrap(await sb().from('user_books').update({ status: 'reading' }).eq('id', userBookId)
           .select('*, book:books(*)').maybeSingle());
+        // #1203: 다시 읽기 = 이 책을 활성으로 승계 — 홈이 즉시 이 책을 띄우고 새로고침 후에도 유지(중단 탭에 남지 않음).
+        if (row) { try { await A.profile.update({ active_user_book_id: userBookId }); } catch (e) {} }
         return row ? _applyBookOverrides(row) : null;
       },
     },
@@ -265,6 +267,8 @@
         const id = await uid();
         const today = _today();
         // 활동 히트맵(#195)용 일별 읽은 쪽수: 직전 current_page 대비 증분을 그날 누적.
+        // #1203 재독: 입력 page 가 현재 진도보다 낮아도 current_page 를 그 값으로 덮어씀(아래).
+        //   증분(delta)은 0으로 클램프해 히트맵에 음수가 들어가지 않게 한다(재독은 쪽수 추가 아님).
         let pagesToday = 0;
         let durationToday = (typeof duration_sec === 'number' && duration_sec > 0) ? duration_sec : 0;
         if (typeof page === 'number') {

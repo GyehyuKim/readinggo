@@ -642,7 +642,9 @@ function App() {
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
   // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind) => {
+  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage) => {
+    // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
+    const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
     setAppState(s => ({
       ...s,
       book: ns.book,
@@ -660,7 +662,7 @@ function App() {
         window.localStorageAdapter.mutate(s => {
           s.pending = s.pending || {};
           s.pending.book = { isbn13: b.isbn13 || '', title: b.title || '', author: b.author || '', total_pages: b.total || 0, current_page: b.cur || 0, cover_url: b.cover || '' };
-          s.pending.sentence = { text: sentence, page: b.cur || 0 };
+          s.pending.sentence = { text: sentence, page: qPage };
           return s;
         });
       } catch (e) {}
@@ -680,7 +682,7 @@ function App() {
         }
         if (!ubId) { console.warn('[ReadingGo] 체크인: 화면 책의 user_book 미해소 — 잘못된 귀속 방지 위해 저장 건너뜀'); surfaceWriteError(new Error('user_book 미해소'), '기록을 저장하지 못했어요 — 다시 시도해주세요'); return; }
         await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
-        if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: ns.book.cur, text: sentence, kind: kind || 'quote' }));
+        if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote' }));
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ubId + ')');
         // 오늘 기록 완료 → 리마인더 재무장(오늘치 취소, 내일로). '읽었는데 알림 발화' 방지(#1163). 웹/비네이티브 no-op.

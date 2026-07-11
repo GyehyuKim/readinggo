@@ -241,7 +241,13 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   const resumeBook = () => {
     if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.resume)) return;
     Promise.resolve(DataStore.myBooks.resume(book.ubId))
-      .then(() => { showToast('다시 읽기 시작 — 읽는 중으로 옮겼어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
+      .then(() => {
+        showToast('다시 읽기 시작 — 읽는 중으로 옮겼어요');
+        window.dispatchEvent(new CustomEvent('rg:wish-changed'));
+        // #1203: 홈이 즉시 이 책을 띄우도록 활성 책으로 전환(resume 이 DB active 도 설정 — UI 동기화·홈 이동).
+        if (window.RG_activateBook) window.RG_activateBook({ id: book.id, ubId: book.ubId, title: book.title, author: book.author, pub: book.pub, cur: book.cur, total: book.total, cover: book.cover });
+        onClose();
+      })
       .catch(() => showToast('다시 읽기 실패 — 다시 시도'));
   };
   // 내 한 문장 좋아요(즐겨찾기) — claps 단일(#641: 자기 문장 좋아요=저장 통일), 토글 (#11)

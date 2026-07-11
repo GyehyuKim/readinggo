@@ -430,6 +430,7 @@ const DataStore = {
         const ub = _ubById(s, userBookId);
         if (!ub) return null;
         ub.status = 'reading';
+        s.active_user_book_id = ub.id;   // #1203: 다시 읽기 = 활성 책으로 (홈 즉시 표시·새로고침 유지)
         return _applyBookOverrides(ub);
       });
     },
