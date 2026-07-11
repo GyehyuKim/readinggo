@@ -367,8 +367,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const runOcrQuick = (file) => {
     if (!file || quickOcrBusy) return;
     if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
-    setQuickOcrBusy(true);
-    showToast('사진에서 글자를 읽는 중…');
+    setQuickOcrBusy(true); // 스피너 오버레이(#1201)가 진행 피드백 — 시작 토스트 불필요(중복 제거)
     Promise.resolve((window.ocrExtractSentence ? window.ocrExtractSentence(file) : Promise.resolve({ text: '', error: 'unavailable' })))
       .then((d) => {
         if (d && d.text) {
@@ -722,6 +721,15 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       {/* 크롭 오버레이 */}
       {quickOcrFile && (
         <OcrCropOverlay file={quickOcrFile} onCancel={() => setQuickOcrFile(null)} onCrop={(blob) => { setQuickOcrFile(null); runOcrQuick(blob); }} />
+      )}
+
+      {/* OCR 추출 로딩 (#1201) — 토스트는 2.2s 후 사라져 장시간 추출 동안 피드백 공백.
+          runOcrQuick 시작~finally 동안 스피너 오버레이로 진행 중임을 유지(성공·실패 모두 자동 해제). */}
+      {quickOcrBusy && (
+        <div style={{ position: 'fixed', inset: 0, height: 'var(--app-h, 100dvh)', background: 'rgba(0,0,0,0.62)', zIndex: 1100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: '#fff' }}>
+          <div className="rg-spinner" />
+          <div style={{ fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>{window.rgIcon('camera', 17)} 사진에서 글자를 읽는 중…</div>
+        </div>
       )}
 
       {/* '오늘 기록 완료 · N일 연속' nudge 제거 (#481) */}
