@@ -83,8 +83,26 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `streak-reminder.js` | 181 | `RG_streakReminder` | 스트릭 로컬 알림(#1033) |
 | `sheet-drag.js` | 201 | (전역 부수효과) | 바텀시트 drag-to-dismiss(#1046) |
 | `inapp.js` | 38 | `RG_inApp` | 인앱 브라우저 감지·외부 열기(#1096) |
+| `nav.js` | 66 | `RG_nav`·`useOverlayBack` | 뒤로가기로 최상위 오버레이 닫기(#1199) |
 | `app.js` | 837 | `RG_*` 핸들러·`createRoot` | 최상위 앱·라우팅 |
 | `onboarding.js` | 402 | `OnboardingFlow` | ⚠️ **index.html 부팅에 미로드 — 미사용 추정**(§11) |
+
+### 2.3 뒤로가기 → 오버레이 닫기 (`nav.js`, #1199)
+
+모달·시트·풀스크린(로그인 포함)은 `app.js` 상태로만 열려 브라우저 히스토리에 흔적이 없었다.
+모바일 Safari에서 뒤로 제스처(엣지 스와이프 = 브라우저 back)를 쓰면 앱의 단일 히스토리
+엔트리가 pop돼 초기/로그인 화면으로 튕겼다(모달만 닫히길 기대). `nav.js`가 중앙 집중식으로:
+
+- **열림**: 오버레이가 열릴 때 합성 `history.pushState` 엔트리 1개 push(스택에 close 콜백 등록).
+- **뒤로가기**: 전역 `popstate` 리스너 하나가 스택 최상위 하나만 닫는다(실제 앱 히스토리·로그인
+  상태 불변). 스택이 비어 있으면 기본 동작(로그인으로 튕기지 않음).
+- **UI 닫기(X·배경탭)**: `history.back()`으로 push했던 합성 엔트리를 되돌려 동기화(죽은 엔트리
+  누적 = "뒤로가기가 안 먹힘" 방지). self-호출 back이 유발한 popstate는 카운터로 무시.
+- **등록**: React 오버레이는 `app.js`에서 `useOverlayBack(open, close)` 한 줄(오버레이 12종:
+  로그인·검색·프로필·설정·재키·책상세/정보·문장모음·서가/텍스트 임포트·방·초대). 비-React/포털
+  오버레이는 `window.RG_nav.push/drop`로 직접 등록 가능. 탭 전환·읽기모드 포털은 현재 미포함
+  (범위: 신고된 "모달 열고 뒤로가기 → 모달 닫힘, 로그아웃 안 됨"에 한정).
+- `sheet-drag.js`(grip 드래그 닫기)와 독립 — 둘 다 각 모달의 `onClose`로 수렴(충돌 없음).
 
 ---
 

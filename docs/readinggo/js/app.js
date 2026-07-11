@@ -832,6 +832,23 @@ function App() {
   // 활성 책 전환을 전역 노출 — 둥지 캐러셀(#185)이 호출
   useEffect(() => { window.RG_activateBook = handleActivateUserBook; return () => { window.RG_activateBook = null; }; }, [handleActivateUserBook]);
 
+  // 뒤로가기로 최상위 오버레이 닫기 (#1199, nav.js). 각 오버레이 상태가 열리면 합성 history
+  // 엔트리를 push하고, 브라우저/OS 뒤로가기(모바일 Safari 엣지 스와이프)가 오면 최상위 하나만
+  // 닫는다 — 실제 앱 히스토리/로그인 상태로 튕기지 않도록. 훅은 매 렌더 같은 순서로 호출.
+  const _overlayBack = window.useOverlayBack || (() => {});
+  _overlayBack(showLogin, () => setShowLogin(false));
+  _overlayBack(isSearchOpen, () => { setIsSearchOpen(false); setSearchPrefill(''); });
+  _overlayBack(!!profileHandle, () => setProfileHandle(null));
+  _overlayBack(settingsOpen, () => setSettingsOpen(false));
+  _overlayBack(!!companionSentence, () => setCompanionSentence(null));
+  _overlayBack(!!bookDetailItem, () => setBookDetailItem(null));
+  _overlayBack(!!bookDetailId, () => setBookDetailId(null));
+  _overlayBack(collectionOpen, () => setCollectionOpen(false));
+  _overlayBack(shelfImportOpen, () => setShelfImportOpen(false));
+  _overlayBack(textImportOpen, () => setTextImportOpen(false));
+  _overlayBack(!!roomOpenId, () => setRoomOpenId(null));
+  _overlayBack(!!invitePreview, () => setInvitePreview(null));
+
   // Phase 1 인증 — 게스트 우선(onboarding.md §4). 로그인은 '저장' 시점에만 요구.
   if (_supa && authUser === undefined) return (<BootSplash text="확인 중..." />);
   if (showLogin) return (<LoginScreen onLogin={(provider) => window.RG_SB.signInWithOAuth(provider || 'google')} onBack={() => setShowLogin(false)} />);
