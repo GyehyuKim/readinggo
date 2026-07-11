@@ -642,9 +642,11 @@ function App() {
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
   // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage) => {
+  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences) => {
     // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
+    // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
+    const batch = Array.isArray(sentences) ? sentences.filter(s => s && s.text && String(s.text).trim()) : null;
     setAppState(s => ({
       ...s,
       book: ns.book,
@@ -656,7 +658,8 @@ function App() {
     window.dispatchEvent(new CustomEvent('rg:today-checked'));
     // 게스트(로그아웃 + Supabase 모드): 저장-worthy 한 책·문장을 pending 에 포착 →
     // 로그인 시 syncPendingToSupabase 가 흡수(§7.7). DataStore 가 아직 localStorage 인 동안만.
-    if (_supa && window.SupabaseDataStore && window.DataStore !== window.SupabaseDataStore && sentence) {
+    // 배치(#1198)는 pending 단일 캡처 대신 localStorage user_book.sentences 의 _guest 마킹으로 로그인 시 일괄 이전됨(syncPendingToSupabase §7.7). 단일만 레거시 pending 캡처.
+    if (_supa && window.SupabaseDataStore && window.DataStore !== window.SupabaseDataStore && sentence && !batch) {
       try {
         const b = ns.book || {};
         window.localStorageAdapter.mutate(s => {
@@ -682,7 +685,14 @@ function App() {
         }
         if (!ubId) { console.warn('[ReadingGo] 체크인: 화면 책의 user_book 미해소 — 잘못된 귀속 방지 위해 저장 건너뜀'); surfaceWriteError(new Error('user_book 미해소'), '기록을 저장하지 못했어요 — 다시 시도해주세요'); return; }
         await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
-        if (sentence) await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote' }));
+        if (batch && batch.length) {
+          // 배치: N개 문장을 개별 add(공유 페이지). 진도·세션·XP·스트릭은 위/아래에서 1회만(#1198).
+          for (const s of batch) {
+            try { await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote' })); } catch (e) { console.warn('[ReadingGo] 배치 문장 저장 실패(1건 스킵):', (e && e.message) || e); }
+          }
+        } else if (sentence) {
+          await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote' }));
+        }
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ubId + ')');
         // 오늘 기록 완료 → 리마인더 재무장(오늘치 취소, 내일로). '읽었는데 알림 발화' 방지(#1163). 웹/비네이티브 no-op.

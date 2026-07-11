@@ -1161,6 +1161,17 @@
         return count || 0;
       },
     },
+    // 한 문장 초안 임시저장 (#1198) — 미확정 문장 뭉치. 로그인 모드에서도 커밋 전까지 로컬 전용
+    //   (서버 미기록). 피처 파일이 localStorage 를 직접 만지지 않도록 계약 도메인으로 노출.
+    drafts: {
+      _key(bookId) { return 'rg_sentence_drafts:' + (bookId || '_'); },
+      load(bookId) {
+        try { const r = JSON.parse(localStorage.getItem(this._key(bookId)) || '[]'); return (Array.isArray(r) && r.length) ? r.map(x => String(x || '')) : ['']; } catch (e) { return ['']; }
+      },
+      save(bookId, arr) {
+        try { const k = this._key(bookId); if ((arr || []).some(x => x && x.trim())) localStorage.setItem(k, JSON.stringify(arr)); else localStorage.removeItem(k); } catch (e) { /* 초안 저장 실패 무해 */ }
+      },
+    },
   };
 
   window.SupabaseDataStore = A;
