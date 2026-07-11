@@ -143,10 +143,21 @@
       // 완독 → status='completed' (+rating/review_text). 성 직접 지급 없음 — 성(🏰)은 XP 주기 파생(castles.list, #520/#521).
       async complete(userBookId, opts) {
         opts = opts || {};
+        const u = await A.profile.get();
         const patch = { status: 'completed', completed_at: new Date().toISOString() };
         if (typeof opts.rating !== 'undefined') patch.rating = opts.rating;
         if (typeof opts.review_text !== 'undefined') patch.review_text = opts.review_text;
-        return unwrap(await sb().from('user_books').update(patch).eq('id', userBookId).select().single());
+        const row = unwrap(await sb().from('user_books').update(patch).eq('id', userBookId).select().single());
+        // 완독한 책이 활성이면 남은 '읽는 중' 책으로 active 승계 (abort #643 동일) —
+        // 안 하면 완독책이 활성으로 남아 홈이 완독책을 '읽는 중'으로 띄운다(#1217).
+        if (u && u.active_user_book_id === userBookId) {
+          const id = await uid();
+          const next = unwrap(await sb().from('user_books').select('id')
+            .eq('user_id', id).eq('status', 'reading').neq('id', userBookId)
+            .order('started_at', { ascending: false }).limit(1).maybeSingle());
+          await A.profile.update({ active_user_book_id: next ? next.id : null });
+        }
+        return row;
       },
       // 참새 완독 회고 캐시 (#352) — user_books.companion_recap. 본인 행만(RLS ub_mod).
       async saveRecap(userBookId, recap) {
