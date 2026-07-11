@@ -25,11 +25,15 @@ function Ceremony({ data, onClose, onComplete }) {
     return () => { alive = false; };
   }, []);
   if (!data) return null;
-  const { xpGain, xpParts, sentence, bookQuoteCount, nestUp, castleGained, castleCount, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
-  // 이번 체크인에 실제로 한 문장을 등록했는가 (#685) — 페이지만 저장 시 false.
-  const savedSentence = !!(sentence && String(sentence).trim());
+  const { xpGain, xpParts, sentence, sentenceCount, bookQuoteCount, nestUp, castleGained, castleCount, prevLv, newLv, prevXp, newXp, pagesAdded, isNewDay, wasReset, isComplete } = data;
+  // 이번 체크인에 등록한 한 문장 수 — 배치(#1198)면 sentenceCount, 단일이면 sentence 유무.
+  const savedCount = (typeof sentenceCount === 'number' && sentenceCount > 0) ? sentenceCount : (sentence && String(sentence).trim() ? 1 : 0);
+  const savedSentence = savedCount > 0;
   let leadText;
-  if (savedSentence) {
+  if (savedCount > 1) {
+    // 배치 요약(#1198): "N개의 한 문장 기록 · +N쪽" — N번의 세리머니 대신 1회 요약.
+    leadText = `${savedCount}개의 한 문장 기록${pagesAdded > 0 ? ` · +${pagesAdded}쪽` : ''}`;
+  } else if (savedSentence) {
     // 한 문장 등록: "1개 문장 등록 +N XP" (#685)
     leadText = `1개 문장 등록 +${xpGain} XP`;
   } else if (!isNewDay && !wasReset) {
@@ -111,9 +115,9 @@ function Ceremony({ data, onClose, onComplete }) {
           </div>
           {/* 한 문장 카드 (#549) — 문장 입력 시 '저장됨', 미입력 시 거짓 표시 대신 이 책 누적 수/0건 독려 */}
           <div className="reward-card gold">
-            <span className="ico">{sentence ? window.rgIcon('bookmark', 22) : (bookQuoteCount > 0 ? window.rgIcon('book', 22) : window.rgIcon('pen', 22))}</span>
-            <div className="val">{sentence ? '저장됨' : (bookQuoteCount > 0 ? `${bookQuoteCount}개` : '0개')}</div>
-            <div className="lbl">{sentence ? '한 문장' : (bookQuoteCount > 0 ? '이 책 한 문장' : '한 문장 남겨봐요')}</div>
+            <span className="ico">{savedSentence ? window.rgIcon('bookmark', 22) : (bookQuoteCount > 0 ? window.rgIcon('book', 22) : window.rgIcon('pen', 22))}</span>
+            <div className="val">{savedCount > 1 ? `${savedCount}개` : (savedSentence ? '저장됨' : (bookQuoteCount > 0 ? `${bookQuoteCount}개` : '0개'))}</div>
+            <div className="lbl">{savedSentence ? '한 문장' : (bookQuoteCount > 0 ? '이 책 한 문장' : '한 문장 남겨봐요')}</div>
           </div>
         </div>
 
