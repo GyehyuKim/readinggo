@@ -60,7 +60,7 @@
 |---|---|
 | 읽는 중 | 진행 중인 책 목록 + 진척률. 탭 → 활성 책 전환 가능 |
 | 완독 | 완독 책 목록. 별점·소감·완독일 표시. XP 주기 성과는 별개 |
-| 중단 | **읽다 그만둔 책** (`user_books.status='aborted'`, #593). 표지+제목+저자+중단 시점 진척률. 카드 탭 → 책 상세. **"다시 읽기"**(`DataStore.myBooks.resume` → 읽는 중 복귀, `current_page` 보존) 제공. 완독·XP 주기와 무관 |
+| 중단 | **읽다 그만둔 책** (`user_books.status='aborted'`, #593). 표지+제목+저자+중단 시점 진척률. 카드 탭 → 책 상세. **"다시 읽기"**(`DataStore.myBooks.resume` → status='reading' 복귀, `current_page` 보존, **활성 책으로 승계**해 홈에 즉시·새로고침 후에도 표시 — #1203) 제공. 완독·XP 주기와 무관 |
 | 관심 책 | 찜한 책 (`wish_books`). 표지+제목+저자+교보문고 링크+"지금 읽기 시작"(→ 책 등록). 기본 비공개 — `users.wishlist_public=true`로 설정 시 타인에게도 공개([feed.md §5.7.2](./feed.md)) |
 
 - **내 서재 목록 3열 그리드화**: 현재 탭의 책 목록을 표지 중심 3열 그리드(표지 아래 제목 작게)로 표시하며, 탭 시 기존 `BookDetailModal`로 진입한다.
@@ -68,7 +68,7 @@
 - **다른 사람 책장 구경 가능** (전체 공개 정책). 타인 한 문장은 [feed.md §5.7.1](./feed.md) 페이지 블라인드 적용
 - **타인 프로필 = 전체 페이지 (v7.2, #3·4·5)**: 피드 @닉 탭 → 풀스크린 프로필. ① 헤더(닉·완독/읽는중/스트릭/XP·팔로우 버튼) ② **책장 6권+더보기**(읽은/읽는중 필터 토글) ③ **❤️ 읽고 싶어하는 책**(대상 user의 `wishlist_public=true`일 때만 노출 — [feed.md §5.7.2](./feed.md)) ④ 공개 한 문장. **책 카드 탭 → 그 사람의 그 책 평점·후기·한 문장 드릴다운**(`users.bookContrib`). DataStore: `users.publicShelf`/`users.publicWishlist`/`bookContrib` ([backend.md §7.2](./backend.md))
 - 관심 책 추가: 소셜 피드 한 문장 → 책 상세 → "관심 책에 추가" (`DataStore.wishBooks.add`)
-- **책 중단 동선 (#593)**: 읽는 중 책의 상세(`BookDetailModal`)에서 **"읽기 중단"** → `DataStore.myBooks.abort(ubId)` → status='aborted'. 중단 책은 "읽는 중"·"완독"에서 빠지고 **"중단" 탭**으로 이동한다. 진척(`current_page`)은 보존되어 "다시 읽기"(`resume`) 시 그대로 이어진다. 중단은 **삭제가 아니며**(책장에서 사라지지 않음) 완독 카운트·XP 주기에 영향 없다.
+- **책 중단 동선 (#593)**: 읽는 중 책의 상세(`BookDetailModal`)에서 **"읽기 중단"** → `DataStore.myBooks.abort(ubId)` → status='aborted'. 중단 책은 "읽는 중"·"완독"에서 빠지고 **"중단" 탭**으로 이동한다. 진척(`current_page`)은 보존되어 "다시 읽기"(`resume`) 시 그대로 이어진다. **`resume`은 status='reading' 갱신에 더해 그 책을 활성 책(`active_user_book_id`)으로 승계**(#1203) — 홈이 즉시 이 책을 띄우고 새로고침 후에도 '읽는 중'에 남는다(중단 탭에 잔류하지 않음). 양 어댑터 동일. 중단은 **삭제가 아니며**(책장에서 사라지지 않음) 완독 카운트·XP 주기에 영향 없다.
 
 #### 5.8.3 완독 별점 + 소감 (v7 신설)
 

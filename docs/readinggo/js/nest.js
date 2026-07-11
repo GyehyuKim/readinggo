@@ -288,7 +288,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setRepairCard(null); // 이번 진입 동안만 숨김 — 다음 진입 때 아직 복구 가능하면 다시 권유(주 1회는 datastore가 강제)
   };
 
-  const handleCheckin = ({ page, sentence, kind }) => {
+  const handleCheckin = ({ page, sentence, kind, sentPage }) => {
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
     const ns = { ...nestState };
@@ -329,13 +329,15 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const newCastles = nestCastleCount(ns.xp);
     const castleGained = newCastles > prevCastles; // 1,600 XP 경계 통과 → 성 획득(#520/#521)
 
+    // #1202: 흔적은 문장 고유 페이지(sentPage)를 그대로 — 현재 진도(cur)보다 낮아도 입력값 그대로.
+    const quotePage = (typeof sentPage === 'number') ? sentPage : page;
     if (sentence) {
-      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page, when: '방금', kind: kind || 'quote' }, ...ns.myQuotes];
+      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page: quotePage, when: '방금', kind: kind || 'quote' }, ...ns.myQuotes];
     }
 
     prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
     setNestState(ns);
-    onCheckin(ns, newLv, xpGain, sentence, kind);
+    onCheckin(ns, newLv, xpGain, sentence, kind, quotePage);
     if (window.rgTrack) window.rgTrack('reading_session_end', { book_id: ns.book.id, pages_logged: pagesAdded, is_complete: isComplete }); // 인게이지먼트/리텐션 (#736)
 
     // 성 획득(1,600 주기 완료)은 단계 toast보다 우선 — 경계 통과 시 둥지 단계는 Lv4→Lv1로
@@ -384,18 +386,18 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       .finally(() => setQuickOcrBusy(false));
   };
 
-  // 입력 페이지 정규화 — 진도는 현재 이상으로만, total 있으면 상한 클램프.
+  // 입력 페이지 정규화 (#1203) — 1..total 로만 클램프. 현재 쪽보다 낮아도 허용(재독) — current_page 를 그 값으로 덮어씀.
   const _quickTargetPage = () => {
     const total = nestState.book.total || 0;
     const cur = nestState.book.cur || 0;
     const raw = quickPage === '' ? cur : (parseInt(quickPage, 10) || 0);
-    return Math.max(cur, total ? Math.min(total, raw) : raw);
+    const p = raw < 1 ? 1 : raw;
+    return total ? Math.min(total, p) : p;
   };
   // 페이지 섹션 [업데이트] (#497) — 페이지만 독립 저장. 문장 입력(quickText)은 보존.
   const submitPage = () => {
-    const cur = nestState.book.cur || 0;
+    if (quickPage === '') { showToast('쪽수를 입력해주세요'); return; }
     const p = _quickTargetPage();
-    if (p <= cur) { showToast('현재 쪽보다 더 넘겨보세요'); return; }
     handleCheckin({ page: p, sentence: null, kind: 'quote' });
     setQuickPage(''); // quickText 보존 — 페이지만 업데이트해도 문장 입력창 유지
   };
@@ -403,11 +405,15 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const submitSentence = () => {
     const t = quickText.trim();
     if (!t) { showToast('한 문장을 입력해주세요'); return; }
-    // #589: 한 문장 전용 페이지(quickSentPage) 사용. 비우면 현재 진도. 진도 역행 방지(_quickTargetPage 와 동일 규칙).
+    // #589/#1202: 한 문장 전용 페이지(quickSentPage). 비우면 현재 진도.
+    // 입력한 쪽 그대로 문장에 저장 — 현재 쪽보다 낮아도(앞부분 발췌·재독) 1..total 로만 클램프.
     const cur = nestState.book.cur || 0, total = nestState.book.total || 0;
-    const raw = quickSentPage === '' ? cur : (parseInt(quickSentPage, 10) || cur);
-    const page = Math.max(cur, total ? Math.min(total, raw) : raw);
-    handleCheckin({ page, sentence: t, kind: 'quote' });
+    let sp = quickSentPage === '' ? cur : (parseInt(quickSentPage, 10) || cur);
+    if (sp < 1) sp = 1;
+    if (total) sp = Math.min(total, sp);
+    // 진도(current_page)는 문장 저장으로 뒤로 밀지 않음 — 문장이 앞쪽이면 현재 유지, 뒤쪽이면 따라 올림.
+    const progressPage = Math.max(cur, sp);
+    handleCheckin({ page: progressPage, sentence: t, kind: 'quote', sentPage: sp });
     setQuickText(''); setQuickSentPage('');
   };
   // 쪽수 stepper (#717) — 빈 값이면 현재 쪽 기준 ±delta, [0, total] 클램프.
