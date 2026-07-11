@@ -3,10 +3,13 @@
    Cloudflare Turnstile 봇 검증 클라이언트.
 
    설계(staged rollout·fail-open):
-   - 부팅 시 Turnstile 스크립트를 async 로 주입하고 invisible 위젯 1개를 렌더한다.
+   - **지연 로드**: 부팅 시 스크립트를 주입하지 않는다(외부 요청이 networkidle 을 막아 부팅/
+     스모크가 느려지는 것 방지). 첫 RG_turnstileToken() 호출 때 스크립트를 async 주입하고
+     invisible 위젯 1개를 렌더한다.
    - RG_turnstileToken() 은 호출마다 execute 로 **새 토큰**을 얻는다(토큰은 1회용·~300s TTL).
-   - 스크립트 미로드·Turnstile 불가·~6s 타임아웃이면 '' 로 **fail-open** 리졸브 —
-     요청은 그대로 진행되고, (워커 secret 이 설정된 경우에만) 워커가 403 → 호출부가 토스트로 안내.
+     위젯이 아직 준비 전이면 로드·렌더를 기다렸다가 실행하고, ~6s 안에 안 되면 '' 로 **fail-open**.
+   - 스크립트 미로드·Turnstile 불가·타임아웃이면 '' 리졸브 — 요청은 그대로 진행되고,
+     (워커 secret 이 설정된 경우에만) 워커가 403 → 호출부가 토스트로 안내.
    - RG_apiFetch(path, opts): 고비용 8개 엔드포인트 호출 래퍼. 토큰을 cf-turnstile-token 헤더로
      실어 fetch. FormData/JSON 바디는 그대로 보존(헤더만 추가, content-type 강제 안 함).
    ========================================================= */
@@ -16,9 +19,26 @@
   var TOKEN_TIMEOUT_MS = 6000;
 
   var widgetId = null;
+  var scriptInjected = false;
   var pending = null;   // { resolve } — 진행 중인 execute 의 콜백 대기
 
-  // 스크립트 onload 후 Turnstile 이 호출 — invisible 위젯 1개 렌더.
+  // 스크립트 지연 주입(첫 토큰 요청 시, 중복 방지). 부팅엔 주입 안 함 — networkidle 지연 방지.
+  function _ensureScript() {
+    if (scriptInjected || !SITE_KEY) return;
+    scriptInjected = true;
+    try {
+      if (!document.querySelector('script[data-rg-turnstile]')) {
+        var s = document.createElement('script');
+        s.src = SCRIPT_SRC;
+        s.async = true;
+        s.defer = true;
+        s.setAttribute('data-rg-turnstile', '1');
+        document.head.appendChild(s);
+      }
+    } catch (e) { /* fail-open — 토큰은 '' */ }
+  }
+
+  // 스크립트 onload 후 Turnstile 이 호출 — invisible 위젯 1개 렌더. 대기 중 요청 있으면 실행.
   window.RG_onTurnstileLoad = function () {
     try {
       if (!window.turnstile || !SITE_KEY) return;
@@ -32,27 +52,33 @@
         'error-callback': function () { _settle(''); },
         'timeout-callback': function () { _settle(''); },
       });
-    } catch (e) { /* fail-open — widgetId 는 null 로 남아 토큰은 '' */ }
+      if (pending && widgetId !== null) _run();   // 로드 전 들어온 요청 처리
+    } catch (e) { _settle(''); }
   };
 
   function _settle(v) {
     if (pending) { var p = pending; pending = null; p.resolve(v); }
   }
 
-  // 호출마다 새 토큰. 준비 안 됐거나 실패·타임아웃이면 '' (fail-open — 요청은 진행).
+  function _run() {
+    try {
+      window.turnstile.reset(widgetId);                 // 이전 토큰 무효화 → 새 토큰 강제
+      window.turnstile.execute(widgetId, { action: 'api' });
+    } catch (e) { _settle(''); }
+  }
+
+  // 호출마다 새 토큰. 준비 안 됐으면 로드·렌더 대기, 실패·6s 타임아웃이면 '' (fail-open — 요청 진행).
   window.RG_turnstileToken = function () {
+    _ensureScript();
     return new Promise(function (resolve) {
-      if (!window.turnstile || widgetId === null) { resolve(''); return; }
       var done = false;
       var finish = function (v) { if (!done) { done = true; resolve(v); } };
       // 이전 대기가 남아 있으면(동시 호출 등) fail-open 처리하고 이번 것으로 교체.
       if (pending) { var prev = pending; pending = null; prev.resolve(''); }
       pending = { resolve: finish };
       setTimeout(function () { if (!done) { pending = null; finish(''); } }, TOKEN_TIMEOUT_MS);
-      try {
-        window.turnstile.reset(widgetId);                 // 이전 토큰 무효화 → 새 토큰 강제
-        window.turnstile.execute(widgetId, { action: 'api' });
-      } catch (e) { pending = null; finish(''); }
+      if (window.turnstile && widgetId !== null) _run();
+      // 아직 로드/렌더 전이면 RG_onTurnstileLoad 가 렌더 후 pending 을 처리(6s 내).
     });
   };
 
@@ -82,16 +108,4 @@
       return res;
     });
   };
-
-  // 스크립트 주입(중복 방지).
-  try {
-    if (SITE_KEY && !document.querySelector('script[data-rg-turnstile]')) {
-      var s = document.createElement('script');
-      s.src = SCRIPT_SRC;
-      s.async = true;
-      s.defer = true;
-      s.setAttribute('data-rg-turnstile', '1');
-      document.head.appendChild(s);
-    }
-  } catch (e) { /* fail-open — 토큰은 '' */ }
 })();
