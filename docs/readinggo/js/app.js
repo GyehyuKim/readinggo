@@ -548,13 +548,18 @@ function App() {
         const getT = window.getBook;
         setAppState(s => ({
           ...s,
-          myQuotes: rows.slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => ({
-            id: r.id, text: r.text, bookId: r.book_id || '',
-            bookTitle: (getT && getT(r.book_id) || {}).title || '',
-            page: r.page, when: '', createdAt: r.created_at || '',
-            note: r.my_note || '', kind: r.kind || 'quote',
-            visibility: 'public', isPrivate: false, notePrivate: false,
-          })),
+          myQuotes: rows.slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => {
+            // #1224: 게스트 등록 책(book_id='bk_…')은 카탈로그 밖 → listMine 이 실어 준 book_title 1순위.
+            // getBook 은 미스 시 RG_BOOKS[0] 폴백이라 id 일치 가드 필수(엉뚱한 제목 귀속 방지).
+            const bk = getT ? getT(r.book_id) : null;
+            return {
+              id: r.id, text: r.text, bookId: r.book_id || '',
+              bookTitle: r.book_title || (bk && bk.id === r.book_id ? bk.title : ''),
+              page: r.page, when: '', createdAt: r.created_at || '',
+              note: r.my_note || '', kind: r.kind || 'quote',
+              visibility: 'public', isPrivate: false, notePrivate: false,
+            };
+          }),
         }));
       }).catch(() => {});
     return () => { alive = false; };

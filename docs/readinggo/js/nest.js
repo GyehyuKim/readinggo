@@ -355,10 +355,10 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const batch = Array.isArray(sentences) ? sentences.filter((s) => s && s.text && String(s.text).trim()) : null;
     const sentenceCount = (batch && batch.length) ? batch.length : (sentence ? 1 : 0);
     if (batch && batch.length) {
-      const rows = batch.map((s) => ({ text: String(s.text).trim(), bookId: ns.book.id, page: (typeof s.page === 'number') ? s.page : quotePage, when: '방금', kind: kind || 'quote' }));
+      const rows = batch.map((s) => ({ text: String(s.text).trim(), bookId: ns.book.id, bookTitle: ns.book.title || '', page: (typeof s.page === 'number') ? s.page : quotePage, when: '방금', kind: kind || 'quote' }));   /* #1224: bookTitle 동봉 — 게스트 책은 getBook 미해소라 흔적 카드가 '책' 폴백 */
       ns.myQuotes = [...rows, ...ns.myQuotes];
     } else if (sentence) {
-      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, page: quotePage, when: '방금', kind: kind || 'quote' }, ...ns.myQuotes];
+      ns.myQuotes = [{ text: sentence, bookId: ns.book.id, bookTitle: ns.book.title || '', page: quotePage, when: '방금', kind: kind || 'quote' }, ...ns.myQuotes];
     }
 
     prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
