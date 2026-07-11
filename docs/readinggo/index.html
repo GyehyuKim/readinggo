@@ -1531,6 +1531,16 @@ input,textarea{font-family:inherit;}
   50% { transform: translateY(-6px); }
 }
 
+/* OCR 추출 로딩 스피너 (#1201) — 어두운 오버레이 위 흰 링 */
+.rg-spinner {
+  width: 34px; height: 34px;
+  border: 3px solid rgba(255,255,255,0.28);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: rgSpin 0.8s linear infinite;
+}
+@keyframes rgSpin { to { transform: rotate(360deg); } }
+
 /* ── 같이읽기(숲) — co-reading.md. 버튼 위계·간격은 DESIGN.md 준수 ── */
 /* 버튼 위계: 1차 솔리드(--brand), 2차 tonal(--brand-soft 배경 + --brand-3 글씨), ghost 금지 */
 .rg-btn-primary{
