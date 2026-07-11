@@ -3,6 +3,88 @@
 // - ISBN / 제목 / 저자 검색
 // - 검색 소스: 우리 DB(Supabase ilike) + 로컬 카탈로그(Fuse, 인라인 폴백) + 알라딘 원격
 
+/* ── 검색 관련성 정렬·판 그룹핑·표지 폴백 (#1223) ─────────────────────
+   감사 사례: "데미안" 1순위가 "데미안더모던타임즈 5"(무관 시리즈), canonical 민음사 데미안이 2위 —
+   기존 병합은 소스 순서(DB ilike → 로컬 → 원격)만 있고 관련성 정렬이 없었다. 첫 슬롯이 최다 클릭
+   슬롯이라 신규 유저의 첫 등록을 오도한다. 같은 작품의 판(벚꽃 에디션·양장·큰글자·리커버 등)이
+   행을 도배하는 결정 피로, canonical 행의 표지 null 회색 placeholder 도 함께 잡는다. */
+
+// 비교용 squash — 공백·구두점 제거 + 소문자 (data.js _normTitle 과 동일 문자 클래스).
+function _rgSquash(t) {
+  return String(t || '').toLowerCase().replace(/[\s·,.:;!?'"“”‘’()\[\]<>「」『』、~\-_]/g, '');
+}
+// 핵심 제목 — 부제·괄호 이후 컷(worker seedSearchTitle #805 와 같은 구분자 규칙)
+// + 괄호 없는 에디션 꼬리("데미안 리커버"류) 제거. 과소 그룹핑은 안전(과대 병합 방지 우선).
+const _RG_EDITION_TAIL = /(\s+(벚꽃|단풍|봄|여름|가을|겨울|리미티드|스페셜)?\s*(에디션|리커버|양장본|양장|합본|특별판|한정판|기념판|개정판|증보판|초판본|미니북|큰글자도서|큰글자|중문판|영문판|세트))+\s*$/;
+function _rgCoreTitle(t) {
+  let s = String(t || '').trim();
+  s = s.split(/\s+[-–—|]\s+|[:(\[【「《]/)[0];
+  s = s.replace(_RG_EDITION_TAIL, '');
+  return s.replace(/\s{2,}/g, ' ').trim();
+}
+// 저자 키 — 첫 저자만, squash 후 역할 표기(지음·옮김 등) 꼬리 제거. 소스별 표기차 흡수.
+function _rgAuthorKey(a) {
+  const first = String(a || '').split(/[,;·|]/)[0];
+  return _rgSquash(first).replace(/(지은이|지음|엮은이|엮음|옮긴이|옮김|글그림|그림|저자|저|역)$/, '');
+}
+// 관련성 점수 — 티어(100 단위): 정규화 제목 완전일치 400 > 제목 prefix 300 > 제목 포함 200 >
+// 제목+저자 토큰 포함 100 > 무관 0(꼬리로 강등, 제외하진 않음 — 설명 매칭 등 리콜 보존).
+// 동률 보정(티어 내): canonical DB(+30) > 로컬(+20) > 원격(+0), 표지 보유 +10, 쪽수 보유 +5
+// — 판 그룹 대표 선정 기준(canonical > 표지 > 쪽수)을 겸한다.
+function _rgScore(b, nq, tokens) {
+  const title = String(b.title || '');
+  const core = _rgSquash(_rgCoreTitle(title));
+  const full = _rgSquash(title);
+  let tier = 0;
+  if (nq && (core === nq || full === nq)) tier = 400;
+  else if (nq && (core.indexOf(nq) === 0 || full.indexOf(nq) === 0)) tier = 300;
+  else if (nq && full.indexOf(nq) >= 0) tier = 200;
+  else {
+    const hayT = title.toLowerCase();
+    if (tokens.length && tokens.every((t) => hayT.indexOf(t) >= 0)) tier = 200;
+    else {
+      const hayTA = (title + ' ' + (b.author || '')).toLowerCase();
+      if (tokens.length && tokens.every((t) => hayTA.indexOf(t) >= 0)) tier = 100;
+    }
+  }
+  return tier
+    + (b._source === 'db' ? 30 : b._source === 'aladin' ? 0 : 20)
+    + (b.cover_url ? 10 : 0)
+    + (b.total_pages ? 5 : 0);
+}
+// 병합 결과 → 관련성 정렬 + 판 그룹핑(핵심제목+저자) + 표지 폴백.
+// 그룹 대표 = 최고점 행(점수에 canonical·표지·쪽수 가점 내장). 대표에 표지가 없고 같은 그룹의
+// 다른 판(카카오 등)에 있으면 **표시용으로만** 빌려온다 — 서버 PATCH 없음(§7.2.1 카카오 캐시
+// 조항 회피 유지). 등록 시엔 이 행이 기존 /api/book-upsert(#1191) 경로로 저장되며 자연 영속.
+// 나머지 판 수는 _editions 로 대표에 표기(별도 판 선택 UI 없음).
+function rgRankSearchResults(rows, query) {
+  const q = String(query || '').trim();
+  const nq = _rgSquash(q);
+  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const groups = new Map();
+  rows.forEach((b, i) => {
+    const tkey = _rgSquash(_rgCoreTitle(b.title)) || _rgSquash(b.title);
+    const key = tkey ? tkey + '|' + _rgAuthorKey(b.author) : '__u' + i; // 빈 제목은 그룹핑 제외
+    const it = { b, s: _rgScore(b, nq, tokens) };
+    const g = groups.get(key);
+    if (g) g.push(it); else groups.set(key, [it]);
+  });
+  const out = [];
+  for (const g of groups.values()) {
+    let rep = g[0];
+    for (const it of g) if (it.s > rep.s) rep = it;
+    let book = rep.b;
+    if (!book.cover_url) {
+      const alt = g.find((it) => it.b.cover_url);
+      if (alt) book = { ...book, cover_url: alt.b.cover_url };
+    }
+    if (g.length > 1) book = { ...book, _editions: g.length };
+    out.push({ book, s: rep.s });
+  }
+  out.sort((a, b) => b.s - a.s); // stable sort — 동점은 원 소스 순서(DB→로컬→원격) 유지
+  return out.map((x) => x.book);
+}
+
 const SearchModal = ({
   isOpen,
   onClose,
@@ -121,7 +203,8 @@ const SearchModal = ({
     if (item) onSelectBook(item, shelf);
   };
 
-  // 병합 우선순위: 우리 DB(즉시) → 로컬(데모) → 알라딘(외부). isbn/제목 기준 중복 제거.
+  // 병합: 우리 DB(즉시) → 로컬(데모) → 알라딘(외부), isbn/제목 기준 중복 제거 후
+  // 관련성 정렬 + 판 그룹핑 + 표지 폴백 (#1223) — 소스 순서가 아니라 질의 관련성이 1순위.
   const localItems = results.map((r) => r.item);
   const _seen = new Set();
   const _dedup = (arr) => arr.filter((b) => {
@@ -130,7 +213,9 @@ const SearchModal = ({
     _seen.add(k);
     return true;
   });
-  const merged = _dedup(dbResults).concat(_dedup(localItems)).concat(_dedup(remote));
+  const merged = rgRankSearchResults(
+    _dedup(dbResults).concat(_dedup(localItems)).concat(_dedup(remote)), query
+  );
   const searching = dbLoading || remoteLoading;  // 진행중 — 결과없음과 구분 (#202)
 
   return (
@@ -434,7 +519,8 @@ const SearchResultItem = ({ book, onClick }) => {
             whiteSpace: 'nowrap',
           }}
         >
-          {[book.publisher, book.total_pages ? `${book.total_pages}p` : null].filter(Boolean).join(' · ')}
+          {/* 다른 판 N — 판 그룹핑(#1223) 힌트. 별도 판 선택 UI 없이 메타 줄에만 표기. */}
+          {[book.publisher, book.total_pages ? `${book.total_pages}p` : null, book._editions > 1 ? `다른 판 ${book._editions - 1}` : null].filter(Boolean).join(' · ')}
         </div>
       </div>
     </button>
