@@ -43,7 +43,9 @@ function _rgScore(b, nq, tokens) {
     const hayT = title.toLowerCase();
     if (tokens.length && tokens.every((t) => hayT.indexOf(t) >= 0)) tier = 200;
     else {
-      const hayTA = (title + ' ' + (b.author || '')).toLowerCase();
+      // 출판사 포함 (#1234) — "민음사 시지프 신화"(#1118)류 필드 가로지르는 질의가
+      // 아래 tier 0 제외에 걸려 죽지 않도록 건초더미에 publisher(로컬 행은 pub)도 넣는다.
+      const hayTA = (title + ' ' + (b.author || '') + ' ' + (b.publisher || b.pub || '')).toLowerCase();
       if (tokens.length && tokens.every((t) => hayTA.indexOf(t) >= 0)) tier = 100;
     }
   }
@@ -69,6 +71,14 @@ function rgRankSearchResults(rows, query) {
     const g = groups.get(key);
     if (g) g.push(it); else groups.set(key, [it]);
   });
+  // 빈 저자 행 흡수 (#1235) — 같은 핵심제목에 저자 있는 그룹이 존재하면, 저자키가 빈 그룹
+  // (카탈로그 오염·메타 불완전 행)을 그쪽 판 그룹으로 합친다. canonical 과 나란한 유령 중복 제거.
+  for (const [key, g] of [...groups]) {
+    if (!key.endsWith('|')) continue;
+    let target = null;
+    for (const k2 of groups.keys()) if (k2 !== key && k2.startsWith(key)) { target = k2; break; }
+    if (target) { groups.get(target).push(...g); groups.delete(key); }
+  }
   const out = [];
   for (const g of groups.values()) {
     let rep = g[0];
@@ -79,6 +89,9 @@ function rgRankSearchResults(rows, query) {
       if (alt) book = { ...book, cover_url: alt.b.cover_url };
     }
     if (g.length > 1) book = { ...book, _editions: g.length };
+    // 무관(tier 0) 제외 (#1234) — 질의가 있는데 제목·저자 어디에도 안 걸린 행(가점만으로 s<100)은
+    // 노출하지 않는다. 자모 난타에 무관 책 1건이 뜨던 신뢰 훼손 케이스. 진짜 오타는 tier 100+ 로 생존.
+    if ((nq || tokens.length) && rep.s < 100) continue;
     out.push({ book, s: rep.s });
   }
   out.sort((a, b) => b.s - a.s); // stable sort — 동점은 원 소스 순서(DB→로컬→원격) 유지
@@ -278,6 +291,7 @@ const SearchModal = ({
           </button>
           <input
             type="text"
+            className="rg-search-input"
             placeholder="제목, 저자, ISBN 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
