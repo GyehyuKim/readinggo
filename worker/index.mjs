@@ -24,22 +24,53 @@ const legacyForced = (env) => env.BOOKS_PROVIDER === 'aladin';
 const kakaoReady = (env) => !legacyForced(env) && !!env.KAKAO_REST_KEY;
 const nlkReady = (env) => !legacyForced(env) && !!env.NLK_CERT_KEY;
 
+/* ── 네이티브 앱 오리진 허용 (#1230) ─────────────────────────
+   Capacitor 앱 WebView 오리진 = https://localhost(Android)·capacitor://localhost(iOS).
+   동일출처 가드(#255)의 목적(타 사이트 브라우저 JS 쿼터 남용 차단)은 유지 — 웹사이트는
+   Origin 을 위조할 수 없고, localhost 오리진은 curl(Origin 생략)급이라 남용 표면 확대 아님.
+   로컬 dev/preview(localhost:포트)도 포함 — 실기기 검증 전 데스크톱 재현용. */
+const isAppOrigin = (o) =>
+  o === 'capacitor://localhost' || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
+
 export default {
-  // ── HTTP: 정적 + 알라딘 프록시 ──────────────────────────
+  // ── HTTP: CORS 래퍼 (#1230) — 앱 오리진의 교차출처 API 호출에 preflight/ACAO 응답 ──
   async fetch(request, env, ctx) {
+    const origin = request.headers.get('Origin');
+    const crossApp = !!origin && origin !== new URL(request.url).origin && isAppOrigin(origin);
+    if (crossApp && request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, cf-turnstile-token',
+        'Access-Control-Max-Age': '86400',
+        'Vary': 'Origin',
+      } });
+    }
+    const res = await this.route(request, env, ctx);
+    if (crossApp) {
+      const r = new Response(res.body, res);   // 헤더 immutable 회피(에셋 응답 포함)
+      r.headers.set('Access-Control-Allow-Origin', origin);
+      r.headers.append('Vary', 'Origin');
+      return r;
+    }
+    return res;
+  },
+
+  // ── HTTP: 정적 + 알라딘 프록시 ──────────────────────────
+  async route(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
     if (p === '/aladin' || p === '/.netlify/functions/aladin') {
       // CORS 제한(#255): 타 사이트 브라우저 JS의 교차출처 호출 차단(TTBKey 쿼터 남용 방지).
       // 동일출처 GET은 Origin 헤더 미전송 → 통과. 다른 출처면 Origin이 우리 도메인과 달라 403.
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       return aladinProxy(url.searchParams, env, ctx);
     }
     // LLM 독서 파트너 — 참새 질문 생성 (#287). 키는 서버에서만 사용(클라 노출 금지).
     if (p === '/api/companion') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'companion'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return companionProxy(request, env);
@@ -48,7 +79,7 @@ export default {
     // companion 형제 — 같은 LLM 프록시(callLLM)·동일출처 가드·키 서버보관. 클라가 내 문장만 전송.
     if (p === '/api/wiki-ask') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'wiki-ask'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return wikiAskProxy(request, env);
@@ -57,7 +88,7 @@ export default {
     // 같은 텍스트 LLM 프록시(callLLM)·동일출처 가드·키 서버보관. 클라가 붙여넣은 텍스트만 전송.
     if (p === '/api/parse-books') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'parse-books'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return parseBooksProxy(request, env);
@@ -66,14 +97,14 @@ export default {
     // public.users → auth.users(id) on delete cascade 라 전 데이터(서재·문장·둥지) 일괄 삭제. 동일출처만.
     if (p === '/api/delete-account') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       return deleteAccountProxy(request, env);
     }
     // 읽기모드 OCR — 책 사진 → 한 문장 추출(#382). Upstage Document OCR + solar-pro3 보정.
     // 키는 서버에서만(클라 노출 금지). 동일출처만.
     if (p === '/api/ocr') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'ocr'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return ocrProxy(request, env);
@@ -81,7 +112,7 @@ export default {
     // 배치 OCR — 사진에서 강조(밑줄/형광펜) 문장 추출 (#844). Gemini Flash vision(이미지 이해). 키 서버만, 동일출처만.
     if (p === '/api/extract-highlights') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'extract-highlights'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return extractHighlightsProxy(request, env);
@@ -91,7 +122,7 @@ export default {
     // 키는 서버에서만(클라 노출 금지). 동일출처만.
     if (p === '/api/shelf-import') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'shelf-import'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return shelfImportProxy(request, env);
@@ -100,7 +131,7 @@ export default {
     // → solar-pro3 정제(한 문장·출처 보존). 저작권 가드: 인용 최소·출처 표기(integrated-shelf.md §5.2).
     if (p === '/api/seed') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'seed'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return seedProxy(request, env);
@@ -109,7 +140,7 @@ export default {
     // 환각 필터(실존 도서 매칭)는 클라에서 books DB로 수행. 키는 서버에서만(클라 노출 금지). 동일출처만.
     if (p === '/api/related') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'related'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return relatedProxy(request, env);
@@ -119,7 +150,7 @@ export default {
     // 오염 가능. 이제 service_role 로만 쓰는 이 엔드포인트 경유(입력 검증·캡·레이트리밋). 동일출처만.
     if (p === '/api/book-upsert') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'book-upsert'); if (rl) return rl; }
       return bookUpsertProxy(request, env);
     }
@@ -127,7 +158,7 @@ export default {
     // 서버가 대신 받아 동일출처로 돌려주면 공유 카드가 표지를 taint 없이 인라인 가능. 알라딘 호스트만 허용(오픈 프록시 방지).
     if (p === '/api/img') {
       const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin) return json({ error: 'forbidden origin' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       return imgProxy(url.searchParams);
     }
     // OTA Live Updates (#876) — 설치 앱(Capgo capacitor-updater)이 POST. 동일출처 게이트 없음
