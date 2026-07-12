@@ -672,7 +672,7 @@ function LibraryView({ state, onActivateUserBook }) {
                 ? (typeof b.rating === 'number' ? `★ ${b.rating.toFixed(1)}` : '완독')
                 : b.status === 'aborted'
                   ? (<span style={{display:'inline-flex', alignItems:'center', gap:3}}>{window.rgIcon('pause',10)}{b.cur > 0 ? `${b.cur}/${b.total}p` : '중단'}</span>)
-                  : (b.cur > 0 ? `${b.cur}/${b.total}p` : '미완독');
+                  : (b.total > 0 ? `${b.cur}/${b.total}쪽` : '읽는 중');   /* #1224: 읽는 중 책에 '미완독' 오표기 → 진행률(0쪽 포함), 쪽수 미상만 '읽는 중' */
               return (
                 <div
                   key={b.ubId || b.id}

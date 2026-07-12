@@ -5,7 +5,8 @@
    설계(staged rollout·fail-open):
    - **지연 로드**: 부팅 시 스크립트를 주입하지 않는다(외부 요청이 networkidle 을 막아 부팅/
      스모크가 느려지는 것 방지). 첫 RG_turnstileToken() 호출 때 스크립트를 async 주입하고
-     invisible 위젯 1개를 렌더한다.
+     위젯 1개(normal + interaction-only — 평소 비표시)를 렌더한다.
+     (#1222: 구 size:'invisible' 은 유효값이 아니라 api.js 가 매 로드마다 TurnstileError 를 던졌다.)
    - RG_turnstileToken() 은 호출마다 execute 로 **새 토큰**을 얻는다(토큰은 1회용·~300s TTL).
      위젯이 아직 준비 전이면 로드·렌더를 기다렸다가 실행하고, ~6s 안에 안 되면 '' 로 **fail-open**.
    - 스크립트 미로드·Turnstile 불가·타임아웃이면 '' 리졸브 — 요청은 그대로 진행되고,
@@ -38,16 +39,21 @@
     } catch (e) { /* fail-open — 토큰은 '' */ }
   }
 
-  // 스크립트 onload 후 Turnstile 이 호출 — invisible 위젯 1개 렌더. 대기 중 요청 있으면 실행.
+  // 스크립트 onload 후 Turnstile 이 호출 — 위젯 1개 렌더(평소 비표시). 대기 중 요청 있으면 실행.
   window.RG_onTurnstileLoad = function () {
     try {
       if (!window.turnstile || !SITE_KEY) return;
+      // 컨테이너: 평소엔 빈 요소(0 크기 — 터치 가로채지 않음). CF 가 인터랙티브 챌린지를
+      // 요구하면 이 자리(하단 중앙, 탭바 위)에 위젯이 보이게 떠서 사용자가 풀 수 있다 (#1222).
       var el = document.createElement('div');
-      el.style.cssText = 'position:fixed;bottom:0;left:0;width:0;height:0;overflow:hidden';
+      el.style.cssText = 'position:fixed;bottom:calc(var(--safe-bottom, 0px) + 76px);left:50%;transform:translateX(-50%);z-index:2000;';
       document.body.appendChild(el);
       widgetId = window.turnstile.render(el, {
         sitekey: SITE_KEY,
-        size: 'invisible',
+        // #1222: size 유효값은 compact/flexible/normal 뿐('invisible' 은 throw).
+        // normal + appearance:'interaction-only' = 챌린지 필요할 때만 표시(인비저블 동작 유지).
+        size: 'normal',
+        appearance: 'interaction-only',
         callback: function (token) { _settle(token || ''); },
         'error-callback': function () { _settle(''); },
         'timeout-callback': function () { _settle(''); },

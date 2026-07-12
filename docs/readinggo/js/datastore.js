@@ -550,7 +550,14 @@ const DataStore = {
       });
     },
     listMine() {
-      return localStorageAdapter.mutate(s => _allSentences(s).slice());
+      // #1224: 게스트 등록 책은 book_id 가 카탈로그 밖 생성 id('bk_…')라 getBook 으로 제목 해소 불가
+      // → 소속 user_book 내장 book 의 제목(book_title)을 행에 실어 준다(흔적 카드 '책' 폴백 방지).
+      return localStorageAdapter.mutate(s => {
+        const out = [];
+        (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se =>
+          out.push({ ...se, book_title: (ub.book && ub.book.title) || '' })));
+        return out;
+      });
     },
     feed() {
       // 전체 공개 피드 — 최신순 (§social). Phase 0 은 내 문장 상단 + NPC 더미 하단(#854).
