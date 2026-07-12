@@ -49,6 +49,38 @@ async function buildStateFromSupabase() {
   return out;
 }
 
+// 게스트(localStorage)도 활성 책을 appState로 올려야 한다. DataStore는 영속되지만,
+// appState를 INITIAL_STATE로만 시작하면 재방문 홈이 빈 상태로 보인다(#1221).
+// Supabase 로그인 경로는 buildStateFromSupabase가 뒤이어 덮어쓰므로 여기서는 local adapter만 읽는다.
+function buildStateFromGuest() {
+  const DS = window.DataStore;
+  if (!DS || DS === window.SupabaseDataStore) return null;
+  try {
+    const ub = DS.activeBook && DS.activeBook.get && DS.activeBook.get();
+    const st = DS.streak && DS.streak.get && DS.streak.get();
+    const xpv = (DS.xp && DS.xp.get && DS.xp.get()) || 0;
+    const out = {
+      streak: st ? (st.current || 0) : 0,
+      xp: xpv,
+      nest: { lv: getNestStageByXp(xpv).lv },
+    };
+    if (ub && ub.book) {
+      const b = ub.book;
+      out.book = {
+        id: ub.book_id || b.id || '', ubId: ub.id, title: b.title || '', author: b.author || '', pub: b.publisher || '',
+        cur: ub.current_page || 0, total: b.total_pages || 0, days: 1,
+        cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], toc: [],
+      };
+    } else {
+      out.book = { id: '', title: '', author: '', pub: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
+    }
+    return out;
+  } catch (e) {
+    console.warn('[ReadingGo] 게스트 상태 복원 실패:', e.message);
+    return null;
+  }
+}
+
 // 게스트(로그아웃) 상태에서 남긴 책·문장·대화(my_note)를 로그인 직후 Supabase 로 흡수
 // (backend.md §7.7). 데모 시드(_seed)는 제외 — 게스트가 직접 남긴 문장(_guest 태그, #370)을
 // 가진 책만 백필한다. 해자("축적되는 대화 데이터")가 가입 시 유실되던 구조 수정.
@@ -454,7 +486,7 @@ function App() {
     };
     return () => { window.RG_openShelfImport = null; window.RG_openTextImport = null; };
   }, [authUser]);
-  const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE }));
+  const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE, ...(buildStateFromGuest() || {}) }));
   const [popularBooks, setPopularBooks] = useState(null);  // #835: 검색 추천 인기 도서(우리 사이트) — startedThisWeek + ALL_BOOKS 폴백
 
   // 검색 추천 '인기 도서' (#835) — 우리 사이트 인기(최근 등록 상위, social과 동일 RPC) 우선, 부족분은 카탈로그 폴백.
@@ -538,10 +570,33 @@ function App() {
   // 게스트 myQuotes hydration (#367) — INITIAL_STATE.myQuotes 시드엔 id가 없어
   // 책상세·컬렉션의 공개/좋아요/감상/삭제 버튼(q.id 가드)이 안 떴음. 로컬 어댑터의
   // 시드 문장(id 보유, #366)을 appState 로 끌어와 첫인상부터 기능 노출.
+  // + 활성 책·스트릭·XP hydration (#1221) — #1136 빈 시작 이후 게스트 부팅은 appState.book 이
+  //   항상 빈 센티널이라, 책을 등록해도 리로드하면 홈이 '읽을 책 등록' hero 로 떨어졌다
+  //   (데이터는 rg_v41 에 멀쩡 — 기록이 사라진 걸로 오인, 게스트 리텐션 킬러). 로그인 경로
+  //   (buildStateFromSupabase)와 대칭으로 localStorage 활성 책을 끌어온다.
+  //   진짜 신규(활성 책 없음, ub=null)는 setAppState 를 건너뛰어 hero 유지(#1136 보존).
   useEffect(() => {
     if (_supa && authUser && authUser !== 'local') return; // 로그인 경로는 buildStateFromSupabase 담당
     if (window.SupabaseDataStore && window.DataStore === window.SupabaseDataStore) return;
     let alive = true;
+    Promise.all([
+      Promise.resolve(DataStore.activeBook && DataStore.activeBook.get ? DataStore.activeBook.get() : null).catch(() => null),
+      Promise.resolve(DataStore.streak && DataStore.streak.get ? DataStore.streak.get() : null).catch(() => null),
+      Promise.resolve(DataStore.xp && DataStore.xp.get ? DataStore.xp.get() : null).catch(() => null),
+    ]).then(([ub, st, xp]) => {
+      if (!alive || !ub || !ub.book) return;   // 활성 책 없으면 빈 시작 유지
+      const total = ub.book.total_pages || 0;  // 0 = 쪽수 미상 (#204)
+      setAppState(s => ({
+        ...s,
+        book: {
+          id: ub.book_id, ubId: ub.id, title: ub.book.title, author: ub.book.author || '', pub: ub.book.publisher || '',
+          cur: ub.current_page || 0, total, days: 1,
+          cover: ub.book.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], toc: [],
+        },
+        streak: (st && typeof st.current === 'number') ? st.current : s.streak,
+        xp: (typeof xp === 'number') ? xp : s.xp,
+      }));
+    }).catch(() => {});
     Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : [])
       .then(rows => {
         if (!alive || !Array.isArray(rows) || !rows.length) return;
@@ -774,16 +829,18 @@ function App() {
           showToast(`🏰 '${book.title}' 완독 책장에 — 서재에서 별점·소감을 남겨보세요`);
           return;
         }
-        // 읽는중(기존) — 활성 책 + 둥지 반영.
+        // 읽는중(기존) — 활성 책 + 둥지 반영. 원본 검색 row가 아니라 저장된 user_book을
+        // 다시 매핑해 canonical 첫 결과·로컬 생성 ID도 화면 상태와 같은 데이터 계약을 쓰게 한다(#1221).
         switchTab('nest');
         await Promise.resolve(DataStore.activeBook.set(ub.id));
+        const savedBook = ub.book || {};
         if (window.rgTrack) window.rgTrack('book_opened', { book_id: ub.book_id || ub.id || '', entry_point: 'register' }); // 퍼널 시작 (#736)
         setAppState(s => ({
           ...s,
           book: {
-            id: ub.book_id, ubId: ub.id, title: book.title, author: book.author || '', pub: book.publisher || '',
-            cur: ub.current_page || 0, total: totalPages, days: 1,
-            cover: book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
+            id: ub.book_id || savedBook.id || '', ubId: ub.id, title: savedBook.title || book.title || '', author: savedBook.author || book.author || '', pub: savedBook.publisher || book.publisher || '',
+            cur: ub.current_page || 0, total: savedBook.total_pages || totalPages || 0, days: 1,
+            cover: savedBook.cover_url || book.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], toc: [],
           },
         }));
         window.dispatchEvent(new CustomEvent('rg:wish-changed')); // #822: 서재 '읽고 있는 책' 즉시 갱신
