@@ -129,7 +129,7 @@
       //   누구나 카탈로그를 오염시킬 수 있었다. 이제 워커 /api/book-upsert(service_role, 입력검증·캡·
       //   레이트리밋) 경유. 반환 shape(캐노니컬 books 행 전체 + id)은 동일 — 호출부 4곳 무변경.
       async upsert(book) {
-        const res = await fetch('/api/book-upsert', {
+        const res = await fetch(((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/book-upsert', {  // #1230 네이티브 절대경로
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

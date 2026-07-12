@@ -102,7 +102,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
     if (!token) { showToast('로그인 상태가 아니에요'); setDelConfirm(false); return; }
     setDeleting(true);
     try {
-      const r = await fetch('/api/delete-account', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+      const r = await fetch(((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/delete-account', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });  // #1230 네이티브 절대경로
       if (!r.ok) throw new Error('실패');
       try { await window.RG_SB.signOut(); } catch (e) { /* 이미 삭제됨 */ }
       try { localStorage.clear(); } catch (e) { /* noop */ }

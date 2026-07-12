@@ -100,7 +100,9 @@
     return window.RG_turnstileToken().then(function (token) {
       var headers = Object.assign({}, opts.headers, { 'cf-turnstile-token': token });
       var init = Object.assign({}, opts, { headers: headers });
-      return fetch(path, init);
+      // #1230: 네이티브 앱·로컬에선 상대경로가 워커에 못 닿음 → API_ORIGIN prefix(웹은 '').
+      var base = (window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '';
+      return fetch(base + path, init);
     }).then(function (res) {
       if (res.status === 403) {
         return res.clone().json().then(function (d) {

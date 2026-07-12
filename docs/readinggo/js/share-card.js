@@ -64,7 +64,7 @@ function _loadCoverSafe(url) {
     img.crossOrigin = 'anonymous';
     // 알라딘 표지는 CORS 헤더가 없어 직접 로드 시 tainted canvas → 동일출처 프록시(/api/img) 경유 (#676).
     // 프록시 미배포(정적 호스팅)·실패 시 onerror → 이니셜 폴백이라 무중단. data:/상대경로는 그대로.
-    const src = /^https?:\/\//i.test(url) ? ('/api/img?url=' + encodeURIComponent(url)) : url;
+    const src = /^https?:\/\//i.test(url) ? (((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/img?url=' + encodeURIComponent(url)) : url;  // #1230 네이티브 절대경로
     let done = false;
     const finish = (v) => { if (!done) { done = true; resolve(v); } };
     img.onload = () => {
