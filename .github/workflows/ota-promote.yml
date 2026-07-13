@@ -43,8 +43,9 @@ jobs:
         run: |
           set -o pipefail
           # --remote 필수: wrangler v4 local-first. 없으면 로컬 KV(빈 값)를 읽어 백업이 무의미(#990).
-          # 최초 승격(아직 prod 없음)이면 빈 값 → 백업 스킵(graceful). kv get 은 키 부재 시 빈 출력.
-          CUR=$(npx -y wrangler@4 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:production")
+          # 최초 승격(아직 prod 없음)이면 빈 값 → 백업 스킵(graceful). wrangler v4 kv get 은
+          # 키 부재 시 404 + exit 1 이므로(#1252) 부재를 허용해 빈 값으로 떨어뜨린다.
+          CUR=$(npx -y wrangler@4 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:production" 2>/dev/null || true)
           if [ -z "$CUR" ]; then
             echo "ℹ️ 현재 production 매니페스트 없음(최초 승격) — :prev 백업 스킵."
           else
