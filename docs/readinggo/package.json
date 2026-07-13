@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "smoke": "node render-smoke.mjs"
+    "smoke": "node render-smoke.mjs",
+    "audit:ui": "node ui-audit-sweep.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
