@@ -1249,6 +1249,8 @@ select{ font-size: 16px !important; }
   width: 70px; text-align:center;
 }
 .page-direct input:focus{ outline: none; border-color: var(--brand); }
+/* 검색 입력창 브랜드 포커스 (#1236) — 스타일 부재 시 UA 기본 링(환경 따라 주황)이 노출됐다. */
+.rg-search-input:focus{ outline: none; box-shadow: 0 0 0 1.5px var(--brand); }
 .page-totalmark{
   display:block; margin-top: 6px; text-align:center;
   font-size: 11px; color: var(--ink-3); font-weight: 700;
