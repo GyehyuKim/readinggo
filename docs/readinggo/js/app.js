@@ -976,9 +976,11 @@ function App() {
             background: 'var(--brand-tint)', borderBottom: '1px solid var(--brand-soft)', fontSize: 12.5, fontWeight: 700, color: 'var(--brand-3)' }}>
             <window.SparrowMark size={18} />
             <span style={{ flex: 1, lineHeight: 1.35 }}>게스트로 둘러보는 중<br />로그인하면 내 기록이 저장돼요</span>
+            {/* #1233: 라벨 '저장하기'는 진도 카드의 저장하기와 동일 라벨·다른 의미(로그인 유도 vs 진도 저장)로
+                오독 경로였고, solid 는 첫 화면 1차 버튼 경쟁(hero CTA·전체 동의와 3개)을 만들었다 → '로그인' + 2차 위계. */}
             <button onClick={() => setShowLogin(true)}
-              style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 999, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>
-              저장하기
+              style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 999, border: '1px solid var(--brand-soft)', background: '#fff', color: 'var(--brand-3)', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>
+              로그인
             </button>
             <button onClick={() => setGuestBannerOff(true)} aria-label="배너 닫기"
               style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex', alignItems: 'center', padding: '13px 14px', margin: '-13px -14px' }}>
