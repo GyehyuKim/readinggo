@@ -30,7 +30,7 @@
 | **방문/설치 링크** | referral 파라미터가 붙은 서비스 링크 | `https://readinggo.app/?ref=ABC123` |
 
 - **특정 책 인용은 미동반(#1092)**: ~~대표 한 문장(공유자의 최근 인용)~~ 은 빼고 철학 한 줄만 보낸다. 앱 초대의 목적은 책 한 권 공유가 아니라 "이 습관을 같이"이기 때문(베타 피드백 — "특정 책의 문구를 공유하는 게 목적이 아님"). 한 문장 *카드* 공유(#651/[share.md](./share.md))는 별개 동선으로 유지.
-- **미리보기 = 링크 OG 카드**: 공유 텍스트를 늘리는 대신 랜딩(`index.html`)의 Open Graph 메타(`og:title`·`og:description`·`twitter:card`)로 카톡·아이메시지·인스타에 미리보기 카드를 띄운다. `og:description` = 위 철학 한 줄과 동일(공유 텍스트와 한목소리). `og:image`(1200×630)는 미정 — 현재 텍스트 카드(`summary`), 추후 추가 시 `summary_large_image`.
+- **미리보기 = 링크 OG 카드**: 공유 텍스트를 늘리는 대신 랜딩(`index.html`)의 Open Graph 메타(`og:title`·`og:description`·`twitter:card`)로 카톡·아이메시지·링크드인에 미리보기 카드를 띄운다. `og:description` = 위 철학 한 줄과 동일(공유 텍스트와 한목소리). `og:image`(#1247) = `public/assets/og-card.png`(1200×630, DESIGN.md 토큰 — 종이 그라데이션·세이지 태그라인·참새 배지) 를 **절대 URL** 로 지정(크롤러는 상대경로 해석 안 함; LinkedIn 은 이미지 없는 카드의 프리뷰 생성을 거부) + `og:image:width/height`, `twitter:card=summary_large_image` + `twitter:image`. 문구·태그라인은 기존 #1092 그대로(새 카피 발명 금지).
 - **공유 수단**: Web Share API(`navigator.share`) 우선, 미지원 환경은 **클립보드 복사 + 토스트** 폴백(#650-A와 동일 기술 스택, 프레임워크 추가 없음).
 - **이미지 카드 vs 텍스트+링크**: 서비스 공유의 기본은 **텍스트+링크**(전환 링크가 1순위). 이미지 카드가 필요하면 #651의 한 문장 카드 비주얼을 재사용하되 **하단 워터마크 영역에 "→ ReadingGo 시작하기" CTA + 링크**를 덧댄 변형으로 한다(§6).
 
