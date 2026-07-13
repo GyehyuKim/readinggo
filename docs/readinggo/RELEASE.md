@@ -200,6 +200,10 @@ OTA 롤백은 두 층이다:
 
 production 을 직전 양호 매니페스트로 되돌리는 법(서버 측). 아래 **A) 가 기본**(원클릭) — `ota-promote.yml` 이 매 승격마다 직전 prod 를 `:prev` 키에 자동 백업하므로(#1029), 한 줄로 복원한다.
 
+> **최초 승격 주의(#1252)**: wrangler v4 `kv key get --remote` 는 키 부재 시 빈 출력이 아니라
+> **404 + exit 1** 이다. 백업 스텝은 이를 허용(`|| true`)해 "prod 없음 → 백업 스킵" 으로
+> 흐른다 — 최초 승격(2026-07-14 이전)이 이 지점에서 항상 실패했던 회귀 방지.
+
 ```bash
 NS=e22049c87f9d44139242316c3c445bf9   # OTA_KV namespace id (wrangler.toml)
 
