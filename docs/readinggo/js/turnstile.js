@@ -40,23 +40,40 @@
   }
 
   // 스크립트 onload 후 Turnstile 이 호출 — 위젯 1개 렌더(평소 비표시). 대기 중 요청 있으면 실행.
+  var challengeWrap = null;   // #1232: 인터랙티브 챌린지 전용 백드롭 레이어
+  function _challenge(show) {
+    if (challengeWrap) challengeWrap.style.display = show ? 'flex' : 'none';
+  }
   window.RG_onTurnstileLoad = function () {
     try {
       if (!window.turnstile || !SITE_KEY) return;
-      // 컨테이너: 평소엔 빈 요소(0 크기 — 터치 가로채지 않음). CF 가 인터랙티브 챌린지를
-      // 요구하면 이 자리(하단 중앙, 탭바 위)에 위젯이 보이게 떠서 사용자가 풀 수 있다 (#1222).
+      // #1232: 구 배치(fixed bottom:76px, z-index:2000)는 챌린지가 뜨는 순간 세리머니 CTA·설정
+      // 시트·책 상세 콘텐츠를 무언으로 덮었다(전면 감사). CF 공식 before/after-interactive-callback 으로
+      // 챌린지가 표시될 때만 dimmed 백드롭 + 중앙 배치 + 안내 문구로 전환한다(평소엔 display:none —
+      // 터치 가로채지 않음). z-index 는 앱 최상위(10002)보다 위.
+      challengeWrap = document.createElement('div');
+      challengeWrap.style.cssText = 'position:fixed;inset:0;z-index:10010;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,0.45);padding:24px;';
+      var caption = document.createElement('div');
+      caption.textContent = '잠깐, 보안 확인이 필요해요';
+      caption.style.cssText = 'color:#fff;font-weight:800;font-size:15px;text-align:center;';
       var el = document.createElement('div');
-      el.style.cssText = 'position:fixed;bottom:calc(var(--safe-bottom, 0px) + 76px);left:50%;transform:translateX(-50%);z-index:2000;';
-      document.body.appendChild(el);
+      challengeWrap.appendChild(caption);
+      challengeWrap.appendChild(el);
+      // 바깥 탭 = 닫기(이탈구) — 챌린지를 안 풀어도 앱이 잠기지 않는다. 토큰은 '' fail-open
+      // (기존 6s 타임아웃 동작과 동일; 워커 secret 활성 시 403 → 호출부 토스트 안내).
+      challengeWrap.addEventListener('click', function (e) { if (e.target === challengeWrap) _challenge(false); });
+      document.body.appendChild(challengeWrap);
       widgetId = window.turnstile.render(el, {
         sitekey: SITE_KEY,
         // #1222: size 유효값은 compact/flexible/normal 뿐('invisible' 은 throw).
         // normal + appearance:'interaction-only' = 챌린지 필요할 때만 표시(인비저블 동작 유지).
         size: 'normal',
         appearance: 'interaction-only',
-        callback: function (token) { _settle(token || ''); },
-        'error-callback': function () { _settle(''); },
-        'timeout-callback': function () { _settle(''); },
+        'before-interactive-callback': function () { _challenge(true); },
+        'after-interactive-callback': function () { _challenge(false); },
+        callback: function (token) { _challenge(false); _settle(token || ''); },
+        'error-callback': function () { _challenge(false); _settle(''); },
+        'timeout-callback': function () { _challenge(false); _settle(''); },
       });
       if (pending && widgetId !== null) _run();   // 로드 전 들어온 요청 처리
     } catch (e) { _settle(''); }
