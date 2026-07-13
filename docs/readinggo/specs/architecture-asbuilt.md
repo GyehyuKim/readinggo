@@ -113,7 +113,11 @@ setup-globals → config → supabase-client → datastore-supabase →
   `input(텍스트 계열):not(.rg-noscale-input), textarea, select { font-size:16px !important }`
   단일 규칙으로 인라인 값까지 덮어 최소 16px 강제 → 줌 자체를 차단. file/checkbox/radio/
   range/color/버튼형은 제외. 의도적으로 큰 입력(둥지 진도 큰 숫자, 26px)은 `.rg-noscale-input`
-  예외(이미 ≥16px라 줌 무관, 디자인 크기 보존).
+  예외(이미 ≥16px라 줌 무관, 디자인 크기 보존). 같은 규칙에 `min-width:0` 동반(#1245) —
+  플로어로 커진 폰트는 input 의 암시적 최소폭(size 속성 ≈20자)도 키워, Android 폰트
+  메트릭에선 검색창 flex 행이 뷰포트를 넘쳐 우측 바코드 버튼이 화면 밖으로 밀렸다
+  (Z Flip 6 실측: 행 443px > 뷰포트 411px). `min-width:0` 은 넘치는 대신 입력을 줄인다
+  (placeholder 잘림 허용, flex 밖 입력엔 무영향).
 - **중첩 스크롤 체이닝**: 스크롤 가능한 오버레이가 끝에 닿아도 배경 페이지로 스크롤을 넘기지
   않게 `overscroll-behavior:contain`을 스크롤 컨테이너에 적용 — `.main`(모든 탭 페이지),
   `.sheet`(책상세·문장모음 등 바텀시트), `.rg-room-sheet`·`.rg-room-modal-body`(마을).
