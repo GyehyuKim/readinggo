@@ -21,8 +21,12 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
       try {
         const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
         const cv = document.createElement('canvas');
-        cv.width = bmp.width; cv.height = bmp.height;
-        cv.getContext('2d').drawImage(bmp, 0, 0);
+        // #1255: 긴 변 2560px 캡 — 12MP 원본 재인코딩(수 초)이 "사진이 늦게 뜸"의 주범.
+        // 크롭·OCR 에 원본 해상도 불필요(글자 판독은 2560 이면 충분), 업로드도 같이 가벼워진다.
+        const scale = Math.min(1, 2560 / Math.max(bmp.width, bmp.height));
+        cv.width = Math.max(1, Math.round(bmp.width * scale));
+        cv.height = Math.max(1, Math.round(bmp.height * scale));
+        cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
         if (bmp.close) bmp.close();
         const blob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.95));
         u = URL.createObjectURL(blob || file);
@@ -100,8 +104,11 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
     cv.toBlob((blob) => { if (blob) onCrop(blob); }, 'image/jpeg', 0.92);
   };
   const hasSel = sel && sel.w >= 8 && sel.h >= 8;
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 'var(--app-h, 100dvh)', background: 'rgba(0,0,0,0.94)', zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
+  // #1255: body 포털 + z 10001(전면 오버레이 컨벤션, 바코드 모달과 동일) — NestView 안에 그리면
+  // fixed/z-index 가 앱 레이아웃(조상 containing block)에 갇혀 헤더·탭바를 못 덮고, 사진 하단
+  // 핸들이 탭바에 가려 선택 불가에 이른다(실기기 #1255). #728 상단 버튼 배치는 유지(이중 안전).
+  return ReactDOM.createPortal(
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 'var(--app-h, 100dvh)', background: 'rgba(0,0,0,0.94)', zIndex: 10001, display: 'flex', flexDirection: 'column' }}>
       {/* #728: 버튼을 상단으로 — 모바일에서 하단 영역이 브라우저 툴바/하단 탭 뒤로 잘려도
           추출 버튼이 항상 보이고 눌리도록. 안내+액션을 위에 모으고 이미지는 아래 flex로 채운다. */}
       <div style={{ padding: 'calc(env(safe-area-inset-top) + 12px) 16px 8px', color: '#fff', textAlign: 'center' }}>
@@ -131,7 +138,8 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 window.OcrCropOverlay = OcrCropOverlay;
