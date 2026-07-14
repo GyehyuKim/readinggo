@@ -1,0 +1,4 @@
+# 공개 배포는 자기완결형 덱(index.html)만 — 작업/스크래치/발표자 노트/구버전은 로컬 보관
+*
+!.gitignore
+!index.html
