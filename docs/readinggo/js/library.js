@@ -35,6 +35,23 @@ function LibraryView({ state, onActivateUserBook }) {
   // 좋아요한 문장은 내 한 문장 "전체 보기" 컬렉션 모달 내 필터로 이동 (#12)
   const [adminOpen, setAdminOpen] = _useState(false); // 운영 대시보드 (#161)
   const [importOpen, setImportOpen] = _useState(false); // 타사 앱 밑줄 가져오기 (#1150)
+  const [wikiOpening, setWikiOpening] = _useState(false); // 독서 위키 상시 진입점 중복 탭 방지 (#1274)
+  const openWikiAsk = async () => {
+    if (wikiOpening) return;
+    setWikiOpening(true);
+    try {
+      const rows = await Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : []);
+      if (!Array.isArray(rows) || rows.length === 0) {
+        showToast('먼저 홈에서 마음에 든 한 문장을 저장해 보세요');
+        return;
+      }
+      if (window.RG_openCollection) window.RG_openCollection({ mode: 'ask' });
+    } catch (e) {
+      showToast('내 문장을 불러오지 못했어요 — 잠시 후 다시');
+    } finally {
+      setWikiOpening(false);
+    }
+  };
   // 한 줄 소개 인라인 편집 (#515) — 설정 탭에서 이동, 프로필 헤더에서 직접 수정.
   const [bioEditing, setBioEditing] = _useState(false);
   const [bioText, setBioText] = _useState((window.RG_ME && window.RG_ME.bio) || '');
@@ -477,6 +494,22 @@ function LibraryView({ state, onActivateUserBook }) {
             </div>{/* #641: 구 저장(📌) → ❤️ 좋아요 단일화. 동작·모달 동일(좋아요한 문장 모아보기) */}
           </button>
         </div>
+      </div>
+
+      {/* 독서 위키 상시 진입점 (#1274) — 활성 책 문장 수와 무관하게 책장에서 발견 가능. */}
+      <div style={{padding:'0 16px', margin:'0 0 20px'}}>
+        <button onClick={openWikiAsk} disabled={wikiOpening}
+          aria-label="내 문장에게 묻기"
+          style={{width:'100%', boxSizing:'border-box', border:'1px solid var(--brand-soft)', borderRadius:16, background:'var(--brand-tint)', color:'var(--ink)', padding:'14px 16px', cursor:wikiOpening?'default':'pointer', opacity:wikiOpening?0.7:1, display:'flex', alignItems:'center', gap:12, textAlign:'left'}}>
+          <span aria-hidden="true" style={{width:36, height:36, borderRadius:12, background:'var(--brand-soft)', color:'var(--brand-3)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+            {window.rgIcon('search',18)}
+          </span>
+          <span style={{minWidth:0, flex:1}}>
+            <span style={{display:'block', fontSize:14, fontWeight:900, lineHeight:1.35}}>내 문장에게 묻기</span>
+            <span style={{display:'block', marginTop:3, fontSize:12, fontWeight:600, color:'var(--ink-3)', lineHeight:1.45}}>모아둔 문장에서 생각과 연결을 찾아보세요</span>
+          </span>
+          <span aria-hidden="true" style={{color:'var(--brand-3)', fontSize:18, flexShrink:0}}>›</span>
+        </button>
       </div>
 
       {/* 둥지 캐릭터(NestTheatre) — 프로필 헤더 아래로 이동 (#508, #428 갱신) */}

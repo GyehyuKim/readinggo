@@ -459,7 +459,8 @@ function App() {
   // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState(null); // 저장(❤️) 진입 시 'fav' (#510)
-  useEffect(() => { window.RG_openCollection = (opts) => { setCollectionFilter(opts && opts.filter); setCollectionOpen(true); }; return () => { window.RG_openCollection = null; }; }, []);
+  const [collectionMode, setCollectionMode] = useState(null); // 책장 상시 진입점은 묻기 모드로 바로 열기 (#1274)
+  useEffect(() => { window.RG_openCollection = (opts) => { setCollectionFilter(opts && opts.filter); setCollectionMode(opts && opts.mode); setCollectionOpen(true); }; return () => { window.RG_openCollection = null; }; }, []);
   // 스샷 서가 복원(#772) — 빈 서재 CTA로 열림.
   const [shelfImportOpen, setShelfImportOpen] = useState(false);
   // 유연 임포트(#1039) — 붙여넣기/파일 텍스트로 가져오기. 스샷과 형제 진입점(텍스트/파일이 1순위).
@@ -1107,7 +1108,7 @@ function App() {
 
         {/* 한 문장 모아보기 (#171) */}
         {collectionOpen && ReactDOM.createPortal(
-          <SentenceCollectionModal initialFilter={collectionFilter} onClose={() => setCollectionOpen(false)} />,
+          <SentenceCollectionModal initialFilter={collectionFilter} initialMode={collectionMode} onClose={() => setCollectionOpen(false)} />,
           document.body
         )}
         {/* 스샷 서가 복원 (#772) */}
