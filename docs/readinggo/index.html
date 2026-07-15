@@ -916,6 +916,21 @@ select{ font-size: 16px !important; min-width: 0; }
 .quick-ocr{ width:100%; margin-top:8px; padding:11px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--ink-2); font-weight:800; font-size:13.5px; cursor:pointer; }
 .quick-ocr:disabled{ opacity:.6; cursor:default; }
 
+/* 홈 진도·한 문장 쪽수 컨트롤: 숫자 스테퍼와 전체 쪽수는 한 의미 단위로 유지한다(#1262). */
+.home-page-control-group,
+.home-page-total{ white-space:nowrap; flex-shrink:0; }
+@media (max-width:430px){
+  .home-page-progress-row,
+  .home-sentence-toolbar{ gap:4px !important; }
+  .home-page-progress-row .home-page-control-group{ gap:3px !important; }
+  .home-page-progress-row .rg-noscale-input{ width:48px !important; }
+  .home-page-progress-row > button,
+  .home-sentence-toolbar > button:last-child{ padding-left:12px !important; padding-right:12px !important; }
+  .home-sentence-toolbar > button:not(:last-child){ width:34px !important; height:34px !important; }
+  .home-sentence-toolbar .home-page-control-group{ gap:3px !important; }
+  .home-sentence-toolbar .home-page-control-group input{ width:38px !important; padding-left:3px !important; padding-right:3px !important; }
+}
+
 /* 오늘의 한 문장 카드 AI 진입 (#469) */
 .my-q-card .q-ai{ margin-top:8px; display:inline-flex; align-items:center; gap:6px; background:var(--brand); border:none; color:#fff; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(46,168,106,0.35); }
 .my-q-card .q-ai:active{ transform:translateY(1px); box-shadow:0 1px 4px rgba(46,168,106,0.2); }
