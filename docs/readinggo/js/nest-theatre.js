@@ -104,7 +104,7 @@ function NestTheatre({ xp, health = 100 }) {
           <div className="nest-name">
             <span style={{display:'inline-flex', alignItems:'center', gap:6}}>{window.nestArt(stage.lv, 22)} {stage.name}</span>
             {next && (
-              <span className="next-arrow" style={{display:'inline-flex', alignItems:'center', gap:4}}>→ {window.nestArt(next.lv, 16)} {next.name}</span>
+              <span className="next-arrow" style={{display:'inline-flex', alignItems:'center', gap:4}}>다음 성장 · {window.nestArt(next.lv, 16)} {next.name}</span>
             )}
           </div>
           <div className="nest-health-num">
