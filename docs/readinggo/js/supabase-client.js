@@ -198,6 +198,20 @@
    companion(/api/companion) 과 동일한 동일출처 프록시 패턴 — 키는 서버 보관(클라 노출 0).
    서버가 그 문장들에만 근거해 답(환각 가드는 워커 프롬프트). 호출부(SentenceCollectionModal)가
    로딩·에러·빈 상태를 처리한다. payload: text·note(my_note)·book(제목)·author·page. */
+// #1283: Worker 보안 정책은 그대로 두고, 호출부가 403/502/네트워크 실패를 구분할 수 있게 한다.
+window.RG_wikiAskErrorMessage = function RG_wikiAskErrorMessage(error) {
+  if (error && error.code === 'TURNSTILE') {
+    return '보안 확인 토큰이 없거나 만료됐어요. 보안 확인을 완료한 뒤 다시 묻기를 눌러주세요.';
+  }
+  if (error && error.code === 'SERVICE') {
+    return '답변 서비스가 잠시 불안정해요. 잠시 후 다시 시도해주세요.';
+  }
+  if (error && error.code === 'NETWORK') {
+    return '네트워크 연결을 확인하고 다시 시도해주세요.';
+  }
+  return '답변 요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.';
+};
+
 window.RG_wikiAsk = async function RG_wikiAsk(question, mine) {
   const items = (mine || [])
     .map((s) => ({
@@ -208,13 +222,29 @@ window.RG_wikiAsk = async function RG_wikiAsk(question, mine) {
       page: (s.page != null) ? s.page : '',
     }))
     .filter((it) => it.text);
-  const r = await window.RG_apiFetch('/api/wiki-ask', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question: String(question || '').trim(), items }),
-  });
+  let r;
+  try {
+    r = await window.RG_apiFetch('/api/wiki-ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: String(question || '').trim(), items }),
+    });
+  } catch (cause) {
+    const error = new Error('wiki-ask network failure', { cause });
+    error.code = 'NETWORK';
+    throw error;
+  }
   let d = null;
   try { d = await r.json(); } catch (e) { d = null; }
-  if (!r.ok) throw new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
+  if (!r.ok) {
+    const error = new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
+    error.status = r.status;
+    if (r.status === 403 && d && typeof d.error === 'string' && d.error.indexOf('turnstile') === 0) {
+      error.code = 'TURNSTILE';
+    } else if (r.status >= 500) {
+      error.code = 'SERVICE';
+    }
+    throw error;
+  }
   return (d && d.answer) || '';
 };

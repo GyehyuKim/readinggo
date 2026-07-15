@@ -98,7 +98,11 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
     if (window.rgTrack) window.rgTrack('wiki_ask', { n: list.length, q_len: text.length });
     Promise.resolve(window.RG_wikiAsk ? window.RG_wikiAsk(text, list) : Promise.reject(new Error('미설정')))
       .then((a) => { setAnswer(a || '모은 문장에서는 못 찾았어요'); })
-      .catch(() => { setAskErr('답하기 실패 — 잠시 후 다시'); })
+      .catch((error) => {
+        setAskErr(window.RG_wikiAskErrorMessage
+          ? window.RG_wikiAskErrorMessage(error)
+          : '답변 요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.');
+      })
       .finally(() => setAsking(false));
   };
   return (
@@ -146,7 +150,7 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
                   onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && ask.trim()) { e.preventDefault(); submitAsk(); } }}
                   placeholder="내 문장에게 물어보세요" aria-label="내 문장에게 묻기" rows={2}
                   style={{ flex: 1, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink)', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', outline: 'none' }} />
-                <button onClick={() => submitAsk()} disabled={!ask.trim() || asking} aria-label="묻기"
+                <button onClick={() => submitAsk()} disabled={!ask.trim() || asking} aria-label={askErr ? '다시 묻기' : '묻기'}
                   style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: (ask.trim() && !asking) ? 'var(--brand)' : 'var(--line)', color: '#fff', cursor: (ask.trim() && !asking) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9l14-7-7 14V9H2z" fill="currentColor"/></svg>
                 </button>
