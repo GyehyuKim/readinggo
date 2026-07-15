@@ -6,7 +6,8 @@
 ## nest.md (둥지) — owner 승원
 | 조항 | 상태 | 근거/갭 |
 |---|---|---|
-| §5.1 상단바·진화배너·둥지자람·캐러셀 | ✅ | app.js topbar · nest.js NestTheatre/twigs/switchBook |
+| §5.1 상단바 진행 지표 | 🚩 | **#1086 결정 미구현, #1176 Telegram 디자인 검토 대기.** 스펙은 XP·Lv 숫자 노출을 폐지하고 둥지 단계·성·스트릭으로 통일하지만, 현행 `app.js`의 `topbar-stats`는 `XP {n}`·`Lv.{n}`만 렌더한다. 컴팩트 표기 승인 전 UX 코드 작업 금지; 승인 후 별도 코드 이슈/PR로 정합 |
+| §5.1 진화배너·둥지자람·캐러셀 | ✅ | nest.js NestTheatre/twigs/switchBook |
 | §5.2 **둥지=1,600 XP 주기(v8.1)** · 경계 성 획득·리셋 | ✅ | nest.js `_cycleXp(xp)=xp%1600`·`nestCastleCount=floor(totalXp/1600)`·1600경계 성획득+리셋(#520/#521). 2026-06 정합(구 🚩는 오표기 — 구현 완료) |
 | §5.1 CTA·§5.4 일일미션 = 읽기모드 대체 | ✅ | #252 — nest.md §5.5 반영(읽기모드가 체크인 대체). CheckinModal 폐기 |
 | §5.4 별점0.5·완독세리머니(읽기모드 위임) · §5.5 읽기모드(나가기✕) | ✅ | #300 finish→handleCheckin · ReadingMode |
