@@ -617,15 +617,6 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           touchAction 'pan-y' = 세로 스크롤은 브라우저, 가로는 우리가 처리(세로 충돌 방지). */}
       <div className="card book-card-wrap" style={{ position: 'relative', touchAction: _swipeEnabled ? 'pan-y' : 'auto' }}
         onPointerDown={_onSwipeDown} onPointerMove={_onSwipeMove} onPointerUp={_onSwipeEnd} onPointerCancel={_onSwipeEnd}>
-        {readingBooks.length > 1 && (
-          <>
-            <button onClick={() => switchBook(-1)} aria-label="이전 책" style={{ position: 'absolute', left: 2, top: '50%', transform: 'translateY(-50%)', zIndex: 3, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.06)', color: 'var(--ink-2)', fontSize: 16, cursor: 'pointer' }}>‹</button>
-            <button onClick={() => switchBook(1)} aria-label="다음 책" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', zIndex: 3, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.06)', color: 'var(--ink-2)', fontSize: 16, cursor: 'pointer' }}>›</button>
-            <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 4, zIndex: 3 }}>
-              {readingBooks.map((b, i) => <span key={b.id || i} style={{ width: 5, height: 5, borderRadius: '50%', background: b.id === nestState.book.id ? 'var(--brand)' : 'var(--line-2, #ccc)' }} />)}
-            </div>
-          </>
-        )}
         {/* 책 정보 탭 → 책 상세 모달(BookInfoModal) 진입 (#495). ⚙️ 수정 버튼은 stopPropagation으로 격리.
             ref=_cardRef: 스와이프 중 이 카드만 translateX(화살표·점은 wrap 기준 고정, #1001). */}
         <div className="book-card" ref={_cardRef} role="button" tabIndex={0} aria-label="책 상세 정보 보기"
@@ -654,6 +645,15 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             </div>
           </div>
         </div>
+        {readingBooks.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <button onClick={() => switchBook(-1)} aria-label="이전 책" style={{ minWidth: 92, minHeight: 44, borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>‹ 이전 책</button>
+            <div aria-hidden="true" style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 4 }}>
+              {readingBooks.map((b, i) => <span key={b.id || i} style={{ width: 5, height: 5, borderRadius: '50%', background: b.id === nestState.book.id ? 'var(--brand)' : 'var(--line-2, #ccc)' }} />)}
+            </div>
+            <button onClick={() => switchBook(1)} aria-label="다음 책" style={{ minWidth: 92, minHeight: 44, borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>다음 책 ›</button>
+          </div>
+        )}
       </div>
 
       {/* 둥지 시어터(NestTheatre)는 프로필 상단으로 이동 (#428) — 홈은 책읽기 중심 */}
