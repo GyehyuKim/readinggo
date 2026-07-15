@@ -24,3 +24,8 @@
 - [ ] 커밋 메시지 Conventional Commits (§5)
 - [ ] 타인 오너 파일 미수정(또는 PR에 조율 사유) (§3.5)
 - [ ] `.env`·API 키·개인정보 없음 (§6)
+
+## Hermes 감독 머지 게이트
+<!-- CI green은 자동 머지 승인이 아님. 구현·머지는 gyehyu/Hermes만 수행한다. -->
+- [ ] 필수 CI 전체 green 및 `main` 최신화
+- [ ] Hermes가 관련 이슈, diff 범위, 테스트 증거, 미해결 대화를 확인

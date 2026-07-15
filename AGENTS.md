@@ -27,7 +27,7 @@
 - **프로젝트**: **ReadingGo** — 독서 습관 앱. "하루 한 페이지, 한 문장"을 게이미피케이션(스트릭·XP·둥지 진화·성 컬렉션)과
   소셜(마을·전체 공개 피드·짹·NPC)로 매일 읽게 만든다. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
 - **형태**: **Capacitor 채택**(런칭 결정, 2026-06) — 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드 = **Vite 전환 완료**(#871). Phase 0 데모(현행) → Phase 1 Supabase. *이전 web-first·Capacitor Phase 3 보류는 해제* (`CLAUDE.md` Stack Lock · `iOS-PLAN.md`).
-- **팀 (dev 3인)**: 김계휴(`gyehyu`, 백엔드·소셜·내서재), 이승원(`seungwon`, 둥지·XP·디자인), 정윤지(`yunji`, 마을).
+- **팀 (dev 3인)**: 김계휴(`gyehyu`, 구현·머지), 이승원(둥지·XP·디자인 제안), 정윤지(마을 제안). 구현 권한은 `gyehyu`와 그가 지시한 Hermes에만 있다.
 - **주요 산출물**: `docs/readinggo/` (Phase 0 데모), `docs/readinggo/specs/` (피처별 spec, v7).
 - **언어**: 모든 커뮤니케이션과 문서는 **한국어**가 기본. 코드 식별자만 영어.
 
@@ -57,7 +57,7 @@ find .git -name "desktop.ini" -type f -delete
 # 1. 최신화
 git checkout main && git pull origin main
 
-# 2. 브랜치 생성 (규칙: <owner>/<topic-slug>, owner ∈ {gyehyu, seungwon, yunji})
+# 2. 브랜치 생성 (규칙: gyehyu/<topic-slug>; 구현은 gyehyu/Hermes만)
 git checkout -b gyehyu/example-topic
 
 # 3. 편집 및 커밋 (Conventional Commits)
@@ -67,7 +67,7 @@ git commit -m "docs: 왜 바꿨는지 한 문장"
 # 4. push 전 항상 (조건 없이 — 그 사이 머지된 PR이 있을 수 있다. CONTRIBUTING §3.0)
 git fetch origin && git rebase origin/main
 
-# 5. 푸시 + PR (머지는 계휴가 GitHub 웹에서)
+# 5. 푸시 + PR (필수 CI green 뒤 Hermes가 diff·이슈·테스트·대화를 확인하고 감독 머지)
 #    PR 본문에 관련 이슈 연결: Closes #N(완료) / Refs #N(관련) — CONTRIBUTING §4.2
 #    작업 중 발견한 새 일은 이슈로 (§4.3 형식)
 git push -u origin gyehyu/example-topic
@@ -80,6 +80,8 @@ gh pr create --title "..." --body "..."
 **Stack Lock**: 플랫폼 = **Capacitor 단일**(RN/Expo/Flutter 등 다른 네이티브 프레임워크 금지), 빌드 = **Vite**. 이 외 **새** 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 상세는 [`CLAUDE.md` Stack Lock](./CLAUDE.md).
 
 **이슈 동기화**: PR은 관련 이슈를 연결(`Closes #N` 완료 / `Refs #N` 관련)하고, 작업 중 발견한 새 일은 이슈로 만든다 (CONTRIBUTING §4.2–4.3).
+
+**운영 권한**: 이슈는 누구나 만들고 의견을 남길 수 있다. 그러나 구현 브랜치·코드/스펙 변경·PR 작성은 `gyehyu`와 그가 지시한 Hermes만 수행한다. CI green은 자동 머지 승인이 아니며, Hermes가 PR의 이슈 연결·diff·테스트 근거·미해결 대화를 확인한 뒤에만 머지한다 (`CONTRIBUTING.md` §0).
 
 ---
 
