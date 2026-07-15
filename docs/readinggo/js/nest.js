@@ -369,7 +369,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     // 성 획득(1,600 주기 완료)은 단계 toast보다 우선 — 경계 통과 시 둥지 단계는 Lv4→Lv1로
     // 리셋되어 nestUp=false 이므로, 성 획득은 별도로 안내한다 (#520/#521).
     if (castleGained) {
-      showToast(`🏰 전설의 참새 성주! ${newCastles}번째 성을 완성했어요`);
+      showToast(`🏰 전설의 재키 성주! ${newCastles}번째 성을 완성했어요`);
     } else if (nestUp) {
       const copy = getEvolutionCopy(prevLv, newLv);
       if (copy) showToast(`${getNestStageByXp(ns.xp).short} ${copy}`);
@@ -796,7 +796,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       {/* 시간차 되감기 카드 (#346) */}
       {resurfaceCard && (
         <div style={{ background: 'var(--brand-tint)', border: '1px solid var(--brand)', borderRadius: 12, padding: '14px 16px', margin: '10px 0' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand-3)', marginBottom: 6 }}>💬 참새</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--brand-3)', marginBottom: 6 }}>💬 재키</div>
           <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>
             {resurfaceCard.daysAgo}일 전, 이 문장을 남겼어요{resurfaceCard.bookTitle ? ` — 《${resurfaceCard.bookTitle}》` : ''}
           </div>

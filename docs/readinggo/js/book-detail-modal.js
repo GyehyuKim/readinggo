@@ -451,7 +451,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* 참새의 완독 회고 (§5.8.6, #259) — 내 한 문장들을 참새(solar-pro3)가 엮어 회고 한 단락 */}
           {bookshelfEntry && (
             <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
-              <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:6}}><window.SparrowInline size={14} /> 참새의 완독 회고</div>
+              <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:6}}><window.SparrowInline size={14} /> 재키의 완독 회고</div>
               {recap ? (
                 <>
                   <div style={{fontSize:13, color:'var(--ink)', lineHeight:1.65, whiteSpace:'pre-wrap'}}>{recap}</div>
@@ -459,18 +459,18 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   {bookQuotes.length > 0 && (
                     <button onClick={loadRecap} disabled={recapLoading}
                       style={{marginTop:8, padding:'5px 12px', background:'var(--brand-soft)', border:'1px solid var(--brand-soft)', borderRadius:12, color:'var(--brand-3)', fontSize:11, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
-                      {recapLoading ? '참새가 곱씹는 중…' : '🔄 다시 받기'}
+                      {recapLoading ? '재키가 곱씹는 중…' : '🔄 다시 받기'}
                     </button>
                   )}
                 </>
               ) : bookQuotes.length === 0 ? (
-                <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5}}>이 책에 남긴 한 문장이 있으면, 참새가 그 문장들을 엮어 회고를 들려줘요.</div>
+                <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5}}>이 책에 남긴 한 문장이 있으면, 재키가 그 문장들을 엮어 회고를 들려줘요.</div>
               ) : (
                 <>
-                  <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5, marginBottom:8}}>이 책에서 남긴 {bookQuotes.length}개의 한 문장을 참새가 엮어 회고를 들려드려요.</div>
+                  <div style={{fontSize:12, color:'var(--ink-2)', lineHeight:1.5, marginBottom:8}}>이 책에서 남긴 {bookQuotes.length}개의 한 문장을 재키가 엮어 회고를 들려드려요.</div>
                   <button onClick={loadRecap} disabled={recapLoading}
                     style={{padding:'9px 16px', background:'var(--brand)', border:'none', borderRadius:12, color:'#fff', fontSize:13, fontWeight:800, cursor:recapLoading?'default':'pointer', opacity:recapLoading?0.6:1}}>
-                    {recapLoading ? '참새가 곱씹는 중…' : <><window.SparrowInline size={13} /> 회고 받기</>}
+                    {recapLoading ? '재키가 곱씹는 중…' : <><window.SparrowInline size={13} /> 회고 받기</>}
                   </button>
                 </>
               )}
