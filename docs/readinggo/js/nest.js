@@ -688,18 +688,18 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       {/* 진도 섹션 */}
       <div style={{ marginTop: 10, background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 'var(--r-md)', padding: '14px 16px' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)', marginBottom: 10 }}>오늘은 어디까지 읽으셨나요?</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <div className="home-page-progress-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="home-page-control-group" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <button onClick={() => _stepPage(setQuickPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtn}>−</button>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickPage} placeholder={String(nestState.book.cur||0)}
               className="rg-noscale-input"
               onChange={e => setQuickPage(e.target.value.replace(/[^0-9]/g, ''))}
               style={{ width: 60, textAlign: 'center', fontSize: 26, fontWeight: 900, color: 'var(--ink)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand)', outline: 'none', padding: '0 4px 2px', fontFamily: 'inherit' }} />
             <button onClick={() => _stepPage(setQuickPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtn}>+</button>
+            {nestState.book.total > 0
+              ? <span className="home-page-total" style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>
+              : <span className="home-page-total" style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>p</span>}
           </span>
-          {nestState.book.total > 0
-            ? <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>
-            : <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>p</span>}
           {nestState.book.total > 0 && (
             <span style={{ fontSize: 12, color: 'var(--brand-3)', fontWeight: 800, background: 'var(--brand-tint)', borderRadius: 999, padding: '3px 10px' }}>
               {Math.min(100, Math.round((parseInt(quickPage,10)||nestState.book.cur||0) / nestState.book.total * 100))}%
@@ -744,7 +744,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             적어둔 {_draftCount}개 문장은 자동 저장돼요 — 다 읽고 덮을 때 아래 쪽수와 함께 한번에 기록해요.
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+        <div className="home-sentence-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
           {/* 사진으로 입력(OCR) — SVG 카메라 아이콘 버튼 (2026 UI, '···' 메뉴 대체) */}
           <button onClick={() => { if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }}
             disabled={quickOcrBusy} title="사진으로 입력 (OCR)" aria-label="사진으로 입력 (OCR)"
@@ -757,15 +757,15 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, borderRadius: 12, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
           </button>
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>p</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span className="home-page-control-group" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>p</span>
             <button onClick={() => _stepPage(setQuickSentPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtnSm}>−</button>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickSentPage}
               placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickSentPage(e.target.value.replace(/[^0-9]/g, ''))}
               style={{ width: 44, textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 12, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
             <button onClick={() => _stepPage(setQuickSentPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtnSm}>+</button>
+            {nestState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
           </span>
-          {nestState.book.total > 0 && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
           <button onClick={() => { setSentFlip(true); setTimeout(() => { submitSentence(); setSentFlip(false); }, 280); }}
             style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.2px', flexShrink: 0 }}>
             {_draftCount > 1 ? `${_draftCount}개 한번에 기록` : '남기기'}
