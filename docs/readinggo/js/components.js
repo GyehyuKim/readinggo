@@ -201,17 +201,27 @@ window.decodeEntities = decodeEntities; // sentence-card.js 등 추출 모듈이
 function ActivityHeatmap({ days }) {
   const N = days || 182;
   const [map, setMap] = useState(null);
+  const [visibleDays, setVisibleDays] = useState(null);
   useEffect(() => {
     const DS = window.DataStore || {};
-    if (!(DS.sessions && DS.sessions.heatmap)) { setMap({}); return; }
-    Promise.resolve(DS.sessions.heatmap(N)).then((rows) => {
-      const m = {}; (rows || []).forEach((r) => { m[r.date] = r.pages; }); setMap(m);
-    }).catch(() => setMap({}));
+    const heatmap = (DS.sessions && DS.sessions.heatmap) ? DS.sessions.heatmap(N) : [];
+    const profile = (DS.profile && DS.profile.get) ? DS.profile.get() : null;
+    Promise.all([Promise.resolve(heatmap).catch(() => []), Promise.resolve(profile).catch(() => null)])
+      .then(([rows, me]) => {
+        const m = {}; (rows || []).forEach((r) => { m[r.date] = r.pages; }); setMap(m);
+        const joined = me && me.created_at ? new Date(me.created_at) : null;
+        if (joined && !isNaN(joined.getTime())) {
+          joined.setHours(0, 0, 0, 0);
+          const age = Math.max(0, Math.floor((Date.now() - joined.getTime()) / 86400000));
+          setVisibleDays(Math.min(N, age + 1));
+        } else {
+          setVisibleDays(Math.min(N, 28));
+        }
+      });
   }, []);
-  if (map === null) return <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: 8 }}>활동 불러오는 중…</div>;
+  if (map === null || visibleDays === null) return <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: 8 }}>활동 불러오는 중…</div>;
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const start = new Date(today.getTime() - (N - 1) * 86400000);
-  start.setDate(start.getDate() - start.getDay());
+  const start = new Date(today.getTime() - (visibleDays - 1) * 86400000);
   const cells = [];
   for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
     const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -234,7 +244,7 @@ function ActivityHeatmap({ days }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.3px' }}>독서 활동</div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{Math.round(N / 7)}주 · {activeDays}일 · {totalPages}쪽</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{Math.ceil(visibleDays / 7)}주 · {activeDays}일 · {totalPages}쪽</div>
       </div>
       <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
         <div style={{ display: 'inline-block' }}>

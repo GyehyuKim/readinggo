@@ -472,8 +472,8 @@ function LibraryView({ state, onActivateUserBook }) {
             </span>
           </div>
         )}
-        {/* 팔로잉/팔로워/저장 (#471/#472) — 팔로우 수는 Supabase friends.counts 실데이터 (#516). 탭 시 유저 목록 모달 (#509) */}
-        {/* 가운데정렬 + 좌우 넓게 분배 — space-around 로 풀폭 균등 배치 */}
+        {/* #1238: 첫 소셜 신호가 생기기 전에는 0·0·0을 전시하지 않는다. 데이터와 기존 버튼 동작은 그대로 유지. */}
+        {(followCounts.following > 0 || followCounts.followers > 0 || savedCount > 0) && (
         <div style={{display:'flex', justifyContent:'space-around', marginTop:14, padding:'0 8px'}}>
           <button onClick={() => setFollowModal('following')}
             style={{textAlign:'center', background:'none', border:'none', cursor:'pointer', padding:0}}>
@@ -494,6 +494,7 @@ function LibraryView({ state, onActivateUserBook }) {
             </div>{/* #641: 구 저장(📌) → ❤️ 좋아요 단일화. 동작·모달 동일(좋아요한 문장 모아보기) */}
           </button>
         </div>
+        )}
       </div>
 
       {/* 독서 위키 상시 진입점 (#1274) — 활성 책 문장 수와 무관하게 책장에서 발견 가능. */}
