@@ -123,7 +123,7 @@ window.nestArt = nestArt;
 function SparrowMark({ size = 40, style, spark }) {
   const s = size || 40;
   return (
-    <svg width={s} height={s} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ReadingGo 참새" style={{ display: 'block', flexShrink: 0, ...(style || {}) }}>
+    <svg width={s} height={s} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ReadingGo 재키" style={{ display: 'block', flexShrink: 0, ...(style || {}) }}>
       <path d="M66 50 L95 40 L79 65 Z" fill="#2EA86A" />
       <ellipse cx="56" cy="62" rx="28" ry="24" fill="#2EA86A" />
       <circle cx="40" cy="40" r="19" fill="#2EA86A" />
