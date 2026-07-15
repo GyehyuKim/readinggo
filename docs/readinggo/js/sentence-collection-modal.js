@@ -7,7 +7,7 @@
 const { useState, useEffect } = React;
 
 /* ── SentenceCollectionModal: 내 한 문장 모아보기(전체/책별/좋아요) + 읽었음 카운터(#171) ── */
-function SentenceCollectionModal({ onClose, initialFilter }) {
+function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
   const SentenceActions = window.SentenceActions; // sentence-card.js(이후 로드)에서 추출 (#761)
   const [mine, setMine] = useState(undefined);
   const [saved, setSaved] = useState([]);   // #608/#641: 좋아요한 타인 문장 — '좋아요' 필터 전용(전체/책별엔 미혼입)
@@ -15,7 +15,7 @@ function SentenceCollectionModal({ onClose, initialFilter }) {
   const [filter, setFilter] = useState(initialFilter || 'all'); // all | book | fav — 좋아요한 문장 진입 시 'fav' (#510)
   const [query, setQuery] = useState('');  // 내 한 문장 키워드 검색 (#1007, profile §5.8.8)
   // 독서 위키 Q&A — "내 문장에게 묻기" (#1007, profile §5.8.8). 같은 mine 데이터에 근거해 LLM 1콜.
-  const [mode, setMode] = useState('find');   // find(찾기: 목록+검색) | ask(묻기: LLM Q&A)
+  const [mode, setMode] = useState(initialMode === 'ask' ? 'ask' : 'find');   // find(찾기: 목록+검색) | ask(묻기: LLM Q&A)
   const [ask, setAsk] = useState('');         // 질문 입력
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState('');   // 받은 답(근거 문장/책 포함)
