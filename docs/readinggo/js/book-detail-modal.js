@@ -226,7 +226,11 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (!book.ubId || !(DataStore.books && DataStore.books.complete)) return;
     if (!window.confirm(`'${book.title}'을(를) 완독으로 표시할까요?`)) return;
     Promise.resolve(DataStore.books.complete(book.ubId))
-      .then(() => showToast('🏰 완독으로 표시했어요 — 새로고침하면 반영돼요'))
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('rg:wish-changed'));
+        onClose();
+        showToast('🏰 완독으로 표시했어요');
+      })
       .catch(() => showToast('완독 처리 실패 — 다시 시도'));
   };
   // 읽기 중단 (#593): 읽던 책을 '중단' 탭으로. 삭제 아님 — 진척 보존, '다시 읽기'로 복구 가능.
@@ -234,7 +238,11 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (!book.ubId || !(DataStore.myBooks && DataStore.myBooks.abort)) return;
     if (!window.confirm(`'${book.title}' 읽기를 중단할까요?\n진척은 보존되고, '중단' 탭에서 다시 읽을 수 있어요.`)) return;
     Promise.resolve(DataStore.myBooks.abort(book.ubId))
-      .then(() => { showToast('읽기를 중단했어요'); window.dispatchEvent(new CustomEvent('rg:wish-changed')); onClose(); })
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('rg:wish-changed'));
+        onClose();
+        showToast('읽기를 중단했어요');
+      })
       .catch(() => showToast('중단 처리 실패 — 다시 시도'));
   };
   // 잘못 담은 책 완전 삭제 (#1195): abort(중단, 되돌리기 가능)와 달리 user_book+문장·세션 영구 제거.
@@ -251,9 +259,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       .then(() => {
         // 삭제된 책의 한 문장을 홈(nest)·서재 피드에서 즉시 제거 (rg:sentence-removed 리스너, app.js/nest.js).
         bookQuotes.forEach(q => { if (q.id) window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id: q.id } })); });
-        showToast('책을 삭제했어요');
         window.dispatchEvent(new CustomEvent('rg:wish-changed'));
         onClose();
+        showToast('책을 삭제했어요');
       })
       .catch(() => showToast('삭제 실패 — 다시 시도'));
   };
