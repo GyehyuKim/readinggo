@@ -34,6 +34,10 @@
         s.async = true;
         s.defer = true;
         s.setAttribute('data-rg-turnstile', '1');
+        s.addEventListener('error', function () {
+          scriptInjected = false;
+          if (s.parentNode) s.parentNode.removeChild(s);
+        });
         document.head.appendChild(s);
       }
     } catch (e) { /* fail-open — 토큰은 '' */ }
