@@ -40,7 +40,7 @@ const NEST_STAGES = [
   { lv: 2, minXp: 100,  maxXp: 399,  name: "빈 둥지",       short: "🪹", color: "#F59E0B", bg: "#FEF3C7" },
   { lv: 3, minXp: 400,  maxXp: 899,  name: "따뜻한 둥지",   short: "🪺", color: "#58CC02", bg: "#F0FDF4" },
   { lv: 4, minXp: 900,  maxXp: 1599, name: "다정한 집",     short: "🐣", color: "#1CB0F6", bg: "#EFF6FF" },
-  { lv: 5, minXp: 1600, maxXp: null, name: "참새의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
+  { lv: 5, minXp: 1600, maxXp: null, name: "재키의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
 ];
 // 현재 1,600 XP 주기 내 누적 XP (0~1599).
 function nestCycleXp(totalXp){ return Math.max(0, totalXp || 0) % NEST_CYCLE_XP; }
@@ -77,10 +77,10 @@ function nestStageProgress(totalXp){
 /* ── 진화 마이크로카피 4종 (nest.md §5.2) ─────────
    단계 상승 시 toast. from/to 는 NEST_STAGES.lv (1-based). */
 const NEST_STAGE_TRANSITIONS = [
-  { from: 1, to: 2, text: "참새가 자리를 잡았어요!" },
-  { from: 2, to: 3, text: "참새가 살림을 차렸어요!" },
+  { from: 1, to: 2, text: "재키가 자리를 잡았어요!" },
+  { from: 2, to: 3, text: "재키가 살림을 차렸어요!" },
   { from: 3, to: 4, text: "다정한 이웃이 되었어요!" },
-  { from: 4, to: 5, text: "전설의 참새 성주!" },
+  { from: 4, to: 5, text: "전설의 재키 성주!" },
 ];
 // fromLv < toLv 일 때 가장 높은 도달 단계의 카피 반환(여러 단계 점프 시 최종 단계).
 function getEvolutionCopy(fromLv, toLv){
