@@ -10,6 +10,7 @@
 | §5.2 **둥지=1,600 XP 주기(v8.1)** · 경계 성 획득·리셋 | ✅ | nest.js `_cycleXp(xp)=xp%1600`·`nestCastleCount=floor(totalXp/1600)`·1600경계 성획득+리셋(#520/#521). 2026-06 정합(구 🚩는 오표기 — 구현 완료) |
 | §5.1 CTA·§5.4 일일미션 = 읽기모드 대체 | ✅ | #252 — nest.md §5.5 반영(읽기모드가 체크인 대체). CheckinModal 폐기 |
 | §5.4 별점0.5·완독세리머니(읽기모드 위임) · §5.5 읽기모드(나가기✕) | ✅ | #300 finish→handleCheckin · ReadingMode |
+| §5.6.1 OCR 전체화면 검토·편집 | 🔧 | 선행 spec PR #1279 · nest.js `_validateOcrReview`·`runOcrQuick`·`saveOcrReview` · app.js `handleCheckin` completion · `tests/ocr-review-flow.test.mjs` |
 
 ## companion.md (LLM 독서 파트너 — v7.4 신설) — owner 계휴
 | 조항 | 상태 | 근거/갭 |
