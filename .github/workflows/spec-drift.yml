@@ -23,6 +23,7 @@ jobs:
           python3 tests/spec-align/align_v7.py
           python3 tests/spec-align/nest.py
           python3 tests/spec-align/drift.py
+          python3 tests/spec-align/architecture_current.py
 
       - name: DataStore 계약 (UI 호출 ↔ supabase 어댑터)
         run: node tests/contract/datastore-contract.mjs
