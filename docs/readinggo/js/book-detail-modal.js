@@ -28,6 +28,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   const [addOpen, setAddOpen] = _useState(false);
   const [addText, setAddText] = _useState('');
   const [addPage, setAddPage] = _useState('');
+  const [addVisibility, setAddVisibility] = _useState('public');
   const [addBusy, setAddBusy] = _useState(false);
   const [quotePasteOpen, setQuotePasteOpen] = _useState(false);  // #848 여러 문장 일괄 담기 모달
   const [batchBusy, setBatchBusy] = _useState(false);
@@ -43,7 +44,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     setAddBusy(true);
     try {
       const pg = addPage === '' ? null : (parseInt(addPage, 10) || null);
-      const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: pg, text: t, kind: 'quote' }));
+      const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: pg, text: t, kind: 'quote', visibility: addVisibility }));
       // #595: DB 행 확정 시에만 낙관 반영(가짜 id 유령 → 리로드 시 사라짐 방지). id 없으면 실패 처리.
       if (!row || !row.id) { showToast('저장 실패 — 잠시 후 다시'); return; }
       window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
@@ -60,13 +61,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // #848 여러 문장 일괄 담기 — saveNewQuote 패턴 재사용. sentences.add 반복 + xp.add(+20) 1회.
   // 각 문장 rg:sentence-added 로 app myQuotes·목록 자동 반영. page 미상=null, 200자/중복은 컴포넌트에서 거름.
   const saveBatchQuotes = async (quotes) => {
-    const list = (quotes || []).map(t => (t || '').trim()).filter(t => t && t.length <= 200);
+    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text && x.text.length <= 200);
     if (!list.length) return { saved: 0 };
     if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return { error: true, saved: 0 }; }
     let saved = 0;
-    for (const text of list) {
+    for (const item of list) {
+      const text = item.text;
       try {
-        const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: null, text, kind: 'quote' }));
+        const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
         if (row && row.id) {
           saved++;
           window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
@@ -651,7 +653,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             <div style={{marginBottom:14}}>
               {!addOpen ? (
                 <>
-                  <button onClick={() => setAddOpen(true)}
+                  <button onClick={() => { window.readDefaultSentenceVisibility().then((visibility) => { setAddVisibility(visibility); setAddOpen(true); }); }}
                     style={{display:'flex', width:'100%', alignItems:'center', justifyContent:'center', gap:6, padding:'12px', borderRadius:12, border:'1.5px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer'}}>{window.rgIcon('pen',15)} 한 문장 추가</button>
                   {/* #848 여러 문장 한 번에 담기 — 눈에 띄는 카드 + 사용법 안내 */}
                   <button onClick={() => setQuotePasteOpen(true)}
@@ -678,6 +680,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     <input type="number" inputMode="numeric" min="0" max="99999" value={addPage} onChange={e => setAddPage(e.target.value)} placeholder="페이지"
                       style={{width:72, textAlign:'center', padding:'7px 4px', border:'1.5px solid var(--line)', borderRadius:12, fontSize:13, fontWeight:700}} />
                   </div>
+                  <div style={{marginTop:8}}><SentenceVisibilitySelect value={addVisibility} onChange={setAddVisibility} /></div>
                   <div style={{display:'flex', gap:8, marginTop:10}}>
                     {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
                     <button onClick={() => { setAddOpen(false); setAddText(''); setAddPage(''); }}

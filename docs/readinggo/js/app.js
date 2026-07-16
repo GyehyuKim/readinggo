@@ -116,7 +116,7 @@ async function syncPendingToSupabase() {
       const gsents = (ub.sentences || []).filter(se => se && se._guest)
         .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
       for (const se of gsents) {
-        try { await DS.sentences.add({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind }); } catch (e) {}
+        try { await DS.sentences.add({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind, visibility: se.visibility }); } catch (e) {}
       }
     }
     // 문장 없이 등록만 한 활성 책(레거시 pending) — 중복 아니면 책만 이전.
@@ -129,7 +129,7 @@ async function syncPendingToSupabase() {
         if (newUb && newUb.id) {
           lastUbId = activeNewId = newUb.id;
           try { await DS.sessions.addToday({ userBookId: newUb.id, page: pb.current_page || 0 }); } catch (e) {}
-          if (pend.sentence && pend.sentence.text) { try { await DS.sentences.add({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text }); } catch (e) {} }
+          if (pend.sentence && pend.sentence.text) { try { await DS.sentences.add({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text, visibility: pend.sentence.visibility }); } catch (e) {} }
         }
       } catch (e) {}
     }
@@ -703,7 +703,7 @@ function App() {
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
   // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences) => {
+  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences, visibility) => {
     // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
     // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
@@ -726,7 +726,7 @@ function App() {
         window.localStorageAdapter.mutate(s => {
           s.pending = s.pending || {};
           s.pending.book = { isbn13: b.isbn13 || '', title: b.title || '', author: b.author || '', total_pages: b.total || 0, current_page: b.cur || 0, cover_url: b.cover || '' };
-          s.pending.sentence = { text: sentence, page: qPage };
+          s.pending.sentence = { text: sentence, page: qPage, visibility };
           return s;
         });
       } catch (e) {}
@@ -749,10 +749,10 @@ function App() {
         if (batch && batch.length) {
           // 배치: N개 문장을 개별 add(공유 페이지). 진도·세션·XP·스트릭은 위/아래에서 1회만(#1198).
           for (const s of batch) {
-            try { await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote' })); } catch (e) { console.warn('[ReadingGo] 배치 문장 저장 실패(1건 스킵):', (e && e.message) || e); }
+            try { await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote', visibility: s.visibility })); } catch (e) { console.warn('[ReadingGo] 배치 문장 저장 실패(1건 스킵):', (e && e.message) || e); }
           }
         } else if (sentence) {
-          await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote' }));
+          await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));
         }
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ubId + ')');
@@ -769,7 +769,7 @@ function App() {
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
           xp: (typeof xpDb === 'number') ? xpDb : s.xp,
           myQuotes: Array.isArray(mineDb)
-            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', isPrivate: !!x.is_private, notePrivate: !!x.note_private }))
+            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: x.visibility || 'public', isPrivate: x.visibility === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
         }));
       } catch (e) { surfaceWriteError(e, '기록을 저장하지 못했어요 — 다시 시도해주세요'); }

@@ -93,13 +93,14 @@ function DataImport({ onClose }) {
 
   // 검토 확정 → 선택 책에 일괄 담기. page=null, kind='quote'. book-detail-modal.saveBatchQuotes 패턴.
   const commit = async (quotes) => {
-    const list = (quotes || []).map(t => (t || '').trim()).filter(t => t && t.length <= 200);
+    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text && x.text.length <= 200);
     if (!list.length || !ubId) { onClose(); return; }
     setBusy(true);
     let saved = 0;
-    for (const text of list) {
+    for (const item of list) {
+      const text = item.text;
       try {
-        const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: null, text, kind: 'quote' }));
+        const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
         if (row && row.id) {
           saved++;
           window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
