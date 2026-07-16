@@ -1,7 +1,8 @@
 // 책 소개 HTML 엔티티 디코드 회귀 테스트 (#562)
 //
-// library.js 는 JSX 라 vm 전체 실행이 어려워, 실제 파일에서 decodeEntities 함수 소스만 추출해 검증한다.
-// node 에는 document 가 없으므로 정규식 폴백 경로가 동작(브라우저는 textarea 트릭으로 전체 엔티티 커버).
+// decodeEntities는 #761 모듈화 뒤 components.js가 소유한다. JSX 전체 실행 대신
+// 실제 함수 소스만 추출해 검증한다. node에는 document가 없으므로 정규식 폴백 경로가
+// 동작한다(브라우저는 textarea 트릭으로 전체 엔티티를 처리).
 //
 // 실행: node tests/decode-entities.test.mjs
 import fs from 'node:fs';
@@ -9,11 +10,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(root, 'docs/readinggo/js/library.js'), 'utf8');
+const sourcePath = path.join(root, 'docs/readinggo/js/components.js');
+const src = fs.readFileSync(sourcePath, 'utf8');
 
 // 모듈 레벨 함수 추출 — 닫는 '}' 는 라인 시작(들여쓰기 0), 내부 '}' 는 들여쓰기되어 있어 안전.
 const m = src.match(/function decodeEntities\(s\) \{[\s\S]*?\n\}/);
-if (!m) { console.error('FAIL  library.js 에서 decodeEntities 추출 실패'); process.exit(1); }
+if (!m) { console.error('FAIL  components.js 에서 decodeEntities 추출 실패'); process.exit(1); }
 const decodeEntities = new Function('return (' + m[0] + ')')();
 
 let pass = 0, fail = 0;
