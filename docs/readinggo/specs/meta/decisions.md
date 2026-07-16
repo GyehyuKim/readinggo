@@ -418,5 +418,14 @@
 | **v6 — SNS 이미지 카드 세부 스펙** | profile §5.10 신설 예정이었으나 **미생성** — v7에서 **후순위** 강등 ([ROADMAP](../../ROADMAP.md)). 한 문장 카드 + 마일스톤 카드 |
 | **v6 — 마일스톤 공유 카드** | 50일·100일 스트릭 달성 시 특별 confetti + 공유 카드 자동 생성. ([§6.3](../systems.md)) |
 
----
+### v12 — 현재 런타임 정합 (2026-07, #1289)
+
+| 결정 | 상태 | 근거 / 후속 |
+|---|---|---|
+| **플랫폼·빌드** | **채택** — Vite + Capacitor 단일 코드베이스 | v7의 "web-first·Capacitor Phase 3 보류·React CDN+Babel" 행(§8.0의 과거 결정)은 **이 결정으로 superseded**. 웹과 iOS/Android 셸은 같은 Vite `dist`를 사용한다. |
+| **배포** | **채택** — Cloudflare Workers | Netlify는 과거 배포 기록일 뿐 현재 운영 경로가 아니다. Worker `readinggo`가 assets와 API를 제공한다. |
+| **데이터 경로** | **현재 공존** — 게스트 localStorage / 로그인 Supabase | Phase 번호로 저장소를 추정하지 않는다. DataStore가 로그인 상태별 어댑터를 선택하며, `books`는 게스트도 Supabase 공개 카탈로그를 읽는다. |
+| **AI provider** | **현재 이원화** — 텍스트 solar-pro3, vision Gemini | 활성 runtime 세부는 `architecture-asbuilt.md §11`을 사실 기준으로 한다. 제품 기능별 provider 변경은 별도 결정으로 append한다. |
+
+> 과거 결정은 감사 추적을 위해 삭제하지 않는다. 활성 스펙은 README §3·backend.md §7.1과 as-built 문서를 따른다.
 
