@@ -15,20 +15,20 @@
 
 ### 7.1 플랫폼
 
-**web-first.** Phase 0 은 백엔드 없이 정적 웹으로, Phase 1 부터 Supabase 를 붙인다. 두 단계는 **DataStore 계약(§7.2)** 으로 추상화되어, 피처 코드는 어느 Phase 인지 모른 채 동일 인터페이스만 호출한다.
+**현재 런타임 (2026-07, #1289)**: Vite가 빌드한 동일 번들을 웹과 Capacitor 셸이 공유하고 Cloudflare Workers가 배포한다. **게스트는 localStorageAdapter, 로그인 사용자는 supabaseAdapter**를 사용한다. 이는 순차 Phase 전환이 아니라 로그인 상태별 현재 공존 경로이며, 피처 코드는 DataStore 계약(§7.2)만 호출한다.
 
-| 항목 | Phase 0 (정적 웹 데모) | Phase 1+ (Supabase) |
+| 항목 | 게스트 경로 (현재) | 로그인 경로 (현재) |
 |---|---|---|
-| 데이터 저장 | `localStorage` (키 `rg_v41`) + Supabase `books` 카탈로그 (#490; 구 정적 TSV 제거 #972) | PostgreSQL + RLS |
-| 인증 | 없음 (가짜 세션 localStorage) | Supabase Auth (Google · Kakao · Apple OAuth — #937. 네이버 보류) |
-| 배치 | 없음 (날짜 시뮬레이터로 대체, §발표용) | pg_cron (UTC 15:00 일일, 월 00:00 주간) |
-| AI 도서 추천 | 하드코딩 추천 시뮬 | **Gemini Flash 무료 티어** + 서버리스 프록시 (§7.9) |
-| 표지 이미지 | 알라딘→카카오·국중도 표지 URL (`books.cover_url`; 소스 이전 #1044 §7.2.1) | 동일 + Storage 옵션 |
+| 데이터 저장 | `localStorage` (키 `rg_v41`) + Supabase `books` 공개 카탈로그 (#490; 구 정적 TSV 제거 #972) | PostgreSQL + RLS |
+| 인증 | 선택 사항 — 게스트 상태 유지 | Supabase Auth (Google · Kakao · Apple OAuth — #937. 네이버 보류) |
+| 배치 | 날짜 시뮬레이터·클라이언트 폴백 | pg_cron (UTC 15:00 일일, 월 00:00 주간) |
+| AI 도서 추천 | 로컬 시뮬/폴백 표면 | Worker 프록시의 실 연동·서버 키 관리 (§7.9) |
+| 표지 이미지 | 카카오·국중도·기존 카탈로그 표지 URL (`books.cover_url`; 소스 이전 #1044 §7.2.1) | 동일 + Storage 옵션 |
 | 풀텍스트 보조 | 클라이언트 fuzzy (Fuse.js + 자모 분해) | + `pg_trgm` 서버 보조 |
 
-**플랫폼 결정 (v7):**
+**플랫폼 결정 (현재 활성):**
 
-- **빌드**: 현행 React 18 CDN + Babel standalone 유지 (빌드 도구 없음). Vite 전환은 **PWA 전환 시 재검토** (현재 보류).
+- **빌드**: **Vite** (`npm run build` → `dist/`). 런타임 Babel/CDN 경로는 #871로 제거됐다.
 - **배포**: **Cloudflare Workers** — Worker `readinggo`, `https://readinggo.hyuniverse.workers.dev`. (Netlify → Cloudflare 이전 완료, GitHub Pages 폐기.) 재배포: `npx wrangler deploy`.
 - **모바일/네이티브 (v8 갱신)**: **Capacitor 채택** — iOS·Android 앱스토어 셸([iOS-PLAN](../iOS-PLAN.md), Stack Lock). 네이티브 앱 **소셜 로그인은 OAuth 딥링크로 복귀**한다(#968, v9 #937 로 provider 일반화): 네이티브 WebView 의 web-origin(`https://localhost`) 복귀는 외부 브라우저에 멈추므로, `isNative()` 일 때 `redirectTo=com.readinggo.app://login-callback`(AndroidManifest 커스텀 스킴 intent-filter) + **PKCE** + 인앱 브라우저(`@capacitor/browser`)로 열고, 복귀는 `@capacitor/app` 의 `appUrlOpen` → `exchangeCodeForSession` → `onAuthStateChange` 자동 발화. **전제: Supabase 대시보드 Auth→URL Configuration→Redirect URLs 에 그 스킴 등록.** 웹 플로우는 `redirectTo=origin` 그대로(분기). 이 경로는 provider 무관(google·kakao·apple 공통). **이메일 매직링크도 네이티브 복귀 지원(v10 갱신, #1035 P1)**: `signInWithEmail` 이 `isNative()` 면 `emailRedirectTo=com.readinggo.app://login-callback`(OAuth 와 같은 커스텀 스킴) 을 쓴다. 이전엔 무조건 `emailRedirectTo=origin`(네이티브에선 `https://localhost`)이라 메일 링크가 외부 브라우저에 세션만 만들고 **앱으로 못 돌아와 로그인 화면에 갇혔다**(소셜 #968 과 동일류). 복귀 핸들러(`appUrlOpen`)는 두 토큰 모양을 모두 처리한다: PKCE `?code=` → `exchangeCodeForSession`(소셜·기본 매직링크), `token_hash`+`type` → `verifyOtp`(템플릿이 `{{ .TokenHash }}` 인 설정). 둘 다 `onAuthStateChange` 자동 발화 → `showLogin` 닫힘(#1011 effect). 전제는 위 Redirect URLs 등록 공유. 네이티브 변경이라 OTA 불가 — 새 빌드 필요. **⚠️ 함정(#1009)**: 위 네이티브 분기는 `isNative()`=true 일 때만 돈다. `setup-globals` 가 네이티브 런타임이 주입한 `window.Capacitor`(브리지)를 **번들 `@capacitor/core` 인스턴스로 덮으면** 브리지와 분리돼 `isNativePlatform()`=false → 분기를 못 타고 다시 웹(외부 브라우저)으로 샌다(=#968 이전 증상 재현). → 브리지를 **덮지 말고 보존**(`if (!window.Capacitor) …`), 네이티브 여부는 로드 시점 `window.RG_NATIVE` 플래그로 확정해 신뢰한다. **⚠️ 함정(#1011)**: 네이티브는 딥링크 복귀라 **페이지 리로드가 없다** → OAuth 성공·세션 복원 후에도 `showLogin` 이 풀리지 않아 로그인 화면이 그대로 남는다(웹은 `redirectTo=origin` 리디렉트 리로드가 화면 상태를 초기화해 이 증상을 가린다). → 인증 성공(`authUser` 채워짐) 시 `setShowLogin(false)` 로 로그인 화면을 **명시적으로 닫아야** 한다(app.js, `authUser` 의존 effect).
 - **소셜 로그인 provider (v9, #937)**: 지원 = **Google · Kakao · Apple**. **네이버는 보류**(Supabase 가 기본 provider 로 미지원 — generic OIDC/커스텀 토큰 교환이 필요해 별도 작업, 지금은 안 만든다). **애플 버튼은 iOS 네이티브에서만 노출**하고 웹·Android 에선 숨긴다(`Capacitor.getPlatform() === 'ios'`, #1054): 웹 Apple 은 **$99 Apple Developer 미결제로 비기능**(거슬리는 빈 버튼)이라 가린다(#873 보류). Google Play 도 "제3자 로그인 제공 시 Apple 의무"가 없어 Android 는 숨긴다. **iOS App Store 가이드라인 4.8**(타사 소셜 로그인 쓰면 Apple 동등 제공 요구)은 iOS 네이티브에서만 발효되므로 거기서만 노출하면 충족 → **완전 삭제 아님**: 코드·spec 유지해 iOS 트랙서 Apple Developer 설정(.p8·Services ID 등) 시 즉시 복원. UI 는 각 provider **브랜드 가이드 색**을 따른다(카카오 `#FEE500`/검정 글씨·말풍선, 애플 검정 버튼/흰 로고) — DESIGN.md 그린 버튼 위계의 명시적 예외(OAuth 버튼은 제공자 규정 우선, 기존 Google 흰색 버튼과 동일 형태로 정렬).

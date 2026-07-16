@@ -217,7 +217,7 @@ alter table public.seed_sentences enable row level security;
 - **OCR**: v8 결정(2026-06-11) — 웹 OCR 허용, Upstage Document OCR + solar-pro3, **키 서버 보관**. #772는 이 라인 **확장**(새 프레임워크 0).
 - **크롤/생성**: 서버리스 워커(`worker/index.mjs`)에 엔드포인트 추가, 키 서버 보관. 클라 노출 금지.
 - **DataStore 계약**: 피처 코드는 저장소 직접 호출 금지. `myBooks.addBatch`·시드 read는 계약 경유(backend.md §7.2 확장).
-- **빌드**: React 18 CDN + Babel 유지. 신규 모듈은 #761 패턴(`shelf-import.js` 등 별도 파일 + `window.X`).
+- **빌드**: Vite 빌드(`npm run build` → `dist/`)를 사용한다. 신규 모듈은 #761 패턴(`shelf-import.js` 등 별도 파일 + `window.X`)과 `main.js` import 순서를 따른다.
 
 ## 7. 결정·미해결
 
