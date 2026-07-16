@@ -95,9 +95,9 @@
 | **share.md** (한 문장 외부 카드, #651) | ✅ | share-card.js `renderSentenceCardBlob`(htmlToImage)·`shareSentence`(navigator.share→클립보드 폴백)·sentence-card.js 진입. 구현 #670, QA #674/#677 머지 |
 | **barcode-scan.md** (ISBN 스캔 등록, #943) | ✅ | barcode-scan.js `BarcodeScanModal`·`barcodeScanSupported`(BarcodeDetector)·`resolveBookByIsbn`(normalizeIsbn13→books/알라딘 정확매칭)·미지원 폴백(수동검색). search.js 연동 |
 | **integrated-shelf.md** (빈 서가 박멸, #772·#774) | ✅ | ① 능동복원: shelf-import.js→`/api/shelf-import`(worker L559 비전OCR)·library.js 상시 진입점(#832). ② 수동시드: book-info-modal.js L64-96 마중물 큐→`/api/seed`(worker L817)+cron `prewarmSeeds`(L797). align_v7 invariant 락(L156) |
-| **ota.md** (웹 번들 OTA, #876) | ✅코드/⏳번들호스팅 | **스펙·이슈는 "코드 후속"이라 적었으나 이미 구현됨**: main.js L60 `@capgo/capacitor-updater`·package.json·capacitor.config.json + worker `/api/ota`=`otaCheck`(L1204, KV 매니페스트·minNative 게이트) + wrangler.toml `OTA_KV`(L28). 남은 건 R2 번들 호스팅+매니페스트 발행 도구(Phase C, #979 OPEN). ota.md 헤더·#876/#979 트래커가 코드보다 뒤처진 **역드리프트**(스펙 헤더 정합은 owner 후속) |
+| **ota.md** (웹 번들 OTA, #876) | ✅ 구현·운영 경로 적재 | `main.js`의 `@capgo/capacitor-updater`, `capacitor.config.json`, Worker `/api/ota`의 `otaCheck`, `wrangler.toml`의 `OTA_KV`가 존재한다. #876 및 #979는 2026-06-24 CLOSED로 확인. 이후 번들 발행·매니페스트 운영 변경은 새 이슈로 추적한다. |
 | **referral.md** (서비스 외부 공유·referral, #650-B) | ⏳부분 | 보상없는 코드만 동선 ✅(#727 — share-card.js `shareService`, library.js L560). **referral 코드·`?ref=` 귀속·랜딩(§5)·보상(§4.2)은 미구현 — CEO 보상 검토 의존(정상 보류, 신규 이슈 생성 안 함)** |
-| **co-reading.md** (같이읽기 방, #987) | ❌미구현 | 코드 없음(villages/village_members 스키마는 #440 마을 폐기 후 잔존, 재사용 예정). 활성 OPEN 이슈 **#987(P1)·#988(P2)** 가 추적 — 신규 이슈 불필요. byBook '함께 읽은 사람들' 집계는 Phase 1(#496) |
+| **co-reading.md** (같이읽기 방, #987) | ✅ 구현 | `co-reading.js`의 `RoomsView`·추천 랭킹·`BookCoReadRow`, 양 DataStore 어댑터의 `byBook` 정렬, `book-detail-modal.js` 진입점이 존재한다. #987/#988은 2026-06-24 CLOSED. 후속 기능은 별도 이슈로만 추적한다. |
 | **resurface.md** (시간차 되감기, #639) | ✅코어/🅿️확장 | 코어 되감기 ✅(#346/#364 — datastore-supabase.js `resurfaceCandidate` L334·`markResurfaced` L364·1일 게이트 L456). resurface.md 자체는 🅿️보류(확장은 Phase later, 정상) |
 
 ## meta/decisions.md
