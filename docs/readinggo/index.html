@@ -1529,11 +1529,13 @@ select{ font-size: 16px !important; min-width: 0; }
 }
 
 .toast{
-  position: fixed; left: 50%; top: 14%;
-  transform: translate(-50%, -10px); z-index: 200;
+  position: fixed; left: 50%; bottom: calc(88px + var(--safe-bottom));
+  transform: translate(-50%, 10px); z-index: 200;
   background: var(--ink); color: #fff;
   padding: 10px 16px; border-radius: 999px;
   font-size: 13px; font-weight: 800;
+  max-width: calc(100vw - 32px); width: max-content;
+  text-align: center;
   opacity: 0; pointer-events: none;
   transition: opacity .25s ease, transform .25s ease;
   box-shadow: var(--shadow-2);

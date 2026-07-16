@@ -56,6 +56,8 @@ function Ceremony({ data, onClose, onComplete }) {
   const startPct = _absPct(startXp, startSP); // 절대 기준(cycleXp/next.minXp) — NestTheatre 바와 일치 #743
   const endPct   = _absPct(endXp, endSP);
   const curStage = endSP.stage;
+  // 정식 단계명은 SSOT에 보존하되, 보상 화면의 다음 목표는 비어 보이지 않는 성취 라벨로 표현한다.
+  const nextGoalName = endSP.next && endSP.next.name === '빈 둥지' ? '첫 둥지' : (endSP.next && endSP.next.name);
 
   _useEffect(() => {
     setBarPct(startPct);
@@ -154,8 +156,8 @@ function Ceremony({ data, onClose, onComplete }) {
               : (endSP.isMax
                   ? '🏰 곧 1,600 XP — 성이 완성돼요!'
                   : (endPct >= 100
-                      ? `${endSP.next ? endSP.next.short + ' ' + endSP.next.name : ''} 단계에 도달했어요!`
-                      : `${endSP.next ? endSP.next.short + ' ' + endSP.next.name : '다음 단계'}까지 ${Math.max(0, endSP.spanXp - endSP.intoXp).toLocaleString()} XP`))}
+                      ? `${endSP.next ? endSP.next.short + ' ' + nextGoalName : ''} 단계에 도달했어요!`
+                      : `${endSP.next ? endSP.next.short + ' ' + nextGoalName : '다음 단계'}까지 ${Math.max(0, endSP.spanXp - endSP.intoXp).toLocaleString()} XP`))}
           </div>
         </div>
 
