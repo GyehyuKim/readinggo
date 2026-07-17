@@ -14,6 +14,31 @@ const { useState, useEffect } = React;
 function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes'); // 데이터 활용 동의 (#294)
   const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'); // 참새 질문 결 (#375)
+  // 한 문장 기본 공개 범위 (#1261) — 저장 완료 후에만 선택 상태를 확정한다.
+  const [sentenceVisibility, setSentenceVisibility] = useState('public');
+  const [sentenceVisibilityBusy, setSentenceVisibilityBusy] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    const settingsApi = window.DataStore && window.DataStore.settings;
+    if (!(settingsApi && settingsApi.get)) { setSentenceVisibilityBusy(false); return () => { alive = false; }; }
+    Promise.resolve(settingsApi.get()).then((settings) => {
+      if (!alive) return;
+      setSentenceVisibility(settings && settings.default_sentence_visibility === 'private' ? 'private' : 'public');
+    }).catch(() => {
+      if (alive) showToast('기본 공개 범위를 불러오지 못했어요. 다시 열어 주세요.');
+    }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
+    return () => { alive = false; };
+  }, []);
+  const saveSentenceVisibility = (next) => {
+    if (sentenceVisibilityBusy || next === sentenceVisibility) return;
+    const settingsApi = window.DataStore && window.DataStore.settings;
+    if (!(settingsApi && settingsApi.update)) { showToast('기본 공개 범위를 저장하지 못했어요. 다시 시도해 주세요.'); return; }
+    setSentenceVisibilityBusy(true);
+    Promise.resolve(settingsApi.update({ default_sentence_visibility: next }))
+      .then(() => { setSentenceVisibility(next); })
+      .catch(() => showToast('기본 공개 범위를 저장하지 못했어요. 다시 시도해 주세요.'))
+      .finally(() => setSentenceVisibilityBusy(false));
+  };
   // 스트릭 리마인더 (#1033) — 매일 정해진 시각 로컬 알림. 네이티브에서만 실효(웹은 토글 비노출).
   const reminderApi = window.RG_streakReminder;
   const reminderNative = !!(reminderApi && reminderApi.isNativeSupported && reminderApi.isNativeSupported());
@@ -167,6 +192,25 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
+          <fieldset disabled={sentenceVisibilityBusy} style={{ margin: '8px 0 0', padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)' }}>
+            <legend style={{ padding: '0 4px', fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>한 문장 기본 공개 범위</legend>
+            <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
+              {[
+                { value: 'public', label: '전체 공개', description: '피드에 공개돼요' },
+                { value: 'private', label: '나만 보기', description: '나만 볼 수 있어요' },
+              ].map((option) => (
+                <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: sentenceVisibilityBusy ? 'default' : 'pointer', opacity: sentenceVisibilityBusy ? 0.6 : 1 }}>
+                  <input type="radio" name="default-sentence-visibility" value={option.value}
+                    checked={sentenceVisibility === option.value}
+                    onChange={() => saveSentenceVisibility(option.value)} />
+                  <span>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{option.label}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{option.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           {/* 위시리스트 공개 (#558) */}
           <div style={{ marginTop: 8, padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>

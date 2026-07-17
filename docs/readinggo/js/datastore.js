@@ -186,6 +186,7 @@ const localStorageAdapter = (function () {
       claps: {},      // sentenceId -> true
       bookmarks: {},  // sentenceId -> true
       wish_books: Array.isArray(window.WISHLIST) ? window.WISHLIST.slice() : [],
+      settings: {},    // 사용자 설정. default_sentence_visibility 미설정은 public 으로 해석(#1261)
       pending: {},    // 가입 전 임시 (rg_pending_*)
     };
   }
@@ -319,6 +320,22 @@ function _npcFeedRows() {
 /* ── DataStore 계약 (§7.2) ───────────────────────────────
    localStorageAdapter 백킹의 실제 동작 구현 (스텁 아님). */
 const DataStore = {
+  /* 설정 ─────────────────────────────────────────── */
+  settings: {
+    get() {
+      return localStorageAdapter.mutate(s => ({
+        ...(s.settings || {}),
+        default_sentence_visibility: s.settings && s.settings.default_sentence_visibility === 'private' ? 'private' : 'public',
+      }));
+    },
+    update(patch) {
+      return localStorageAdapter.mutate(s => {
+        s.settings = { ...(s.settings || {}), ...(patch || {}) };
+        return { ...s.settings };
+      });
+    },
+  },
+
 
   /* 책 / 활성 책 ──────────────────────────────── */
   activeBook: {
@@ -520,7 +537,7 @@ const DataStore = {
 
   /* 한 문장 (sentences) ───────────────────────────── */
   sentences: {
-    add({ userBookId, sessionId, page, text, my_note, kind }) {
+    add({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
       return localStorageAdapter.mutate(s => {
         // #565: userBookId 가 명시됐는데 못 찾으면 active 책으로 폴백하지 않는다(잘못된 귀속 방지) — null 로 실패.
         // userBookId 미명시(레거시 호출)일 때만 active 책 사용.
@@ -536,6 +553,10 @@ const DataStore = {
           text: text || '',
           my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
+          // #1261: 호출부의 문장별 명시값이 우선. 없으면 저장된 기본값, 알 수 없는 값은 public.
+          visibility: visibility === 'private' || visibility === 'followers' || visibility === 'public'
+            ? visibility
+            : (s.settings && s.settings.default_sentence_visibility === 'private' ? 'private' : 'public'),
           _guest: true,   // 게스트가 직접 남긴 문장(시드 아님) — 로그인 시 backfill 대상 (#370)
           created_at: Date.now(),
         };
@@ -1134,10 +1155,10 @@ const DataStore = {
   drafts: {
     _key(bookId) { return 'rg_sentence_drafts:' + (bookId || '_'); },
     load(bookId) {
-      try { const r = JSON.parse(localStorage.getItem(this._key(bookId)) || '[]'); return (Array.isArray(r) && r.length) ? r.map(x => String(x || '')) : ['']; } catch (e) { return ['']; }
+      try { const r = JSON.parse(localStorage.getItem(this._key(bookId)) || '[]'); return (Array.isArray(r) && r.length) ? r.map(x => (x && typeof x === 'object') ? { text: String(x.text || ''), visibility: x.visibility || null } : { text: String(x || ''), visibility: null }) : [{ text: '', visibility: null }]; } catch (e) { return [{ text: '', visibility: null }]; }
     },
     save(bookId, arr) {
-      try { const k = this._key(bookId); if ((arr || []).some(x => x && x.trim())) localStorage.setItem(k, JSON.stringify(arr)); else localStorage.removeItem(k); } catch (e) { /* 초안 저장 실패 무해 */ }
+      try { const k = this._key(bookId); if ((arr || []).some(x => x && String(x.text || x).trim())) localStorage.setItem(k, JSON.stringify(arr)); else localStorage.removeItem(k); } catch (e) { /* 초안 저장 실패 무해 */ }
     },
   },
 };

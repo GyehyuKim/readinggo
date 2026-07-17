@@ -104,9 +104,16 @@
       },
     },
     settings: {
-      async get() { const u = await A.profile.get(); return (u && u.settings) || {}; },
+      async get() {
+        const u = await A.profile.get();
+        const settings = (u && u.settings) || {};
+        return { ...settings, default_sentence_visibility: settings.default_sentence_visibility === 'private' ? 'private' : 'public' };
+      },
       async update(patch) {
-        const cur = await A.settings.get();
+        // 정규화된 get() 결과를 병합하면 키 없는 기존 계정까지 public 으로 백필된다.
+        // 원본 JSONB만 병합해 #1261의 무백필 계약을 지킨다.
+        const u = await A.profile.get();
+        const cur = (u && u.settings) || {};
         return A.profile.update({ settings: { ...cur, ...patch } });
       },
     },
@@ -342,14 +349,21 @@
 
     /* 한 문장 (sentences) */
     sentences: {
-      async add({ userBookId, sessionId, page, text, my_note, kind }) {
+      async add({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
         // #565: userBookId 없이는 insert 금지 — 무효/누락 ID 로 조용히 잘못 저장하지 않는다(명확히 실패).
         if (!userBookId) throw new Error('sentences.add: userBookId 필요 (#565)');
         const id = await uid();
+        // #1261: 호출부의 문장별 명시값이 우선. 없으면 계정 설정, 알 수 없는 값은 public.
+        let sentenceVisibility = visibility === 'private' || visibility === 'followers' || visibility === 'public' ? visibility : null;
+        if (!sentenceVisibility) {
+          const settings = await A.settings.get();
+          sentenceVisibility = settings.default_sentence_visibility === 'private' ? 'private' : 'public';
+        }
         return unwrap(await sb().from('sentences').insert({
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
           page: (typeof page === 'number') ? page : null, text: text || '', my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
+          visibility: sentenceVisibility,
         }).select().single());
       },
       // 사후 감상 추가·편집 (작성 시점 무관) — profile §5.8.4
