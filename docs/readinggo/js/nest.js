@@ -636,6 +636,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           <BookCover className="book-cover" title={nestState.book.title} author={nestState.book.author} cover={nestState.book.cover} fb={nestState.book.fb} />
           <div className="book-meta">
             <div className="book-title-row">
+              {readingBooks.length > 1 && (
+                <button onClick={(e) => { e.stopPropagation(); switchBook(-1); }} aria-label="이전 책"
+                  style={{ width: 44, height: 44, margin: '-10px -4px -10px -10px', flexShrink: 0, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                </button>
+              )}
               <p className="book-title">{nestState.book.title}</p>
               {/* 책 정보 수정 (#410) — 제목과 같은 행에서 현재 책 편집 맥락을 명확히 표시. */}
               <button className="book-jump" onClick={(e) => { e.stopPropagation(); setBookEditOpen(true); }} title="책 정보 수정" aria-label="책 정보 수정">
@@ -644,6 +650,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
+              {readingBooks.length > 1 && (
+                <button onClick={(e) => { e.stopPropagation(); switchBook(1); }} aria-label="다음 책"
+                  style={{ width: 44, height: 44, margin: '-10px -10px -10px -4px', flexShrink: 0, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                </button>
+              )}
             </div>
             <p className="book-author">{[nestState.book.author, nestState.book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
             <div className="book-progress-row">
@@ -656,12 +668,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           </div>
         </div>
         {readingBooks.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <button onClick={() => switchBook(-1)} aria-label="이전 책" style={{ minWidth: 92, minHeight: 44, borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>‹ 이전 책</button>
-            <div aria-hidden="true" style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 4 }}>
-              {readingBooks.map((b, i) => <span key={b.id || i} style={{ width: 5, height: 5, borderRadius: '50%', background: b.id === nestState.book.id ? 'var(--brand)' : 'var(--line-2, #ccc)' }} />)}
-            </div>
-            <button onClick={() => switchBook(1)} aria-label="다음 책" style={{ minWidth: 92, minHeight: 44, borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>다음 책 ›</button>
+          <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 4 }}>
+            {readingBooks.map((b, i) => <span key={b.id || i} style={{ width: 5, height: 5, borderRadius: '50%', background: b.id === nestState.book.id ? 'var(--brand)' : 'var(--line-2, #ccc)' }} />)}
           </div>
         )}
       </div>
