@@ -971,6 +971,9 @@ function App() {
           </div>
         </header>
 
+        {/* 전역 Toast — 헤더 아래, 스크롤 콘텐츠 밖에서 제목을 가리지 않음 (#1239) */}
+        <Toast />
+
         {/* 게스트 안내 배너 — 로그인 없이 둘러보는 중. 로그인=저장 (onboarding.md §4 E). */}
         {isGuest && !guestBannerOff && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
@@ -1065,9 +1068,6 @@ function App() {
         {showConsent && (
           <ConsentBanner onChoose={(v) => { if (window.RG_consent) window.RG_consent.set(v); if (window.RG_applyConsent) window.RG_applyConsent(v); if (window.rgTrack) window.rgTrack('data_consent', { value: v, source: 'banner' }); setShowConsent(false); }} />
         )}
-
-        {/* 전역 Toast */}
-        <Toast />
 
         {/* 도서 검색 모달 */}
         <SearchModal

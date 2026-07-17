@@ -37,7 +37,7 @@ const INITIAL_PROGRESS = {
 const NEST_CYCLE_XP = 1600;
 const NEST_STAGES = [
   { lv: 1, minXp: 0,    maxXp: 99,   name: "나뭇가지 자리", short: "🌿", color: "#AFAFAF", bg: "#f3f4f6" },
-  { lv: 2, minXp: 100,  maxXp: 399,  name: "빈 둥지",       short: "🪹", color: "#F59E0B", bg: "#FEF3C7" },
+  { lv: 2, minXp: 100,  maxXp: 399,  name: "새 둥지",       short: "🪹", color: "#F59E0B", bg: "#FEF3C7" },
   { lv: 3, minXp: 400,  maxXp: 899,  name: "따뜻한 둥지",   short: "🪺", color: "#58CC02", bg: "#F0FDF4" },
   { lv: 4, minXp: 900,  maxXp: 1599, name: "다정한 집",     short: "🐣", color: "#1CB0F6", bg: "#EFF6FF" },
   { lv: 5, minXp: 1600, maxXp: null, name: "재키의 성",     short: "🏰", color: "#CE82FF", bg: "#FAF5FF" },
@@ -57,7 +57,7 @@ function nestXpProgress(totalXp){
   return Math.max(0, Math.min(100, Math.round(nestCycleXp(totalXp) / NEST_CYCLE_XP * 100)));
 }
 // 현재 "단계 구간" 진척 (#682) — 현재 단계 시작 XP를 0, 다음 단계 임계값을 분모로.
-// 예) 빈 둥지(100~399) 구간에서 cycleXp=342 → into=242, span=300, next.minXp=400.
+// 예) 새 둥지(100~399) 구간에서 cycleXp=342 → into=242, span=300, next.minXp=400.
 // 반환: { stage, next, intoXp(현재 단계 진입 XP), spanXp(분모), pct, isMax }.
 // isMax=true 면 최고 단계(다음 임계값 없음) — 분모 없음, "최고 단계"로 표기.
 function nestStageProgress(totalXp){

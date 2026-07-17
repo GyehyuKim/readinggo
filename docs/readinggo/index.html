@@ -1529,16 +1529,19 @@ select{ font-size: 16px !important; min-width: 0; }
 }
 
 .toast{
-  position: fixed; left: 50%; top: 14%;
-  transform: translate(-50%, -10px); z-index: 200;
+  position: relative; align-self: center; z-index: 20;
+  transform: translateY(-8px);
   background: var(--ink); color: #fff;
-  padding: 10px 16px; border-radius: 999px;
+  max-width: calc(100% - 32px); max-height: 0; overflow: hidden;
+  padding: 0 16px; margin: 0;
+  border-radius: 999px;
   font-size: 13px; font-weight: 800;
+  line-height: 1.45; text-align: center;
   opacity: 0; pointer-events: none;
-  transition: opacity .25s ease, transform .25s ease;
+  transition: opacity .25s ease, transform .25s ease, max-height .25s ease, padding .25s ease, margin .25s ease;
   box-shadow: var(--shadow-2);
 }
-.toast.show{ opacity: 1; transform: translate(-50%, 0); }
+.toast.show{ opacity: 1; transform: translateY(0); max-height: 72px; padding: 10px 16px; margin: 8px 0 0; }
 
 .helper{
   font-size: 11px; color: var(--ink-3); font-weight: 700;
