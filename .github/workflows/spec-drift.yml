@@ -7,6 +7,11 @@ on:
     paths:
       - 'docs/readinggo/specs/**'
       - 'docs/readinggo/js/**'
+      - 'docs/readinggo/main.js'
+      - 'docs/readinggo/setup-globals.js'
+      - 'docs/readinggo/index.html'
+      - 'docs/readinggo/capacitor.config.json'
+      - 'docs/readinggo/supabase/**'
       - 'worker/**'
       - 'tests/**'
       - '.github/workflows/spec-drift.yml'

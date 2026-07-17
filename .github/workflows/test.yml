@@ -48,6 +48,26 @@ jobs:
       - name: DataStore contract
         run: node tests/contract/datastore-contract.mjs
 
+  regression:
+    name: regression (핵심 순수 로직·오류 분기)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # 존재하지만 CI 밖에 있던 순수 Node 회귀 테스트를 명시적으로 모두 실행한다 (#1298).
+      - name: Core regression tests
+        run: |
+          node tests/decode-entities.test.mjs
+          node tests/nest-cycle.test.mjs
+          node tests/related-filter.test.mjs
+          node tests/sentence-book-binding.test.mjs
+          node tests/streak-checkin.test.mjs
+          node tests/supabase-books.test.mjs
+          node tests/turnstile-retry.test.mjs
+          node tests/wiki-ask-response.test.mjs
+
   boot-smoke:
     name: boot-smoke (Vite 빌드 회귀)
     runs-on: ubuntu-latest
@@ -116,9 +136,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # docs/readinggo/js/** 를 바꿨으면 spec(docs/readinggo/specs/**) 변경 또는 PR 본문 "no-spec: <사유>"
-      # 가 있어야 통과. spec-first mandate 의 자동 탐지 — honor-system 을 끝내고 spec 스킵을 의식적·가시적
-      # 행위로 만든다(silent 드리프트 방지). 순수 시각·카피·CI 폴리시는 "no-spec: <사유>"로 명시 면제.
+      # Vite entrypoint·Worker·SQL도 동작/계약 변경이므로 spec 동반 또는 no-spec 사유를 요구한다.
+      # 순수 CI·빌드·스타일 변경은 "no-spec: <사유>"로 명시 면제한다.
       - name: Require spec change or no-spec rationale
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -126,15 +145,15 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          JS=$(printf '%s\n' "$CHANGED" | grep -E '^docs/readinggo/js/.*\.(js|mjs)$' || true)
+          RUNTIME=$(printf '%s\n' "$CHANGED" | grep -E '^(docs/readinggo/js/.*\.(js|mjs)|docs/readinggo/(main\.js|setup-globals\.js|index\.html|capacitor\.config\.json)|worker/|docs/readinggo/supabase/.*\.sql$)' || true)
           SPEC=$(printf '%s\n' "$CHANGED" | grep -E '^docs/readinggo/specs/.*\.md$' || true)
-          if [ -z "$JS" ]; then echo "✅ docs/readinggo/js 변경 없음 — spec 불필요"; exit 0; fi
-          if [ -n "$SPEC" ]; then echo "✅ 코드 변경에 spec 동반"; exit 0; fi
+          if [ -z "$RUNTIME" ]; then echo "✅ 런타임·Worker·SQL 변경 없음 — spec 불필요"; exit 0; fi
+          if [ -n "$SPEC" ]; then echo "✅ 런타임 변경에 spec 동반"; exit 0; fi
           if printf '%s' "$PR_BODY" | grep -qiE 'no-spec:[[:space:]]*[^[:space:]]'; then
             echo "✅ no-spec 사유 명시(폴리시/CI 등 spec 불필요)"; exit 0
           fi
-          echo "::error::docs/readinggo/js 를 바꿨는데 spec(docs/readinggo/specs)도 'no-spec: <사유>'도 없습니다. 동작 변경이면 해당 spec(.md)을 같이 갱신하고, 순수 시각·카피·CI 폴리시면 PR 본문에 'no-spec: <사유>'를 넣어주세요 (CONTRIBUTING §4.1 — spec-first)."
-          echo "--- spec 없이 바뀐 js ---"; printf '%s\n' "$JS"
+          echo "::error::런타임·Worker·SQL을 바꿨는데 spec(docs/readinggo/specs)도 'no-spec: <사유>'도 없습니다. 동작 변경이면 해당 spec(.md)을 같이 갱신하고, 순수 시각·카피·CI 폴리시면 PR 본문에 'no-spec: <사유>'를 넣어주세요 (CONTRIBUTING §4.1 — spec-first)."
+          echo "--- spec 없이 바뀐 runtime paths ---"; printf '%s\n' "$RUNTIME"
           exit 1
 
   migrations:
