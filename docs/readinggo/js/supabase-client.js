@@ -200,8 +200,11 @@
    로딩·에러·빈 상태를 처리한다. payload: text·note(my_note)·book(제목)·author·page. */
 // #1283: Worker 보안 정책은 그대로 두고, 호출부가 403/502/네트워크 실패를 구분할 수 있게 한다.
 window.RG_wikiAskErrorMessage = function RG_wikiAskErrorMessage(error) {
-  if (error && error.code === 'TURNSTILE') {
-    return '보안 확인 토큰이 없거나 만료됐어요. 보안 확인을 완료한 뒤 다시 묻기를 눌러주세요.';
+  if (error && error.code === 'TURNSTILE_REQUIRED') {
+    return '보안 확인 정보가 전송되지 않았어요. 보안 확인 후 한 번 다시 시도할 수 있어요.';
+  }
+  if (error && error.code === 'TURNSTILE_FAILED') {
+    return '보안 확인이 승인되지 않았어요. 새 보안 확인 후 한 번 다시 시도할 수 있어요.';
   }
   if (error && error.code === 'SERVICE') {
     return '답변 서비스가 잠시 불안정해요. 잠시 후 다시 시도해주세요.';
@@ -210,6 +213,12 @@ window.RG_wikiAskErrorMessage = function RG_wikiAskErrorMessage(error) {
     return '네트워크 연결을 확인하고 다시 시도해주세요.';
   }
   return '답변 요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.';
+};
+
+window.RG_wikiAskCanRetry = function RG_wikiAskCanRetry(error, retryUsed) {
+  return !retryUsed && !!error && (
+    error.code === 'TURNSTILE_REQUIRED' || error.code === 'TURNSTILE_FAILED'
+  );
 };
 
 window.RG_wikiAsk = async function RG_wikiAsk(question, mine) {
@@ -239,8 +248,12 @@ window.RG_wikiAsk = async function RG_wikiAsk(question, mine) {
   if (!r.ok) {
     const error = new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
     error.status = r.status;
-    if (r.status === 403 && d && typeof d.error === 'string' && d.error.indexOf('turnstile') === 0) {
-      error.code = 'TURNSTILE';
+    if (r.status === 403 && d && (d.code === 'TURNSTILE_REQUIRED' || d.code === 'TURNSTILE_FAILED')) {
+      error.code = d.code;
+    } else if (r.status === 403 && d && d.error === 'turnstile required') {
+      error.code = 'TURNSTILE_REQUIRED';
+    } else if (r.status === 403 && d && d.error === 'turnstile failed') {
+      error.code = 'TURNSTILE_FAILED';
     } else if (r.status >= 500) {
       error.code = 'SERVICE';
     }

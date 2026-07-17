@@ -1827,7 +1827,11 @@ async function rateLimited(request, env, name) {
 async function verifyTurnstile(request, env) {
   if (!env.TURNSTILE_SECRET) return null;   // 시크릿 미설정 → fail-open(무동작)
   const token = request.headers.get('cf-turnstile-token') || request.headers.get('x-turnstile-token') || '';
-  if (!token) return json({ error: 'turnstile required' }, 403);
+  if (!token) return json({
+    error: 'turnstile required',
+    code: 'TURNSTILE_REQUIRED',
+    message: '보안 확인 정보가 필요해요.',
+  }, 403);
   try {
     const body = new URLSearchParams();
     body.set('secret', env.TURNSTILE_SECRET);
@@ -1838,7 +1842,11 @@ async function verifyTurnstile(request, env) {
       method: 'POST', body,
     });
     const d = await r.json();
-    if (d.success !== true) return json({ error: 'turnstile failed' }, 403);
+    if (d.success !== true) return json({
+      error: 'turnstile failed',
+      code: 'TURNSTILE_FAILED',
+      message: '보안 확인이 승인되지 않았어요.',
+    }, 403);
     return null;
   } catch (e) { return null; }   // siteverify 네트워크 실패 → fail-open
 }

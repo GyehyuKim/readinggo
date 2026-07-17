@@ -19,7 +19,8 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
   const [ask, setAsk] = useState('');         // 질문 입력
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState('');   // 받은 답(근거 문장/책 포함)
-  const [askErr, setAskErr] = useState('');
+  const [askErr, setAskErr] = useState(null);
+  const [askRetryUsed, setAskRetryUsed] = useState(false); // Turnstile 오류는 동일 질문에 단 1회만 새 토큰으로 재시도
   // 작성일자 표기 (#608) — created_at 은 number(localStorage)·ISO(Supabase) 모두 new Date 로 처리. 월/일만.
   const fmtWhen = (t) => { if (!t) return ''; const d = new Date(t); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }); };
   useEffect(() => {
@@ -90,18 +91,19 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
   // "내 문장에게 묻기" (#1007) — 내 문장 전체(list)를 worker /api/wiki-ask 로. 서버가 그 문장에만 근거해 답.
   // 빈 질문·문장 0개·미설정은 비활성/안내. 환각 가드(근거 인용·"못 찾음")는 워커 프롬프트가 강제.
   const EXAMPLE_QS = ['내가 외로움에 대해 모은 문장은?', '이 문장들을 관통하는 주제는?', '다른 책에서 비슷한 생각을 한 부분이 있어?'];
-  const submitAsk = (qOverride) => {
+  const submitAsk = (qOverride, isRetry) => {
     const text = String(qOverride != null ? qOverride : ask).trim();
-    if (!text || asking || !list.length) return;
+    if (!text || asking || !list.length || (askErr && !isRetry)) return;
+    if (isRetry && !(window.RG_wikiAskCanRetry && window.RG_wikiAskCanRetry(askErr, askRetryUsed))) return;
     if (qOverride != null) setAsk(text);
-    setAsking(true); setAnswer(''); setAskErr('');
+    if (isRetry) setAskRetryUsed(true);
+    else setAskRetryUsed(false);
+    setAsking(true); setAnswer(''); setAskErr(null);
     if (window.rgTrack) window.rgTrack('wiki_ask', { n: list.length, q_len: text.length });
     Promise.resolve(window.RG_wikiAsk ? window.RG_wikiAsk(text, list) : Promise.reject(new Error('미설정')))
       .then((a) => { setAnswer(a || '모은 문장에서는 못 찾았어요'); })
       .catch((error) => {
-        setAskErr(window.RG_wikiAskErrorMessage
-          ? window.RG_wikiAskErrorMessage(error)
-          : '답변 요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.');
+        setAskErr(error);
       })
       .finally(() => setAsking(false));
   };
@@ -146,12 +148,12 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
                 내가 모은 {list.length}개의 문장에만 근거해 답해요. 없으면 솔직히 "못 찾았어요".
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10 }}>
-                <textarea value={ask} onChange={e => setAsk(e.target.value)}
+                <textarea value={ask} onChange={e => { setAsk(e.target.value); setAskErr(null); setAskRetryUsed(false); }}
                   onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && ask.trim()) { e.preventDefault(); submitAsk(); } }}
                   placeholder="내 문장에게 물어보세요" aria-label="내 문장에게 묻기" rows={2}
                   style={{ flex: 1, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink)', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', outline: 'none' }} />
-                <button onClick={() => submitAsk()} disabled={!ask.trim() || asking} aria-label={askErr ? '다시 묻기' : '묻기'}
-                  style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: (ask.trim() && !asking) ? 'var(--brand)' : 'var(--line)', color: '#fff', cursor: (ask.trim() && !asking) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <button onClick={() => submitAsk()} disabled={!ask.trim() || asking || !!askErr} aria-label="묻기"
+                  style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: (ask.trim() && !asking && !askErr) ? 'var(--brand)' : 'var(--line)', color: '#fff', cursor: (ask.trim() && !asking && !askErr) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9l14-7-7 14V9H2z" fill="currentColor"/></svg>
                 </button>
               </div>
@@ -167,7 +169,13 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
               {asking ? (
                 <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 18, fontSize: 13 }}>문장을 살펴보는 중…</div>
               ) : askErr ? (
-                <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 18, fontSize: 13, lineHeight: 1.6 }}>{askErr}</div>
+                <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 18, fontSize: 13, lineHeight: 1.6 }}>
+                  <div>{window.RG_wikiAskErrorMessage ? window.RG_wikiAskErrorMessage(askErr) : '답변 요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.'}</div>
+                  {window.RG_wikiAskCanRetry && window.RG_wikiAskCanRetry(askErr, askRetryUsed) && (
+                    <button onClick={() => submitAsk(null, true)}
+                      style={{ marginTop: 10, padding: '7px 14px', borderRadius: 12, border: 'none', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>한 번 다시 시도</button>
+                  )}
+                </div>
               ) : answer ? (
                 <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px', marginTop: 6, fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{answer}</div>
               ) : null}
