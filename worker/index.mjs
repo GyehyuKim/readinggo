@@ -75,6 +75,14 @@ export default {
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return companionProxy(request, env);
     }
+    // Prompt Lab (#1304) — 합성 fixture만 쓰는 인증·역할 보호 실험 경로.
+    // candidate는 이 명시적 경로에서만 로드하며 일반 /api/companion에는 절대 전달하지 않는다.
+    if (p === '/api/prompt-lab') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'prompt-lab'); if (rl) return rl; }
+      return promptLabProxy(request, env);
+    }
     // 독서 위키 Q&A — "내 문장에게 묻기" (#1007). 사용자가 모은 한 문장(+감상)에만 근거해 답.
     // companion 형제 — 같은 LLM 프록시(callLLM)·동일출처 가드·키 서버보관. 클라가 내 문장만 전송.
     if (p === '/api/wiki-ask') {
@@ -272,6 +280,25 @@ async function syncInquiries(env, ctx) {
    키 없거나 실패 시 목 질문으로 graceful fallback (데모/피치 무중단). */
 const COMPANION_SYSTEM = '당신은 사용자와 그 책을 *함께 읽은* 친구 재키입니다. 독서모임 진행자나 평가자, 선생님이 아니라 — 같은 책을 읽고 곁에서 담백하게 이야기 나누는 동료입니다. 사용자가 방금 남긴 한 문장을 보고, 훈수나 분석·평가 없이 사람처럼 짧게 반응하세요. 입력의 역할을 혼동하지 마세요(#359): "책에서 옮겨 적은 한 문장(인용)"은 작품 속 문장이고, "내 메모(감상)"는 사용자 자신의 생각입니다. 인용을 사용자의 감상으로 단정하지 마세요. 만약 한 문장이 책 속 인용으로 보기 어렵거나(예: "즐거웠다"처럼 짧은 감상형) 작품 속 맥락을 알 수 없다면, 함부로 해석하지 말고 — 그 문장이 책의 어떤 장면·맥락에서 나온 것인지, 혹은 본인의 생각을 적은 것인지를 먼저 가볍게 물어보세요. 사용자가 다른 작품이나 작가를 언급하거나 두 작품을 비교하면(예: "○○와 닮았다"), 그 연결 자체를 두고 물으세요. 다른 작품의 줄거리·인물을 현재 책의 인물·사건에 억지로 끼워 맞추거나 두 작품을 뒤섞지 마세요. 그 책·작가에 대해 확실히 아는 것만 자연스럽게 한 조각 곁들이고, 모르는 것은 지어내지 마세요. 톤 — 이게 가장 중요합니다: 따뜻하고 담백한 친구처럼. 분석을 늘어놓거나 가르치려 들지 말고, 칭찬으로 운을 뗀 뒤 캐묻는 방식("정말 좋은 문장이네요! 왜 그렇게 느꼈어요?")이나 취조하듯 몰아붙이는 되물음은 하지 마세요. 물을 때는 진짜 궁금해서 혼잣말하듯, 부담 없이 답할 수 있는 열린 질문 하나면 충분합니다. 때로는 질문을 억지로 붙이기보다 그 문장에 짧게 공감하며 여운을 남기는 편이 더 따뜻합니다. 2~3문장 이내로 짧고 자연스럽게. 마크다운 서식(별표 **, #, 목록 기호 등)을 절대 쓰지 말고 일반 문장으로만 쓰세요.';
 
+// 일반 companion은 DB의 active 한 건만 읽는다. 테이블/마이그레이션 미적용·일시 장애 시
+// 코드 정본으로 폴백해 현재 동작을 보존한다. candidate 조회는 promptLabProxy(run) 안에서만 한다.
+let ACTIVE_PROMPT_CACHE = { body: '', expiresAt: 0 };
+async function getActiveCompanionPrompt(env) {
+  if (ACTIVE_PROMPT_CACHE.body && Date.now() < ACTIVE_PROMPT_CACHE.expiresAt) return ACTIVE_PROMPT_CACHE.body;
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return COMPANION_SYSTEM;
+  try {
+    const rows = await promptLabDb(env,
+      'prompt_lab_prompt_versions?status=eq.active&select=id,prompt_body&limit=1');
+    const body = rows && rows[0] && String(rows[0].prompt_body || '').trim();
+    if (!body) return COMPANION_SYSTEM;
+    const ttl = Math.max(0, Number(env.PROMPT_LAB_CACHE_TTL_MS == null ? 60000 : env.PROMPT_LAB_CACHE_TTL_MS) || 0);
+    ACTIVE_PROMPT_CACHE = { body, expiresAt: Date.now() + ttl };
+    return body;
+  } catch (e) {
+    return COMPANION_SYSTEM;
+  }
+}
+
 // 마크다운 서식 제거 (#406) — UI가 md 렌더 안 해 별표(**)가 날것으로 보이는 문제 방지.
 // 굵게/기울임/제목/목록/코드 기호만 제거(텍스트 보존).
 function stripMd(s) {
@@ -411,12 +438,337 @@ async function deleteAccountProxy(request, env) {
   return json({ ok: true }, 200, 0);
 }
 
+/* ── Prompt Lab (#1304) — 서버 역할 보호 + 합성 fixture 전용 ─────────── */
+function promptLabHeaders(env, extra) {
+  return Object.assign({
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  }, extra || {});
+}
+
+async function promptLabDb(env, path, opts) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    const e = new Error('Prompt Lab not configured'); e.status = 503; throw e;
+  }
+  const init = Object.assign({}, opts || {});
+  init.headers = promptLabHeaders(env, init.headers);
+  const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, init);
+  if (!r.ok) { const e = new Error('Prompt Lab storage failed'); e.status = 502; throw e; }
+  if (r.status === 204) return null;
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function promptLabActor(request, env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    const e = new Error('Prompt Lab not configured'); e.status = 503; throw e;
+  }
+  const auth = request.headers.get('Authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!token) { const e = new Error('unauthorized'); e.status = 401; throw e; }
+  let user;
+  try {
+    const r = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) { const e = new Error('invalid session'); e.status = 401; throw e; }
+    user = await r.json();
+  } catch (e) {
+    if (e && e.status) throw e;
+    const authError = new Error('auth check failed'); authError.status = 401; throw authError;
+  }
+  if (!user || !user.id) { const e = new Error('unauthorized'); e.status = 401; throw e; }
+  const [profiles, grants] = await Promise.all([
+    promptLabDb(env, `users?id=eq.${user.id}&select=id,handle,is_admin&limit=1`),
+    promptLabDb(env, `prompt_lab_grants?user_id=eq.${user.id}&status=eq.active&select=role,target_handle`),
+  ]);
+  const profile = profiles && profiles[0];
+  const roles = new Set((grants || []).map((g) => g.role));
+  if (!profile || roles.size === 0) { const e = new Error('forbidden'); e.status = 403; throw e; }
+  return {
+    id: user.id,
+    handle: profile.handle || '',
+    canEdit: roles.has('editor'),
+    // Promoter grant is necessary but not sufficient: an account demoted from
+    // ReadingGo admin loses promotion authority on the next request.
+    canPromote: roles.has('promoter') && profile.is_admin === true,
+  };
+}
+
+function promptLabNeed(actor, capability) {
+  if (!actor || !actor[capability]) { const e = new Error('forbidden'); e.status = 403; throw e; }
+}
+
+function promptLabText(v, max) { return String(v == null ? '' : v).trim().slice(0, max); }
+function promptLabFixtureInput(raw) {
+  const o = raw && typeof raw === 'object' ? raw : {};
+  return {
+    bookTitle: promptLabText(o.bookTitle, 200),
+    author: promptLabText(o.author, 120),
+    sentence: promptLabText(o.sentence, 1000),
+    comment: promptLabText(o.comment, 500),
+    kind: o.kind === 'thought' ? 'thought' : 'quote',
+    exchanges: (Array.isArray(o.exchanges) ? o.exchanges : []).slice(0, 6).map((x) => ({
+      q: promptLabText(x && x.q, 500), a: promptLabText(x && x.a, 1000),
+    })).filter((x) => x.q || x.a),
+    userStyle: promptLabText(o.userStyle, 300),
+  };
+}
+
+async function promptLabAudit(env, actor, action, fields) {
+  const f = fields || {};
+  await promptLabDb(env, 'prompt_lab_audit_log', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      action, actor_id: actor.id,
+      prompt_version_id: f.promptVersionId || null,
+      fixture_id: f.fixtureId || null,
+      metadata: f.metadata || {},
+    }),
+  });
+}
+
+async function promptLabRows(env, table, filter) {
+  return (await promptLabDb(env, `${table}?${filter}`)) || [];
+}
+
+async function promptLabPromoteVersion(env, actor, sourceId, reason, action) {
+  promptLabNeed(actor, 'canPromote');
+  const sources = await promptLabRows(env, 'prompt_lab_prompt_versions',
+    `id=eq.${sourceId}&select=id,status,prompt_body,version_no&limit=1`);
+  const source = sources[0];
+  if (!source) { const e = new Error('version not found'); e.status = 404; throw e; }
+  if (action === 'promote' && source.status !== 'candidate') {
+    const e = new Error('candidate required'); e.status = 409; throw e;
+  }
+  if (action === 'rollback' && source.status !== 'archived') {
+    const e = new Error('archived version required'); e.status = 409; throw e;
+  }
+  const activeRows = await promptLabRows(env, 'prompt_lab_prompt_versions',
+    'status=eq.active&select=id,prompt_body&limit=1');
+  const active = activeRows[0];
+  if (!active) { const e = new Error('active version missing'); e.status = 409; throw e; }
+  await promptLabDb(env, `prompt_lab_prompt_versions?id=eq.${active.id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'archived' }),
+  });
+  try {
+    const inserted = await promptLabDb(env, 'prompt_lab_prompt_versions', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'active', prompt_body: source.prompt_body,
+        change_reason: promptLabText(reason, 500) || (action === 'promote' ? 'candidate 승격' : 'active rollback'),
+        created_by: actor.id, based_on_version: source.id,
+      }),
+    });
+    const activeVersion = inserted && inserted[0];
+    ACTIVE_PROMPT_CACHE = { body: source.prompt_body, expiresAt: Date.now() + 60000 };
+    await promptLabAudit(env, actor, action, {
+      promptVersionId: activeVersion && activeVersion.id,
+      metadata: { sourceVersionId: source.id, previousActiveId: active.id, reason: promptLabText(reason, 500) },
+    });
+    return activeVersion;
+  } catch (e) {
+    await promptLabDb(env, `prompt_lab_prompt_versions?id=eq.${active.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'active' }),
+    }).catch(() => {});
+    throw e;
+  }
+}
+
+async function promptLabProxy(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+  try {
+    const actor = await promptLabActor(request, env);
+    const action = promptLabText(body && body.action, 40);
+    if (action === 'access') return json({ allowed: true, actor }, 200);
+
+    if (action === 'bootstrap') {
+      const [versions, fixtures, runs, evaluations, audit] = await Promise.all([
+        promptLabRows(env, 'prompt_lab_prompt_versions', 'select=id,version_no,status,prompt_body,change_reason,created_at,based_on_version&order=version_no.desc'),
+        promptLabRows(env, 'prompt_lab_fixtures', 'deleted_at=is.null&select=id,slug,fixture_type,title,input,expected_direction,forbidden_response,source_fixture_id,created_at,updated_at&order=fixture_type.asc,title.asc'),
+        promptLabRows(env, 'prompt_lab_runs', 'select=id,fixture_id,active_version_id,candidate_version_id,active_output,candidate_output,created_at&order=created_at.desc&limit=20'),
+        promptLabRows(env, 'prompt_lab_evaluations', 'select=*&order=created_at.desc&limit=50'),
+        promptLabRows(env, 'prompt_lab_audit_log', 'select=id,action,actor_id,prompt_version_id,fixture_id,metadata,created_at&order=created_at.desc&limit=50'),
+      ]);
+      return json({ actor, versions, fixtures, runs, evaluations, audit }, 200);
+    }
+
+    if (action === 'candidate_save') {
+      promptLabNeed(actor, 'canEdit');
+      const promptBody = promptLabText(body.prompt, 12000);
+      const reason = promptLabText(body.reason, 500);
+      if (promptBody.length < 20 || !reason) return json({ error: 'prompt와 변경 이유가 필요해요.' }, 422);
+      const oldRows = await promptLabRows(env, 'prompt_lab_prompt_versions', 'status=eq.candidate&select=id&limit=1');
+      const old = oldRows[0];
+      if (old) await promptLabDb(env, `prompt_lab_prompt_versions?id=eq.${old.id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'archived' }),
+      });
+      try {
+        const inserted = await promptLabDb(env, 'prompt_lab_prompt_versions', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ status: 'candidate', prompt_body: promptBody, change_reason: reason, created_by: actor.id, based_on_version: old ? old.id : null }),
+        });
+        const version = inserted && inserted[0];
+        await promptLabAudit(env, actor, 'candidate_save', { promptVersionId: version && version.id, metadata: { reason } });
+        return json({ version }, 200);
+      } catch (e) {
+        if (old) await promptLabDb(env, `prompt_lab_prompt_versions?id=eq.${old.id}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'candidate' }),
+        }).catch(() => {});
+        throw e;
+      }
+    }
+
+    if (action === 'sandbox_save') {
+      promptLabNeed(actor, 'canEdit');
+      const input = promptLabFixtureInput(body.input);
+      const title = promptLabText(body.title, 120);
+      if (!title || !input.sentence) return json({ error: '제목과 합성 문장이 필요해요.' }, 422);
+      const row = {
+        title, input,
+        expected_direction: promptLabText(body.expectedDirection, 1000),
+        forbidden_response: promptLabText(body.forbiddenResponse, 1000),
+        updated_at: new Date().toISOString(),
+      };
+      let fixture;
+      if (body.id) {
+        const found = await promptLabRows(env, 'prompt_lab_fixtures', `id=eq.${body.id}&deleted_at=is.null&select=id,fixture_type&limit=1`);
+        if (!found[0] || found[0].fixture_type !== 'sandbox') { const e = new Error('sandbox required'); e.status = 409; throw e; }
+        const updated = await promptLabDb(env, `prompt_lab_fixtures?id=eq.${body.id}`, {
+          method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row),
+        });
+        fixture = updated && updated[0];
+      } else {
+        row.slug = `sandbox-${crypto.randomUUID()}`;
+        row.fixture_type = 'sandbox'; row.created_by = actor.id;
+        row.source_fixture_id = body.sourceFixtureId || null;
+        const inserted = await promptLabDb(env, 'prompt_lab_fixtures', {
+          method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row),
+        });
+        fixture = inserted && inserted[0];
+      }
+      await promptLabAudit(env, actor, 'sandbox_save', { fixtureId: fixture && fixture.id });
+      return json({ fixture }, 200);
+    }
+
+    if (action === 'sandbox_delete') {
+      promptLabNeed(actor, 'canEdit');
+      const found = await promptLabRows(env, 'prompt_lab_fixtures', `id=eq.${body.id}&deleted_at=is.null&select=id,fixture_type&limit=1`);
+      if (!found[0] || found[0].fixture_type !== 'sandbox') { const e = new Error('sandbox required'); e.status = 409; throw e; }
+      await promptLabDb(env, `prompt_lab_fixtures?id=eq.${body.id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+      });
+      await promptLabAudit(env, actor, 'sandbox_delete', { metadata: { deletedFixtureId: body.id } });
+      return json({ ok: true }, 200);
+    }
+
+    if (action === 'baseline_promote') {
+      promptLabNeed(actor, 'canPromote');
+      const found = await promptLabRows(env, 'prompt_lab_fixtures', `id=eq.${body.id}&deleted_at=is.null&select=*&limit=1`);
+      const sandbox = found[0];
+      if (!sandbox || sandbox.fixture_type !== 'sandbox') { const e = new Error('sandbox required'); e.status = 409; throw e; }
+      const inserted = await promptLabDb(env, 'prompt_lab_fixtures', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          slug: `baseline-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+          fixture_type: 'baseline', title: sandbox.title, input: sandbox.input,
+          expected_direction: sandbox.expected_direction, forbidden_response: sandbox.forbidden_response,
+          source_fixture_id: sandbox.id, created_by: actor.id,
+        }),
+      });
+      const fixture = inserted && inserted[0];
+      await promptLabAudit(env, actor, 'baseline_promote', { fixtureId: fixture && fixture.id, metadata: { sourceFixtureId: sandbox.id } });
+      return json({ fixture }, 200);
+    }
+
+    if (action === 'run') {
+      promptLabNeed(actor, 'canEdit');
+      const [fixtureRows, activeRows, candidateRows] = await Promise.all([
+        promptLabRows(env, 'prompt_lab_fixtures', `id=eq.${body.fixtureId}&deleted_at=is.null&select=*&limit=1`),
+        promptLabRows(env, 'prompt_lab_prompt_versions', 'status=eq.active&select=*&limit=1'),
+        promptLabRows(env, 'prompt_lab_prompt_versions', 'status=eq.candidate&select=*&limit=1'),
+      ]);
+      const fixture = fixtureRows[0], active = activeRows[0], candidate = candidateRows[0];
+      if (!fixture || !active || !candidate) { const e = new Error('run inputs missing'); e.status = 409; throw e; }
+      let activeResult, candidateResult;
+      try {
+        activeResult = await generateCompanionQuestion(fixture.input, env, active.prompt_body, true);
+        candidateResult = await generateCompanionQuestion(fixture.input, env, candidate.prompt_body, true);
+      } catch (e) {
+        const runError = new Error('Prompt Lab execution failed'); runError.status = (e && e.status) || 502; throw runError;
+      }
+      const inserted = await promptLabDb(env, 'prompt_lab_runs', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          fixture_id: fixture.id, active_version_id: active.id, candidate_version_id: candidate.id,
+          active_output: activeResult.question, candidate_output: candidateResult.question, created_by: actor.id,
+        }),
+      });
+      const run = inserted && inserted[0];
+      await promptLabAudit(env, actor, 'run', { promptVersionId: candidate.id, fixtureId: fixture.id, metadata: { runId: run && run.id } });
+      return json({ run }, 200);
+    }
+
+    if (action === 'evaluate') {
+      promptLabNeed(actor, 'canEdit');
+      const rubric = body.rubric || {};
+      const keys = ['context', 'depth', 'personalization_off', 'safety', 'tone'];
+      const row = { run_id: body.runId, evaluator_id: actor.id };
+      for (const key of keys) {
+        const score = Number(rubric[key] && rubric[key].score);
+        const comment = promptLabText(rubric[key] && rubric[key].comment, 1000);
+        if (!Number.isInteger(score) || score < 1 || score > 5 || !comment) {
+          return json({ error: '다섯 기준 모두 1~5점과 코멘트가 필요해요.' }, 422);
+        }
+        row[`${key}_score`] = score; row[`${key}_comment`] = comment;
+      }
+      const inserted = await promptLabDb(env, 'prompt_lab_evaluations', {
+        method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row),
+      });
+      const evaluation = inserted && inserted[0];
+      await promptLabAudit(env, actor, 'evaluate', { metadata: { runId: body.runId, evaluationId: evaluation && evaluation.id } });
+      return json({ evaluation }, 200);
+    }
+
+    if (action === 'promote' || action === 'rollback') {
+      const version = await promptLabPromoteVersion(env, actor, body.versionId, body.reason, action);
+      return json({ version }, 200);
+    }
+    return json({ error: 'unknown action' }, 404);
+  } catch (e) {
+    const status = (e && e.status) || 500;
+    const safe = status === 401 ? 'unauthorized'
+      : status === 403 ? 'forbidden'
+        : status === 404 ? 'not found'
+          : status === 409 ? 'request conflict'
+            : status === 503 ? 'Prompt Lab unavailable'
+              : 'Prompt Lab request failed';
+    return json({ error: safe }, status);
+  }
+}
+
 async function companionProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
   // 완독 회고 모드 (#259) — 내가 남긴 한 문장들을 참새가 엮어 따뜻한 회고 한 단락.
   if (body && body.mode === 'recap') return companionRecap(body, env);
+  const prompt = await getActiveCompanionPrompt(env); // active만. candidate 조회 금지.
+  try {
+    const result = await generateCompanionQuestion(body, env, prompt, false);
+    return json(result, 200);
+  } catch (e) {
+    const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
+    if (e && e.status === 422) return json({ error: 'sentence 필요' }, 422);
+    // 일반 사용자 경로의 기존 graceful fallback 보존.
+    return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
+  }
+}
+
+async function generateCompanionQuestion(body, env, systemPrompt, strictLab) {
   const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
   const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
   const author = String((body && body.author) || '').slice(0, 120).trim();
@@ -430,19 +782,21 @@ async function companionProxy(request, env) {
   const presetTone = PRESET_TONE[preset] || '';
   // 멀티턴 — 이전 대화(질문/답변). 후속 질문 생성용 (#327).
   const exchanges = Array.isArray(body && body.exchanges) ? body.exchanges.slice(0, 6) : [];
-  if (!sentence) return json({ error: 'sentence 필요' }, 422);
+  if (!sentence) { const e = new Error('sentence 필요'); e.status = 422; throw e; }
   // 키/설정 없으면 목 질문 폴백 (데모 안전 — companion.md §4)
   if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
-    return json({ question: companionMock(sentence), demo: true }, 200);
+    if (strictLab) { const e = new Error('lab execution unavailable'); e.status = 503; throw e; }
+    return { question: companionMock(sentence), demo: true };
   }
   // 책 문학 브리프 (#656) — "같이 읽은 진행자"용 작품 맥락. 모든 턴에 주입(첫 턴 한정 제거 —
   // 2턴부터 책 잊던 문제 해소). 책별 캐시라 첫 생성 후 후속 턴은 LLM 재호출 없음. best-effort.
   let brief = '';
   if (bookTitle) { try { brief = await getBookBrief(bookTitle, author, env); } catch (e) { /* 무시 */ } }
-  const messages = [{ role: 'system', content: COMPANION_SYSTEM }];
+  const messages = [{ role: 'system', content: systemPrompt || COMPANION_SYSTEM }];
   messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}`
     + (brief ? `\n이 책에 대해 당신(진행자)이 같이 읽으며 아는 것(주제·작가·시대·톤 — 단정 말고 자연스럽게 한 조각만 녹이세요): ${brief}` : '')
-    + `\n${kind === 'thought' ? `읽다가 든 내 생각(감상): "${sentence}" — 이것은 책의 인용이 아니라 독자 본인의 생각입니다. 작품 맥락을 단정하지 말고 이 생각 자체를 더 깊이 여는 질문을 하세요.` : `책에서 옮겨 적은 한 문장(인용): "${sentence}"`}${comment ? `\n내 메모(감상): ${comment}` : ''}` });
+    + `\n${kind === 'thought' ? `읽다가 든 내 생각(감상): "${sentence}" — 이것은 책의 인용이 아니라 독자 본인의 생각입니다. 작품 맥락을 단정하지 말고 이 생각 자체를 더 깊이 여는 질문을 하세요.` : `책에서 옮겨 적은 한 문장(인용): "${sentence}"`}${comment ? `\n내 메모(감상): ${comment}` : ''}`
+    + (strictLab && body && body.userStyle ? `\n합성 사용자 스타일(실제 개인정보 아님): ${String(body.userStyle).slice(0, 300)}` : '') });
   for (const e of exchanges) {
     if (e && e.q) messages.push({ role: 'assistant', content: String(e.q).slice(0, 500) });
     if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
@@ -452,14 +806,10 @@ async function companionProxy(request, env) {
     : '사용자가 방금 한 답변에 먼저 한 문장으로 짧게 공감·반응한 뒤, 그 답을 실마리로 한 걸음 더 들어가는 질문 하나만 한국어로. 사용자의 답이 짧거나 가벼워도(예: 농담) 그 답을 무시하지 말고 거기서 자연스럽게 이어가세요. 새 작품 분석을 길게 늘어놓지 말 것. 전체 2~3문장, 질문 하나.';
   if (avoid) instr += ` 다음 질문은 이미 했으니 반드시 피하고 다르게 물으세요: "${avoid}"`;
   if (presetTone) instr += ` 질문의 결(사용자 선호): ${presetTone}`;
+  if (strictLab) instr += ' 이 입력은 Prompt Lab의 합성 fixture이며 실제 사용자 기록이나 장기 기억을 사용하거나 암시하지 마세요.';
   messages.push({ role: 'user', content: instr });
-  try {
-    const q = await callLLM({ messages, env });
-    return json({ question: stripMd(q) || companionMock(sentence) }, 200);
-  } catch (e) {
-    // 호출 실패 → 목 질문 폴백 (무중단)
-    return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
-  }
+  const q = await callLLM({ messages, env });
+  return { question: stripMd(q) || companionMock(sentence) };
 }
 
 /* ── 관련 도서 추천 — 이 책과 함께 읽을 책 (#496) ──────────────
@@ -1804,7 +2154,7 @@ function json(obj, status, maxAge) {
 const RL_LIMITS = {
   seed: 20, ocr: 30, 'extract-highlights': 20, 'shelf-import': 12,
   companion: 40, 'wiki-ask': 40, 'parse-books': 20, related: 40,
-  'book-upsert': 30,
+  'book-upsert': 30, 'prompt-lab': 30,
 };
 async function rateLimited(request, env, name) {
   try {

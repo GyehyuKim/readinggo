@@ -31,6 +31,7 @@ import './js/companion.js';
 import './js/co-reading.js';
 import './js/social.js';
 import './js/admin-dashboard.js';
+import './js/prompt-lab.js';
 import './js/book-detail-modal.js';
 import './js/nest-theatre.js';
 import './js/follow-list-modal.js';
