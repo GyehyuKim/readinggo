@@ -187,8 +187,9 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>한 문장·대화를 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해요. 끄면 로컬 질문만(외부 전송·수집 없음).</div>
             </div>
             <button onClick={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); if (window.RG_applyConsent) window.RG_applyConsent(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '고마워요! 더 나은 질문을 드릴게요' : '로컬 모드로 전환됐어요', { sparrow: nv === 'yes' }); }}
-              aria-label="데이터 활용 동의 토글"
+              role="switch" aria-checked={consentOn} aria-label={`데이터 활용 동의 ${consentOn ? '켜짐' : '꺼짐'}`}
               style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer', background: consentOn ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s' }}>
+              <span style={{ position: 'absolute', right: 'calc(100% + 7px)', top: 4, fontSize: 11, fontWeight: 900, color: consentOn ? 'var(--brand-3)' : 'var(--ink-3)', whiteSpace: 'nowrap' }}>{consentOn ? '켜짐' : '꺼짐'}</span>
               <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
@@ -217,8 +218,9 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('bookmark', 14)} 읽고 싶은 책 공개</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
             </div>
-            <button onClick={toggleWishPublic} aria-pressed={wishPublic} aria-label="위시리스트 공개 토글"
+            <button onClick={toggleWishPublic} role="switch" aria-checked={isSupabase && wishPublic} aria-label={`위시리스트 공개 ${isSupabase && wishPublic ? '켜짐' : '꺼짐'}`}
               style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: isSupabase ? 'pointer' : 'default', background: (isSupabase && wishPublic) ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', opacity: isSupabase ? 1 : 0.45 }}>
+              <span style={{ position: 'absolute', right: 'calc(100% + 7px)', top: 4, fontSize: 11, fontWeight: 900, color: (isSupabase && wishPublic) ? 'var(--brand-3)' : 'var(--ink-3)', whiteSpace: 'nowrap' }}>{isSupabase && wishPublic ? '켜짐' : '꺼짐'}</span>
               <span style={{ position: 'absolute', top: 3, left: (isSupabase && wishPublic) ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
@@ -255,8 +257,9 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--ink)' }}>스포일러 모두 보기</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>안 읽은 페이지의 한 문장도 표시</div>
             </div>
-            <button onClick={() => setSpoilerReveal(v => !v)} aria-pressed={spoilerReveal} title="스포일러 토글"
+            <button onClick={() => setSpoilerReveal(v => !v)} role="switch" aria-checked={spoilerReveal} aria-label={`스포일러 모두 보기 ${spoilerReveal ? '켜짐' : '꺼짐'}`} title="스포일러 토글"
               style={{ width: 52, height: 30, borderRadius: 999, border: 'none', cursor: 'pointer', background: spoilerReveal ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', right: 'calc(100% + 7px)', top: 5, fontSize: 11, fontWeight: 900, color: spoilerReveal ? 'var(--brand-3)' : 'var(--ink-3)', whiteSpace: 'nowrap' }}>{spoilerReveal ? '켜짐' : '꺼짐'}</span>
               <span style={{ position: 'absolute', top: 3, left: spoilerReveal ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
@@ -268,8 +271,9 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                   <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--ink)' }}>🔔 스트릭 리마인더</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>매일 정해진 시각에 "오늘 한 줄" 알림을 보내요. 오늘 이미 읽었으면 건너뛰어요.</div>
                 </div>
-                <button onClick={toggleReminder} aria-pressed={reminderOn} title="스트릭 리마인더 토글" disabled={reminderBusy}
+                <button onClick={toggleReminder} role="switch" aria-checked={reminderOn} aria-label={`스트릭 리마인더 ${reminderOn ? '켜짐' : '꺼짐'}`} title="스트릭 리마인더 토글" disabled={reminderBusy}
                   style={{ width: 52, height: 30, borderRadius: 999, border: 'none', cursor: reminderBusy ? 'default' : 'pointer', background: reminderOn ? 'var(--brand)' : 'var(--line)', position: 'relative', transition: 'background .2s', flexShrink: 0, opacity: reminderBusy ? 0.6 : 1 }}>
+                  <span style={{ position: 'absolute', right: 'calc(100% + 7px)', top: 5, fontSize: 11, fontWeight: 900, color: reminderOn ? 'var(--brand-3)' : 'var(--ink-3)', whiteSpace: 'nowrap' }}>{reminderOn ? '켜짐' : '꺼짐'}</span>
                   <span style={{ position: 'absolute', top: 3, left: reminderOn ? 25 : 3, width: 24, height: 24, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                 </button>
               </div>

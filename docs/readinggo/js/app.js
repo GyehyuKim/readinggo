@@ -845,7 +845,7 @@ function App() {
           },
         }));
         window.dispatchEvent(new CustomEvent('rg:wish-changed')); // #822: 서재 '읽고 있는 책' 즉시 갱신
-        showToast(`${book.title} 등록 완료`);
+        showToast(`${book.title} 등록 완료`, { belowHeader: true });
         // P2(co-reading.md §7.5): 같이읽기 기본 = 같이+공개(opt-out). together 모드면 이 책의
         // 공개 숲에 자동 합류(없으면 새로 만들어 합류) = "공개로 열면 알아서 붙어서 읽는다".
         // solo 모드·게스트/로컬 표면은 헬퍼가 알아서 no-op/로컬 처리. 등록을 막지 않게 fire-and-forget.

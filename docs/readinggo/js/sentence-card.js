@@ -75,7 +75,7 @@ function SentenceCard({ item, bookId, noBlind }) {
             <path d="M6 10.5C6 10.5 1 7.2 1 4a2.5 2.5 0 0 1 5 0 2.5 2.5 0 0 1 5 0c0 3.2-5 6.5-5 6.5Z"
               fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
           </svg>
-          {likeCount > 0 ? likeCount : '좋아요'}
+          좋아요 {likeCount}
         </span>
         {/* #650 A: 외부 공유 — 이미지 카드 + Web Share/텍스트 폴백 (share-card.js) */}
         {window.shareSentence ? (
@@ -162,7 +162,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M6 10.5C6 10.5 1 7.5 1 4.5a2.5 2.5 0 0 1 5-0.5 2.5 2.5 0 0 1 5 .5c0 3-5 6-5 6z" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
-    {likeN > 0 ? likeN : '좋아요'}
+    좋아요 {likeN}
   </button>;
   // #650 A: 외부 공유 — 이미지 카드(html-to-image) + Web Share/텍스트 폴백. share-card.js.
   const share = (e) => { stop(e); if (window.shareSentence) window.shareSentence({ id, text: sentence.text, bookId: sentence.bookId, bookTitle: sentence.bookTitle, author: sentence.author, page: sentence.page, note: sentence.note, kind: sentence.kind }); };

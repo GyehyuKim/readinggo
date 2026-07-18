@@ -34,17 +34,17 @@ let _setToastFn = null;
 // (토스트는 문자열이라 메시지에 SVG를 못 넣음 → 아이콘은 옵션 플래그로 Toast 컴포넌트가 렌더. 참새 머리 이모지 대체, #864.)
 function showToast(msg, opts) {
   if (_setToastFn) {
-    _setToastFn({ msg, sparrow: !!(opts && opts.sparrow) });
+    _setToastFn({ msg, sparrow: !!(opts && opts.sparrow), belowHeader: !!(opts && opts.belowHeader) });
     clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => _setToastFn({ msg: '', sparrow: false }), 2200);
+    _toastTimer = setTimeout(() => _setToastFn({ msg: '', sparrow: false, belowHeader: false }), 2200);
   }
 }
 
 function Toast() {
-  const [t, setT] = useState({ msg: '', sparrow: false });
+  const [t, setT] = useState({ msg: '', sparrow: false, belowHeader: false });
   _setToastFn = setT;
   return (
-    <div className={'toast' + (t.msg ? ' show' : '')}>
+    <div className={'toast' + (t.belowHeader ? ' below-header' : '') + (t.msg ? ' show' : '')}>
       {t.sparrow && t.msg ? <><window.SparrowInline size={14} />{' '}</> : null}{t.msg}
     </div>
   );

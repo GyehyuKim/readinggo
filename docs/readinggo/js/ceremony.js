@@ -155,7 +155,7 @@ function Ceremony({ data, onClose, onComplete }) {
                   ? '🏰 곧 1,600 XP — 성이 완성돼요!'
                   : (endPct >= 100
                       ? `${endSP.next ? endSP.next.short + ' ' + endSP.next.name : ''} 단계에 도달했어요!`
-                      : `${endSP.next ? endSP.next.short + ' ' + endSP.next.name : '다음 단계'}까지 ${Math.max(0, endSP.spanXp - endSP.intoXp).toLocaleString()} XP`))}
+                      : `${endSP.next && endSP.next.name === '빈 둥지' ? '둥지가 모양을 갖추기' : (endSP.next ? endSP.next.short + ' ' + endSP.next.name : '다음 단계')}까지 ${Math.max(0, endSP.spanXp - endSP.intoXp).toLocaleString()} XP`))}
           </div>
         </div>
 
