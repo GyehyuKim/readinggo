@@ -34,6 +34,8 @@ function LibraryView({ state, onActivateUserBook }) {
   const [followModal, setFollowModal] = _useState(null); // null | 'following' | 'followers' — 유저 목록 모달 (#509)
   // 좋아요한 문장은 내 한 문장 "전체 보기" 컬렉션 모달 내 필터로 이동 (#12)
   const [adminOpen, setAdminOpen] = _useState(false); // 운영 대시보드 (#161)
+  const [promptLabOpen, setPromptLabOpen] = _useState(false); // 합성 prompt 실험실 (#1304)
+  const [promptLabAccess, setPromptLabAccess] = _useState(null); // 서버 역할 확인 결과. UI 숨김은 편의일 뿐 권한 아님.
   const [importOpen, setImportOpen] = _useState(false); // 타사 앱 밑줄 가져오기 (#1150)
   const [wikiOpening, setWikiOpening] = _useState(false); // 독서 위키 상시 진입점 중복 탭 방지 (#1274)
   const openWikiAsk = async () => {
@@ -233,6 +235,17 @@ function LibraryView({ state, onActivateUserBook }) {
   };
   const isAdmin = !!(window.RG_ME && window.RG_ME.isAdmin);
 
+  // 융디 editor / Hyu promoter는 is_admin UI 플래그와 별도다. Worker가 실제 세션 UUID와
+  // active grant를 확인한 결과만 진입 버튼에 반영하며, 모든 후속 API도 다시 서버에서 검사한다.
+  _useEffect(() => {
+    let alive = true;
+    if (!window.RG_promptLab || !window.RG_SB || !window.RG_SB.accessToken) return () => { alive = false; };
+    Promise.resolve(window.RG_promptLab('access')).then((r) => {
+      if (alive && r && r.allowed) setPromptLabAccess(r.actor || {});
+    }).catch(() => { if (alive) setPromptLabAccess(null); });
+    return () => { alive = false; };
+  }, []);
+
   // 내 책(읽는중/완독) + 관심책 — 실 Supabase (양 어댑터 정규화). 데모 상수 미사용.
   _useEffect(() => {
     let alive = true;
@@ -417,6 +430,10 @@ function LibraryView({ state, onActivateUserBook }) {
           {isAdmin && (
             <button onClick={() => setAdminOpen(true)} title="운영 대시보드"
               style={{background:'var(--card)', border:'1px solid var(--line)', borderRadius:'50%', width:34, height:34, fontSize:16, cursor:'pointer', color:'var(--ink-2)', lineHeight:1}}>📊</button>
+          )}
+          {promptLabAccess && (
+            <button onClick={() => setPromptLabOpen(true)} title="Prompt Lab" aria-label="Prompt Lab 열기"
+              style={{background:'var(--brand-soft)', border:'1px solid var(--brand-soft)', borderRadius:12, height:34, padding:'0 10px', display:'inline-flex', alignItems:'center', gap:5, cursor:'pointer', color:'var(--brand-3)', fontSize:11, fontWeight:900}}>{window.rgIcon('pen',14)} Lab</button>
           )}
         </div>
         {/* 닉네임 인라인 편집 (#568) — 탭 → 입력, Enter/저장 → 저장, ESC/바깥 → 취소 */}
@@ -822,6 +839,10 @@ function LibraryView({ state, onActivateUserBook }) {
       )}
       {adminOpen && ReactDOM.createPortal(
         <AdminDashboardModal onClose={() => setAdminOpen(false)} />,
+        document.body
+      )}
+      {promptLabOpen && ReactDOM.createPortal(
+        <PromptLabModal onClose={() => setPromptLabOpen(false)} />,
         document.body
       )}
       {followModal && ReactDOM.createPortal(
