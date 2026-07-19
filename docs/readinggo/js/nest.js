@@ -60,6 +60,19 @@ function _saveDrafts(bookId, arr) {
   try { const d = window.DataStore && window.DataStore.drafts; if (d) d.save(bookId, arr); } catch (e) { /* 초안은 부가 기능 — 실패 무해 */ }
 }
 
+// OCR 검토 입력 정규화(#1265) — 저장 직전 한 곳에서 원문·페이지 계약을 검증한다.
+function _validateOcrReview(text, page, currentPage, totalPages) {
+  const sentence = String(text || '').trim();
+  const rawPage = String(page == null ? '' : page).trim();
+  const fallbackPage = Math.max(1, parseInt(currentPage, 10) || 1);
+  const parsedPage = rawPage === '' ? fallbackPage : Number(rawPage);
+  const textError = !sentence ? '한 문장을 입력해주세요.' : (sentence.length > 200 ? '한 문장은 200자 이내로 남겨주세요.' : '');
+  const pageError = (!Number.isInteger(parsedPage) || parsedPage < 1 || (totalPages > 0 && parsedPage > totalPages))
+    ? `페이지는 1${totalPages > 0 ? `~${totalPages}` : ' 이상'} 범위로 입력해주세요.` : '';
+  return { sentence, page: parsedPage, textError, pageError, valid: !textError && !pageError };
+}
+window._validateOcrReview = _validateOcrReview;
+
 /* ── NestView ─────────────────────────────────────────── */
 
 // 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 둥지 진척 즉시 반영.
@@ -115,11 +128,20 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const [drafts, setDrafts] = _useState(() => _loadDrafts(state.book.id));
   const [quickSentPage, setQuickSentPage] = _useState('');
   const [sentFlip, setSentFlip] = _useState(false); // 문장 저장 시 일기장 넘기기 효과
-  // 빠른입력 OCR (#498) — 책 사진 → quickText 프리필
+  // 빠른입력 OCR (#498/#1265) — 책 사진 → 전체화면 임시 검토
   const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
   const [quickOcrFile, setQuickOcrFile] = _useState(null);
+  const [ocrReview, setOcrReview] = _useState(null);
+  const [ocrSaving, setOcrSaving] = _useState(false);
+  const [ocrErrors, setOcrErrors] = _useState({ text: '', page: '', status: '' });
   const _quickOcrInputRef = _useRef(null);
   const _quickAlbumInputRef = _useRef(null);  // #792 앨범(갤러리) 불러오기 — capture 없는 input
+  const _ocrReviewRef = _useRef(null);
+  const _ocrTextRef = _useRef(null);
+  const _ocrPageRef = _useRef(null);
+  const _ocrTriggerRef = _useRef(null);
+  const _ocrHistoryRef = _useRef(false);
+  const _ocrSavingRef = _useRef(false);
   const _quickSentRef = _useRef(null);        // #1068 빈 상태 CTA → 한 문장 입력창 포커스 타깃
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
@@ -182,6 +204,35 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     window.readDefaultSentenceVisibility().then((visibility) => setDrafts((d) => [...d, { text: '', visibility }]));
   };
   const removeDraft = (i) => setDrafts((d) => { const n = d.filter((_, j) => j !== i); return n.length ? n : [{ text: '', visibility: null }]; });
+
+  const closeOcrReview = () => {
+    _ocrSavingRef.current = false;
+    setOcrReview(null); setOcrSaving(false); setOcrErrors({ text: '', page: '', status: '' });
+    setTimeout(() => { if (_ocrTriggerRef.current) _ocrTriggerRef.current.focus(); }, 0);
+  };
+  const requestCloseOcrReview = () => {
+    if (_ocrSavingRef.current) return;
+    if (_ocrHistoryRef.current) window.history.back(); else closeOcrReview();
+  };
+  _useEffect(() => {
+    if (!ocrReview) return undefined;
+    _ocrHistoryRef.current = true;
+    window.history.pushState({ rgOcrReview: true }, '');
+    const onPop = () => { _ocrHistoryRef.current = false; closeOcrReview(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); requestCloseOcrReview(); return; }
+      if (e.key !== 'Tab' || !_ocrReviewRef.current) return;
+      const items = Array.from(_ocrReviewRef.current.querySelectorAll('button:not([disabled]), textarea:not([disabled]), input:not([disabled])'));
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('popstate', onPop);
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => { if (_ocrTextRef.current) _ocrTextRef.current.focus(); }, 0);
+    return () => { window.removeEventListener('popstate', onPop); document.removeEventListener('keydown', onKey); };
+  }, [!!ocrReview]);
 
   // 읽는 중 책 목록 — 활성 책 좌우 리볼빙 전환용 (#185)
   _useEffect(() => {
@@ -318,9 +369,10 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setRepairCard(null); // 이번 진입 동안만 숨김 — 다음 진입 때 아직 복구 가능하면 다시 권유(주 1회는 datastore가 강제)
   };
 
-  const handleCheckin = ({ page, sentence, visibility, kind, sentPage, sentences }) => {
+  const handleCheckin = ({ page, sentence, visibility, kind, sentPage, sentences, awaitPersistence }) => {
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
+    const previousNestState = nestState;
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
     // 스트릭은 실제 마지막 기록일 기준으로 계산(#927). 종전 `ns.streak += 1`(맹목 증가)은
@@ -373,7 +425,17 @@ function NestView({ state, onCheckin, onOpenSearch }) {
 
     prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
     setNestState(ns);
-    onCheckin(ns, newLv, xpGain, sentence, kind, quotePage, batch, visibility); // batch 있으면 app 이 N개 문장 영속(#1198)
+    let completionPromise = null, completion = null;
+    if (awaitPersistence) {
+      completionPromise = new Promise((resolve, reject) => {
+        completion = {
+          rollback: { book: previousNestState.book, streak: previousNestState.streak, xp: previousNestState.xp, nestLv: getNestStageByXp(previousNestState.xp).lv, myQuotes: previousNestState.myQuotes },
+          onSuccess: resolve,
+          onFailure: (error) => { setNestState(previousNestState); setCheckedToday(false); setCeremony(null); setShowConfetti(false); reject(error); },
+        };
+      });
+    }
+    const checkinResult = onCheckin(ns, newLv, xpGain, sentence, kind, quotePage, batch, visibility, completion); // batch 있으면 app 이 N개 문장 영속(#1198)
     if (window.rgTrack) window.rgTrack('reading_session_end', { book_id: ns.book.id, pages_logged: pagesAdded, is_complete: isComplete }); // 인게이지먼트/리텐션 (#736)
 
     // 성 획득(1,600 주기 완료)은 단계 toast보다 우선 — 경계 통과 시 둥지 단계는 Lv4→Lv1로
@@ -394,11 +456,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, sentenceCount, bookQuoteCount, nestUp, castleGained, castleCount: newCastles, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
+    return completionPromise || checkinResult;
   };
 
   // 빠른 기록 (#462) — 홈 상시 입력 폼에서 페이지/한 문장을 한 번에 체크인.
   // handleCheckin 단일 경로 재사용 → 스트릭·XP·세리머니·문장 영속(app onCheckin)·companion(#438) 보존.
-  // 빠른입력 OCR (#498) — Upstage OCR + solar-pro3 → quickText 프리필(원하는 부분만 남기고 저장).
+  // 빠른입력 OCR (#498/#1265) — Upstage OCR + solar-pro3 → 전체화면에서 원문·페이지 검토 후 저장.
   // 공유 헬퍼 window.ocrExtractSentence(data.js) 로 OCR 호출(#939). 토스트·busy·tracking 은 여기서.
   const runOcrQuick = (file) => {
     if (!file || quickOcrBusy) return;
@@ -406,10 +469,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setQuickOcrBusy(true); // 스피너 오버레이(#1201)가 진행 피드백 — 시작 토스트 불필요(중복 제거)
     Promise.resolve((window.ocrExtractSentence ? window.ocrExtractSentence(file) : Promise.resolve({ text: '', error: 'unavailable' })))
       .then((d) => {
-        if (d && d.text) {
-          // OCR 추출문은 첫 초안(drafts[0])에 이어붙인다 — 기존 단일 입력창 동작 보존(#1198).
-          setDrafts((arr) => { const copy = arr.slice(); const cur = copy[0] || { text: '', visibility: 'public' }; copy[0] = { ...cur, text: (cur.text.trim() ? cur.text.trim() + '\n' + d.text : d.text).slice(0, 1000) }; return copy; });
-          showToast('추출했어요 — 원하는 부분만 남기고 저장하세요');
+        if (d && String(d.text || '').trim()) {
+          setOcrReview({ text: String(d.text), page: '', sourceBook: nestState.book.id });
+          setOcrErrors({ text: '', page: '', status: '' });
           rgTrack('ocr_extracted', { book_id: nestState.book.id, chars: d.text.length });
         } else if (d && d.empty) {
           showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
@@ -420,6 +482,26 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         }
       })
       .finally(() => setQuickOcrBusy(false));
+  };
+
+  const saveOcrReview = async () => {
+    if (!ocrReview || ocrSaving) return;
+    const checked = _validateOcrReview(ocrReview.text, ocrReview.page, nestState.book.cur, nestState.book.total);
+    if (!checked.valid) {
+      setOcrErrors({ text: checked.textError, page: checked.pageError, status: '입력 내용을 확인해주세요.' });
+      setTimeout(() => { const target = checked.textError ? _ocrTextRef.current : _ocrPageRef.current; if (target) target.focus(); }, 0);
+      return;
+    }
+    _ocrSavingRef.current = true; setOcrSaving(true); setOcrErrors({ text: '', page: '', status: '저장 중입니다.' });
+    try {
+      const progressPage = Math.max(nestState.book.cur || 0, checked.page);
+      await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, kind: 'quote', sentPage: checked.page, awaitPersistence: true }));
+      setOcrErrors({ text: '', page: '', status: '저장했습니다.' });
+      if (_ocrHistoryRef.current) window.history.back(); else closeOcrReview();
+    } catch (e) {
+      _ocrSavingRef.current = false; setOcrSaving(false);
+      setOcrErrors((prev) => ({ ...prev, status: '저장하지 못했어요. 내용을 유지했으니 다시 시도해주세요.' }));
+    }
   };
 
   // 입력 페이지 정규화 (#1203) — 1..total 로만 클램프. 현재 쪽보다 낮아도 허용(재독) — current_page 를 그 값으로 덮어씀.
@@ -768,13 +850,13 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         )}
         <div className="home-sentence-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
           {/* 사진으로 입력(OCR) — SVG 카메라 아이콘 버튼 (2026 UI, '···' 메뉴 대체) */}
-          <button onClick={() => { if (!quickOcrBusy && _quickOcrInputRef.current) _quickOcrInputRef.current.click(); }}
+          <button onClick={(e) => { if (!quickOcrBusy && _quickOcrInputRef.current) { _ocrTriggerRef.current = e.currentTarget; _quickOcrInputRef.current.click(); } }}
             disabled={quickOcrBusy} title="사진으로 입력 (OCR)" aria-label="사진으로 입력 (OCR)"
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, borderRadius: 12, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           </button>
           {/* #792 앨범에서 불러오기 — capture 없는 input → OS 갤러리. 동일 OcrCropOverlay 파이프라인 재사용 */}
-          <button onClick={() => { if (!quickOcrBusy && _quickAlbumInputRef.current) _quickAlbumInputRef.current.click(); }}
+          <button onClick={(e) => { if (!quickOcrBusy && _quickAlbumInputRef.current) { _ocrTriggerRef.current = e.currentTarget; _quickAlbumInputRef.current.click(); } }}
             disabled={quickOcrBusy} title="앨범에서 불러오기" aria-label="앨범에서 불러오기"
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, borderRadius: 12, border: 'none', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: quickOcrBusy ? 'default' : 'pointer', opacity: quickOcrBusy ? 0.5 : 1, padding: 0 }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
@@ -812,6 +894,42 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           <div style={{ fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>{window.rgIcon('camera', 17)} 사진에서 글자를 읽는 중…</div>
         </div>
       )}
+
+      {ocrReview && ReactDOM.createPortal(
+        <div className="ocr-review" role="dialog" aria-modal="true" aria-labelledby="ocr-review-title" ref={_ocrReviewRef}>
+          <header className="ocr-review-head">
+            <button type="button" className="ocr-review-cancel" onClick={requestCloseOcrReview} disabled={ocrSaving}>취소</button>
+            <h2 id="ocr-review-title">추출한 문장 확인</h2>
+            <button type="button" className="ocr-review-save" onClick={saveOcrReview} disabled={ocrSaving} aria-describedby="ocr-review-status">
+              {ocrSaving ? '저장 중' : '저장'}
+            </button>
+          </header>
+          <main className="ocr-review-body">
+            <div className="ocr-review-field ocr-review-text-field">
+              <label htmlFor="ocr-review-text">한 문장 원문</label>
+              <textarea id="ocr-review-text" ref={_ocrTextRef} value={ocrReview.text}
+                onChange={(e) => { setOcrReview((r) => ({ ...r, text: e.target.value })); setOcrErrors((v) => ({ ...v, text: '', status: '' })); }}
+                aria-invalid={!!ocrErrors.text} aria-describedby="ocr-review-count ocr-review-text-error" />
+              <div className="ocr-review-meta">
+                <span id="ocr-review-text-error" className="ocr-review-error">{ocrErrors.text}</span>
+                <span id="ocr-review-count" className={ocrReview.text.trim().length > 200 ? 'is-over' : ''}>{ocrReview.text.trim().length}/200자</span>
+              </div>
+            </div>
+            <div className="ocr-review-field">
+              <label htmlFor="ocr-review-page">페이지</label>
+              <div className="ocr-review-page-row">
+                <input id="ocr-review-page" ref={_ocrPageRef} type="text" inputMode="numeric" pattern="[0-9]*"
+                  value={ocrReview.page} placeholder={String(Math.max(1, nestState.book.cur || 1))}
+                  onChange={(e) => { setOcrReview((r) => ({ ...r, page: e.target.value.replace(/[^0-9]/g, '') })); setOcrErrors((v) => ({ ...v, page: '', status: '' })); }}
+                  aria-invalid={!!ocrErrors.page} aria-describedby="ocr-review-page-help ocr-review-page-error" />
+                {nestState.book.total > 0 && <span>/ {nestState.book.total}p</span>}
+              </div>
+              <div id="ocr-review-page-help" className="ocr-review-help">비우면 현재 페이지로 저장돼요.</div>
+              <div id="ocr-review-page-error" className="ocr-review-error">{ocrErrors.page}</div>
+            </div>
+            <div id="ocr-review-status" className="ocr-review-status" role="status" aria-live="polite">{ocrErrors.status}</div>
+          </main>
+        </div>, document.body)}
 
       {/* '오늘 기록 완료 · N일 연속' nudge 제거 (#481) */}
 

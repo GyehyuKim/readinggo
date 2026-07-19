@@ -703,7 +703,7 @@ function App() {
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
   // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences, visibility) => {
+  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences, visibility, completion) => {
     // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
     // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
@@ -733,7 +733,7 @@ function App() {
     }
     // Phase 1: 백엔드 영속(로그인 시). 낙관적 UI 유지 + 백그라운드 persist.
     // sessions.addToday 가 스트릭 bump 까지 연동(양 어댑터). 활성 책 없으면 no-op.
-    (async () => {
+    return (async () => {
       try {
         // #565: 화면 책(ns.book)에 정확히 귀속 — 전역 activeBook 타이밍(리볼빙 전환 race)에 의존하지 않는다.
         // 1순위 ns.book.ubId(readingBooks·buildState 에서 동결한 user_book id). 없으면 ns.book.id 로 내 책을 해소
@@ -744,7 +744,7 @@ function App() {
           const found = (myb || []).find(u => (u.book_id === ns.book.id) || (u.book && u.book.id === ns.book.id));
           ubId = found && found.id;
         }
-        if (!ubId) { console.warn('[ReadingGo] 체크인: 화면 책의 user_book 미해소 — 잘못된 귀속 방지 위해 저장 건너뜀'); surfaceWriteError(new Error('user_book 미해소'), '기록을 저장하지 못했어요 — 다시 시도해주세요'); return; }
+        if (!ubId) { console.warn('[ReadingGo] 체크인: 화면 책의 user_book 미해소 — 잘못된 귀속 방지 위해 저장 건너뜀'); throw new Error('user_book 미해소'); }
         await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
         if (batch && batch.length) {
           // 배치: N개 문장을 개별 add(공유 페이지). 진도·세션·XP·스트릭은 위/아래에서 1회만(#1198).
@@ -772,7 +772,15 @@ function App() {
             ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: x.visibility || 'public', isPrivate: x.visibility === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
         }));
-      } catch (e) { surfaceWriteError(e, '기록을 저장하지 못했어요 — 다시 시도해주세요'); }
+        if (completion && completion.onSuccess) completion.onSuccess();
+      } catch (e) {
+        await surfaceWriteError(e, '기록을 저장하지 못했어요 — 다시 시도해주세요');
+        if (completion && completion.rollback) {
+          const prev = completion.rollback;
+          setAppState(s => ({ ...s, book: prev.book, streak: prev.streak, xp: prev.xp, nest: { ...s.nest, lv: prev.nestLv }, myQuotes: prev.myQuotes }));
+        }
+        if (completion && completion.onFailure) completion.onFailure(e);
+      }
     })();
   }, []);
 
