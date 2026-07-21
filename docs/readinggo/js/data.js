@@ -515,21 +515,22 @@ function extractBookSummary(book, quotes) {
 
 /* 공유 OCR 헬퍼 (#939) — 책 사진 한 장 → worker /api/ocr(Upstage Document OCR + solar-pro3 보정)
    → 한 문장 텍스트. 읽기모드 빠른입력(#498 nest.js runOcrQuick)이 이 호출을 쓴다(인라인 중복 구현 금지).
-   반환: { text, empty, error } (배타). 호출측이 토스트·busy·tracking 을 담당. 키 미설정/네트워크 실패는 error. */
+   반환: { text } | { empty, code, stage } | { error, stage, status } (배타).
+   호출측이 토스트·busy·tracking 을 담당하고 provider 원문은 보존하지 않는다. */
 const OCR_MAX_BYTES = 8 * 1024 * 1024;   // 8MB — ocrProxy OCR_MAX_BYTES 와 동일
 function ocrExtractSentence(file) {
-  if (!file) return Promise.resolve({ text: '', empty: true });
-  if (file.size && file.size > OCR_MAX_BYTES) return Promise.resolve({ text: '', error: 'too_large' });
+  if (!file) return Promise.resolve({ text: '', error: 'ocr_image_missing', stage: 'request', status: 0 });
+  if (file.size && file.size > OCR_MAX_BYTES) return Promise.resolve({ text: '', error: 'ocr_image_too_large', stage: 'request', status: 413 });
   const fd = new FormData();
   fd.append('document', file, file.name || 'page.jpg');
   return window.RG_apiFetch('/api/ocr', { method: 'POST', body: fd })
-    .then((r) => r.json().catch(() => ({})))
-    .then((d) => {
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }))
+    .then(({ status, body: d }) => {
       if (d && d.text) return { text: String(d.text).slice(0, 1000) };
-      if (d && d.empty) return { text: '', empty: true };
-      return { text: '', error: (d && d.error) || 'failed' };
+      if (d && d.empty) return { text: '', empty: true, code: d.code || 'ocr_empty', stage: d.stage || 'result' };
+      return { text: '', error: (d && d.code) || 'ocr_failed', stage: (d && d.stage) || 'request', status };
     })
-    .catch(() => ({ text: '', error: 'network' }));
+    .catch(() => ({ text: '', error: 'ocr_network_failure', stage: 'network', status: 0 }));
 }
 
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
