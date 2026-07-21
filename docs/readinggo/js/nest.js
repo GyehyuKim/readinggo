@@ -73,6 +73,22 @@ function _validateOcrReview(text, page, currentPage, totalPages) {
 }
 window._validateOcrReview = _validateOcrReview;
 
+function _ocrFailureMessage(code) {
+  return {
+    TURNSTILE_REQUIRED: '보안 확인 정보를 받지 못했어요 — 다시 시도해 주세요',
+    TURNSTILE_FAILED: '보안 확인이 완료되지 않았어요 — 다시 시도해 주세요',
+    ocr_image_too_large: '이미지가 너무 커요(최대 8MB)',
+    ocr_image_missing: '사진을 다시 선택해 주세요',
+    ocr_unconfigured: 'OCR 설정을 확인 중이에요 — 잠시 후 다시 시도해 주세요',
+    ocr_upstream_auth: 'OCR 서비스 설정을 확인 중이에요 — 잠시 후 다시 시도해 주세요',
+    ocr_upstream_unavailable: 'OCR 서비스가 잠시 응답하지 않아요 — 다시 시도해 주세요',
+    ocr_upstream_rejected: '이 사진을 읽지 못했어요 — 다른 사진으로 시도해 주세요',
+    ocr_transport_failure: 'OCR 서비스 연결에 실패했어요 — 다시 시도해 주세요',
+    ocr_network_failure: '네트워크를 확인하고 다시 시도해 주세요',
+  }[code] || '사진을 읽지 못했어요 — 다시 시도해 주세요';
+}
+window._ocrFailureMessage = _ocrFailureMessage;
+
 /* ── NestView ─────────────────────────────────────────── */
 
 // 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 둥지 진척 즉시 반영.
@@ -475,10 +491,11 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           rgTrack('ocr_extracted', { book_id: nestState.book.id, chars: d.text.length });
         } else if (d && d.empty) {
           showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
-        } else if (d && d.error === 'network') {
-          showToast('추출 실패 — 네트워크를 확인해요');
+          rgTrack('ocr_failed', { book_id: nestState.book.id, code: d.code || 'ocr_empty', stage: d.stage || 'result' });
         } else {
-          showToast('추출 실패 — 잠시 후 다시 시도해요');
+          const code = (d && d.error) || 'ocr_failed';
+          showToast(_ocrFailureMessage(code));
+          rgTrack('ocr_failed', { book_id: nestState.book.id, code, stage: (d && d.stage) || 'unknown', http_status: (d && d.status) || 0 });
         }
       })
       .finally(() => setQuickOcrBusy(false));

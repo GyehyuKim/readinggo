@@ -881,14 +881,20 @@ const OCR_URL = 'https://api.upstage.ai/v1/document-digitization';
 const OCR_MAX_BYTES = 8 * 1024 * 1024;   // 8MB
 const OCR_CORRECT_SYSTEM = '너는 책 사진 OCR 결과를 다듬는 교정기다. 책의 좌우 단·줄바꿈 때문에 생긴 불필요한 줄바꿈과 띄어쓰기 오류만 자연스럽게 이어 붙여라. 절대 원문 단어를 바꾸거나 추가·삭제·요약·번역하지 마라. 맞춤법 교정도 하지 마라. 오직 줄바꿈·띄어쓰기 정리만. 결과 텍스트만 출력(설명·따옴표 금지).';
 
+function ocrFailure({ code, stage, status, error, demo = false }) {
+  // 운영 로그는 단계·안전한 코드·HTTP 상태만 남긴다. 이미지·OCR 원문·인증 헤더는 절대 기록하지 않는다.
+  console.warn(JSON.stringify({ event: 'ocr_failure', code, stage, status }));
+  return json({ error, code, stage, ...(demo ? { demo: true } : {}) }, status);
+}
+
 async function ocrProxy(request, env) {
-  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-  if (!env.UPSTAGE_API_KEY) return json({ error: 'OCR 미설정', demo: true }, 503);
+  if (request.method !== 'POST') return ocrFailure({ error: 'POST only', code: 'ocr_method_not_allowed', stage: 'request', status: 405 });
+  if (!env.UPSTAGE_API_KEY) return ocrFailure({ error: 'OCR 미설정', code: 'ocr_unconfigured', stage: 'config', status: 503, demo: true });
   let form;
-  try { form = await request.formData(); } catch { return json({ error: 'invalid form' }, 400); }
+  try { form = await request.formData(); } catch { return ocrFailure({ error: 'invalid form', code: 'ocr_request_invalid', stage: 'request', status: 400 }); }
   const file = form.get('document');
-  if (!file || typeof file === 'string') return json({ error: 'document(이미지) 필요' }, 422);
-  if (file.size && file.size > OCR_MAX_BYTES) return json({ error: '이미지가 너무 큽니다(최대 8MB)' }, 413);
+  if (!file || typeof file === 'string') return ocrFailure({ error: 'document(이미지) 필요', code: 'ocr_image_missing', stage: 'request', status: 422 });
+  if (file.size && file.size > OCR_MAX_BYTES) return ocrFailure({ error: '이미지가 너무 큽니다(최대 8MB)', code: 'ocr_image_too_large', stage: 'request', status: 413 });
   const doCorrect = String(form.get('correct') || 'true') !== 'false';   // 기본 LLM 보정 on
   // 1) Upstage Document OCR (model=ocr) — { text, confidence, pages }.
   let raw = '';
@@ -897,15 +903,21 @@ async function ocrProxy(request, env) {
     up.append('document', file, (file.name || 'page.jpg'));
     up.append('model', 'ocr');
     const r = await fetch(OCR_URL, { method: 'POST', headers: { Authorization: `Bearer ${env.UPSTAGE_API_KEY}` }, body: up });
-    if (!r.ok) return json({ error: 'OCR HTTP ' + r.status }, 502);
+    if (!r.ok) {
+      const code = r.status === 401 || r.status === 403
+        ? 'ocr_upstream_auth'
+        : r.status >= 500 ? 'ocr_upstream_unavailable' : 'ocr_upstream_rejected';
+      return ocrFailure({ error: 'OCR upstream failed', code, stage: 'upstage', status: 502 });
+    }
     const d = await r.json();
     raw = String((d && d.text) || '').trim();
   } catch (e) {
-    return json({ error: 'OCR 호출 실패: ' + String((e && e.message) || e) }, 502);
+    return ocrFailure({ error: 'OCR upstream failed', code: 'ocr_transport_failure', stage: 'upstage', status: 502 });
   }
-  if (!raw) return json({ text: '', raw: '', empty: true }, 200);
+  if (!raw) return json({ text: '', empty: true, code: 'ocr_empty', stage: 'result' }, 200);
   // 2) solar-pro3 보정 — 컬럼 끊김·띄어쓰기만(temperature 0.1, 원문 충실). 실패 시 raw 폴백(무중단).
   let text = raw;
+  let correctedApplied = false;
   if (doCorrect && env.LLM_BASE_URL && env.LLM_MODEL) {
     try {
       const corrected = await callLLM({
@@ -914,10 +926,11 @@ async function ocrProxy(request, env) {
           { role: 'user', content: '다음 OCR 텍스트의 줄바꿈·띄어쓰기만 정리:\n' + raw.slice(0, 2000) },
         ], env, maxTokens: 600, temperature: 0.1,
       });
-      if (corrected) text = corrected.trim();
+      if (corrected) { text = corrected.trim(); correctedApplied = true; }
     } catch (e) { /* raw 폴백 */ }
   }
-  return json({ text, raw }, 200);
+  // OCR 원문은 별도 필드로 중복 반환하지 않는다(업로드 콘텐츠 최소화).
+  return json({ text, corrected: correctedApplied, stage: 'result' }, 200);
 }
 
 /* ── 배치 OCR — 사진에서 강조(밑줄/형광펜) 문장 추출 (#844) ──────────────
