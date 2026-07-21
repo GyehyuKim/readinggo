@@ -116,14 +116,23 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     setOcrItems(items);
   };
   // #610: 자체 삭제/좋아요/공개범위 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 한 문장 카드).
-  const bookshelfEntry = (book.status === 'completed') ? { rating: book.rating, comment: book.comment } : null;
+  const [savedRating, setSavedRating] = _useState(book.rating);
+  const [savedReview, setSavedReview] = _useState(book.comment || '');
+  const bookshelfEntry = (book.status === 'completed') ? { rating: savedRating, comment: savedReview } : null;
   // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
   const revealAll = React.useContext(SpoilerContext);
   const [revealed, setRevealed] = _useState({});
   // 완독 별점·소감 수정 (QA #3) — 이미 완독한 책의 rating/review 편집.
   const [editMeta, setEditMeta] = _useState(false);
   const [rt, setRt] = _useState(book.rating || 0);
+  const [reviewOpen, setReviewOpen] = _useState(false);
   const [rv, setRv] = _useState(book.comment || '');
+  const [reviewInitial, setReviewInitial] = _useState(book.comment || '');
+  const [reviewBusy, setReviewBusy] = _useState(false);
+  const [reviewFeedback, setReviewFeedback] = _useState('');
+  const reviewTriggerRef = React.useRef(null);
+  const reviewDialogRef = React.useRef(null);
+  const reviewTextareaRef = React.useRef(null);
   // 참새의 완독 회고 (#259) — 내 한 문장들을 엮어 회고 한 단락. 실패/키없음 시 목 폴백(서버에서 처리).
   // #352: 저장본(user_books.companion_recap) 우선 표시, 새로 받으면 캐시 갱신.
   const [recap, setRecap] = _useState(book.recap || '');
@@ -216,13 +225,54 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     } catch (e) { showToast('회고를 불러오지 못했어요 — 잠시 후 다시'); }
     setRecapLoading(false);
   };
-  const saveMeta = () => {
+  const saveRating = () => {
     if (!book.ubId || !(DataStore.books && DataStore.books.complete)) { setEditMeta(false); return; }
-    Promise.resolve(DataStore.books.complete(book.ubId, { rating: rt || null, review_text: (rv || '').trim() || null }))
-      .then(() => showToast('완독 정보 저장됨 — 새로고침하면 반영돼요'))
-      .catch(() => showToast('저장 실패'));
-    setEditMeta(false);
+    Promise.resolve(DataStore.books.complete(book.ubId, { rating: rt || null }))
+      .then(() => { setSavedRating(rt || null); setEditMeta(false); showToast('별점을 저장했어요'); })
+      .catch(() => showToast('별점 저장 실패 — 다시 시도해 주세요'));
   };
+  const openReview = () => {
+    const current = savedReview || '';
+    setRv(current); setReviewInitial(current); setReviewFeedback(''); setReviewOpen(true);
+  };
+  const closeReview = () => {
+    if (reviewBusy) return;
+    if (rv !== reviewInitial && !window.confirm('작성 중인 소감을 버릴까요?')) return;
+    setReviewOpen(false);
+    window.setTimeout(() => reviewTriggerRef.current && reviewTriggerRef.current.focus(), 0);
+  };
+  const saveReview = async () => {
+    if (reviewBusy || !book.ubId || !(DataStore.books && DataStore.books.complete)) return;
+    setReviewBusy(true); setReviewFeedback('저장 중…');
+    try {
+      const next = (rv || '').trim();
+      await Promise.resolve(DataStore.books.complete(book.ubId, { review_text: next || null }));
+      setSavedReview(next); setReviewInitial(next); setReviewFeedback('소감을 저장했어요.');
+      showToast('완독 소감을 저장했어요');
+      setReviewOpen(false);
+      window.setTimeout(() => reviewTriggerRef.current && reviewTriggerRef.current.focus(), 0);
+    } catch (e) {
+      setReviewFeedback('저장하지 못했어요. 입력한 내용은 그대로 두었어요. 다시 시도해 주세요.');
+    } finally { setReviewBusy(false); }
+  };
+  _useEffect(() => {
+    if (!reviewOpen) return undefined;
+    const dialog = reviewDialogRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.setTimeout(() => reviewTextareaRef.current && reviewTextareaRef.current.focus(), 0);
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeReview(); return; }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]), textarea:not([disabled])')];
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => { document.removeEventListener('keydown', onKeyDown); document.body.style.overflow = previousOverflow; };
+  }, [reviewOpen, reviewBusy, rv, reviewInitial]);
   // 수동 완독 표시 (#265 안전망): 읽기 모드가 100% 트리거를 놓쳤거나 total 미상이던 '망령 책' 복구용.
   const markDone = () => {
     if (!book.ubId || !(DataStore.books && DataStore.books.complete)) return;
@@ -363,10 +413,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   };
 
   return (
-    <div className="modal-backdrop show" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="sheet" role="dialog" aria-label={book.title}>
+    <div className="modal-backdrop show" onClick={e => { if (!reviewOpen && e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" role="dialog" aria-label={`${book.title} 책 상세`} aria-hidden={reviewOpen ? 'true' : undefined} inert={reviewOpen ? '' : undefined}>
         <div className="sheet-grip" />
-        <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:10, right:14, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:30, height:30, cursor:'pointer', color:'var(--ink-2)', zIndex:2, display:'inline-flex', alignItems:'center', justifyContent:'center'}}>{window.rgIcon('close',16)}</button>
+        <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:8, right:10, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:44, height:44, cursor:'pointer', color:'var(--ink-2)', zIndex:2, display:'inline-flex', alignItems:'center', justifyContent:'center'}}>{window.rgIcon('close',16)}</button>
         
         <div style={{textAlign:'center', padding:'16px 20px 0'}}>
           <BookCover
@@ -379,13 +429,13 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           <p style={{fontSize:13, color:'var(--ink-2)', fontWeight:700, margin:'0 0 12px'}}>{[book.author, book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
         </div>
 
-        <div style={{padding:'16px 20px', maxHeight:'50vh', overflowY:'auto'}}>
+        <div data-testid="book-detail-content" style={{padding:'16px 20px', maxHeight:'50vh', overflowY:'auto', display:'flex', flexDirection:'column'}}>
           {/* 완독 정보 */}
           {bookshelfEntry && (
-            <div style={{background:'var(--paper-2)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
+            <div data-section="primary-completed" style={{order:1, background:'var(--paper-2)', borderRadius:12, padding:'12px 14px', marginBottom:14}}>
               <div style={{fontSize:12, color:'var(--ink-3)', fontWeight:800, marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                 <span>완독 정보</span>
-                {!editMeta && <button onClick={() => { setRt(book.rating || 0); setRv(book.comment || ''); setEditMeta(true); }} style={{background:'none', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:12, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4}}>{window.rgIcon('pen',13)} 수정</button>}
+                {!editMeta && <span>{book.completedAt ? `완독 ${String(book.completedAt).slice(0, 10)}` : '완독'}</span>}
               </div>
               {editMeta ? (
                 <div>
@@ -404,12 +454,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     })}
                     <span style={{marginLeft:6, fontSize:13, fontWeight:800, color:'var(--ink-2)'}}>{rt > 0 ? rt.toFixed(1) : ''}</span>
                   </div>
-                  <textarea value={rv} maxLength={1000} onChange={e => setRv(e.target.value)} placeholder="완독 소감 (최대 1000자)" rows={3}
-                    style={{width:'100%', boxSizing:'border-box', padding:8, borderRadius:12, border:'1.5px solid var(--line)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
                   <div style={{display:'flex', gap:6, marginTop:6}}>
-                    <button onClick={saveMeta} style={{padding:'6px 12px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>저장</button>
+                    <button onClick={saveRating} style={{minHeight:44, padding:'6px 12px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer'}}>별점 저장</button>
                     {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
-                    <button onClick={() => setEditMeta(false)} style={{padding:'6px 12px', borderRadius:12, border:'none', background:'transparent', color:'var(--ink-2)', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
+                    <button onClick={() => setEditMeta(false)} style={{minHeight:44, padding:'6px 12px', borderRadius:12, border:'none', background:'transparent', color:'var(--ink-2)', fontSize:12, fontWeight:700, cursor:'pointer'}}>취소</button>
                   </div>
                 </div>
               ) : (
@@ -422,8 +470,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                         const fillPct = Math.max(0, Math.min(1, bookshelfEntry.rating - (n - 1))) * 100;
                         return (
                           <button key={n} type="button" aria-label={`${n}점 — 탭하여 별점 수정`}
-                            onClick={() => { setRt(bookshelfEntry.rating); setRv(book.comment || ''); setEditMeta(true); }}
-                            style={{position:'relative', display:'inline-block', width:26, height:26, fontSize:24, lineHeight:'26px', background:'none', border:'none', cursor:'pointer', padding:0}}>
+                            onClick={() => { setRt(bookshelfEntry.rating); setEditMeta(true); }}
+                            style={{position:'relative', display:'inline-block', width:44, height:44, fontSize:24, lineHeight:'44px', background:'none', border:'none', cursor:'pointer', padding:0}}>
                             <span style={{color:'var(--star-empty)'}}>★</span>
                             <span style={{position:'absolute', left:0, top:0, width:fillPct+'%', overflow:'hidden', color:'var(--gold)'}}>★</span>
                           </button>
@@ -436,15 +484,17 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                     <div style={{display:'flex', gap:3, alignItems:'center', marginBottom:8}}>
                       {[1,2,3,4,5].map(n => (
                         <button key={n} type="button" aria-label={`${n}점 주기`}
-                          onClick={() => { setRt(n); setRv(book.comment || ''); setEditMeta(true); }}
-                          style={{background:'none', border:'none', cursor:'pointer', padding:0, fontSize:24, lineHeight:'26px', color:'var(--star-empty)'}}>★</button>
+                          onClick={() => { setRt(n); setEditMeta(true); }}
+                          style={{background:'none', border:'none', cursor:'pointer', padding:0, width:44, height:44, fontSize:24, lineHeight:'44px', color:'var(--star-empty)'}}>★</button>
                       ))}
                       <span style={{marginLeft:6, fontSize:12, color:'var(--ink-3)', fontWeight:700}}>별점 주기</span>
                     </div>
                   )}
-                  {bookshelfEntry.comment && (
-                    <div style={{fontSize:13, color:'var(--ink)', lineHeight:'1.5'}}>{bookshelfEntry.comment}</div>
-                  )}
+                  {bookshelfEntry.comment && <div style={{fontSize:13, color:'var(--ink)', lineHeight:'1.5', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden'}}>{bookshelfEntry.comment}</div>}
+                  <button ref={reviewTriggerRef} onClick={openReview}
+                    style={{minHeight:44, marginTop:8, padding:'8px 12px', borderRadius:12, border:'1px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:5}}>
+                    {window.rgIcon('pen',13)} {bookshelfEntry.comment ? '소감 수정' : '소감 남기기'}
+                  </button>
                 </>
               )}
             </div>
@@ -452,7 +502,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
 
           {/* 참새의 완독 회고 (§5.8.6, #259) — 내 한 문장들을 참새(solar-pro3)가 엮어 회고 한 단락 */}
           {bookshelfEntry && (
-            <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
+            <div data-section="tertiary-recap" style={{order:3, background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:12, padding:'12px 14px', marginBottom:14}}>
               <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:6}}><window.SparrowInline size={14} /> 재키의 완독 회고</div>
               {recap ? (
                 <>
@@ -482,7 +532,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* ── 완독 후 AI 카드 (§5.8.6, #946) — Phase 0 하드코딩 시뮬 ────────────── */}
           {/* ① AI 도서 추천 — 다음 책 (나↔책 fit, 친구 매칭 아님). CTA = 교보문고에서 보기 */}
           {bookshelfEntry && aiNextBooks.length > 0 && (
-            <div style={{marginBottom:14}}>
+            <div data-section="tertiary-ai-recommendations" style={{order:3, marginBottom:14}}>
               <SectionLabel icon="related" mb={3}>AI 추천 — 다음에 읽을 책</SectionLabel>
               <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:10}}>이 책을 완독한 당신에게 어울리는 다음 책이에요</div>
               {aiNextBooks.map(rb => (
@@ -506,7 +556,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
 
           {/* ② AI 추출 책 — 나만의 추출 책 (내 한 문장 기반). Phase 0 = 한 문장 나열 + 고정 카피 */}
           {bookshelfEntry && aiExtract && (
-            <div style={{background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:12, padding:'12px 14px', marginBottom:14}}>
+            <div data-section="tertiary-ai-extract" style={{order:3, background:'var(--brand-tint)', border:'1px solid var(--brand)', borderRadius:12, padding:'12px 14px', marginBottom:14}}>
               <div style={{fontSize:13, fontWeight:800, color:'var(--brand-3)', marginBottom:8}}>✨ 나만의 추출 책</div>
               {/* 반응한 주제 TOP 3 */}
               <div style={{display:'flex', flexWrap:'wrap', gap:6, marginBottom:10}}>
@@ -530,9 +580,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           )}
 
           {/* 진도 정보 (읽는 중일 때) — 쪽수 미상 graceful (§5.8.4 v7.2 #204) */}
-          {prog.cur > 0 && !bookshelfEntry && (
-            <div style={{background:'var(--paper-2)', borderRadius:'8px', padding:'12px 14px', marginBottom:14}}>
-              <div style={{fontSize:12, color:'var(--ink-3)', fontWeight:800, marginBottom:6}}>진도</div>
+          {!bookshelfEntry && (
+            <div data-section="primary-progress" style={{order:1, background:'var(--paper-2)', borderRadius:12, padding:'12px 14px', marginBottom:14}}>
+              <div style={{fontSize:12, color:'var(--ink-3)', fontWeight:800, marginBottom:6}}>{book.status === 'aborted' ? `중단 · ${prog.cur}쪽에서 멈춤` : '읽는 중'}</div>
               {book.total > 0 ? (
                 <>
                   <div style={{display:'flex', alignItems:'center', gap:10}}>
@@ -548,13 +598,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   <span style={{display:'inline-flex', alignItems:'center', gap:5}}>{window.rgIcon('book',14)}{prog.cur}p 읽음</span> · <span style={{color:'var(--ink-3)'}}>쪽수 미상</span>
                 </div>
               )}
+              {book.status === 'aborted' && <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginTop:7}}>읽던 진도는 그대로 보존돼요.</div>}
             </div>
           )}
 
           {/* 다시 읽기 (#593): 중단(aborted) 책 → 읽는 중 복귀. current_page 보존. */}
           {book.status === 'aborted' && book.ubId && (
-            <button onClick={resumeBook}
-              style={{display:'flex', width:'100%', alignItems:'center', justifyContent:'center', gap:6, padding:'12px 14px', background:'var(--brand)', border:'none', borderRadius:'8px', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
+            <button data-section="primary-resume" onClick={resumeBook}
+              style={{order:1, display:'flex', width:'100%', minHeight:44, alignItems:'center', justifyContent:'center', gap:6, padding:'12px 14px', background:'var(--brand)', border:'none', borderRadius:12, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', marginBottom:14}}>
               {window.rgIcon('book',15)} 다시 읽기
             </button>
           )}
@@ -562,16 +613,16 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* 완독 표시(#265) / 읽기 중단(#593) — 한 줄 좌우 2버튼 · SVG 아이콘(2026 UI, 이모지 제거).
               미완독·미중단 등록 책에만 노출. 완독=체크, 중단=일시정지. */}
           {!bookshelfEntry && book.status !== 'aborted' && book.ubId && (
-            <div style={{display:'flex', gap:8, marginBottom:14}}>
+            <div data-section="primary-reading-actions" style={{order:1, display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8, marginBottom:14}}>
               <button onClick={markDone}
-                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--brand-tint)', border:'1.5px solid var(--brand-soft)', borderRadius:12, color:'var(--brand-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+                style={{minWidth:0, minHeight:44, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 8px', background:'var(--brand)', border:'none', borderRadius:12, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer'}}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 완독으로 표시
               </button>
               {/* 읽기 중단 = 중립 tonal(DESIGN.md #1032: ghost 투명+보더 금지 → 채워진 배경.
                   비긍정 액션이라 그린 tonal 대신 중립 paper-2 채움으로 '완독' 그린과 위계 구분) */}
               <button onClick={abortBook}
-                style={{flex:1, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 12px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:12, color:'var(--ink-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+                style={{minWidth:0, minHeight:44, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 8px', background:'var(--brand-soft)', border:'1.5px solid var(--brand-soft)', borderRadius:12, color:'var(--brand-3)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
                 읽기 중단
               </button>
@@ -581,27 +632,33 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* 잘못 담은 책 완전 삭제 (#1195) — 중단(되돌리기 가능)과 구분되는 영구 삭제.
               3차 danger 텍스트 버튼(DESIGN.md §버튼위계, settings 계정삭제와 동일 위계). 모든 상태(읽는중·중단·완독)에서 노출. */}
           {book.ubId && (
-            <button onClick={deleteBook}
-              style={{display:'block', width:'100%', textAlign:'center', padding:'10px 12px', marginBottom:14, border:'none', background:'transparent', color:'var(--danger, #E5484D)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
+            <button data-section="tertiary-delete" onClick={deleteBook}
+              style={{order:4, display:'block', width:'100%', minHeight:44, textAlign:'center', padding:'10px 12px', marginBottom:14, border:'none', background:'transparent', color:'var(--danger)', fontSize:13, fontWeight:800, cursor:'pointer'}}>
               이 책 삭제
             </button>
           )}
 
+          <div data-section="utility-row" style={{order:4, display:'flex', alignItems:'center', justifyContent:'center', flexWrap:'wrap', gap:4, marginBottom:14}}>
           <a href={kyoboUrl} target="_blank" rel="noopener noreferrer"
-             style={{display:'block', textAlign:'center', padding:'12px 14px', background:'var(--brand-tint)', border:'1.5px solid var(--brand)', borderRadius:'8px', color:'var(--brand-3)', fontSize:13, fontWeight:800, textDecoration:'none', marginBottom:14, cursor:'pointer'}}>
+             style={{display:'inline-flex', alignItems:'center', minHeight:44, padding:'6px 10px', color:'var(--brand-3)', fontSize:12, fontWeight:800, textDecoration:'none', cursor:'pointer'}}>
             교보문고에서 보기 →
           </a>
+          {bookQuotes.length > 0 && <button onClick={exportMarkdown}
+            style={{display:'inline-flex', alignItems:'center', gap:5, minHeight:44, padding:'6px 10px', background:'transparent', border:'none', color:'var(--ink-2)', fontSize:12, fontWeight:800, cursor:'pointer'}}>
+            {window.rgIcon('download',14)} 내 한 문장 Markdown 내보내기
+          </button>}
+          </div>
 
           {/* 이 책 같이 읽는 숲 추천 (co-reading.md §4.4·§7.6) — 그 책의 공개 숲이 있을 때만 한 줄.
               강제 join 아님 — 탭하면 상세 닫고 추천 상위(인원 많은) 숲으로 입장. 공개 숲 0 이면 미노출. */}
-          {window.BookCoReadRow && (
+          <div data-section="tertiary-co-read" style={{order:3}}>{window.BookCoReadRow && (
             <window.BookCoReadRow bookId={book.id}
               onOpen={(room) => { onClose(); if (window.RG_openRoom && room) window.RG_openRoom(room.id); }} />
-          )}
+          )}</div>
 
           {/* 책 소개 (#530) — DB books.description 우선, 없으면 알라딘 실시간 폴백. 둘 다 없으면 섹션 생략. */}
           {(bookDesc || descLoading) && (
-            <div style={{marginBottom:14}}>
+            <div data-section="tertiary-description" style={{order:3, marginBottom:14}}>
               {/* 섹션 헤더 #696 — 이모지 prefix 폐기, 공용 SectionLabel(components.js, window 노출). */}
               <SectionLabel icon="intro"
                 trailing={descSource === 'llm' && <span title="AI가 작성한 소개예요 · 부정확할 수 있어요" style={{fontSize:10, fontWeight:800, color:'var(--ink-3)', background:'var(--line)', borderRadius:999, padding:'1px 6px', letterSpacing:0.3}}>AI</span>}>
@@ -618,7 +675,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           {/* 함께 읽으면 좋은 책 (#496) — LLM 추천 + 실존 books 매칭(환각 필터). 표지 탭 → 찜.
               실제 '함께 읽은 사람들' 집계는 Phase 1이므로 허위 카피("N명이 읽었어요") 금지. */}
           {related.length > 0 && (
-            <div style={{marginBottom:14}}>
+            <div data-section="tertiary-related" style={{order:3, marginBottom:14}}>
               <SectionLabel icon="related" mb={3}>함께 읽으면 좋은 책</SectionLabel>
               <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:10}}>이 책을 좋아한다면 — 표지를 누르면 찜에 담겨요</div>
               <div style={{display:'flex', gap:12, overflowX:'auto', paddingBottom:4, WebkitOverflowScrolling:'touch'}}>
@@ -640,17 +697,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </div>
           )}
 
-          {/* Markdown Export (§5.8.4) — 내 한 문장이 1개 이상 있을 때만 노출 */}
-          {bookQuotes.length > 0 && (
-            <button onClick={exportMarkdown}
-              style={{display:'flex', alignItems:'center', justifyContent:'center', gap:6, width:'100%', padding:'12px 14px', background:'var(--paper-2)', border:'1.5px solid var(--line)', borderRadius:'8px', color:'var(--ink-2)', fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', marginBottom:14, boxSizing:'border-box'}}>
-              {window.rgIcon('download',14)} 내 한 문장 Markdown 내보내기
-            </button>
-          )}
-
           {/* 한 문장 추가 (#584) — 완독 책 포함, book.ubId 있을 때. 목록 0개여도 항상 노출 */}
           {book.ubId && (
-            <div style={{marginBottom:14}}>
+            <div data-section="secondary-add-quote" style={{order:2, marginBottom:14}}>
               {!addOpen ? (
                 <>
                   <button onClick={() => { window.readDefaultSentenceVisibility().then((visibility) => { setAddVisibility(visibility); setAddOpen(true); }); }}
@@ -694,7 +743,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           )}
 
           {bookQuotes.length > 0 && (
-            <>
+            <div data-section="secondary-quotes" style={{order:2}}>
               <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:10, display:'flex', alignItems:'center', gap:6}}>
                 {window.rgIcon('book',15)}<span>내 한 문장 {bookQuotes.length}개</span>
               </div>
@@ -764,7 +813,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                   </div>
                 );
               })}
-            </>
+            </div>
           )}
         </div>
 
@@ -817,6 +866,37 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
             finally { setBatchBusy(false); }
           }} />
+      )}
+
+      {reviewOpen && (
+        <div role="presentation" data-testid="review-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) closeReview(); }}
+          style={{position:'fixed', inset:0, zIndex:1300, background:'rgba(0,0,0,0.48)', display:'flex', alignItems:'flex-end', justifyContent:'center'}}>
+          <div ref={reviewDialogRef} role="dialog" aria-modal="true" aria-labelledby="review-modal-title" aria-describedby="review-modal-book"
+            style={{width:'min(100%, 560px)', maxHeight:'calc(var(--app-h, 100dvh) - var(--safe-top, 0px) - 16px)', overflowY:'auto', background:'var(--card)', borderRadius:'18px 18px 0 0', padding:'20px 20px calc(20px + var(--safe-bottom, 0px))', boxSizing:'border-box', boxShadow:'0 -8px 28px rgba(0,0,0,0.16)'}}>
+            <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12}}>
+              <div>
+                <h2 id="review-modal-title" style={{margin:0, fontSize:18, color:'var(--ink)'}}>완독 소감</h2>
+                <p id="review-modal-book" style={{margin:'4px 0 0', fontSize:13, color:'var(--ink-2)', fontWeight:700}}>{book.title}</p>
+              </div>
+              <button type="button" aria-label="완독 소감 닫기" onClick={closeReview}
+                style={{width:44, height:44, flex:'0 0 auto', border:'none', borderRadius:'50%', background:'var(--paper-2)', color:'var(--ink-2)', cursor:'pointer'}}>{window.rgIcon('close',16)}</button>
+            </div>
+            <label htmlFor="completed-review-text" style={{display:'block', marginTop:16, fontSize:13, fontWeight:800, color:'var(--ink)'}}>책을 덮고 남은 생각</label>
+            <textarea ref={reviewTextareaRef} id="completed-review-text" value={rv} maxLength={1000} rows={7}
+              onChange={e => { setRv(e.target.value); setReviewFeedback(''); }} placeholder="이 책을 읽고 남은 생각을 적어보세요"
+              style={{width:'100%', minHeight:168, boxSizing:'border-box', marginTop:8, padding:12, borderRadius:12, border:'1.5px solid var(--line)', background:'var(--card)', color:'var(--ink)', fontSize:15, lineHeight:1.6, fontFamily:'inherit', resize:'vertical'}} />
+            <div style={{display:'flex', justifyContent:'space-between', gap:12, marginTop:6, minHeight:22}}>
+              <div role="status" aria-live="polite" style={{fontSize:12, color:reviewFeedback.includes('못했')?'var(--danger)':'var(--ink-3)', fontWeight:700}}>{reviewFeedback}</div>
+              <div aria-label={`1000자 중 ${rv.length}자`} style={{fontSize:12, color:'var(--ink-3)', fontWeight:700, whiteSpace:'nowrap'}}>{rv.length} / 1000</div>
+            </div>
+            <div style={{position:'sticky', bottom:0, display:'grid', gridTemplateColumns:'minmax(0, 1fr) minmax(0, 2fr)', gap:8, paddingTop:12, background:'var(--card)'}}>
+              <button type="button" onClick={closeReview} disabled={reviewBusy}
+                style={{minHeight:48, border:'none', borderRadius:12, background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, cursor:reviewBusy?'default':'pointer'}}>취소</button>
+              <button type="button" onClick={saveReview} disabled={reviewBusy}
+                style={{minHeight:48, border:'none', borderRadius:12, background:'var(--brand)', color:'#fff', fontWeight:800, cursor:reviewBusy?'default':'pointer', opacity:reviewBusy?0.65:1}}>{reviewBusy ? '저장 중…' : '저장'}</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

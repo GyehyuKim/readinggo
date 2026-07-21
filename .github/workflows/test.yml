@@ -60,6 +60,7 @@ jobs:
       - name: Core regression tests
         run: |
           node tests/decode-entities.test.mjs
+          node tests/book-detail-hierarchy.test.mjs
           node tests/nest-cycle.test.mjs
           node tests/prompt-lab.test.mjs
           node tests/related-filter.test.mjs
