@@ -1,6 +1,6 @@
 # 리팩토링 — monolith 분할 (모듈화)
 
-> **신설 (#761, 2026-06-17)**: `components.js`(1626줄) 등 monolith를 기능별 파일로 분할. 목적은 **병렬 작업 충돌 영구 감소** + 인브라우저 Babel 파싱 에러 **blast radius 축소**(#687류). 개발 중지·pre-beta(저트래픽) 시점에 수행.
+> **신설 (#761, 2026-06-17; 완료 이력)**: monolith를 기능별 파일로 분할해 병렬 충돌과 당시 인브라우저 Babel 오류의 blast radius를 줄였다. Babel 런타임 전제는 #871 Vite 전환으로 superseded.
 > **1차 완료 (2026-06-17)**: components.js 5개 모듈 추출 종료(#763·#764·#765·#766·#767). 1626→718줄.
 > **3차 완료 (2026-06-17)**: nest.js(1406→632)·library.js(1163→507) 분할 종료(#773·#775·#776·#777) + CheckinModal 폐기 제거(#778). monolith 3종 모두 core view + 모듈로 분리. prod 작동확인.
 > **2차 완료 (2026-06-17)**: components.js 잔여 큰 컴포넌트 3개 추출(#780, UserProfileModal·SentenceCollectionModal·TinderCards). 730→308줄. 작은 모달·공유 프리미티브·컨텍스트는 core 잔류(§3.1).
@@ -9,7 +9,7 @@
 ## 1. 목적·범위
 
 - **왜**: 1000줄+ 파일을 모두가 건드려 worktree로 격리해도 머지 충돌. 모듈 경계 = 병렬 작업 경계로 맞추면 미래 PR이 서로 다른 파일을 만져 충돌이 구조적으로 사라진다.
-- **이 repo의 이점**: 크로스파일 공유가 `window.X` 글로벌이라 **import 그래프가 없다** → 추출 = "코드 이동 + `<script>` 추가 + `window.X` shim 유지"뿐. 소비자 코드 0 변경.
+- **현재 계약**: `main.js`가 ES `import` 순서로 모듈을 평가하고 파일 간 공유는 `window.X` shim을 유지한다. 추출 = 코드 이동 + `main.js` import 추가 + shim 유지. 구 `<script>` 추가 절차는 superseded.
 - **범위**: hot monolith만(`components.js`·`nest.js`·`library.js`). `social.js`(224)·`onboarding.js`(402)는 제외.
 - **비목표**: 로직 변경(절대 같은 PR에 섞지 않음 — 별 PR), 빌드도구·번들러 도입(Stack Lock), import/export 전환.
 
@@ -93,15 +93,15 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 
 main 머지 = Cloudflare Workers Build 자동배포(prod 직행)라 검증 완충이 없다 → 추출 PR마다:
 
-1. **프리뷰 검증**: 브랜치에서 `wrangler versions upload`(비프로모션 — prod 미영향) → 프리뷰 URL에서 **부팅·전 스크립트 로드·해당 컴포넌트 렌더** 확인.
-2. **CI 게이트**: `boot-smoke`(부팅 Babel 회귀) + spec-align 통과.
-3. **머지** → Workers Build 자동배포 → `deploy-verify`(#693, `_RG_V` 대조)로 반영 감지.
+1. **프리뷰 검증**: `preview-smoke.yml`이 비프로모션 Worker를 올리고 edge URL에서 Vite 번들 부팅·전 탭 렌더를 검증.
+2. **CI 게이트**: Vite `boot-smoke` + render-smoke + spec-align.
+3. **머지** → Workers Build 자동배포 → `deploy-verify`가 Vite content-hash 자산 반영·production live smoke 검증.
 4. **롤백**: 깨지면 `wrangler rollback`(또는 PR revert + 재배포). tiny PR이라 비용 최소.
-5. **`_RG_V` bump**: 파일 추가/변경마다 캐시버스트 상향(스큐·#687 방지).
+5. **캐시버스트**: Vite content-hash 파일명이 자동 담당. 수동 `_RG_V` bump는 폐기됨.
 
 ## 5. 검증 체크리스트 (추출 PR마다)
 
 - [ ] 순수 이동(로직 diff 0), `window.X` shim 유지
-- [ ] index.html `<script>` 추가 + 로드 순서(의존 먼저), `_RG_V` bump
-- [ ] 프리뷰(`wrangler versions upload`)에서 부팅·렌더 확인
-- [ ] boot-smoke·spec-align 통과
+- [ ] `main.js` ES import 추가 + 로드 순서(의존 먼저), `window.X` shim 유지
+- [ ] PR `preview-smoke` edge URL에서 부팅·렌더 확인
+- [ ] Vite boot-smoke·render-smoke·spec-align 통과

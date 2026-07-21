@@ -19,7 +19,7 @@
 
 ```
 [바코드로 등록] 진입 (검색 모달 헤더 / 온보딩 — §3)
-   │  (지원 브라우저에서만 노출 — capability gate §5)
+   │  (항상 노출 — capability gate는 카메라/수동 모드만 결정 §5)
    ▼
 카메라 뷰파인더 (getUserMedia, facingMode:environment)
    │  BarcodeDetector.detect(video) 폴링 루프 (≈ rAF/250ms)
@@ -29,7 +29,7 @@ EAN-13 rawValue 검출 → normalizeIsbn13() (숫자 13자리 검증)
    ▼
 ISBN 해석 (§2.1)
    ├─ 1) 로컬 즉시:  BOOK_BY_ID[isbn]            (부팅 캐시 — 동기, 오프라인 OK)
-   ├─ 2) 카탈로그:   loadBooks() 중 isbn 일치       (Supabase/TSV)
+   ├─ 2) 카탈로그:   loadBooks() 중 isbn 일치       (Supabase/인라인 폴백)
    └─ 3) 원격 단건:  ALADIN_PROXY?isbn=<isbn>       (ItemLookUp — 외서 보강 포함)
    ▼
 책 1권 확정 → 기존 등록 경로 재사용
@@ -42,7 +42,7 @@ ISBN 해석 (§2.1)
 ### 2.1 ISBN → 책 해석 규칙 (오탐 0 보장)
 
 1. **로컬 즉시 히트** — `window.BOOK_BY_ID[isbn]`. `data.js _indexBooks` 가 부팅 시 `id`·`isbn13` 양쪽 키로 채운다(#490 A). 동기·오프라인. 가장 빠름.
-2. **카탈로그 스캔** — 1) 미스 시 `loadBooks()`(Supabase canonical / TSV 폴백) 결과에서 `normalizeIsbn13(b.isbn) === isbn` 탐색. (loadBooks 가 이미 `_indexBooks` 하므로 보통 1)에서 끝남 — 방어적 2차.)
+2. **카탈로그 스캔** — 1) 미스 시 `loadBooks()`(Supabase canonical / 장애 시 인라인 `RG_BOOKS` 12권 최소 폴백) 결과에서 ISBN 정확 일치를 탐색한다. 구 `books.tsv` 폴백은 #972로 제거됐다.
 3. **원격 단건 조회** — 1·2 미스 시 `ALADIN_PROXY?isbn=<isbn>`(worker `aladinProxy` → `ItemLookUp`, 외서는 Google→OpenLibrary 보강 #529). 결과를 `{isbn13,title,author,publisher,total_pages,cover_url}` 로 매핑해 등록.
 4. **모두 미스** — "이 바코드의 책을 찾지 못했어요" 토스트 + 검색 모달에 ISBN 프리필(수동 확인). **자동 등록 금지**(잘못된 책 등록 방지).
 
@@ -88,7 +88,7 @@ async function barcodeScanSupported() {
 }
 ```
 
-지원 표(2026 기준 대략):
+지원은 정적 브라우저 표가 아니라 `barcodeScanSupported()`의 API + `ean_13` 런타임 검사로 판정한다. 미지원이면 버튼을 숨기지 않고 `cameraSupported=false`로 ISBN 수동 입력을 연다.
 
 | 환경 | `BarcodeDetector` | 비고 |
 |---|---|---|
@@ -134,6 +134,8 @@ async function barcodeScanSupported() {
 - **DESIGN.md**: 전체화면 어두운 뷰파인더 + 중앙 가이드 프레임(EAN 가로 비율) + 하단 "직접 검색" 보조버튼(3차/텍스트 위계). 1차 솔리드 버튼은 결과 확정(책장 시트)에서만.
 
 ## 8. 미해결 / 후속
+
+> **#1290 분리**: 이 정합 PR은 바코드 버튼/입력 포커스 구현을 흡수하지 않는다.
 
 - 온보딩 첫 책 단계 진입점 추가(§3) — 별도 PR.
 - iOS 셸 (c) 플러그인 도입 + capability 분기(셸=네이티브, 웹=BarcodeDetector) — Phase 2, Stack Lock 결정 동반.
