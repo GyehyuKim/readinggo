@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "node render-smoke.mjs",
+    "test:page-input-width": "node page-input-width.test.mjs",
     "audit:ui": "node ui-audit-sweep.mjs"
   },
   "dependencies": {
