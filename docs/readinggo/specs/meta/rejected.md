@@ -9,9 +9,9 @@
 
 | 항목 | 검토 시점 | 기각 사유 | 재검토 트리거 |
 |---|---|---|---|
-| **OCR — 웹 환경** (Tesseract.js / Cloud Vision API) | 2026-05-22 | 라이브러리 무게(Tesseract.js 4MB+, 한국어 정확도) 또는 외부 API 비용 | — (Phase 0/1 웹 환경 한정 영구 기각). Capacitor 네이티브로 우회 |
+| **OCR — 웹 환경** (Tesseract.js / Cloud Vision API) | 2026-05-22 → **superseded** | 당시 기각 사유: 라이브러리 무게·정확도 또는 외부 API 비용 | 현재 웹 OCR은 Worker `/api/ocr`(Upstage)로 구현. 역사 기록을 삭제하지 않고 superseded로 보존 |
 | **마을 탭** (커뮤니티 게시판, [village.md](../village.md)) | 2026-06 (#440·#639) | 소셜/피드로 일원화 — 별도 탭 분산이 핵심 루프(읽기·한 문장)를 희석. **위임**: 공개 한 문장·발견은 [feed.md](../feed.md), 같은 책 독자 연결은 추천 피드로 흡수 | 커뮤니티 수요·사용자 N 폭증 시 재검토 |
-| **OCR — 네이티브** (Capacitor + ML Kit/Vision) | 2026-05-22 → **2026-05-23 채택** | (이전 기각 사유: 학기 범위 비용) | **Capacitor 처음부터 진행 결정으로 비용 0 확인. Phase 2 P1로 채택 ([§3](../README.md), ROADMAP)** |
+| **OCR — 네이티브** (Capacitor + ML Kit/Vision) | 2026-05-22 → **채택 후 superseded** | Capacitor 셰은 현재 채택됐지만 ML Kit/Vision OCR 플러그인은 미설치 | 현재 OCR은 Worker 경유. 네이티브 플러그인은 별도 Stack Lock 결정 없이 채택된 것으로 간주하지 않음 |
 | **음성 받아쓰기 — 웹** (Web Speech API) | 2026-05-22 | 브라우저별 지원 불일치, Chrome은 사실상 외부 API | — |
 | **음성 받아쓰기 — 네이티브** (Capacitor) | 2026-05-23 | (이전 기각 사유 해제) | **Phase 3 채택 — `@capacitor-community/speech-recognition`** |
 | **글자 수 미니멈 도입** | 2026-05-22 | 어차피 미설정. 마찰 늘림 | 입력 품질 문제 발생 시 |
@@ -29,8 +29,8 @@
 
 | 항목 | 기각/보류 사유 | 재검토 트리거 |
 |---|---|---|
-| **Capacitor 처음부터 (v5.1)** | web-first 결정. 순수 웹으로 Phase 0/1 충분. 네이티브 설정 부담만 | OCR/STT/앱스토어/위젯을 실제 커밋하는 Phase 3 |
-| **OCR·STT (네이티브)** | 우회 경로였던 Capacitor가 보류 → 함께 보류. 웹 유료 API 비용 기각 유지 | Capacitor 재도입(Phase 3). 그전 입력 마찰은 **OS 키보드 음성입력**으로 대체 |
+| **Capacitor 처음부터 (v5.1)** | **superseded** — v7 당시 web-first 보류 역사 | Capacitor는 출시 플랫폼으로 채택되어 Vite `dist`를 iOS/Android와 공유. 구 Phase 3 트리거 비활성 |
+| **OCR·STT (네이티브)** | **부분 superseded** — “Capacitor 보류” 전제는 해제, 네이티브 플러그인은 미채택 | OCR은 Worker로 제공. STT·네이티브 OCR은 별도 제품/스택 결정 필요 |
 | **운영자 짹** | 첫 7일 보호 주축이었으나 운영 부담·확장성 우려. 짹/NPC로 대체 | 별도 결정 |
 | **첫 7일 둥지 가속 (D1/D3/D7)** | 둥지=진척률로 단순화하며 가속 트리거 제거 | — |
 | **주간 리그 (기능 자체)** | v4.4 노출 보류 → v7 기능 삭제. 경쟁 자극보다 다정함 톤 우선 | 사용자 인터뷰에서 경쟁 요구 명시 시 |
@@ -39,7 +39,7 @@
 | **마을 공동자산 (도서관/세계수)** | 마을 단순화. 파트 마일스톤·둥지 그리드로 충분 | 마을 리텐션 약하면 재검토 |
 | **"모이" 브랜드 용어** | "한 문장"으로 통일(직관성). DB `sentences` 유지 | — |
 | **`chapter_id` 자동매핑** | 챕터 XP 후순위 → 자동매핑 불요 | 챕터 기능 본격화 시 |
-| **푸시 알림 (Phase 0/1)** | 순수 웹은 푸시 채널 없음 | Phase 2 PWA(웹푸시) 전환 |
+| **푸시 알림 (Phase 0/1)** | **부분 superseded** — 네이티브 스트릭 로컬 알림은 #1033으로 구현 | 웹/PWA·서버 원격 푸시는 미구현; 별도 이슈·운영 정책 필요 |
 
 > v7 결정 전체 근거: [`meta/decisions.md`](./decisions.md).
 

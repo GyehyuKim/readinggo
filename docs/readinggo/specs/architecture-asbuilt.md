@@ -12,13 +12,13 @@
 | 층 | 무엇 | 핵심 |
 |---|---|---|
 | **프론트엔드** | React 18 + **Vite**(빌드타임 JSX, #871) | esbuild가 `.js`의 JSX를 classic 변환. `main.js` 진입. `js/` 모듈 ~33개 |
-| **모듈 공유** | `window.X` 전역 | import/export 없음. 로드 순서가 계약 |
+| **모듈 로드·공유** | `main.js` ES import + `window.X` shim | import 순서가 계약. 파일 간 공개 API는 아직 `window.X` |
 | **상태/데이터** | DataStore 계약 | 미로그인=localStorage / 로그인=Supabase (부팅 스왑) |
 | **백엔드** | Cloudflare Worker (`worker/index.mjs`) | 정적 서빙 + 12개 API/프록시 라우트 + cron 2종 |
 | **DB/인증** | Supabase (Postgres·Auth·RLS·pg_cron) | 테이블 약 22개, 마이그레이션 ~39개 |
 | **외부 연동** | 알라딘·구글북스·오픈라이브러리·네이버·Upstage·**Gemini(vision)**·PostHog | 키는 워커(서버)에만 |
-| **배포** | Cloudflare Workers Build | `main` 머지 시 자동. 키 캐시버스트 `_RG_V` |
-| **CI** | GitHub Actions 3종 | test · spec-drift · deploy-verify |
+| **배포** | Cloudflare Workers Build | `main` 머지 시 자동. Vite content-hash 자산으로 반영 확인 |
+| **CI·릴리스** | GitHub Actions | test · spec-drift · preview-smoke · deploy-verify · OTA release/promote |
 
 ---
 
@@ -36,11 +36,11 @@
 setup-globals → config → supabase-client → datastore-supabase →
   data → datastore → icons → components → sentence-card → book-info-modal →
   user-profile-modal → sentence-collection-modal → share-card → search →
-  barcode-scan → ocr-crop-overlay → batch-quote-import → ceremony →
+  barcode-scan → ocr-crop-overlay → batch-quote-import → data-import → ceremony →
   milestone-recap → nest → companion → co-reading → social →
-  admin-dashboard → book-detail-modal → nest-theatre → follow-list-modal →
+  admin-dashboard → prompt-lab → book-detail-modal → nest-theatre → follow-list-modal →
   library → settings-modal → shelf-import → streak-reminder → sheet-drag →
-  inapp → (Supabase 스왑) → app (동적 import 마운트)
+  nav → inapp → (Supabase 스왑) → app (동적 import 마운트)
 ```
 
 > `main.js`가 위 순서로 정적 `import` 한다(로드 순서 = 의존 계약). 런타임 Babel/`loadBabel`/`index.html` IIFE는 폐기(#871). 로그인 상태면 `app.js` 동적 import 직전에 `window.DataStore`를 `SupabaseDataStore`로 스왑(§4).
@@ -223,9 +223,11 @@ setup-globals → config → supabase-client → datastore-supabase →
 
 | 워크플로우 | 잡(주요) |
 |---|---|
-| `test.yml` | validate-books · align_v7 · datastore-contract · **boot-smoke**(부팅 Babel 회귀) · biome lint · migrations_applied |
+| `test.yml` | validate-books · align_v7 · datastore-contract · **boot-smoke**(Vite 부팅 회귀) · render-smoke · biome lint · migrations_applied |
 | `spec-drift.yml` | align_v7+nest+drift · datastore-contract · related-filter · nest-cycle · supabase-books · sentence-book-binding · biome lint |
-| `deploy-verify.yml` | 배포 후 `_RG_V` 대조(#693) — Workers Build 멈춤 감지 |
+| `preview-smoke.yml` | PR Worker 비프로모션 버전 업로드 + edge render-smoke |
+| `deploy-verify.yml` | Vite content-hash 자산 반영 폴링 + production live smoke 3회 + 실패 시 자동 롤백 |
+| `ota-release.yml` / `ota-promote.yml` | `main`→Android beta R2/KV 자동 발행 / beta→production 수동 승격·`:prev` 백업 |
 
 ---
 
@@ -251,6 +253,8 @@ setup-globals → config → supabase-client → datastore-supabase →
 4. **모듈화 진행됨**: `components.js` 1626→307줄. #761/#762로 27개 모듈로 분리 완료(부팅 순서 §2.1).
 5. **`onboarding.js` 미로드**: `window.OnboardingFlow` 정의돼 있으나 index.html 부팅·`app.js`에서 참조 없음 → **사용 안 되는 코드로 추정**(별도 확인·정리 후보).
 6. **Phase 표현**: README §3은 Phase 0/1을 미래형으로 적었으나, 실제 런타임은 **로그인=Supabase / 미로그인=localStorage 공존**.
+7. **네이티브 로컬 알림**: `@capacitor/local-notifications` + `streak-reminder.js`가 기본 OFF 21:00 스트릭 리마인더를 스케줄한다. 웹/PWA·서버 푸시는 미구현.
+8. **OTA 구현**: Capgo updater·`/api/ota`·R2·KV·beta 자동 발행·production 수동 승격이 정책 코드에 존재한다. 설치 기기의 실제 수신 성공은 코드 스캔만으로 단정하지 않는다.
 
 ---
 

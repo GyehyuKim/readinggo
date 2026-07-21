@@ -3,7 +3,7 @@
 > **신설 (2026-06-24)**: 설치된 네이티브 앱에 웹 레이어(JS/HTML/CSS)를 스토어 우회로 갱신.
 > iOS-PLAN [§10.5 업데이트 전략](../iOS-PLAN.md)의 OTA 골격을 구체화한 **피처 스펙**.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec PR 먼저 → 코드 PR 나중.
-> ⚠️ **본 PR은 spec only**. 코드·신규 의존성(`@capgo/capacitor-updater`)·인프라(R2/KV)는 후속 코드 PR.
+> **현행 정합 (2026-07-21, #1297)**: 초기 설계는 구현 완료됐다. `@capgo/capacitor-updater`, Worker `/api/ota`, R2 `readinggo-ota`, KV `ota:android:<channel>`, `ota-release.yml`·`ota-promote.yml`이 현재 `main`의 실행 계약이다.
 
 ## 0. 목적
 
@@ -37,7 +37,7 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 ```
 
 - **플러그인**: `@capgo/capacitor-updater` — 오픈소스, **자가호스팅**(Capgo 클라우드 미사용 → 비용 0·데이터 보유·우리 스택 일관). Appflow(`@capacitor/live-updates`)는 2026 종료 예정이라 배제.
-- **번들 저장**: 매니페스트 `url` 에 **위임** — 워커는 매니페스트만 보유하고 번들을 직접 서빙하지 않는다(호스팅 source-agnostic). 후보: Cloudflare **R2** 또는 **GitHub Releases**(무료·무설정). ⚠️ R2 는 계정 활성화 필요(2026-06-24 미활성 확인) → **번들 호스팅은 페이즈 C(릴리스 자동화)에서 결정**.
+- **번들 저장**: Cloudflare **R2 `readinggo-ota`** public bucket. `ota-release.yml`이 zip을 `--remote`로 올리고 Worker는 KV 매니페스트의 R2 URL을 반환한다. GitHub Releases 후보와 “R2 미활성”은 superseded.
 - **매니페스트**: Workers **KV** `ota:<platform>:<channel>` → `{version, url, checksum, minNative}` (구현 #979 페이즈 A).
 - **엔드포인트**: 기존 `readinggo` 워커에 **`POST /api/ota`** 추가(구현 #979) — Capgo 규약(`platform·version_name·version_code·custom_id`) 수신 → 매니페스트 비교 → `{version,url,checksum}` 또는 `{}`(no-update). 동일출처 게이트 없음(네이티브 클라).
 
@@ -45,7 +45,7 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 
 ### ① 인프라
 - **호스팅**: 자가호스팅(CF Worker + R2 + KV). 근거: 비용 0·데이터 보유·기존 워커 재사용.
-- **버전 표기**: `YYYY.MM.DD-<gitSHA7>` — 시간순 정렬 + 커밋 추적.
+- **버전 표기**: `1.0.<github.run_number>` semver. `@capgo/cli` 검증을 따르며 git SHA·날짜는 매니페스트 `sha`·`date`로 추적한다. 초기 버전안은 superseded.
 - **무결성**: SHA-256 **checksum**(플러그인이 적용 전 검증). 공개키 **서명**은 Phase 2(후속).
 
 ### ② 동작
@@ -85,10 +85,12 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 
 - **신규 의존성**: `@capgo/capacitor-updater` — Capacitor 1차 생태계, 오픈소스, 자가호스팅. **Capacitor 단일 lock 내**(새 프레임워크 아님). 코드 PR에서 추가 시 재확인.
 
-## 8. 구현 단계 (후속 코드 PR)
+## 8. 구현 상태 (2026-07-21 `main`)
 
-1. 플러그인 추가 + `capacitor.config`(updateUrl·autoUpdate·channel) + 앱 부팅에 `notifyAppReady()`.
-2. CF Worker `/api/ota`(KV 조회) + R2 바인딩.
-3. GitHub Action: build → zip → checksum → R2 → KV(beta).
-4. 승격 워크플로우(`workflow_dispatch`: beta→prod).
-5. 새 APK 빌드(플러그인=네이티브 변경) → 설치 → OTA 수신·적용·롤백 검증.
+1. ✅ `capacitor.config.json`: `updateUrl`, `autoUpdate:true`, `directUpdate:false`, `resetWhenUpdate:true`.
+2. ✅ `main.js`: 네이티브 부팅 성공 후 `notifyAppReady()`.
+3. ✅ Worker/KV: `POST /api/ota` + `minNative` 게이트.
+4. ✅ `ota-release.yml`: `main` 푸시 시 build → zip/checksum → R2 → beta.
+5. ✅ `ota-promote.yml`: 수동 beta→production 승격 + `:prev` 백업.
+
+> 실제 R2/KV 객체와 설치 기기의 수신 성공은 워크플로우 실행·기기 QA 근거로 별도 판정한다.
