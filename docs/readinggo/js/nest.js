@@ -571,6 +571,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   };
   const _stepBtn = { width: 30, height: 30, flexShrink: 0, borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-2)', fontSize: 20, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
   const _stepBtnSm = { width: 24, height: 24, flexShrink: 0, borderRadius: 12, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--ink-2)', fontSize: 15, fontWeight: 800, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
+  const _pageInputCh = (value, fallback) => Math.max(3, String(value || fallback || 0).length);
 
   // 완독 세리머니에서 받은 별점/소감을 영속 (§5.8.3).
   // 활성 책의 user_book 을 status='completed' + rating/review_text 로 마감.
@@ -811,7 +812,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickPage} placeholder={String(nestState.book.cur||0)}
               className="rg-noscale-input"
               onChange={e => setQuickPage(e.target.value.replace(/[^0-9]/g, ''))}
-              style={{ width: 60, textAlign: 'center', fontSize: 26, fontWeight: 900, color: 'var(--ink)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand)', outline: 'none', padding: '0 4px 2px', fontFamily: 'inherit' }} />
+              style={{ '--page-input-ch': _pageInputCh(quickPage, nestState.book.cur), textAlign: 'center', fontSize: 26, fontWeight: 900, color: 'var(--ink)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand)', outline: 'none', padding: '0 4px 2px', fontFamily: 'inherit' }} />
             <button onClick={() => _stepPage(setQuickPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtn}>+</button>
             {nestState.book.total > 0
               ? <span className="home-page-total" style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>
@@ -882,8 +883,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>p</span>
             <button onClick={() => _stepPage(setQuickSentPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtnSm}>−</button>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickSentPage}
+              className="home-page-number-input"
               placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickSentPage(e.target.value.replace(/[^0-9]/g, ''))}
-              style={{ width: 44, textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 12, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
+              style={{ '--page-input-ch': _pageInputCh(quickSentPage, nestState.book.cur), textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 12, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
             <button onClick={() => _stepPage(setQuickSentPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtnSm}>+</button>
             {nestState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
           </span>
