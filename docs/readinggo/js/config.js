@@ -6,12 +6,15 @@
 // 워커 API 오리진 (#1230) — 네이티브 앱(Capacitor: https://localhost·capacitor://localhost)과
 // 로컬 dev/preview 에선 상대경로가 로컬 셸로 해석돼 워커 API 전부(원격 책검색·book-upsert 등)가
 // 조용히 죽는다 → localhost 오리진이면 프로덕션 워커 절대경로. 웹(워커 서빙)은 '' = 기존 동일출처.
-var RG_API_ORIGIN = (location.protocol === 'capacitor:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))
-  ? 'https://readinggo.hyuniverse.workers.dev' : '';
+var RG_BUILD_API_ORIGIN = String(import.meta.env.VITE_API_ORIGIN || '').replace(/\/$/, '');
+var RG_BUILD_ENV = import.meta.env.VITE_READINGGO_ENV || 'production';
+var RG_API_ORIGIN = RG_BUILD_ENV === 'development' ? RG_BUILD_API_ORIGIN :
+  ((location.protocol === 'capacitor:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))
+    ? 'https://readinggo.hyuniverse.workers.dev' : '');
 
 window.RG_CONFIG = {
-  SUPABASE_URL: 'https://cttllwwkaddghqttyhkg.supabase.co',
-  SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_R-f42NFOGq3dxqMlootNlQ_Us4AdUd-',
+  SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://cttllwwkaddghqttyhkg.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_R-f42NFOGq3dxqMlootNlQ_Us4AdUd-',
   API_ORIGIN: RG_API_ORIGIN,                    // RG_apiFetch·raw /api/* 호출 prefix (#1230)
   ALADIN_PROXY: RG_API_ORIGIN + '/.netlify/functions/aladin',   // 서버리스 프록시 (TTBKey 서버에만)
   // Cloudflare Turnstile 봇 검증 (#1158/#1159) — Site Key 는 공개 안전(공개용). Secret 은 워커에만.

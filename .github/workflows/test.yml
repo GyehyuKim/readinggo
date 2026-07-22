@@ -85,6 +85,28 @@ jobs:
       - name: Boot smoke (dist 검증)
         run: node tests/boot-smoke.mjs
 
+  dev-isolation:
+    name: dev-isolation (prod endpoint/write path 차단)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build a synthetic DEV bundle
+        working-directory: docs/readinggo
+        env:
+          VITE_SUPABASE_URL: https://synthetic-dev.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: synthetic-public-key
+          VITE_API_ORIGIN: https://readinggo-dev.hyuniverse.workers.dev
+          VITE_READINGGO_ENV: development
+        run: npm ci && npm run build
+      - name: Assert production endpoints and bindings are absent
+        env:
+          EXPECTED_DEV_SUPABASE_URL: https://synthetic-dev.supabase.co
+          EXPECTED_DEV_WORKER_URL: https://readinggo-dev.hyuniverse.workers.dev
+        run: node tests/dev-isolation.test.mjs
+
   render-smoke:
     name: render-smoke (탭 런타임 렌더)
     runs-on: ubuntu-latest

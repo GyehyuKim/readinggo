@@ -17,7 +17,8 @@
    이미지를 내보내느니 표지를 빼는 쪽이 안전하다. (worker 이미지 프록시는 과한 스코프 →
    후속 검토.) */
 
-const RG_SHARE_LINK = 'readinggo.hyuniverse.workers.dev';
+const RG_SHARE_LINK = ((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || location.origin)
+  .replace(/^https?:\/\//, '').replace(/\/$/, '');
 const RG_SHARE_HANDLE = '@readinggo.app';
 const RG_SHARE_LINK_FULL = 'https://' + RG_SHARE_LINK;
 

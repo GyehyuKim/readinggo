@@ -2,7 +2,8 @@
 
 > **신설 (2026-06-24, #960·#901)** — 배포안전 에픽([#897](https://github.com/), decisions.md §8.13)의 P3 구현 스펙.
 > 런칭 후 개발 중 **'머지 = 즉시 100% 프로덕션'** 사고를 줄이는 두 장치를 정의한다: **피처 플래그/킬 스위치**(#960)와 **카나리(점진 배포)**(#901).
-> 근거: [decisions.md §8.13](./meta/decisions.md) — dev-val-prod 3환경 **기각**, 카나리 + 플래그 **채택**(3인·소비자 앱·Workers 규모엔 3환경 과함).
+> **2026-07-22 #1303 갱신**: [decisions.md §8.16](./meta/decisions.md)이 §8.13의 별도 환경 기각을 supersede한다.
+> 카나리·플래그는 prod 내부 안전망으로 남고, 기본 릴리스 경로는 별도 dev 검증 → 동일 SHA prod 승격이다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-first(코드 PR 동반 시 사유 PR 본문).
 
 ## 1. 피처 플래그 / 킬 스위치 (#960)
@@ -37,7 +38,23 @@
 > **실배선 1건**: `seedCollectorTrigger` 가 main에 실재하는 위험 기능(collector 백엔드 의존 네트워크 트리거)을 끄는 킬 스위치로 `book-info-modal.js` 효과 진입부에 배선됐다. collector 장애·과부하 시 클라발 호출을 즉시 차단한다.
 > `socialProofSentences` 는 같은 트리거를 동반하는 신규 기능(#926, 별도 브랜치 진행 중)이 main에 들어올 때 그 섹션을 가릴 자리만 미리 잡아둔 것이다(off=미노출 원칙 적용 예시).
 
-## 2. 카나리 — Cloudflare Workers 점진 배포 (#901)
+## 2. dev 검증 → 동일 SHA production 승격 (#1303)
+
+| 경계 | DEV | PROD |
+|---|---|---|
+| Supabase | 별도 `ReadingGo Dev`(서울), 합성 fixture만 | 기존 `ReadingGo`, 운영 사용자 |
+| Worker | `readinggo-dev`, stable URL + version preview | `readinggo`, 기존 사용자 URL |
+| binding | dev 전용 KV, dev service-role secret. cron/R2/운영 side effect 없음 | 기존 prod KV/R2/secret/cron |
+| 배포 | PR=비프로모션 preview, `main`=stable dev 자동 배포 | `workflow_dispatch` + GitHub `production` environment Hermes 승인 |
+
+DEV 빌드는 `VITE_SUPABASE_URL`·`VITE_SUPABASE_PUBLISHABLE_KEY`·`VITE_API_ORIGIN`을 GitHub DEV secret에서
+주입한다. 저장소에는 dev project ref나 credential을 고정하지 않는다. Worker는 `wrangler.dev.toml`을 쓰며
+`SUPABASE_URL`·`RELEASE_SHA`를 배포 시 주입하고, `SUPABASE_SERVICE_ROLE_KEY`는 `readinggo-dev`에만 등록한다.
+
+승격 workflow는 (1) 승인 SHA가 `origin/main` HEAD인지, (2) stable dev `/api/release` receipt의 SHA와 같은지
+검증한 뒤에만 동일 checkout을 prod에 배포한다. 자세한 실행·rollback은 [RUNBOOK-DEPLOY](../RUNBOOK-DEPLOY.md).
+
+### 2.1 prod 카나리 — 보조 안전망 (#901)
 
 > **이 절차의 롤아웃 단계는 Cloudflare 계정 액션(대시보드/`wrangler`)이라 코드/PR로 자동화되지 않는다 — 계휴(계정 보유자)가 수동 실행한다.** 본 스펙은 *방법*을 문서화할 뿐, 실제 트래픽 분할은 LLM이 실행할 수 없다.
 
@@ -77,6 +94,9 @@
 
 비율 분할 중 한 세션이 매 요청 다른 버전에 붙으면 상태가 튄다. 세션 고정이 필요하면 gradual deployment의 **version affinity**(쿠키 기반 세션 고정)를 켠다 — Phase 0 정적+클라 상태(localStorage) 특성상 필수는 아니나, Phase 1 Supabase 세션·서버 상태가 늘면 검토.
 
-## 3. 재검토 조건
+## 3. 격리 불변조건
 
-decisions.md §8.13대로 — 큰 마이그레이션 묵힘 · 발표용 안정 데모 환경 필요 · 팀/트래픽 증가로 규정·SLA 발생 시 → 별도 스테이징(dev-val-prod) 재검토. 그전까지는 **카나리 + 플래그**가 중간층을 채운다.
+- dev bundle에 prod Supabase/Worker endpoint가 없어야 한다.
+- dev Worker에 prod KV/R2 ID, production secret, cron이 없어야 한다.
+- production 관련 workflow는 `main` push로 실행되면 안 되며 `production` environment 승인을 요구한다.
+- 이 중 하나라도 증명할 수 없으면 prod 승격을 중단하고 rollback이 아니라 pause/report한다.

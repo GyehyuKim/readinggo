@@ -23,8 +23,12 @@
 name: ota-release
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: stable dev에서 검증된 main SHA
+        required: true
+        type: string
 
 # 연속 머지 시 직렬화(KV/R2 동시 쓰기로 인한 매니페스트-자산 불일치 방지). 진행 중인 릴리스는 취소 안 함.
 concurrency:
@@ -38,12 +42,26 @@ jobs:
   ota-release:
     name: build → zip → R2 → KV(beta)
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Gate on main HEAD and stable DEV receipt
+        env:
+          APPROVED_SHA: ${{ inputs.sha }}
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$APPROVED_SHA"
+          test "$(git rev-parse origin/main)" = "$APPROVED_SHA"
+          curl -fsS https://readinggo-dev.hyuniverse.workers.dev/api/release > /tmp/dev-release.json
+          test "$(jq -r .environment /tmp/dev-release.json)" = development
+          test "$(jq -r .sha /tmp/dev-release.json)" = "$APPROVED_SHA"
 
       # Vite 빌드 → docs/readinggo/dist. @capgo/capacitor-updater 도 여기서 설치됨(#983 의존성, zip 검사 통과 전제).
       - name: Build web bundle (Vite)

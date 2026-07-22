@@ -14,6 +14,11 @@ name: ota-promote
 
 on:
   workflow_dispatch:
+    inputs:
+      sha:
+        description: beta manifest와 stable dev에서 검증된 main SHA
+        required: true
+        type: string
 
 # 승격은 직렬화(동시 실행 시 prod 매니페스트 경합 방지).
 concurrency:
@@ -27,12 +32,26 @@ jobs:
   ota-promote:
     name: promote beta → production
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.sha }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Gate on main HEAD and stable DEV receipt
+        env:
+          APPROVED_SHA: ${{ inputs.sha }}
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$APPROVED_SHA"
+          test "$(git rev-parse origin/main)" = "$APPROVED_SHA"
+          curl -fsS https://readinggo-dev.hyuniverse.workers.dev/api/release > /tmp/dev-release.json
+          test "$(jq -r .sha /tmp/dev-release.json)" = "$APPROVED_SHA"
 
       # 승격으로 prod 를 덮어쓰기 전에, 현재 prod 매니페스트를 :prev 키로 백업한다(원클릭 롤백용, #1029).
       # prod 가 나쁜 번들로 승격됐을 때 RELEASE.md §4.1 의 한 줄로 :prev → :production 복원 가능.
@@ -71,6 +90,7 @@ jobs:
           fi
           # 유효한 JSON·필수 필드 검증(빈 prod·깨진 매니페스트 승격 방지).
           echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);if(!m.version||!m.url){console.error("invalid manifest: version/url 누락");process.exit(1)}})'
+          test "$(printf '%s' "$BETA" | jq -r .sha)" = "${{ inputs.sha }}"
           echo "promoting beta manifest: $BETA"
           # --remote 필수: 없으면 로컬 KV 에만 써서 prod 가 실제로 안 바뀐다(#990).
           npx -y wrangler@4 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \

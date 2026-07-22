@@ -1,0 +1,46 @@
+name: promote-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Hermes가 승인한 stable-dev 검증 SHA
+        required: true
+        type: string
+
+concurrency:
+  group: readinggo-production-promotion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    name: same SHA stable-dev → production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Gate on main HEAD and stable DEV receipt
+        env:
+          APPROVED_SHA: ${{ inputs.sha }}
+          DEV_URL: https://readinggo-dev.hyuniverse.workers.dev
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$APPROVED_SHA"
+          test "$(git rev-parse origin/main)" = "$APPROVED_SHA"
+          curl -fsS "$DEV_URL/api/release" > /tmp/dev-release.json
+          test "$(jq -r .environment /tmp/dev-release.json)" = development
+          test "$(jq -r .sha /tmp/dev-release.json)" = "$APPROVED_SHA"
+      - name: Promote the exact verified SHA
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --var "RELEASE_SHA:${{ inputs.sha }}" --var "ENVIRONMENT:production"
