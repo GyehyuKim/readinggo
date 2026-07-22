@@ -1,0 +1,38 @@
+name: PostHog production weekly report
+
+on:
+  schedule:
+    # KST 월요일 01:00 (GitHub cron은 UTC)
+    - cron: '0 16 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  weekly-report:
+    name: production analytics report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Report calculation tests
+        run: node --test tests/posthog-weekly-report.test.mjs
+
+      - name: Generate production-only PostHog report
+        env:
+          POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
+          REPORT_OUTPUT_DIR: artifacts/posthog-weekly-report
+        run: node scripts/posthog-weekly-report.mjs
+
+      - name: Upload JSON and Markdown report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: posthog-production-weekly-report-${{ github.run_id }}
+          path: artifacts/posthog-weekly-report/
+          if-no-files-found: warn
+          retention-days: 90
