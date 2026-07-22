@@ -41,11 +41,23 @@ jobs:
           DEV_URL: https://readinggo-dev.hyuniverse.workers.dev
           DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
         run: |
-          curl -fsS "$DEV_URL/api/release" > /tmp/release.json
-          test "$(jq -r .environment /tmp/release.json)" = development
-          test "$(jq -r .sha /tmp/release.json)" = "$EXPECTED_SHA"
-          test "$(jq -r .supabaseHost /tmp/release.json)" = "$(printf '%s' "$DEV_SUPABASE_URL" | sed -E 's#https://([^/]+).*#\1#')"
-          if grep -q 'cttllwwkaddghqttyhkg.supabase.co' /tmp/release.json; then exit 1; fi
+          EXPECTED_HOST="$(printf '%s' "$DEV_SUPABASE_URL" | sed -E 's#https://([^/]+).*#\1#')"
+          # Workers deploy 성공 직후 stable hostname의 edge 전파가 수 초 늦을 수 있다.
+          # 이전 SHA를 일시 관측해도 실패하지 않고, 새 SHA+격리 메타데이터가 함께 보일 때까지 대기한다.
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$DEV_URL/api/release" > /tmp/release.json \
+              && test "$(jq -r .environment /tmp/release.json)" = development \
+              && test "$(jq -r .sha /tmp/release.json)" = "$EXPECTED_SHA" \
+              && test "$(jq -r .supabaseHost /tmp/release.json)" = "$EXPECTED_HOST" \
+              && ! grep -q 'cttllwwkaddghqttyhkg.supabase.co' /tmp/release.json; then
+              exit 0
+            fi
+            echo "stable DEV 전파 대기 ($attempt/30)"
+            sleep 2
+          done
+          echo "기대한 DEV release metadata가 60초 안에 전파되지 않았습니다." >&2
+          cat /tmp/release.json >&2 || true
+          exit 1
       - name: Stable DEV render smoke
         env:
           SMOKE_URL: https://readinggo-dev.hyuniverse.workers.dev/
