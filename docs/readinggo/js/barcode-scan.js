@@ -66,12 +66,57 @@ async function resolveBookByIsbn(isbn13) {
   return { book: null, matched: 'none' };
 }
 
+// 카메라 초점 capability helpers (#1290). 브라우저/기기마다 표면이 달라 모두 best-effort다.
+function barcodeTrackCapabilities(track) {
+  try { return track && track.getCapabilities ? (track.getCapabilities() || {}) : {}; } catch (e) { return {}; }
+}
+
+function barcodeModeSupported(capabilities, key, mode) {
+  const values = capabilities && capabilities[key];
+  return Array.isArray(values) && values.includes(mode);
+}
+
+async function barcodeApplyContinuousFocus(track) {
+  if (!track || !track.applyConstraints) return false;
+  const capabilities = barcodeTrackCapabilities(track);
+  if (!barcodeModeSupported(capabilities, 'focusMode', 'continuous')) return false;
+  try {
+    await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function barcodeApplyPointFocus(track, point) {
+  if (!track || !track.applyConstraints) return false;
+  const capabilities = barcodeTrackCapabilities(track);
+  const constraint = {};
+  if (barcodeModeSupported(capabilities, 'focusMode', 'single-shot')) constraint.focusMode = 'single-shot';
+  if (barcodeModeSupported(capabilities, 'exposureMode', 'single-shot')) constraint.exposureMode = 'single-shot';
+  // pointsOfInterest는 구현별 capability 모양이 달라 속성 존재 여부만 확인한다.
+  if (Object.prototype.hasOwnProperty.call(capabilities, 'pointsOfInterest')) constraint.pointsOfInterest = [point];
+  if (!Object.keys(constraint).length) return false;
+  try {
+    await track.applyConstraints({ advanced: [constraint] });
+    return true;
+  } catch (e) {
+    // 일부 Chrome/기기는 pointsOfInterest capability를 노출해도 좌표 제약을 거부한다.
+    // 이때 위치만 빼고 single-shot focus/exposure를 한 번 더 시도한다.
+    if (!constraint.pointsOfInterest) return false;
+    const fallback = { ...constraint };
+    delete fallback.pointsOfInterest;
+    if (!Object.keys(fallback).length) return false;
+    try { await track.applyConstraints({ advanced: [fallback] }); return true; } catch (_) { return false; }
+  }
+}
+
 // cameraSupported=false(iOS Safari·카메라 없는 웹) → 카메라 없이 'manual' 로 바로 진입.
 const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = true }) => {
   const videoRef = React.useRef(null);
   const streamRef = React.useRef(null);
   const detectorRef = React.useRef(null);
+  const trackRef = React.useRef(null);
   const rafRef = React.useRef(0);
+  const focusTimerRef = React.useRef(0);
   const lockRef = React.useRef(false);  // 검출/해석 중 재진입 방지
   const tokenRef = React.useRef(0);     // 열림 세대 토큰(#1162) — 닫힘/재열림 시 대기 중 async 결과 폐기
   const [status, setStatus] = React.useState('starting'); // starting | scanning | denied | error | resolving | manual
@@ -79,14 +124,18 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
   const [manualIsbn, setManualIsbn] = React.useState('');     // 수동 ISBN 입력값 (폴백)
   const [showManual, setShowManual] = React.useState(false);  // 스캔 중 "직접 입력" 펼침
   const [scanNonce, setScanNonce] = React.useState(0);        // 예외 후 디코드 루프 재시작 트리거(#1162)
+  const [focusFeedback, setFocusFeedback] = React.useState(''); // focusing | focused | unsupported
+  const [focusPoint, setFocusPoint] = React.useState({ x: 0.5, y: 0.5 });
 
   // 카메라·루프 정지 — 닫힘/언마운트/검출성공 공통. 카메라 LED·배터리 누수 방지(spec §4).
   const stopCamera = React.useCallback(() => {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
+    if (focusTimerRef.current) { clearTimeout(focusTimerRef.current); focusTimerRef.current = 0; }
     if (streamRef.current) {
       try { streamRef.current.getTracks().forEach((t) => t.stop()); } catch (e) {}
       streamRef.current = null;
     }
+    trackRef.current = null;
     if (videoRef.current) { try { videoRef.current.srcObject = null; } catch (e) {} }
   }, []);
 
@@ -142,6 +191,40 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     resolveAndRoute(isbn);
   }, [manualIsbn, resolveAndRoute]);
 
+  const showFocusFeedback = React.useCallback((next) => {
+    setFocusFeedback(next);
+    if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    focusTimerRef.current = setTimeout(() => setFocusFeedback(''), next === 'unsupported' ? 1800 : 900);
+  }, []);
+
+  const focusAt = React.useCallback(async (point) => {
+    if (status !== 'scanning' || lockRef.current) return;
+    setFocusPoint(point);
+    showFocusFeedback('focusing');
+    const track = trackRef.current;
+    const applied = await barcodeApplyPointFocus(track, point);
+    if (trackRef.current !== track) return;
+    showFocusFeedback(applied ? 'focused' : 'unsupported');
+    // single-shot 뒤 지원 기기는 continuous로 복귀. 실패해도 스캔은 계속한다.
+    if (applied && trackRef.current === track) barcodeApplyContinuousFocus(track).catch(() => {});
+  }, [status, showFocusFeedback]);
+
+  const onViewfinderTap = React.useCallback((event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+    focusAt({ x, y });
+  }, [focusAt]);
+
+  const restartCamera = React.useCallback(() => {
+    if (!cameraSupported) return;
+    tokenRef.current += 1;
+    stopCamera();
+    setFocusFeedback('');
+    setScanNonce((n) => n + 1);
+  }, [cameraSupported, stopCamera]);
+
   // 카메라 시작 + 디코드 루프 (모달 열릴 때). 미지원이면 카메라 없이 수동 입력으로.
   React.useEffect(() => {
     if (!isOpen) return undefined;
@@ -163,7 +246,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
       // 카메라 권한·스트림
       let stream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
       } catch (e) {
         if (cancelled) return;
         // NotAllowedError = 권한 거부, 그 외 = 장치/보안컨텍스트 문제
@@ -172,10 +255,13 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
       }
       if (cancelled) { try { stream.getTracks().forEach((t) => t.stop()); } catch (e) {} return; }
       streamRef.current = stream;
+      trackRef.current = stream.getVideoTracks ? (stream.getVideoTracks()[0] || null) : null;
       const video = videoRef.current;
       if (!video) return;
       video.srcObject = stream;
       try { await video.play(); } catch (e) { /* autoplay 정책 — muted+playsinline 로 보통 통과 */ }
+      if (cancelled) return;
+      await barcodeApplyContinuousFocus(trackRef.current);
       if (cancelled) return;
       setStatus('scanning');
       if (window.rgTrack) window.rgTrack('barcode_scan_opened', {});
@@ -256,13 +342,18 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
         <span style={{ width: 34 }} />
       </div>
 
-      {/* 뷰파인더 */}
-      <div style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 430, overflow: 'hidden' }}>
+      {/* 뷰파인더 — 탭 위치를 지원 track의 focus/exposure point로 전달(#1290). */}
+      <div onClick={onViewfinderTap} style={{ position: 'relative', flex: 1, width: '100%', maxWidth: 430, overflow: 'hidden', touchAction: 'manipulation' }}>
         <video ref={videoRef} autoPlay playsInline muted
           style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: (status === 'scanning' || status === 'resolving') ? 'block' : 'none' }} />
         {/* 중앙 가이드 프레임 (EAN 가로 비율) */}
         {(status === 'scanning' || status === 'resolving') && (
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '74%', height: 120, border: '2px solid rgba(255,255,255,0.9)', borderRadius: 12, boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)' }} />
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '74%', height: 120, border: '2px solid rgba(255,255,255,0.9)', borderRadius: 12, boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)', pointerEvents: 'none' }} />
+        )}
+        {status === 'scanning' && focusFeedback && (
+          <div aria-live="polite" style={{ position: 'absolute', left: `${focusPoint.x * 100}%`, top: `${focusPoint.y * 100}%`, transform: 'translate(-50%,-50%)', width: 54, height: 54, borderRadius: 12, border: `2px solid ${focusFeedback === 'unsupported' ? 'rgba(255,255,255,0.55)' : 'var(--brand)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 800, background: 'rgba(0,0,0,0.28)', pointerEvents: 'none' }}>
+            {focusFeedback === 'focusing' ? '초점…' : focusFeedback === 'focused' ? '초점' : '미지원'}
+          </div>
         )}
         {/* 카메라 미지원·거부·오류 — ISBN 직접 입력 폴백(전면). */}
         {showManualView && (
@@ -285,6 +376,18 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
       {(status === 'scanning' || status === 'resolving' || status === 'starting') && (
         <div style={{ width: '100%', maxWidth: 430, padding: '16px 16px 28px', textAlign: 'center', color: 'rgba(255,255,255,0.92)', zIndex: 2 }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{overlayMsg}</div>
+          {status === 'scanning' && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <button onClick={() => focusAt({ x: 0.5, y: 0.5 })}
+                style={{ border: 'none', borderRadius: 999, background: 'rgba(255,255,255,0.14)', color: '#fff', padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                초점 다시 맞추기
+              </button>
+              <button onClick={restartCamera}
+                style={{ border: 'none', borderRadius: 999, background: 'rgba(255,255,255,0.14)', color: '#fff', padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                카메라 다시 시작
+              </button>
+            </div>
+          )}
           {showManual ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 12 }}>{manualBlock}</div>
           ) : (
@@ -325,4 +428,6 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
 
 window.barcodeScanSupported = barcodeScanSupported;
 window.resolveBookByIsbn = resolveBookByIsbn;
+window.barcodeApplyContinuousFocus = barcodeApplyContinuousFocus;
+window.barcodeApplyPointFocus = barcodeApplyPointFocus;
 window.BarcodeScanModal = BarcodeScanModal;
