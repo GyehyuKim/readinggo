@@ -1,34 +1,44 @@
-# 배포 런북 — 자동배포 실패 시 복구 (#693)
+# 배포 런북 — DEV 검증·동일 SHA 승격·rollback (#1303)
 
-> ReadingGo 데모는 **Cloudflare Workers Build** 가 `main` 푸시 시 자동 배포한다.
-> 평상시엔 수동 배포가 필요 없다([cicd-auto-deploy] 원칙). 이 문서는 **자동배포가 멈췄을 때만** 쓰는 예외 절차다.
+활성 SSOT는 [decisions.md §8.16](./specs/meta/decisions.md)과 [ops.md §2](./specs/ops.md)다.
+기존 “main → production 자동배포” 절차는 superseded다. prod는 기존 ReadingGo를 보존한다.
 
-## 1. 증상
+## 1. 정상 흐름
 
-- `main` 머지 후 라이브 사이트(`https://readinggo.hyuniverse.workers.dev`)가 갱신 안 됨.
-- `deploy-verify` 워크플로우가 **fail**(라이브 `_RG_V` ≠ 머지본 `_RG_V`).
-- 브라우저 강력 새로고침으로도 옛 버전 → 서버(엣지) stale, 캐시 아님.
+1. PR: `preview-smoke`가 `wrangler.dev.toml`로 `readinggo-dev` version preview를 만들고 edge smoke를 수행한다.
+2. merge: `deploy-dev`가 그 `main` SHA를 stable DEV에 배포하고 `/api/release`의 environment·SHA·Supabase host를 검증한다.
+3. Hermes: 이슈·diff·CI·stable DEV smoke·미해결 대화를 검토한다.
+4. prod: `promote-production`을 승인 SHA로 수동 실행한다. GitHub `production` environment 승인 뒤,
+   `origin/main` HEAD와 stable DEV receipt가 모두 같은 SHA일 때만 기존 `readinggo`에 배포한다.
+5. OTA가 필요하면 같은 SHA로 `ota-release`를 별도 수동 실행한다. beta→production은 기존 `ota-promote` gate를 따른다.
 
-## 2. 원인 (관측 이력)
+## 2. DEV 구성·비밀 경계
 
-- 배포를 짧은 시간에 매우 자주 하면 **Workers Build 빌드 할당량/레이트리밋** 소진 추정 → 특정 빌드를 건너뜀(#692 사례, 2026-06-16).
-- 정확 사유는 Cloudflare 대시보드 → **Workers & Pages → `readinggo` → Builds** 에서 해당 빌드 상태(skipped/failed/quota) 확인.
+- Supabase project ref는 `supabase projects list` 인증 결과에서만 구한다. 저장소에 고정하지 않는다.
+- DB password는 macOS Keychain service `supabase-db-password-readinggo-dev`, account `ReadingGo Dev`에서 읽고 출력하지 않는다.
+- GitHub DEV secrets: `DEV_SUPABASE_URL`, `DEV_SUPABASE_PUBLISHABLE_KEY`.
+- Worker DEV secret: `SUPABASE_SERVICE_ROLE_KEY`를 `readinggo-dev`에만 등록한다.
+- DEV에는 prod 사용자 복사, prod KV/R2 binding, prod secret, cron, 문의 동기화, OTA publish를 연결하지 않는다.
 
-## 3. 즉시 복구
+## 3. 검증 receipt
 
 ```bash
-# 직접 업로드 — Workers Build CI 우회, 빌드 할당량과 무관.
-npx wrangler deploy
+curl -fsS https://readinggo-dev.hyuniverse.workers.dev/api/release
 ```
 
-배포 후 라이브 `_RG_V`(`docs/readinggo/index.html` 상단 `const _RG_V`)가 머지본과 일치하는지 확인.
+응답의 `environment=development`, 승인 SHA, DEV Supabase hostname만 기록한다. credential은 기록하지 않는다.
+`tests/dev-isolation.test.mjs`는 DEV bundle의 prod endpoint 부재와 dev config의 prod KV/R2/cron 부재를 검사한다.
 
-## 4. 재발 방지
+## 4. rollback·중단
 
-- **배포 빈도 줄이기**: 작은 PR 여러 개를 몰아 머지(머지 큐) → 빌드 횟수 감소.
-- **한도 확인**: CF 대시보드에서 Builds 월 한도·리셋 주기 점검(필요 시 플랜 검토). *(계휴/대시보드 권한 필요)*
-- **감지**: `deploy-verify` 워크플로우가 미반영을 자동 감지(라이브 `_RG_V` 폴링, 최대 10분).
-- **(선택) Actions 폴백 배포 job**: `wrangler deploy` 를 Actions 에서 직접 실행하면 Builds 쿼터와 무관하게 배포 가능. 단 `CLOUDFLARE_API_TOKEN` 시크릿 필요 + Workers Build 와의 **이중 배포** 주의 → 도입 시 `workflow_dispatch`(수동 트리거)로 한정 권장. *(미도입, 계휴 결정)*
-- **자동 롤백 (P2 #900, 도입됨)**: 배포 반영 후 `deploy-verify` 가 production live render-smoke 를 **3회 재시도** → 연속 실패 시 `wrangler rollback --yes` 로 직전 버전 자가복구 + `auto-rollback` 라벨 이슈 생성. `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`(P1 #899 에서 등록) 사용, 3회 재시도로 일시 오류 오롤백 방어. **auto-rollback 이슈를 받으면** 그 커밋의 런타임 회귀부터 조사 — preview-smoke(#899)는 통과했는데 production 만 실패면 preview↔production 의 env·시크릿 차이를 먼저 의심.
+- DEV 회귀: Cloudflare `readinggo-dev`의 직전 정상 version을 100% 재배포한다. prod는 건드리지 않는다.
+- prod 승격 전 실패: **중단·보고**한다. stable DEV receipt를 새로 만들기 전 prod workflow를 재실행하지 않는다.
+- prod 승격 후 회귀: GitHub `production` environment에서 직전 정상 prod SHA를 `promote-production`으로 재승격한다.
+  자동 rollback이나 DEV credential로 prod를 조작하지 않는다.
+- Cloudflare Workers Builds에 남은 `main → readinggo` 자동 연결은 제거돼야 한다. 이 계정 설정이 확인되기 전에는
+  #1303을 완료 처리하거나 `Closes #1303`을 쓰지 않는다.
 
-[cicd-auto-deploy]: 메모리 — main 머지 시 CI/CD 자동 배포가 기본. 이 런북은 그 예외(자동배포 실패) 전용.
+## 5. 감사 증거
+
+PR URL/commit SHA, DEV project region/status, DEV Worker URL/version, DEV KV ID, migration 개수,
+schema/RLS 검사 결과, preview/stable smoke run URL, production environment 승인 기록을 한 release receipt로 보존한다.

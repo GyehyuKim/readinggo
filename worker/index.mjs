@@ -60,6 +60,12 @@ export default {
   async route(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
+    // 배포 증명용 비밀 없는 메타데이터. prod 승격 gate가 stable-dev에서 같은 SHA를 확인한다.
+    if (p === '/api/release') return json({
+      environment: env.ENVIRONMENT || 'production',
+      sha: env.RELEASE_SHA || null,
+      supabaseHost: (() => { try { return new URL(env.SUPABASE_URL || '').hostname; } catch { return null; } })(),
+    });
     if (p === '/aladin' || p === '/.netlify/functions/aladin') {
       // CORS 제한(#255): 타 사이트 브라우저 JS의 교차출처 호출 차단(TTBKey 쿼터 남용 방지).
       // 동일출처 GET은 Origin 헤더 미전송 → 통과. 다른 출처면 Origin이 우리 도메인과 달라 403.

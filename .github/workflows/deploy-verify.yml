@@ -7,8 +7,7 @@
 name: deploy-verify
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 # 동시 다중 머지 시 마지막 것만 검증(이전 런 취소).
 concurrency:
@@ -23,6 +22,7 @@ jobs:
   verify-deploy:
     name: verify-deploy (반영 확인 + live smoke + 자동롤백)
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

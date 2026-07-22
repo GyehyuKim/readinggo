@@ -1,0 +1,27 @@
+# ReadingGo Dev — production과 완전히 별도인 무료 개발 Worker.
+# SUPABASE_URL/RELEASE_SHA는 배포 시 --var로 주입하며 project ref를 저장소에 고정하지 않는다.
+name = "readinggo-dev"
+main = "worker/index.mjs"
+compatibility_date = "2026-06-01"
+preview_urls = true
+
+[build]
+command = "cd docs/readinggo && npm ci && npm run build"
+
+[assets]
+directory = "docs/readinggo/dist"
+binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "OTA_KV"
+id = "3bca8bcf0a5641a283cd0c61c6471666"
+
+[vars]
+ENVIRONMENT = "development"
+ARCHIVE_DAILY_CAP = "0"
+LLM_BASE_URL = "https://api.upstage.ai/v1"
+LLM_MODEL = "solar-pro3"
+VISION_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+VISION_MODEL = "gemini-2.5-flash"
+
+# 의도적으로 [triggers]와 R2 binding이 없다. DEV는 cron, prod OTA/R2, 문의 GitHub sync를 실행하지 않는다.

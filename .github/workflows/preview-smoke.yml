@@ -1,4 +1,4 @@
-# PR preview Worker + edge render-smoke (#899 배포안전 P1, 에픽 #897)
+# PR → 별도 ReadingGo Dev Worker preview + edge render-smoke (#1303)
 #
 # PR 마다 실제 Cloudflare preview Worker(`wrangler versions upload` — 새 버전만 올리고
 # Active Deployment 로 승격하지 않음 → 프로덕션 트래픽 미영향)를 만들고, 그 **edge URL**에서
@@ -59,18 +59,23 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.DEV_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_API_ORIGIN: https://readinggo-dev.hyuniverse.workers.dev
+          VITE_READINGGO_ENV: development
         run: |
           set -o pipefail
-          # wrangler.toml [build](npm ci && vite build)가 업로드 전 자동 실행 → dist 를 버전으로 업로드.
-          # versions upload 는 Active 승격 없음(프로덕션 미영향). preview_urls=true 라 버전별 URL 생성.
-          OUT=$(npx --yes wrangler@4 versions upload 2>&1 | tee /dev/stderr)
+          # DEV 전용 config/binding/secret만 사용한다. production Worker에는 버전조차 업로드하지 않는다.
+          OUT=$(npx --yes wrangler@4 versions upload -c wrangler.dev.toml \
+            --var "SUPABASE_URL:$DEV_SUPABASE_URL" --var "RELEASE_SHA:$GITHUB_SHA" 2>&1 | tee /dev/stderr)
           URL=$(printf '%s\n' "$OUT" | awk '/Version Preview URL:/ {gsub(/.*Version Preview URL: /, ""); print; exit}')
           if [ -z "$URL" ]; then
             echo "::error::Version Preview URL 추출 실패 — wrangler 출력 형식/preview_urls 설정 확인 (wrangler.toml preview_urls=true)."
             exit 1
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "✅ preview Worker: $URL"
+          echo "✅ readinggo-dev preview Worker: $URL"
 
       - name: Install Playwright chromium
         if: steps.gate.outputs.enabled == 'true'

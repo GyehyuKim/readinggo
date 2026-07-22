@@ -345,6 +345,22 @@
 | Stack Lock | `@capgo/capacitor-updater` = Capacitor 1차 생태계·오픈소스 → **단일 lock 내**. 코드 PR에서 추가 |
 | 상태 | **결정 + spec only(`ota.md`)**. 코드·인프라(플러그인·Worker·R2/KV·GH Action)는 후속 코드 PR |
 
+### 8.16 결정 (2026-07-22, #1303 dev/prod 완전 분리. 충돌 시 §8.13·§8.15 위에 **우선**)
+
+> 출시 안정화를 위해 §8.13의 “별도 환경 기각”을 **superseded**한다. prod는 기존 ReadingGo를 보존하고,
+> dev는 서울 리전의 별도 `ReadingGo Dev` Supabase와 별도 `readinggo-dev` Worker를 쓴다.
+
+| 항목 | 활성 결정 |
+|---|---|
+| 데이터·인증 | dev/prod DB·Auth·Storage·project secret을 공유하지 않는다. 운영 사용자 복사 금지, dev에는 합성 fixture·테스트 계정만 허용 |
+| Worker·binding | dev Worker·KV·secret은 별도 리소스. dev에 prod KV/R2·cron·운영 side effect binding을 연결하지 않는다 |
+| PR | `readinggo-dev`의 비프로모션 version preview에서 build·render smoke·endpoint isolation을 검증 |
+| main | 동일 SHA를 stable dev URL에 자동 배포한다. main은 production 자동 배포·OTA publish를 하지 않는다 |
+| prod | stable dev가 보고한 SHA와 `origin/main` HEAD가 모두 승인 SHA와 같을 때만 GitHub `production` environment의 Hermes gate 뒤 수동 승격 |
+| rollback·감사 | dev/prod 배포 receipt에 SHA·Worker version·smoke 결과를 남긴다. prod rollback도 별도 승인된 production workflow에서만 수행 |
+
+구현 정본은 [`ops.md §2`](../ops.md)와 [`RUNBOOK-DEPLOY.md`](../../RUNBOOK-DEPLOY.md)다.
+
 ---
 
 ### v5/v6 결정 이력 (참고 — 충돌 시 §8.0 우선)
@@ -428,4 +444,3 @@
 | **AI provider** | **현재 이원화** — 텍스트 solar-pro3, vision Gemini | 활성 runtime 세부는 `architecture-asbuilt.md §11`을 사실 기준으로 한다. 제품 기능별 provider 변경은 별도 결정으로 append한다. |
 
 > 과거 결정은 감사 추적을 위해 삭제하지 않는다. 활성 스펙은 README §3·backend.md §7.1과 as-built 문서를 따른다.
-

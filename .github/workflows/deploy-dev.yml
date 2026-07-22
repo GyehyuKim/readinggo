@@ -1,0 +1,56 @@
+name: deploy-dev
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: readinggo-stable-dev
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: main → stable dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Deploy the exact main SHA to readinggo-dev
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.DEV_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_API_ORIGIN: https://readinggo-dev.hyuniverse.workers.dev
+          VITE_READINGGO_ENV: development
+        run: |
+          test -n "$DEV_SUPABASE_URL"
+          test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"
+          npx --yes wrangler@4 deploy -c wrangler.dev.toml \
+            --var "SUPABASE_URL:$DEV_SUPABASE_URL" --var "RELEASE_SHA:$GITHUB_SHA"
+      - name: Verify stable DEV metadata and isolation
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          DEV_URL: https://readinggo-dev.hyuniverse.workers.dev
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+        run: |
+          curl -fsS "$DEV_URL/api/release" > /tmp/release.json
+          test "$(jq -r .environment /tmp/release.json)" = development
+          test "$(jq -r .sha /tmp/release.json)" = "$EXPECTED_SHA"
+          test "$(jq -r .supabaseHost /tmp/release.json)" = "$(printf '%s' "$DEV_SUPABASE_URL" | sed -E 's#https://([^/]+).*#\1#')"
+          if grep -q 'cttllwwkaddghqttyhkg.supabase.co' /tmp/release.json; then exit 1; fi
+      - name: Stable DEV render smoke
+        env:
+          SMOKE_URL: https://readinggo-dev.hyuniverse.workers.dev/
+        run: |
+          cd docs/readinggo
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run smoke
