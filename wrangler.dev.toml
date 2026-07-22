@@ -6,7 +6,7 @@ compatibility_date = "2026-06-01"
 preview_urls = true
 
 [build]
-command = "cd docs/readinggo && npm ci && npm run build"
+command = "cd docs/readinggo && npm ci && VITE_READINGGO_ENV=development npm run build"
 
 [assets]
 directory = "docs/readinggo/dist"

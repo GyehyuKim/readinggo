@@ -59,6 +59,8 @@ jobs:
       # 웹 번들(dist) 빌드 — capacitor webDir=dist.
       - name: Build web bundle (Vite)
         working-directory: docs/readinggo
+        env:
+          VITE_READINGGO_ENV: production
         run: |
           npm ci
           npm run build

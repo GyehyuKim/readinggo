@@ -148,7 +148,6 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     lockRef.current = true;
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
     setStatus('resolving');
-    if (window.rgTrack) window.rgTrack('barcode_detected', { isbn });
     try {
       const { book, matched } = await resolveBookByIsbn(isbn);
       if (myToken !== tokenRef.current) return;   // 닫힘/재열림 후 도착 — stale, 무시

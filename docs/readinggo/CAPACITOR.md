@@ -18,7 +18,7 @@ ReadingGo 웹앱(Vite, #871)을 Capacitor로 감싸 iOS/Android 앱으로 출시
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # xcode-select sudo 우회(프로세스 단위)
 cd docs/readinggo
-npm ci && npm run build                                           # 웹 → dist
+npm ci && VITE_READINGGO_ENV=development npm run build            # 시뮬레이터용 웹 → dist
 npx cap sync ios                                                  # dist → ios + 플러그인
 # ⚠️ SPM 이 GitHub(capacitor-swift-pm)을 fetch → macOS 키체인 GUI 가 막음.
 #    아래 env 로 시스템 git + 키체인 헬퍼 OFF(이 프로세스만) → 프롬프트 없이 진행:
@@ -30,6 +30,14 @@ xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator -configuratio
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -scmProvider system -disableAutomaticPackageResolution CODE_SIGNING_ALLOWED=NO build
 # → ** BUILD SUCCEEDED **
+```
+
+App Store/TestFlight 아카이브용 번들은 반드시 production 분석 경계와 commit SHA를 포함해 빌드한다.
+
+```bash
+cd docs/readinggo
+VITE_READINGGO_ENV=production npm run build
+npx cap sync ios
 ```
 - 키체인 창이 떠도 **Deny** 눌러도 됨(위 env 면 안 뜸). SPM 아티팩트 캐시가 깨지면 `rm -rf ~/Library/Caches/org.swift.swiftpm` 후 재해석.
 - 실기기·TestFlight 는 **Apple Developer 계정($99, #873)** 활성 + 서명 필요(이후).

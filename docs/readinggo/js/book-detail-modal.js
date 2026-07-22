@@ -54,7 +54,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       } } }));
       setAddText(''); setAddPage(''); setAddOpen(false);
       showToast('한 문장을 남겼어요');
-      if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote' });
+      if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote', source: 'book_detail' });
     } catch (e) { showToast('저장 실패 — 잠시 후 다시'); }
     finally { setAddBusy(false); }
   };
@@ -71,6 +71,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
         const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
         if (row && row.id) {
           saved++;
+          if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote', source: 'book_detail_import' });
           window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
             id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
             page: (typeof row.page === 'number' ? row.page : 0), when: '방금',
@@ -279,6 +280,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (!window.confirm(`'${book.title}'을(를) 완독으로 표시할까요?`)) return;
     Promise.resolve(DataStore.books.complete(book.ubId))
       .then(() => {
+        if (window.rgTrack) window.rgTrack('book_completed', { book_id: book.id || '', rating_present: !!savedRating, review_present: !!String(savedReview || '').trim() });
         window.dispatchEvent(new CustomEvent('rg:wish-changed'));
         onClose();
         showToast('🏰 완독으로 표시했어요');

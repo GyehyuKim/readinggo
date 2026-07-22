@@ -74,6 +74,7 @@ jobs:
           node tests/supabase-books.test.mjs
           node tests/turnstile-retry.test.mjs
           node tests/wiki-ask-response.test.mjs
+          cd docs/readinggo && npm run test:analytics
 
   boot-smoke:
     name: boot-smoke (Vite 빌드 회귀)
@@ -85,6 +86,8 @@ jobs:
           node-version: "20"
       # #871 Vite 전환 — 런타임 Babel 폐기. Vite 빌드가 성공하고 dist 가 해시 번들/#root 를 갖는지 검증.
       - name: Vite build
+        env:
+          VITE_READINGGO_ENV: production
         run: cd docs/readinggo && npm ci && npm run build
       - name: Boot smoke (dist 검증)
         run: |

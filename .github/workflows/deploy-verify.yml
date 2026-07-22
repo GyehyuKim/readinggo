@@ -31,6 +31,8 @@ jobs:
 
       - name: 머지본 빌드 → 기대 해시 자산 추출
         id: ver
+        env:
+          VITE_READINGGO_ENV: production
         run: |
           cd docs/readinggo && npm ci && npm run build
           EXPECTED=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/index.html | head -1)
