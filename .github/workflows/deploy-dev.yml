@@ -26,10 +26,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          VITE_READINGGO_ENV: development
           VITE_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.DEV_SUPABASE_PUBLISHABLE_KEY }}
           VITE_API_ORIGIN: https://readinggo-dev.hyuniverse.workers.dev
-          VITE_READINGGO_ENV: development
         run: |
           test -n "$DEV_SUPABASE_URL"
           test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"
