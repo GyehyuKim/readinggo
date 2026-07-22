@@ -2,6 +2,7 @@
 // 기존 로드 순서를 그대로 ES import 로 옮긴다(순서 = 의존성, window.X 전역 공유 유지).
 // 1) setup-globals 가 가장 먼저 — window.React 등 전역 보장.
 import './setup-globals.js';
+import './js/analytics.js'; // #1306 중앙 이벤트 메타데이터·PII 게이트
 
 // 2) 백엔드 계층(순수 JS) — 기존 plain <script> 순서.
 import './js/config.js';

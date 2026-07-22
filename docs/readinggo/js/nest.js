@@ -451,8 +451,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         };
       });
     }
-    const checkinResult = onCheckin(ns, newLv, xpGain, sentence, kind, quotePage, batch, visibility, completion); // batch 있으면 app 이 N개 문장 영속(#1198)
-    if (window.rgTrack) window.rgTrack('reading_session_end', { book_id: ns.book.id, pages_logged: pagesAdded, is_complete: isComplete }); // 인게이지먼트/리텐션 (#736)
+    const checkinResult = onCheckin(ns, newLv, xpGain, sentence, kind, quotePage, batch, visibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
 
     // 성 획득(1,600 주기 완료)은 단계 toast보다 우선 — 경계 통과 시 둥지 단계는 Lv4→Lv1로
     // 리셋되어 nestUp=false 이므로, 성 획득은 별도로 안내한다 (#520/#521).
@@ -580,7 +579,14 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     (async () => {
       try {
         const ub = await Promise.resolve(DataStore.activeBook.get());
-        if (ub && ub.id) await Promise.resolve(DataStore.books.complete(ub.id, { rating, review_text }));
+        if (ub && ub.id) {
+          await Promise.resolve(DataStore.books.complete(ub.id, { rating, review_text }));
+          if (window.rgTrack) window.rgTrack('book_completed', {
+            book_id: ub.book_id || (ub.book && ub.book.id) || nestState.book.id || '',
+            rating_present: !!rating,
+            review_present: !!String(review_text || '').trim(),
+          });
+        }
       } catch (e) {
         console.warn('[nest] 완독 기록 저장 실패:', (e && e.message) || e);
       }

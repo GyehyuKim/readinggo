@@ -50,14 +50,6 @@ function Toast() {
   );
 }
 
-// PostHog 커스텀 이벤트 (analytics.md §3.1). posthog 미로드/차단 시 안전 no-op.
-function rgTrack(event, props) {
-  try {
-    if (window.posthog && typeof window.posthog.capture === 'function') {
-      window.posthog.capture(event, props || {});
-    }
-  } catch (e) { /* analytics 실패는 무시 */ }
-}
 
 // 공용 북커버 (#316 A) — 표지 없거나 로드 실패 시 제목·저자 타이포 placeholder.
 // 기존 인라인 `<div className="book-cover" style={{background:grad}}><img/></div>` 드롭인 대체.
@@ -151,7 +143,6 @@ function ConsentBanner({ onChoose }) {
 }
 
 window.showToast = showToast;
-window.rgTrack = rgTrack;
 window.BookCover = BookCover;
 window.ConsentBanner = ConsentBanner;
 // 데이터 수집·AI 활용 동의 (#294, analytics.md §5). DataStore.consent 어댑터 위임(직접 localStorage 금지).

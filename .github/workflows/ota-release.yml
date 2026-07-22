@@ -66,6 +66,8 @@ jobs:
       # Vite 빌드 → docs/readinggo/dist. @capgo/capacitor-updater 도 여기서 설치됨(#983 의존성, zip 검사 통과 전제).
       - name: Build web bundle (Vite)
         working-directory: docs/readinggo
+        env:
+          VITE_READINGGO_ENV: production
         run: |
           npm ci
           npm run build

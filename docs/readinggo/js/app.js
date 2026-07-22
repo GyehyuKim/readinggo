@@ -223,7 +223,7 @@ class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(error, info) {
-    try { if (window.rgTrack) window.rgTrack('app_error', { message: String((error && error.message) || error).slice(0, 200), tab: this.props.label || '' }); } catch (e) {}
+    try { if (window.rgTrack) window.rgTrack('app_error', { code: 'component_render_failed', stage: 'render', tab: this.props.label || '' }); } catch (e) {}
     console.error('[ReadingGo] ErrorBoundary 포착:', error, info);
   }
   render() {
@@ -692,7 +692,7 @@ function App() {
         // 거부·미질문이면 식별 생략(익명 분석은 유지) — PIPA 비필수 분리(#752).
         try {
           if (window.posthog && authUser && authUser.id && window.RG_consent && window.RG_consent.get() === 'yes') {
-            window.posthog.identify(authUser.id, { email: authUser.email || undefined, books_count: (next && next.castleCount) || 0 });
+            window.posthog.identify(authUser.id, { books_count: (next && next.castleCount) || 0 });
           }
         } catch (e) {}
         if (alive && next) {
@@ -739,7 +739,7 @@ function App() {
 
   // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
   // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences, visibility, completion) => {
+  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences, visibility, completion, pagesLogged, isComplete) => {
     // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
     // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
@@ -782,13 +782,22 @@ function App() {
         }
         if (!ubId) { console.warn('[ReadingGo] 체크인: 화면 책의 user_book 미해소 — 잘못된 귀속 방지 위해 저장 건너뜀'); throw new Error('user_book 미해소'); }
         await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
+        if (window.rgTrack) window.rgTrack('reading_session_end', {
+          book_id: ns.book.id || '',
+          pages_logged: Math.max(0, Number(pagesLogged || 0)),
+          is_complete: !!isComplete,
+        });
         if (batch && batch.length) {
           // 배치: N개 문장을 개별 add(공유 페이지). 진도·세션·XP·스트릭은 위/아래에서 1회만(#1198).
           for (const s of batch) {
-            try { await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote', visibility: s.visibility })); } catch (e) { console.warn('[ReadingGo] 배치 문장 저장 실패(1건 스킵):', (e && e.message) || e); }
+            try {
+              await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote', visibility: s.visibility }));
+              if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
+            } catch (e) { console.warn('[ReadingGo] 배치 문장 저장 실패(1건 스킵):', (e && e.message) || e); }
           }
         } else if (sentence) {
           await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));
+          if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
         }
         if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ubId + ')');
@@ -869,7 +878,10 @@ function App() {
         if (!ub || !ub.id) return;
         // 완독(다 읽었어요, #409) — status=completed. 별점·소감은 서재 책상세에서.
         if (shelf === 'completed') {
-          if (DataStore.books && DataStore.books.complete) await Promise.resolve(DataStore.books.complete(ub.id, {}));
+          if (DataStore.books && DataStore.books.complete) {
+            await Promise.resolve(DataStore.books.complete(ub.id, {}));
+            if (window.rgTrack) window.rgTrack('book_completed', { book_id: ub.book_id || (ub.book && ub.book.id) || '', rating_present: false, review_present: false });
+          }
           window.dispatchEvent(new CustomEvent('rg:wish-changed')); // 서재 목록 갱신 신호 재사용
           showToast(`🏰 '${book.title}' 완독 책장에 — 서재에서 별점·소감을 남겨보세요`);
           return;
@@ -922,7 +934,7 @@ function App() {
   }, [handleSearchSelectBook]);
 
   // 이미 등록된 user_book 으로 활성 전환 (서재에서 — 재등록 없이 activeBook.set).
-  const handleActivateUserBook = useCallback((item) => {
+  const handleActivateUserBook = useCallback(async (item) => {
     if (!item || !item.id) return;
     // #822: user_book 미존재(위시리스트·검색 등 ubId 없음) 책을 '활성'으로 바꾸면 등록 경로로 위임해
     // '읽는 중' user_books 행을 실제로 생성한다. (종전: 로컬 화면만 바뀌고 DB 행 미생성 →
@@ -943,7 +955,12 @@ function App() {
     showToast(`${item.title} — 활성 책으로 변경`);
     switchTab('nest');
     if (item.ubId && DataStore.activeBook && DataStore.activeBook.set) {
-      Promise.resolve(DataStore.activeBook.set(item.ubId)).catch(e => console.warn('[ReadingGo] 활성 전환 실패:', e));
+      try {
+        await Promise.resolve(DataStore.activeBook.set(item.ubId));
+      } catch (e) {
+        console.warn('[ReadingGo] 활성 전환 실패:', e);
+        return;
+      }
     }
     if (window.rgTrack) window.rgTrack('book_opened', { book_id: item.id || '', entry_point: 'switch' }); // 퍼널 시작 — 서재 활성전환 (#736)
   }, [switchTab, handleSearchSelectBook]);

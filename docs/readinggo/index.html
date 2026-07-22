@@ -57,16 +57,45 @@
     })();
 </script>
 <script>
-    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="$i ji init en nn Ar tn an Yi capture calculateEventProperties dn register register_once register_for_session unregister unregister_for_session gn getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync mn identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty fn hn createPersonProfile setInternalOrTestUser pn Ji opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing un debug Dr vn getPageViewId captureTraceFeedback captureTraceMetric Zi".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    // 환경이 명시된 dev/prod 번들에서만 SDK를 초기화한다. 로컬·테스트 기본 빌드는 전송 차단(#1306).
+    if (['development', 'production'].includes('__RG_BUILD_ENV__')) {
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="$i ji init en nn Ar tn an Yi capture calculateEventProperties dn register register_once register_for_session unregister unregister_for_session gn getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync mn identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags reset setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty fn hn createPersonProfile setInternalOrTestUser pn Ji opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing un debug Dr vn getPageViewId captureTraceFeedback captureTraceMetric Zi".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    var rgAnalyticsMeta = {
+        environment: '__RG_BUILD_ENV__', release_sha: '__RG_RELEASE_SHA__', schema_version: 1,
+        platform: (window.Capacitor && window.Capacitor.getPlatform && ['ios', 'android'].includes(window.Capacitor.getPlatform())) ? window.Capacitor.getPlatform() : 'web'
+    };
+    // 자동수집 속성에도 URL query/hash·토큰이 섞이지 않게 재귀 정리한다.
+    function rgSanitizeAutoProps(value) {
+        if (Array.isArray(value)) return value.map(rgSanitizeAutoProps);
+        if (!value || typeof value !== 'object') return value;
+        var clean = {};
+        Object.keys(value).forEach(function (key) {
+            var normalized = String(key).toLowerCase().replace(/^\$/, '');
+            if (/(^|_)(query|hash|token|el_text|text|email|name|nickname)$/.test(normalized)) return;
+            var nested = value[key];
+            if (typeof nested === 'string' && /(url|href|referrer)/.test(normalized)) {
+                try { var parsed = new URL(nested, window.location.origin); nested = parsed.origin + parsed.pathname; }
+                catch (e) { nested = nested.split(/[?#]/)[0]; }
+            }
+            clean[key] = rgSanitizeAutoProps(nested);
+        });
+        return clean;
+    }
     posthog.init('phc_wsqrjrhwFFuNykimjsw97WVJ69jKPHpMjqquxfETEWSD', {
         api_host: 'https://us.i.posthog.com',
         defaults: '2026-05-30',
         person_profiles: 'identified_only',
+        // autocapture에서도 화면의 문장·감상·닉네임과 DOM 속성을 원문으로 보내지 않는다.
+        mask_all_text: true,
+        mask_all_element_attributes: true,
         // 2단 동의(analytics.md §5.4, #752) — 세션 리플레이 기본 OFF. 선택 동의('yes')만 RG_applyConsent로 startSessionRecording.
         // 익명 이벤트·퍼널은 상시(필수·고지). 리플레이 녹화 시 입력값 전수 마스킹(PII).
         disable_session_recording: true,
         session_recording: { maskAllInputs: true },
+        // 초기 $pageview/autocapture도 중앙 모듈 로드 전부터 같은 빌드 메타데이터를 갖는다.
+        before_send: function (event) { event.properties = Object.assign({}, rgSanitizeAutoProps(event.properties || {}), rgAnalyticsMeta); return event; },
     })
+    }
 </script>
 <!-- DESIGN.md Typography(#1032): Body/UI = Noto Sans KR, Quote/흔적·발췌 = Noto Serif KR.
      세리프는 따옴표 흔적·발췌 문장 전용(헤딩·버튼·라벨은 Sans 유지).

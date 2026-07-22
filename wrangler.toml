@@ -18,7 +18,7 @@ preview_urls = true
 # #871 Vite 전환 — 배포 전 Vite 빌드 실행(Cloudflare Workers Build / 로컬 wrangler deploy 공통).
 # ⚠️ Workers Build 가 대시보드 빌드 명령을 별도로 가지면 그쪽도 동일하게 설정 필요.
 [build]
-command = "cd docs/readinggo && npm ci && npm run build"
+command = "cd docs/readinggo && npm ci && VITE_READINGGO_ENV=production npm run build"
 
 # 정적 사이트(Vite 산출물 dist)를 Worker가 서빙. /aladin 외 모든 경로는 에셋.
 [assets]

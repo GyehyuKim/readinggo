@@ -161,13 +161,15 @@ function CompanionModal({ sentence, onClose }) {
     try { _compTailRef.current && _compTailRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch (e) {}
   }, [question, loading, done, exchanges.length]);
   const persist = (ex) => {
-    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return;
-    if (!ex || !ex.length) return;   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
+    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return Promise.resolve(false);
+    if (!ex || !ex.length) return Promise.resolve(false);   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
     const qa = ex.map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
     const note = rgJoinNote(rgSplitNote(sentence.note).free, qa);   // 내 감상 블록 보존 (#1070)
-    Promise.resolve(DataStore.sentences.setNote(sentence.id, note)).catch(() => {});
-    sentence.note = note; // 모달 내 즉시 정합
-    window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+    return Promise.resolve(DataStore.sentences.setNote(sentence.id, note)).then(() => {
+      sentence.note = note;
+      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+      return true;
+    }).catch(() => false);
   };
   // 내 감상만 저장 (#1070) — 재키 Q/A 는 보존하고 자유 감상 블록만 교체. 빈 감상 저장 = 감상 블록 제거.
   // 재키를 강제하지 않고 이 한 번으로 성찰이 완결된다(데이터=my_note, 양 어댑터 setNote 표면 일치).
@@ -199,8 +201,10 @@ function CompanionModal({ sentence, onClose }) {
     const a = answer.trim();
     if (!a) return; // 빈 답은 no-op — '마치기' 제거(#655) 후 종료는 모달 이탈(✕/바깥)로만. 빈 전송으로 대화 끝내지 않음.
     const ex = [...exchanges, { q: question, a }];
-    setExchanges(ex); setAnswer(''); persist(ex);
-    rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
+    setExchanges(ex); setAnswer('');
+    persist(ex).then((saved) => {
+      if (saved) rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
+    });
     archiveCompanion(sentence.bookId, sentence.text, question, a); // 서버 아카이브 (#295)
     // 5턴 도달 또는 미동의(단발) → 따뜻한 마무리로 종료. 이 5턴 경계가 향후 '더 이야기하기 = 업그레이드' 수익화 훅(#655).
     if (ex.length >= MAX || consent !== 'yes') { setQuestion(null); setDone(true); return; }
