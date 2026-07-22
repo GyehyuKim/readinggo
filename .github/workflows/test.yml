@@ -83,7 +83,9 @@ jobs:
       - name: Vite build
         run: cd docs/readinggo && npm ci && npm run build
       - name: Boot smoke (dist 검증)
-        run: node tests/boot-smoke.mjs
+        run: |
+          node tests/boot-smoke.mjs
+          node tests/dev-review-mode.test.mjs
 
   dev-isolation:
     name: dev-isolation (prod endpoint/write path 차단)
@@ -105,7 +107,10 @@ jobs:
         env:
           EXPECTED_DEV_SUPABASE_URL: https://synthetic-dev.supabase.co
           EXPECTED_DEV_WORKER_URL: https://readinggo-dev.hyuniverse.workers.dev
-        run: node tests/dev-isolation.test.mjs
+          EXPECT_REVIEW_MODE: "1"
+        run: |
+          node tests/dev-isolation.test.mjs
+          node tests/dev-review-mode.test.mjs
 
   render-smoke:
     name: render-smoke (탭 런타임 렌더)

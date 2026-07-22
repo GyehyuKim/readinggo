@@ -273,7 +273,13 @@ const AppleGlyph = () => (
   </svg>
 );
 
-function LoginScreen({ onLogin, onBack }) {
+// #1321: OAuth 설정 전에도 로그인 이후 UI를 확인하는 DEV 전용 로컬 검수 모드.
+// Vite가 production 빌드에서 이 상수와 연결된 JSX/카피를 dead-code 제거한다.
+// 인증 세션을 만들지 않고 local DataStore만 사용하므로 운영 사용자·운영 DB에 접근하지 않는다.
+const RG_DEV_REVIEW_ENABLED = import.meta.env.VITE_READINGGO_ENV === 'development';
+const RG_DEV_REVIEW_SESSION_KEY = 'rg_dev_review_mode';
+
+function LoginScreen({ onLogin, onBack, onReview }) {
   const { useState } = React;
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -322,7 +328,18 @@ function LoginScreen({ onLogin, onBack }) {
               <AppleGlyph /> Apple로 시작하기
             </button>
           )}
+          {RG_DEV_REVIEW_ENABLED && onReview && (
+            <button onClick={onReview} aria-label="개발 검수 모드로 들어가기"
+              style={{ ...SOCIAL_BTN_BASE, border: '1.5px dashed var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', cursor: 'pointer' }}>
+              개발 검수 모드로 둘러보기
+            </button>
+          )}
         </div>
+        {RG_DEV_REVIEW_ENABLED && onReview && (
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', maxWidth: 300, lineHeight: 1.5 }}>
+            테스트 데이터만 사용하는 개발 전용 화면이에요. 실제 계정 로그인과 서버 저장은 하지 않아요.
+          </div>
+        )}
         {sent ? (
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.6, background: 'rgba(0,0,0,0.04)', borderRadius: 12, padding: '12px 16px', maxWidth: 300, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <span style={{ flexShrink: 0, marginTop: 1 }}>{window.rgIcon('mail', 15)}</span>
@@ -379,7 +396,11 @@ function App() {
   const { useState, useCallback, useMemo, useEffect } = React;
   // Phase 1: Supabase 설정 시 로그인 게이트 + 실데이터. 미설정/미로그인은 localStorage 폴백.
   const _supa = !!(window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured());
-  const [authUser, setAuthUser] = useState(_supa ? undefined : 'local'); // undefined=확인중, null=로그아웃(게스트), 그외=OK
+  const [reviewMode, setReviewMode] = useState(() => {
+    if (!RG_DEV_REVIEW_ENABLED) return false;
+    try { return sessionStorage.getItem(RG_DEV_REVIEW_SESSION_KEY) === '1'; } catch (e) { return false; }
+  });
+  const [authUser, setAuthUser] = useState(reviewMode ? 'local' : (_supa ? undefined : 'local')); // undefined=확인중, null=로그아웃(게스트), 그외=OK
   const [dataReady, setDataReady] = useState(!_supa);
   const [showLogin, setShowLogin] = useState(false);        // 로그인 화면 온디맨드(벽 아님)
   const [guestBannerOff, setGuestBannerOff] = useState(false); // 게스트 안내 배너 세션 닫기
@@ -623,9 +644,24 @@ function App() {
 
   // 인증 상태 구독 (Supabase 모드)
   useEffect(() => {
-    if (!_supa) return;
+    if (!_supa || reviewMode) return;
     window.RG_SB.currentUser().then(u => setAuthUser(u || null)).catch(() => setAuthUser(null));
     return window.RG_SB.onAuthChange(u => setAuthUser(u || null));
+  }, [reviewMode]);
+
+  const enterDevReview = useCallback(() => {
+    if (!RG_DEV_REVIEW_ENABLED) return;
+    try { sessionStorage.setItem(RG_DEV_REVIEW_SESSION_KEY, '1'); } catch (e) {}
+    setReviewMode(true);
+    setAuthUser('local');
+    setDataReady(true);
+    setShowLogin(false);
+  }, []);
+
+  const exitDevReview = useCallback(() => {
+    if (!RG_DEV_REVIEW_ENABLED) return;
+    try { sessionStorage.removeItem(RG_DEV_REVIEW_SESSION_KEY); } catch (e) {}
+    location.reload();
   }, []);
 
   // 로그인 성공 시 로그인 화면 자동 닫기(#1011). 웹은 OAuth 리디렉트가 페이지를 리로드해
@@ -933,7 +969,7 @@ function App() {
 
   // Phase 1 인증 — 게스트 우선(onboarding.md §4). 로그인은 '저장' 시점에만 요구.
   if (_supa && authUser === undefined) return (<BootSplash text="확인 중..." />);
-  if (showLogin) return (<LoginScreen onLogin={(provider) => window.RG_SB.signInWithOAuth(provider || 'google')} onBack={() => setShowLogin(false)} />);
+  if (showLogin) return (<LoginScreen onLogin={(provider) => window.RG_SB.signInWithOAuth(provider || 'google')} onReview={RG_DEV_REVIEW_ENABLED ? enterDevReview : undefined} onBack={() => setShowLogin(false)} />);
   // 로그인 사용자만 Supabase 데이터 로드 대기. 게스트(authUser===null)는 localStorage 로 즉시 진입.
   if (_supa && authUser && authUser !== 'local' && !dataReady) return (<BootSplash text="불러오는 중..." />);
 
@@ -944,6 +980,13 @@ function App() {
       <div className="app">
 
         <InAppBanner />
+
+        {RG_DEV_REVIEW_ENABLED && reviewMode && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: 'var(--brand-tint)', borderBottom: '1px solid var(--brand-soft)', color: 'var(--brand-3)', fontSize: 12, fontWeight: 800 }}>
+            <span style={{ flex: 1 }}>DEV 검수 모드 · 테스트 데이터 · 서버에 저장되지 않음</span>
+            <button onClick={exitDevReview} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--paper)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>검수 종료</button>
+          </div>
+        )}
 
         {/* 상단 바 */}
         <header className="topbar">
