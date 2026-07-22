@@ -878,11 +878,13 @@ const DataStore = {
      #641: 짹+저장(구 bookmark) → claps 단일 수렴. 자기 문장 좋아요(저장) 허용 — localStorage는 작성자 구분 없이 토글. */
   claps: {
     toggle(sentenceId) {
-      return localStorageAdapter.mutate(s => {
+      const liked = localStorageAdapter.mutate(s => {
         if (s.claps[sentenceId]) delete s.claps[sentenceId];
         else s.claps[sentenceId] = true;
         return !!s.claps[sentenceId];
       });
+      if (window.dispatchEvent && window.CustomEvent) window.dispatchEvent(new CustomEvent('rg:clap-changed', { detail: { sentenceId, liked } }));
+      return liked;
     },
     isMine(sentenceId) {
       return localStorageAdapter.mutate(s => !!s.claps[sentenceId]);
