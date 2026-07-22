@@ -70,6 +70,9 @@ ISBN 해석 (§2.1)
 | 모달 닫힘/언마운트 | `track`/`getUserMedia` 스트림 **반드시 stop**(카메라 LED·배터리 누수 방지) + 폴링 루프 취소. |
 | **해석 중 닫힘/재열림 (#1162)** | `resolveAndRoute`가 세대 토큰(`tokenRef`)을 잡고 await 후 재확인 — 닫힘/재열림이면 결과 폐기(닫힌 모달에 setState 금지). `handleClose`·open effect 가 토큰 증가. |
 | **해석 예외 후 스캐너 정지 (#1162)** | catch 에서 카메라면 `scanNonce`++ 로 open effect 재실행 → 카메라·디코드 루프 재시작(예외로 죽은 스캐너 부활). 미지원이면 'manual' 유지. |
+| **후면 카메라 초점 이탈 (#1290)** | track capability에 `continuous` focus가 있으면 시작 직후 우선 적용한다. 지원하지 않거나 `applyConstraints`가 실패해도 디코드 루프는 계속한다. |
+| **뷰파인더 탭 (#1290)** | 지원 track이면 탭 위치를 정규화한 `pointsOfInterest`와 single-shot focus/exposure를 best-effort 적용한다. 미지원이면 무반응으로 두지 않고 안내를 표시한다. |
+| **계속 흐림/정지 (#1290)** | 하단에 "초점 다시 맞추기"와 "카메라 다시 시작"을 제공한다. 재시작은 기존 track·rAF를 먼저 정리한 뒤 새 세대로 연다. ISBN 직접입력은 항상 유지한다. |
 
 - **개인정보**: 프레임은 **클라이언트에서만** BarcodeDetector 로 디코드 — **이미지 업로드 0**. (OCR 과 달리 서버 왕복 없음.) 분석엔 ISBN·성공여부만.
 - **분석 이벤트**(systems/analytics 합류): `barcode_scan_opened`, `barcode_detected`(matched: local|catalog|aladin|none), `barcode_register`(book_id).
@@ -128,7 +131,8 @@ async function barcodeScanSupported() {
 ## 7. 구현 메모 (Phase 0, 무의존)
 
 - 새 파일 `js/barcode-scan.js` — `BarcodeScanModal`(뷰파인더 + 디코드 루프) + `barcodeScanSupported()` + ISBN 해석기. `window.BarcodeScanModal` 전역 노출(파일 끝 `window.X=X` 패턴). `main.js` 에서 `search.js` 다음 import.
-- **카메라**: `getUserMedia({ video:{ facingMode:'environment' } })` → `<video autoplay playsinline muted>` → `requestAnimationFrame`(또는 250ms) 루프에서 `detector.detect(videoEl)`. 검출 시 루프 정지 + 스트림 stop. (읽기모드 OCR 은 *파일 입력*이지만, 바코드는 *연속 뷰파인더*가 lovable — 한 번 조준에 잡힘.)
+- **카메라**: `getUserMedia({ video:{ facingMode:{ideal:'environment'}, focusMode:{ideal:'continuous'} } })` → `<video autoplay playsinline muted>` → `requestAnimationFrame`(또는 250ms) 루프에서 `detector.detect(videoEl)`. 제약은 capability 확인 뒤 best-effort로 적용하며, 미지원/실패가 스캔 자체를 막지 않는다. 검출 시 루프 정지 + stream stop.
+- **초점 UX (#1290)**: 시작 직후 `track.getCapabilities()`/`getSettings()`를 읽어 continuous autofocus 지원 여부를 판단한다. 뷰파인더 탭은 지원 환경에서 정규화 좌표 `pointsOfInterest` + single-shot focus/exposure를 시도하고, 항상 짧은 시각 피드백을 준다. 하단에는 초점 재시도·카메라 재시작·ISBN 직접입력을 함께 둔다.
 - **매칭 재사용**: `normalizeIsbn13`(data.js) + `window.BOOK_BY_ID` + `window.loadBooks` + `RG_CONFIG.ALADIN_PROXY`. 등록은 `onSelectBook`(=`handleSearchSelectBook`). **신규 등록/저장 로직 0** — 전부 기존 경로.
 - **정리(cleanup)**: `useEffect` 반환에서 stream track stop + rAF cancel + detector 참조 해제. 모달은 닫힘/언마운트/검출 성공 모두에서 카메라를 끈다.
 - **DESIGN.md**: 전체화면 어두운 뷰파인더 + 중앙 가이드 프레임(EAN 가로 비율) + 하단 "직접 검색" 보조버튼(3차/텍스트 위계). 1차 솔리드 버튼은 결과 확정(책장 시트)에서만.
@@ -141,3 +145,4 @@ async function barcodeScanSupported() {
 - iOS 셸 (c) 플러그인 도입 + capability 분기(셸=네이티브, 웹=BarcodeDetector) — Phase 2, Stack Lock 결정 동반.
 - ISBN-10(구간 도서) 입력 시 → ISBN-13 변환(978 prefix + 체크섬) 후 매칭 — 현재는 EAN-13(=ISBN-13)만. 필요 판명 시 추가.
 - 다중 검출(한 프레임에 여러 바코드) 시 가장 큰/중앙 우선 — 현재 첫 EAN-13 채택. 실사용 데이터로 튜닝.
+- Android Chrome/Capacitor Android의 실제 기기별 autofocus·tap-to-focus 지원 편차는 실기기 검증표로 남긴다. 웹 API 미지원 기기는 ISBN 직접입력이 최종 폴백이다.
