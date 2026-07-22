@@ -249,6 +249,8 @@ function LibraryView({ state, onActivateUserBook }) {
   // 내 책(읽는중/완독) + 관심책 — 실 Supabase (양 어댑터 정규화). 데모 상수 미사용.
   _useEffect(() => {
     let alive = true;
+    const loadSavedCount = () => Promise.resolve((DataStore.claps && DataStore.claps.list) ? DataStore.claps.list() : [])
+      .then(rows => { if (alive) setSavedCount((rows || []).filter(row => row && row.sentence).length); }).catch(() => {});
     Promise.resolve(DataStore.myBooks.list()).then(rows => {
       if (!alive) return;
       setMyBooks((rows || []).map(ub => {
@@ -271,10 +273,11 @@ function LibraryView({ state, onActivateUserBook }) {
       setWishlistBooks((rows || []).map(_mapWish));
     }).catch(() => { if (alive) setWishlistBooks([]); });
     // ❤️ 좋아요한 문장 수 — stats행 카운트 (#471/#472→#641 claps 단일)
-    Promise.resolve((DataStore.claps && DataStore.claps.list) ? DataStore.claps.list() : []).then(rows => { if (alive) setSavedCount((rows || []).length); }).catch(() => {});
+    loadSavedCount();
     // 팔로잉/팔로워 수 — Supabase friends.counts (게스트/localStorage는 메서드 부재 → 0 유지) (#516)
     Promise.resolve((DataStore.friends && DataStore.friends.counts) ? DataStore.friends.counts() : { following: 0, followers: 0 }).then(c => { if (alive) setFollowCounts(c || { following: 0, followers: 0 }); }).catch(() => {});
-    return () => { alive = false; };
+    window.addEventListener('rg:clap-changed', loadSavedCount);
+    return () => { alive = false; window.removeEventListener('rg:clap-changed', loadSavedCount); };
   }, []);
 
   // 회고 저장 시 myBooks 의 해당 book.recap 즉시 갱신 (#404) — 모달 재오픈 시 stale 빈 화면 방지.

@@ -633,9 +633,11 @@
       async toggle(sentenceId) {
         const id = await uid();
         const ex = unwrap(await sb().from('claps').select('id').eq('from_user_id', id).eq('to_sentence_id', sentenceId).maybeSingle());
-        if (ex) { await sb().from('claps').delete().eq('id', ex.id); return false; }
-        await sb().from('claps').insert({ from_user_id: id, to_sentence_id: sentenceId });
-        return true;
+        const liked = !ex;
+        if (ex) await sb().from('claps').delete().eq('id', ex.id);
+        else await sb().from('claps').insert({ from_user_id: id, to_sentence_id: sentenceId });
+        if (window.dispatchEvent && window.CustomEvent) window.dispatchEvent(new CustomEvent('rg:clap-changed', { detail: { sentenceId, liked } }));
+        return liked;
       },
       async countFor(sentenceId) {
         const { count } = await sb().from('claps').select('*', { count: 'exact', head: true }).eq('to_sentence_id', sentenceId);
@@ -650,7 +652,7 @@
       // {sentence_id, sentence} 표면 유지(SentenceCollectionModal 호환). to_sentence_id → sentence_id 별칭.
       async list() {
         const id = await uid();
-        return unwrap(await sb().from('claps').select('sentence_id:to_sentence_id, sentence:sentences(*, user_book:user_books(book_id, book:books(title)))')
+        return unwrap(await sb().from('claps').select('sentence_id:to_sentence_id, sentence:sentences_public(*, user_book:user_books(book_id, book:books(title)))')
           .eq('from_user_id', id).order('created_at', { ascending: false }));
       },
     },

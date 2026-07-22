@@ -62,6 +62,20 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
     }).catch(() => { if (alive) { setMine([]); setSaved([]); } });
     return () => { alive = false; };
   }, []);
+  useEffect(() => {
+    const onClapChanged = (event) => {
+      const detail = event && event.detail;
+      if (!detail || !detail.sentenceId) return;
+      setFavIds((current) => {
+        const next = new Set(current);
+        if (detail.liked) next.add(detail.sentenceId);
+        else next.delete(detail.sentenceId);
+        return next;
+      });
+    };
+    window.addEventListener('rg:clap-changed', onClapChanged);
+    return () => window.removeEventListener('rg:clap-changed', onClapChanged);
+  }, []);
   const list = mine || [];
   // #608/#641: 좋아요 필터 풀 = 내 문장 + 좋아요한 타인 문장. 전체/책별은 내 문장(list)만.
   const favPool = list.concat(saved);
