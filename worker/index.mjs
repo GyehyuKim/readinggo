@@ -89,6 +89,12 @@ export default {
       { const rl = await rateLimited(request, env, 'prompt-lab'); if (rl) return rl; }
       return promptLabProxy(request, env);
     }
+    // Judy용 Solar prompt 실험 API (#1330). 운영에는 경로 자체를 노출하지 않는다.
+    // 외부 도구가 합성 fixture를 stateless JSON으로 보내며 운영 prompt/사용자 DB는 읽거나 쓰지 않는다.
+    if (p === '/api/prompt-experiments/run') {
+      if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
+      return promptExperimentProxy(request, env, ctx);
+    }
     // 독서 위키 Q&A — "내 문장에게 묻기" (#1007). 사용자가 모은 한 문장(+감상)에만 근거해 답.
     // companion 형제 — 같은 LLM 프록시(callLLM)·동일출처 가드·키 서버보관. 클라가 내 문장만 전송.
     if (p === '/api/wiki-ask') {
@@ -442,6 +448,281 @@ async function deleteAccountProxy(request, env) {
     if (!r.ok) { const t = await r.text(); return json({ error: 'delete failed', detail: String(t).slice(0, 200) }, 502); }
   } catch (e) { return json({ error: 'delete failed' }, 502); }
   return json({ ok: true }, 200, 0);
+}
+
+/* ── Solar prompt experiment API (#1330) — DEV·합성 데이터 전용 ─────── */
+const PE_PROTOCOL_VERSION = '1.0';
+const PE_DEFAULT_DAILY_LIMIT = 1000;
+const PE_DEFAULT_MINUTE_LIMIT = 60;
+const PE_LOG_TTL_SECONDS = 90 * 24 * 60 * 60;
+const PE_PRESETS = new Set(['balanced', 'deep', 'light', 'emotional', 'critical', 'context', 'author']);
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function peConstantTimeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i += 1) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return mismatch === 0;
+}
+
+async function promptExperimentActor(request, env) {
+  const configured = String(env.PROMPT_EXPERIMENT_TOKEN || '');
+  if (!configured) { const e = new Error('experiment unavailable'); e.status = 503; throw e; }
+  const auth = request.headers.get('Authorization') || '';
+  const supplied = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!supplied) { const e = new Error('unauthorized'); e.status = 401; throw e; }
+  const [expectedHash, suppliedHash] = await Promise.all([sha256Hex(configured), sha256Hex(supplied)]);
+  if (!peConstantTimeEqual(expectedHash, suppliedHash)) { const e = new Error('unauthorized'); e.status = 401; throw e; }
+  return { id: suppliedHash.slice(0, 16), label: 'judy' };
+}
+
+function peObject(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : null; }
+function peString(value, path, min, max, errors, required = false) {
+  if (value == null || value === '') {
+    if (required) errors.push(`${path} is required`);
+    return '';
+  }
+  if (typeof value !== 'string') { errors.push(`${path} must be a string`); return ''; }
+  const text = value.trim();
+  if (text.length < min || text.length > max) errors.push(`${path} length must be ${min}..${max}`);
+  return text;
+}
+function peUnknown(obj, allowed, path, errors) {
+  if (!obj) return;
+  for (const key of Object.keys(obj)) if (!allowed.has(key)) errors.push(`${path}.${key} is not allowed`);
+}
+
+function validatePromptExperiment(raw) {
+  const errors = [];
+  const body = peObject(raw);
+  if (!body) return { errors: ['body must be a JSON object'] };
+  peUnknown(body, new Set(['protocol_version', 'data_classification', 'experiment', 'prompt', 'input', 'history', 'generation', 'trace']), '$', errors);
+  if (body.protocol_version !== PE_PROTOCOL_VERSION) errors.push(`protocol_version must be ${PE_PROTOCOL_VERSION}`);
+  if (body.data_classification !== 'synthetic') errors.push('data_classification must be synthetic');
+
+  const experiment = peObject(body.experiment);
+  if (!experiment) errors.push('experiment must be an object');
+  peUnknown(experiment, new Set(['id', 'variant', 'note']), 'experiment', errors);
+  const experimentId = peString(experiment && experiment.id, 'experiment.id', 1, 100, errors, true);
+  const variant = peString(experiment && experiment.variant, 'experiment.variant', 1, 100, errors, true);
+  const note = peString(experiment && experiment.note, 'experiment.note', 0, 500, errors);
+
+  const prompt = peObject(body.prompt);
+  if (!prompt) errors.push('prompt must be an object');
+  peUnknown(prompt, new Set(['system', 'first_turn_instruction', 'followup_instruction', 'constraints']), 'prompt', errors);
+  const system = peString(prompt && prompt.system, 'prompt.system', 20, 12000, errors, true);
+  const firstTurn = peString(prompt && prompt.first_turn_instruction, 'prompt.first_turn_instruction', 0, 4000, errors);
+  const followup = peString(prompt && prompt.followup_instruction, 'prompt.followup_instruction', 0, 4000, errors);
+  const rawConstraints = prompt && prompt.constraints == null ? [] : prompt && prompt.constraints;
+  if (!Array.isArray(rawConstraints) || rawConstraints.length > 20) errors.push('prompt.constraints must be an array with at most 20 items');
+  const constraints = Array.isArray(rawConstraints) ? rawConstraints.map((v, i) => peString(v, `prompt.constraints[${i}]`, 1, 500, errors, true)) : [];
+
+  const input = peObject(body.input);
+  if (!input) errors.push('input must be an object');
+  peUnknown(input, new Set(['book', 'kind', 'sentence', 'comment', 'preset']), 'input', errors);
+  if (input && input.book != null && !peObject(input.book)) errors.push('input.book must be an object');
+  const book = peObject(input && input.book) || {};
+  peUnknown(book, new Set(['title', 'author', 'brief']), 'input.book', errors);
+  const bookTitle = peString(book.title, 'input.book.title', 0, 200, errors);
+  const author = peString(book.author, 'input.book.author', 0, 120, errors);
+  const brief = peString(book.brief, 'input.book.brief', 0, 2000, errors);
+  const kind = input && input.kind;
+  if (kind !== 'quote' && kind !== 'thought') errors.push('input.kind must be quote or thought');
+  const sentence = peString(input && input.sentence, 'input.sentence', 1, 1000, errors, true);
+  const comment = peString(input && input.comment, 'input.comment', 0, 1000, errors);
+  const preset = input && input.preset == null ? 'balanced' : peString(input.preset, 'input.preset', 1, 20, errors, true);
+  if (preset && !PE_PRESETS.has(preset)) errors.push('input.preset is not supported');
+
+  const rawHistory = body.history == null ? [] : body.history;
+  if (!Array.isArray(rawHistory) || rawHistory.length > 12 || rawHistory.length % 2 !== 0) {
+    errors.push('history must contain at most 12 assistant/user messages in pairs');
+  }
+  const history = [];
+  if (Array.isArray(rawHistory)) rawHistory.slice(0, 12).forEach((item, i) => {
+    const msg = peObject(item);
+    if (!msg) { errors.push(`history[${i}] must be an object`); return; }
+    peUnknown(msg, new Set(['role', 'content']), `history[${i}]`, errors);
+    const expectedRole = i % 2 === 0 ? 'assistant' : 'user';
+    if (msg.role !== expectedRole) errors.push(`history[${i}].role must be ${expectedRole}`);
+    history.push({ role: expectedRole, content: peString(msg.content, `history[${i}].content`, 1, 2000, errors, true) });
+  });
+
+  const generation = body.generation == null ? {} : peObject(body.generation);
+  if (!generation) errors.push('generation must be an object');
+  peUnknown(generation, new Set(['temperature', 'max_tokens']), 'generation', errors);
+  const rawTemperature = generation && generation.temperature;
+  const rawMaxTokens = generation && generation.max_tokens;
+  const temperature = rawTemperature == null ? 0.8 : rawTemperature;
+  const maxTokens = rawMaxTokens == null ? 220 : rawMaxTokens;
+  if (typeof temperature !== 'number' || !Number.isFinite(temperature) || temperature < 0 || temperature > 2) errors.push('generation.temperature must be a number 0..2');
+  if (typeof maxTokens !== 'number' || !Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 1000) errors.push('generation.max_tokens must be an integer 1..1000');
+
+  const trace = body.trace == null ? {} : peObject(body.trace);
+  if (!trace) errors.push('trace must be an object');
+  peUnknown(trace, new Set(['include_compiled_messages']), 'trace', errors);
+  const includeCompiled = !trace || trace.include_compiled_messages !== false;
+  if (trace && trace.include_compiled_messages != null && typeof trace.include_compiled_messages !== 'boolean') {
+    errors.push('trace.include_compiled_messages must be boolean');
+  }
+
+  return { errors, value: {
+    experiment: { id: experimentId, variant, note },
+    prompt: { system, firstTurn, followup, constraints },
+    input: { bookTitle, author, brief, kind, sentence, comment, preset },
+    history, generation: { temperature, maxTokens }, includeCompiled,
+  } };
+}
+
+function compilePromptExperiment(v) {
+  const system = v.prompt.system + (v.prompt.constraints.length
+    ? `\n\n추가 제약:\n${v.prompt.constraints.map((x) => `- ${x}`).join('\n')}` : '');
+  let initial = `책: ${v.input.bookTitle || '(제목 미상)'}${v.input.author ? ` — ${v.input.author}` : ''}`;
+  if (v.input.brief) initial += `\n책 브리프: ${v.input.brief}`;
+  initial += v.input.kind === 'thought'
+    ? `\n읽다가 든 독자의 생각: "${v.input.sentence}"\n이 문장은 책의 인용이 아니라 독자의 생각입니다.`
+    : `\n책에서 옮겨 적은 한 문장: "${v.input.sentence}"`;
+  if (v.input.comment) initial += `\n독자의 감상: ${v.input.comment}`;
+  const messages = [{ role: 'system', content: system }, { role: 'user', content: initial }, ...v.history];
+  let instruction = v.history.length ? v.prompt.followup : v.prompt.firstTurn;
+  const presetTone = PRESET_TONE[v.input.preset] || '';
+  if (presetTone) instruction += `${instruction ? '\n' : ''}질문의 결: ${presetTone}`;
+  if (instruction) messages.push({ role: 'user', content: instruction });
+  return messages;
+}
+
+function peLimitNumber(value, fallback, min, max) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= min && n <= max ? n : fallback;
+}
+function peKstDay() { return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10); }
+
+async function promptExperimentLimit(env, actorId) {
+  if (!env.OTA_KV) { const e = new Error('limit storage unavailable'); e.status = 503; throw e; }
+  const minuteLimit = peLimitNumber(env.PROMPT_EXPERIMENT_MINUTE_LIMIT, PE_DEFAULT_MINUTE_LIMIT, 1, 1000);
+  const dailyLimit = peLimitNumber(env.PROMPT_EXPERIMENT_DAILY_LIMIT, PE_DEFAULT_DAILY_LIMIT, 1, 100000);
+  const minuteKey = `pe:minute:${actorId}:${Math.floor(Date.now() / 60000)}`;
+  const dayKey = `pe:day:${actorId}:${peKstDay()}`;
+  let minuteUsed, dailyUsed;
+  try {
+    const [m, d] = await Promise.all([env.OTA_KV.get(minuteKey), env.OTA_KV.get(dayKey)]);
+    minuteUsed = Number.parseInt(m || '0', 10) || 0;
+    dailyUsed = Number.parseInt(d || '0', 10) || 0;
+    if (minuteUsed >= minuteLimit) { const e = new Error('minute limit exceeded'); e.status = 429; e.code = 'MINUTE_LIMIT_EXCEEDED'; throw e; }
+    if (dailyUsed >= dailyLimit) { const e = new Error('daily limit exceeded'); e.status = 429; e.code = 'DAILY_LIMIT_EXCEEDED'; throw e; }
+    await Promise.all([
+      env.OTA_KV.put(minuteKey, String(minuteUsed + 1), { expirationTtl: 120 }),
+      env.OTA_KV.put(dayKey, String(dailyUsed + 1), { expirationTtl: 172800 }),
+    ]);
+  } catch (e) {
+    if (e && e.status) throw e;
+    const unavailable = new Error('limit storage unavailable'); unavailable.status = 503; throw unavailable;
+  }
+  return { minuteLimit, minuteUsed: minuteUsed + 1, dailyLimit, dailyUsed: dailyUsed + 1 };
+}
+
+async function callLLMWithMeta({ messages, env, maxTokens, temperature }) {
+  const base = String(env.LLM_BASE_URL || '').replace(/\/$/, '');
+  const requestedModel = String(env.LLM_MODEL || '');
+  if (!base || !requestedModel || !env.UPSTAGE_API_KEY) { const e = new Error('provider unavailable'); e.status = 503; throw e; }
+  const started = Date.now();
+  const response = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.UPSTAGE_API_KEY}` },
+    body: JSON.stringify({ model: requestedModel, messages, temperature, max_tokens: maxTokens }),
+  });
+  const latencyMs = Date.now() - started;
+  if (!response.ok) { const e = new Error('provider request failed'); e.status = 502; e.providerStatus = response.status; e.latencyMs = latencyMs; throw e; }
+  const data = await response.json();
+  const choice = data && data.choices && data.choices[0];
+  const content = String(choice && choice.message && choice.message.content || '').trim();
+  if (!content) { const e = new Error('provider returned empty output'); e.status = 502; e.latencyMs = latencyMs; throw e; }
+  const usage = data && peObject(data.usage);
+  const numberOrNull = (n) => n == null || n === '' || !Number.isFinite(Number(n)) ? null : Number(n);
+  return {
+    content, finishReason: choice.finish_reason || null,
+    requestedModel, resolvedModel: data.model || requestedModel, latencyMs,
+    usage: {
+      prompt_tokens: numberOrNull(usage && usage.prompt_tokens),
+      completion_tokens: numberOrNull(usage && usage.completion_tokens),
+      total_tokens: numberOrNull(usage && usage.total_tokens),
+      source: usage ? 'provider' : 'unavailable',
+    },
+  };
+}
+
+async function promptExperimentLog(env, record) {
+  if (!env.OTA_KV) return;
+  try { await env.OTA_KV.put(`pe:run:${record.run_id}`, JSON.stringify(record), { expirationTtl: PE_LOG_TTL_SECONDS }); } catch (e) { /* 실행 결과는 로그 장애와 분리 */ }
+}
+
+async function promptExperimentProxy(request, env, ctx) {
+  if (request.method !== 'POST') return json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'POST only' } }, 405);
+  const origin = request.headers.get('Origin');
+  if (origin) return json({ error: { code: 'FORBIDDEN_ORIGIN', message: 'browser origins are not allowed' } }, 403);
+  let actor;
+  try { actor = await promptExperimentActor(request, env); }
+  catch (e) { return json({ error: { code: e.status === 503 ? 'UNAVAILABLE' : 'UNAUTHORIZED', message: e.status === 503 ? 'experiment API unavailable' : 'invalid experiment token' } }, e.status || 401); }
+
+  let raw;
+  try {
+    const text = await request.text();
+    if (new TextEncoder().encode(text).byteLength > 100000) return json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'request body exceeds 100KB' } }, 413);
+    raw = JSON.parse(text);
+  } catch (e) { return json({ error: { code: 'INVALID_JSON', message: 'request body must be valid JSON' } }, 400); }
+  const checked = validatePromptExperiment(raw);
+  if (checked.errors.length) return json({ error: { code: 'VALIDATION_ERROR', message: 'request does not match jacky-experiment/v1', details: checked.errors.slice(0, 30) } }, 400);
+
+  let limits;
+  try { limits = await promptExperimentLimit(env, actor.id); }
+  catch (e) {
+    const status = e.status || 503;
+    return json({ error: { code: e.code || 'LIMIT_STORAGE_UNAVAILABLE', message: status === 429 ? e.message : 'usage limits unavailable' } }, status);
+  }
+
+  const value = checked.value;
+  const messages = compilePromptExperiment(value);
+  const runId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const [promptHash, inputHash] = await Promise.all([
+    sha256Hex(JSON.stringify(messages)),
+    sha256Hex(JSON.stringify({ input: value.input, history: value.history })),
+  ]);
+  try {
+    const result = await callLLMWithMeta({ messages, env, maxTokens: value.generation.maxTokens, temperature: value.generation.temperature });
+    const record = {
+      run_id: runId, actor: actor.label, experiment_id: value.experiment.id, variant: value.experiment.variant,
+      requested_model: result.requestedModel, resolved_model: result.resolvedModel,
+      prompt_hash: promptHash, input_hash: inputHash, ...result.usage,
+      latency_ms: result.latencyMs, status: 'completed', created_at: createdAt,
+    };
+    const logging = promptExperimentLog(env, record);
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(logging); else await logging;
+    return json({
+      protocol_version: PE_PROTOCOL_VERSION,
+      run: { id: runId, experiment_id: value.experiment.id, variant: value.experiment.variant, created_at: createdAt },
+      model: { provider: 'upstage', requested: result.requestedModel, resolved: result.resolvedModel },
+      result: { content: result.content, finish_reason: result.finishReason },
+      usage: result.usage,
+      performance: { latency_ms: result.latencyMs },
+      limits: { minute: { used: limits.minuteUsed, limit: limits.minuteLimit }, daily: { used: limits.dailyUsed, limit: limits.dailyLimit, timezone: 'Asia/Seoul' } },
+      trace: { prompt_hash: promptHash, input_hash: inputHash, ...(value.includeCompiled ? { compiled_messages: messages } : {}) },
+    }, 200);
+  } catch (e) {
+    const record = {
+      run_id: runId, actor: actor.label, experiment_id: value.experiment.id, variant: value.experiment.variant,
+      requested_model: env.LLM_MODEL || null, resolved_model: null, prompt_hash: promptHash, input_hash: inputHash,
+      prompt_tokens: null, completion_tokens: null, total_tokens: null,
+      latency_ms: e && e.latencyMs || null, status: 'failed', error_code: e && e.status === 503 ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_ERROR', created_at: createdAt,
+    };
+    const logging = promptExperimentLog(env, record);
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(logging); else await logging;
+    return json({ error: { code: record.error_code, message: e && e.status === 503 ? 'Solar is not configured' : 'Solar request failed', run_id: runId } }, e && e.status || 502);
+  }
 }
 
 /* ── Prompt Lab (#1304) — 서버 역할 보호 + 합성 fixture 전용 ─────────── */

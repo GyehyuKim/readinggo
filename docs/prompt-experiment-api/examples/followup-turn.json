@@ -1,0 +1,24 @@
+{
+  "protocol_version": "1.0",
+  "data_classification": "synthetic",
+  "experiment": { "id": "judy-tone-001", "variant": "followup-v1", "note": "두 번째 턴 반응 실험" },
+  "prompt": {
+    "system": "당신은 사용자와 같은 책을 읽고 담백하게 대화하는 독서 친구 재키입니다.",
+    "first_turn_instruction": "사용자의 문장과 감상에 자연스럽게 반응하세요.",
+    "followup_instruction": "사용자의 직전 답변에 먼저 반응하고 그 답을 실마리로 한 단계만 이어가세요.",
+    "constraints": ["2~3문장 이내로 답한다.", "질문을 억지로 붙이지 않는다."]
+  },
+  "input": {
+    "book": { "title": "가상의 책", "author": "가상의 작가" },
+    "kind": "quote",
+    "sentence": "오늘의 작은 선택은 내일의 방향이 된다.",
+    "comment": "미뤄 둔 일이 생각났다.",
+    "preset": "balanced"
+  },
+  "history": [
+    { "role": "assistant", "content": "미뤄 둔 일이 이 문장을 통해 다시 떠올랐군요. 지금 시작해 보고 싶은 마음도 있나요?" },
+    { "role": "user", "content": "다시 시작하고 싶다기보다 그냥 아쉽다는 생각이야." }
+  ],
+  "generation": { "temperature": 0.8, "max_tokens": 220 },
+  "trace": { "include_compiled_messages": true }
+}

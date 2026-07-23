@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readinggo-dev.hyuniverse.workers.dev/schemas/jacky-experiment-v1.schema.json",
+  "title": "ReadingGo Jacky prompt experiment request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "data_classification", "experiment", "prompt", "input"],
+  "properties": {
+    "protocol_version": { "const": "1.0" },
+    "data_classification": { "const": "synthetic" },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "variant"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "variant": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "note": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "prompt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system"],
+      "properties": {
+        "system": { "type": "string", "minLength": 20, "maxLength": 12000 },
+        "first_turn_instruction": { "type": "string", "maxLength": 4000 },
+        "followup_instruction": { "type": "string", "maxLength": 4000 },
+        "constraints": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sentence"],
+      "properties": {
+        "book": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": { "type": "string", "maxLength": 200 },
+            "author": { "type": "string", "maxLength": 120 },
+            "brief": { "type": "string", "maxLength": 2000 }
+          }
+        },
+        "kind": { "enum": ["quote", "thought"] },
+        "sentence": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "comment": { "type": "string", "maxLength": 1000 },
+        "preset": { "enum": ["balanced", "deep", "light", "emotional", "critical", "context", "author"] }
+      }
+    },
+    "history": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "content"],
+        "properties": {
+          "role": { "enum": ["assistant", "user"] },
+          "content": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        }
+      },
+      "description": "assistant, user 순서의 완전한 쌍만 허용합니다. 서버가 순서와 짝수를 추가 검증합니다."
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2, "default": 0.8 },
+        "max_tokens": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 220 }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include_compiled_messages": { "type": "boolean", "default": true }
+      }
+    }
+  }
+}

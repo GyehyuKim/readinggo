@@ -1,0 +1,171 @@
+openapi: 3.1.0
+info:
+  title: ReadingGo Solar Prompt Experiment API
+  version: 1.0.0
+  description: 개발 환경에서 합성 데이터로 Upstage Solar 프롬프트를 실행하는 내부 API입니다.
+servers:
+  - url: https://readinggo-dev.hyuniverse.workers.dev
+    description: ReadingGo development Worker
+paths:
+  /api/prompt-experiments/run:
+    post:
+      operationId: runPromptExperiment
+      summary: Solar 프롬프트 실험 1건 실행
+      description: 요청은 독립적이며 클라이언트가 여러 요청을 병렬로 실행할 수 있습니다. Production에서는 이 경로가 404를 반환합니다.
+      security:
+        - experimentToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./jacky-experiment-v1.schema.json
+            examples:
+              firstTurn:
+                externalValue: ./examples/first-turn.json
+      responses:
+        '200':
+          description: Solar 실행 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResponse'
+        '400':
+          description: JSON 파싱 또는 계약 검증 실패
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
+          description: 실험 토큰 누락 또는 불일치
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403':
+          description: 브라우저 Origin 요청 차단
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: Production 또는 존재하지 않는 경로
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+        '413':
+          description: 요청 본문이 100KB를 초과함
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          description: 분당 또는 일일 호출 제한 초과
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '502':
+          description: Solar 요청 또는 응답 오류
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: 토큰, 한도 저장소 또는 Solar 설정 없음
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+components:
+  securitySchemes:
+    experimentToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    Message:
+      type: object
+      required: [role, content]
+      properties:
+        role: { type: string, enum: [system, user, assistant] }
+        content: { type: string }
+    NullableTokenCount:
+      type: [integer, 'null']
+      minimum: 0
+    Usage:
+      type: object
+      required: [prompt_tokens, completion_tokens, total_tokens, source]
+      properties:
+        prompt_tokens: { $ref: '#/components/schemas/NullableTokenCount' }
+        completion_tokens: { $ref: '#/components/schemas/NullableTokenCount' }
+        total_tokens: { $ref: '#/components/schemas/NullableTokenCount' }
+        source: { type: string, enum: [provider, unavailable] }
+    RunResponse:
+      type: object
+      required: [protocol_version, run, model, result, usage, performance, limits, trace]
+      properties:
+        protocol_version: { type: string, const: '1.0' }
+        run:
+          type: object
+          required: [id, experiment_id, variant, created_at]
+          properties:
+            id: { type: string, format: uuid }
+            experiment_id: { type: string }
+            variant: { type: string }
+            created_at: { type: string, format: date-time }
+        model:
+          type: object
+          required: [provider, requested, resolved]
+          properties:
+            provider: { type: string, const: upstage }
+            requested: { type: string }
+            resolved: { type: string }
+        result:
+          type: object
+          required: [content, finish_reason]
+          properties:
+            content: { type: string }
+            finish_reason: { type: [string, 'null'] }
+        usage: { $ref: '#/components/schemas/Usage' }
+        performance:
+          type: object
+          required: [latency_ms]
+          properties:
+            latency_ms: { type: integer, minimum: 0 }
+        limits:
+          type: object
+          required: [minute, daily]
+          properties:
+            minute:
+              type: object
+              required: [used, limit]
+              properties:
+                used: { type: integer, minimum: 1 }
+                limit: { type: integer, minimum: 1 }
+            daily:
+              type: object
+              required: [used, limit, timezone]
+              properties:
+                used: { type: integer, minimum: 1 }
+                limit: { type: integer, minimum: 1 }
+                timezone: { type: string, const: Asia/Seoul }
+        trace:
+          type: object
+          required: [prompt_hash, input_hash]
+          properties:
+            prompt_hash: { type: string, pattern: '^[a-f0-9]{64}$' }
+            input_hash: { type: string, pattern: '^[a-f0-9]{64}$' }
+            compiled_messages:
+              type: array
+              items: { $ref: '#/components/schemas/Message' }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: array
+              items: { type: string }
+            run_id: { type: string, format: uuid }

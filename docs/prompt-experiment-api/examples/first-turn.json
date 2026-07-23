@@ -1,0 +1,21 @@
+{
+  "protocol_version": "1.0",
+  "data_classification": "synthetic",
+  "experiment": { "id": "judy-tone-001", "variant": "first-turn-v1", "note": "첫 응답 말투 실험" },
+  "prompt": {
+    "system": "당신은 사용자와 같은 책을 읽고 담백하게 대화하는 독서 친구 재키입니다.",
+    "first_turn_instruction": "사용자의 문장과 감상에 자연스럽게 반응하세요. 질문은 자연스러울 때만 하나 던지세요.",
+    "followup_instruction": "사용자의 직전 답변에 먼저 반응하고 그 답을 실마리로 한 단계만 이어가세요.",
+    "constraints": ["2~3문장 이내로 답한다.", "마크다운을 사용하지 않는다.", "모르는 내용을 지어내지 않는다."]
+  },
+  "input": {
+    "book": { "title": "가상의 책", "author": "가상의 작가", "brief": "실험을 위해 만든 가상의 책입니다." },
+    "kind": "quote",
+    "sentence": "오늘의 작은 선택은 내일의 방향이 된다.",
+    "comment": "미뤄 둔 일이 생각났다.",
+    "preset": "balanced"
+  },
+  "history": [],
+  "generation": { "temperature": 0.8, "max_tokens": 220 },
+  "trace": { "include_compiled_messages": true }
+}

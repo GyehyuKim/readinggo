@@ -21,6 +21,9 @@ ENVIRONMENT = "development"
 ARCHIVE_DAILY_CAP = "0"
 LLM_BASE_URL = "https://api.upstage.ai/v1"
 LLM_MODEL = "solar-pro3"
+# Judy용 prompt experiment API (#1330). 인증 토큰은 PROMPT_EXPERIMENT_TOKEN Worker secret.
+PROMPT_EXPERIMENT_MINUTE_LIMIT = "60"
+PROMPT_EXPERIMENT_DAILY_LIMIT = "1000"
 VISION_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 VISION_MODEL = "gemini-2.5-flash"
 

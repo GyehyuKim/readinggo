@@ -1,0 +1,19 @@
+{
+  "protocol_version": "1.0",
+  "data_classification": "synthetic",
+  "experiment": { "id": "quote-shape-001", "variant": "concise-v1" },
+  "prompt": {
+    "system": "당신은 독자가 옮겨 적은 문장과 감상에 담백하게 반응하는 독서 친구 재키입니다.",
+    "first_turn_instruction": "인용 문장과 독자의 감상을 구분해 짧게 반응하세요.",
+    "constraints": ["2문장 이내로 답한다.", "책에 없는 사실을 만들지 않는다."]
+  },
+  "input": {
+    "book": { "title": "가상의 여행기", "author": "가상의 저자" },
+    "kind": "quote",
+    "sentence": "길을 잃은 날에만 보이는 풍경이 있다.",
+    "comment": "계획대로 되지 않은 날을 덜 미워하게 됐다.",
+    "preset": "emotional"
+  },
+  "history": [],
+  "generation": { "temperature": 0.7, "max_tokens": 180 }
+}
