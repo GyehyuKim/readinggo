@@ -2,6 +2,8 @@
 
 이 API는 Judy가 ReadingGo 개발 환경에서 실제 Upstage Solar 모델의 프롬프트를 반복·병렬 실험할 수 있도록 설계된 내부 도구입니다.
 
+> **팀에 전달할 때**: [Judy·Jerome 복사·붙여넣기용 안내문](./HANDOFF.md)을 사용하세요.
+
 ## 핵심 원칙
 - **개발 전용**: `readinggo-dev.hyuniverse.workers.dev`에서만 작동합니다. 운영 서버에서는 404를 반환합니다.
 - **합성 데이터**: 실제 사용자 기록을 사용하지 마세요. 모든 실험 데이터는 `data_classification: "synthetic"`이어야 합니다.
