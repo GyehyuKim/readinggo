@@ -94,6 +94,16 @@ jobs:
             --var "SUPABASE_URL:$DEV_SUPABASE_URL" --var "RELEASE_SHA:$GITHUB_SHA" 2>&1 | tee /dev/stderr)
           URL=$(printf '%s\n' "$OUT" | awk '/Version Preview URL:/ {gsub(/.*Version Preview URL: /, ""); print; exit}')
           if [ -z "$URL" ]; then
+            # 새 전용 Worker는 versions upload만으로 workers.dev/preview 설정이 활성화되지 않을 수 있다.
+            # 전용 UI preview Worker에만 최초 배포해 non-versioned 설정을 적용한 뒤 새 version을 올린다.
+            echo "::notice::readinggo-ui-preview 최초 설정을 적용한 뒤 version upload를 재시도합니다."
+            npx --yes wrangler@4 deploy -c .wrangler.preview.toml \
+              --var "SUPABASE_URL:$DEV_SUPABASE_URL" --var "RELEASE_SHA:$GITHUB_SHA"
+            OUT=$(npx --yes wrangler@4 versions upload -c .wrangler.preview.toml \
+              --var "SUPABASE_URL:$DEV_SUPABASE_URL" --var "RELEASE_SHA:$GITHUB_SHA" 2>&1 | tee /dev/stderr)
+            URL=$(printf '%s\n' "$OUT" | awk '/Version Preview URL:/ {gsub(/.*Version Preview URL: /, ""); print; exit}')
+          fi
+          if [ -z "$URL" ]; then
             echo "::error::Version Preview URL 추출 실패 — wrangler 출력 형식/preview_urls 설정 확인 (wrangler.toml preview_urls=true)."
             exit 1
           fi
