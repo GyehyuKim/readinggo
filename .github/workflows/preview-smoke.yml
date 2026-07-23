@@ -67,7 +67,25 @@ jobs:
         run: |
           set -o pipefail
           # DEV 전용 config/binding/secret만 사용한다. production Worker에는 버전조차 업로드하지 않는다.
-          OUT=$(npx --yes wrangler@4 versions upload -c wrangler.dev.toml \
+          # versions upload는 신규 Durable Object migration을 적용할 수 없다(code 10211).
+          # UI edge smoke에는 limiter가 필요 없으므로 preview version에서만 DO binding/migration을 제거한다.
+          # main의 non-versioned deploy는 원본 wrangler.dev.toml로 migration을 적용한다.
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('wrangler.dev.toml').read_text()
+          output = []
+          skipping = False
+          for line in source.splitlines():
+              if line in ('[[durable_objects.bindings]]', '[[migrations]]'):
+                  skipping = True
+                  continue
+              if skipping and line.startswith('['):
+                  skipping = False
+              if not skipping:
+                  output.append(line)
+          Path('.wrangler.preview.toml').write_text('\n'.join(output) + '\n')
+          PY
+          OUT=$(npx --yes wrangler@4 versions upload -c .wrangler.preview.toml \
             --var "SUPABASE_URL:$DEV_SUPABASE_URL" --var "RELEASE_SHA:$GITHUB_SHA" 2>&1 | tee /dev/stderr)
           URL=$(printf '%s\n' "$OUT" | awk '/Version Preview URL:/ {gsub(/.*Version Preview URL: /, ""); print; exit}')
           if [ -z "$URL" ]; then

@@ -58,6 +58,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '415':
+          description: Content-Type이 application/json이 아님
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '429':
           description: 분당 또는 일일 호출 제한 초과
           content:
@@ -70,6 +75,11 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
         '503':
           description: 토큰, 한도 저장소 또는 Solar 설정 없음
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '504':
+          description: Solar가 제한 시간 안에 응답하지 않음
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -135,16 +145,18 @@ components:
           properties:
             minute:
               type: object
-              required: [used, limit]
+              required: [used, limit, remaining]
               properties:
                 used: { type: integer, minimum: 1 }
                 limit: { type: integer, minimum: 1 }
+                remaining: { type: integer, minimum: 0 }
             daily:
               type: object
-              required: [used, limit, timezone]
+              required: [used, limit, remaining, timezone]
               properties:
                 used: { type: integer, minimum: 1 }
                 limit: { type: integer, minimum: 1 }
+                remaining: { type: integer, minimum: 0 }
                 timezone: { type: string, const: Asia/Seoul }
         trace:
           type: object

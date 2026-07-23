@@ -32,6 +32,39 @@ const nlkReady = (env) => !legacyForced(env) && !!env.NLK_CERT_KEY;
 const isAppOrigin = (o) =>
   o === 'capacitor://localhost' || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
 
+// Judy prompt experiment 호출량을 actor별 단일 Durable Object에서 원자적으로 예약한다 (#1332).
+// KV read-modify-write는 병렬 요청에서 한도를 우회하므로 사용하지 않는다.
+export class PromptExperimentLimiter {
+  constructor(state) { this.storage = state.storage; }
+
+  async fetch(request) {
+    if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+    let body;
+    try { body = await request.json(); } catch (e) { return json({ error: 'invalid request' }, 400); }
+    const minuteLimit = peLimitNumber(body && body.minuteLimit, PE_DEFAULT_MINUTE_LIMIT, 1, 1000);
+    const dailyLimit = peLimitNumber(body && body.dailyLimit, PE_DEFAULT_DAILY_LIMIT, 1, 100000);
+    const minuteBucket = String(body && body.minuteBucket || '');
+    const day = String(body && body.day || '');
+    if (!minuteBucket || !day) return json({ error: 'invalid request' }, 400);
+
+    return this.storage.transaction(async (txn) => {
+      const minuteState = await txn.get('minute');
+      const dailyState = await txn.get('daily');
+      const minuteUsed = minuteState && minuteState.bucket === minuteBucket ? minuteState.used : 0;
+      const dailyUsed = dailyState && dailyState.day === day ? dailyState.used : 0;
+      if (minuteUsed >= minuteLimit) return json({ code: 'MINUTE_LIMIT_EXCEEDED', message: 'minute limit exceeded' }, 429);
+      if (dailyUsed >= dailyLimit) return json({ code: 'DAILY_LIMIT_EXCEEDED', message: 'daily limit exceeded' }, 429);
+      const nextMinute = minuteUsed + 1;
+      const nextDaily = dailyUsed + 1;
+      await txn.put({
+        minute: { bucket: minuteBucket, used: nextMinute },
+        daily: { day, used: nextDaily },
+      });
+      return json({ minuteUsed: nextMinute, dailyUsed: nextDaily, minuteLimit, dailyLimit });
+    });
+  }
+}
+
 export default {
   // ── HTTP: CORS 래퍼 (#1230) — 앱 오리진의 교차출처 API 호출에 preflight/ACAO 응답 ──
   async fetch(request, env, ctx) {
@@ -602,27 +635,23 @@ function peLimitNumber(value, fallback, min, max) {
 function peKstDay() { return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10); }
 
 async function promptExperimentLimit(env, actorId) {
-  if (!env.OTA_KV) { const e = new Error('limit storage unavailable'); e.status = 503; throw e; }
+  if (!env.PROMPT_EXPERIMENT_LIMITER) { const e = new Error('limit storage unavailable'); e.status = 503; throw e; }
   const minuteLimit = peLimitNumber(env.PROMPT_EXPERIMENT_MINUTE_LIMIT, PE_DEFAULT_MINUTE_LIMIT, 1, 1000);
   const dailyLimit = peLimitNumber(env.PROMPT_EXPERIMENT_DAILY_LIMIT, PE_DEFAULT_DAILY_LIMIT, 1, 100000);
-  const minuteKey = `pe:minute:${actorId}:${Math.floor(Date.now() / 60000)}`;
-  const dayKey = `pe:day:${actorId}:${peKstDay()}`;
-  let minuteUsed, dailyUsed;
   try {
-    const [m, d] = await Promise.all([env.OTA_KV.get(minuteKey), env.OTA_KV.get(dayKey)]);
-    minuteUsed = Number.parseInt(m || '0', 10) || 0;
-    dailyUsed = Number.parseInt(d || '0', 10) || 0;
-    if (minuteUsed >= minuteLimit) { const e = new Error('minute limit exceeded'); e.status = 429; e.code = 'MINUTE_LIMIT_EXCEEDED'; throw e; }
-    if (dailyUsed >= dailyLimit) { const e = new Error('daily limit exceeded'); e.status = 429; e.code = 'DAILY_LIMIT_EXCEEDED'; throw e; }
-    await Promise.all([
-      env.OTA_KV.put(minuteKey, String(minuteUsed + 1), { expirationTtl: 120 }),
-      env.OTA_KV.put(dayKey, String(dailyUsed + 1), { expirationTtl: 172800 }),
-    ]);
+    const id = env.PROMPT_EXPERIMENT_LIMITER.idFromName(actorId);
+    const response = await env.PROMPT_EXPERIMENT_LIMITER.get(id).fetch('https://prompt-experiment-limiter/reserve', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minuteLimit, dailyLimit, minuteBucket: Math.floor(Date.now() / 60000), day: peKstDay() }),
+    });
+    const data = await response.json();
+    if (response.status === 429) { const e = new Error(data.message); e.status = 429; e.code = data.code; throw e; }
+    if (!response.ok) throw new Error('limit storage failed');
+    return data;
   } catch (e) {
     if (e && e.status) throw e;
     const unavailable = new Error('limit storage unavailable'); unavailable.status = 503; throw unavailable;
   }
-  return { minuteLimit, minuteUsed: minuteUsed + 1, dailyLimit, dailyUsed: dailyUsed + 1 };
 }
 
 async function callLLMWithMeta({ messages, env, maxTokens, temperature }) {
@@ -630,14 +659,30 @@ async function callLLMWithMeta({ messages, env, maxTokens, temperature }) {
   const requestedModel = String(env.LLM_MODEL || '');
   if (!base || !requestedModel || !env.UPSTAGE_API_KEY) { const e = new Error('provider unavailable'); e.status = 503; throw e; }
   const started = Date.now();
-  const response = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.UPSTAGE_API_KEY}` },
-    body: JSON.stringify({ model: requestedModel, messages, temperature, max_tokens: maxTokens }),
-  });
+  const timeoutMs = peLimitNumber(env.PROMPT_EXPERIMENT_TIMEOUT_MS, 30000, 1, 120000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let data;
+  try {
+    const response = await fetch(`${base}/chat/completions`, {
+      method: 'POST', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.UPSTAGE_API_KEY },
+      body: JSON.stringify({ model: requestedModel, messages, temperature, max_tokens: maxTokens }),
+    });
+    if (!response.ok) {
+      const e = new Error('provider request failed'); e.status = 502; e.code = 'PROVIDER_ERROR';
+      e.providerStatus = response.status; e.latencyMs = Date.now() - started; throw e;
+    }
+    data = await response.json();
+  } catch (cause) {
+    if (cause && cause.status) throw cause;
+    const e = new Error(controller.signal.aborted ? 'provider timeout' : 'provider request failed');
+    e.status = controller.signal.aborted ? 504 : 502;
+    e.code = controller.signal.aborted ? 'PROVIDER_TIMEOUT' : 'PROVIDER_ERROR';
+    e.latencyMs = Date.now() - started;
+    throw e;
+  } finally { clearTimeout(timeout); }
   const latencyMs = Date.now() - started;
-  if (!response.ok) { const e = new Error('provider request failed'); e.status = 502; e.providerStatus = response.status; e.latencyMs = latencyMs; throw e; }
-  const data = await response.json();
   const choice = data && data.choices && data.choices[0];
   const content = String(choice && choice.message && choice.message.content || '').trim();
   if (!content) { const e = new Error('provider returned empty output'); e.status = 502; e.latencyMs = latencyMs; throw e; }
@@ -667,6 +712,10 @@ async function promptExperimentProxy(request, env, ctx) {
   let actor;
   try { actor = await promptExperimentActor(request, env); }
   catch (e) { return json({ error: { code: e.status === 503 ? 'UNAVAILABLE' : 'UNAUTHORIZED', message: e.status === 503 ? 'experiment API unavailable' : 'invalid experiment token' } }, e.status || 401); }
+  const contentType = request.headers.get('Content-Type') || '';
+  if (!/^application\/json(?:\s*;|$)/i.test(contentType)) return json({ error: { code: 'UNSUPPORTED_MEDIA_TYPE', message: 'Content-Type must be application/json' } }, 415);
+  const contentLength = Number(request.headers.get('Content-Length'));
+  if (Number.isFinite(contentLength) && contentLength > 100000) return json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'request body exceeds 100KB' } }, 413);
 
   let raw;
   try {
@@ -709,7 +758,10 @@ async function promptExperimentProxy(request, env, ctx) {
       result: { content: result.content, finish_reason: result.finishReason },
       usage: result.usage,
       performance: { latency_ms: result.latencyMs },
-      limits: { minute: { used: limits.minuteUsed, limit: limits.minuteLimit }, daily: { used: limits.dailyUsed, limit: limits.dailyLimit, timezone: 'Asia/Seoul' } },
+      limits: {
+        minute: { used: limits.minuteUsed, limit: limits.minuteLimit, remaining: Math.max(0, limits.minuteLimit - limits.minuteUsed) },
+        daily: { used: limits.dailyUsed, limit: limits.dailyLimit, remaining: Math.max(0, limits.dailyLimit - limits.dailyUsed), timezone: 'Asia/Seoul' },
+      },
       trace: { prompt_hash: promptHash, input_hash: inputHash, ...(value.includeCompiled ? { compiled_messages: messages } : {}) },
     }, 200);
   } catch (e) {
@@ -717,11 +769,12 @@ async function promptExperimentProxy(request, env, ctx) {
       run_id: runId, actor: actor.label, experiment_id: value.experiment.id, variant: value.experiment.variant,
       requested_model: env.LLM_MODEL || null, resolved_model: null, prompt_hash: promptHash, input_hash: inputHash,
       prompt_tokens: null, completion_tokens: null, total_tokens: null,
-      latency_ms: e && e.latencyMs || null, status: 'failed', error_code: e && e.status === 503 ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_ERROR', created_at: createdAt,
+      latency_ms: e && e.latencyMs || null, status: 'failed', error_code: e && e.code || (e && e.status === 503 ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_ERROR'), created_at: createdAt,
     };
     const logging = promptExperimentLog(env, record);
     if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(logging); else await logging;
-    return json({ error: { code: record.error_code, message: e && e.status === 503 ? 'Solar is not configured' : 'Solar request failed', run_id: runId } }, e && e.status || 502);
+    const message = e && e.status === 503 ? 'Solar is not configured' : e && e.status === 504 ? 'Solar request timed out' : 'Solar request failed';
+    return json({ error: { code: record.error_code, message, run_id: runId } }, e && e.status || 502);
   }
 }
 

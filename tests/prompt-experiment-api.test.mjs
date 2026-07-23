@@ -1,7 +1,7 @@
 /* Judy용 Solar prompt experiment API 회귀 테스트 (#1330)
  * 실행: node tests/prompt-experiment-api.test.mjs
  */
-import worker from '../worker/index.mjs';
+import worker, { PromptExperimentLimiter } from '../worker/index.mjs';
 import { readFile } from 'node:fs/promises';
 
 let passed = 0;
@@ -17,6 +17,32 @@ class MemoryKV {
   async put(key, value) { this.rows.set(key, String(value)); }
 }
 
+class SerialStorage {
+  constructor() { this.rows = new Map(); this.tail = Promise.resolve(); }
+  async get(key) { return this.rows.get(key); }
+  async put(keyOrEntries, value) {
+    if (typeof keyOrEntries === 'string') this.rows.set(keyOrEntries, value);
+    else for (const [key, item] of Object.entries(keyOrEntries)) this.rows.set(key, item);
+  }
+  async transaction(callback) {
+    const previous = this.tail;
+    let release;
+    this.tail = new Promise((resolve) => { release = resolve; });
+    await previous;
+    try { return await callback(this); } finally { release(); }
+  }
+}
+
+class LimiterNamespace {
+  constructor() { this.instances = new Map(); }
+  idFromName(name) { return name; }
+  get(id) {
+    if (!this.instances.has(id)) this.instances.set(id, new PromptExperimentLimiter({ storage: new SerialStorage() }));
+    const instance = this.instances.get(id);
+    return { fetch: (input, init) => instance.fetch(new Request(input, init)) };
+  }
+}
+
 const kv = new MemoryKV();
 const env = {
   ENVIRONMENT: 'development',
@@ -27,6 +53,7 @@ const env = {
   LLM_MODEL: 'solar-pro3',
   UPSTAGE_API_KEY: 'upstage-test-key',
   OTA_KV: kv,
+  PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(),
 };
 const baseBody = {
   protocol_version: '1.0',
@@ -60,8 +87,12 @@ function request(body = baseBody, token = 'judy-test-token', path = '/api/prompt
 
 const originalFetch = globalThis.fetch;
 const providerPayloads = [];
+let providerMode = 'success';
 globalThis.fetch = async (url, init = {}) => {
   if (String(url) !== 'https://api.upstage.test/v1/chat/completions') throw new Error(`unexpected fetch ${url}`);
+  if (providerMode === 'timeout') return new Promise((resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+  });
   const payload = JSON.parse(init.body);
   providerPayloads.push(payload);
   return Response.json({
@@ -85,8 +116,13 @@ try {
   response = await worker.fetch(request(baseBody, 'wrong-token'), env, {});
   check('잘못된 토큰은 401', response.status === 401);
 
+  response = await worker.fetch(request(baseBody, 'judy-test-token', '/api/prompt-experiments/run', { headers: { 'Content-Type': 'text/plain' } }), env, {});
+  check('application/json 외 본문은 415', response.status === 415 && (await response.json()).error.code === 'UNSUPPORTED_MEDIA_TYPE');
+
   response = await worker.fetch(request('{bad-json', 'judy-test-token'), env, {});
   check('깨진 JSON은 400', response.status === 400 && (await response.json()).error.code === 'INVALID_JSON');
+  response = await worker.fetch(request(baseBody, 'judy-test-token', '/api/prompt-experiments/run', { headers: { 'Content-Length': '100001' } }), env, {});
+  check('Content-Length 100KB 초과는 본문 파싱 전 413', response.status === 413 && (await response.json()).error.code === 'PAYLOAD_TOO_LARGE');
   response = await worker.fetch(request(JSON.stringify({ padding: '한'.repeat(40000) }), 'judy-test-token'), env, {});
   check('UTF-8 기준 100KB 초과 본문은 413', response.status === 413 && (await response.json()).error.code === 'PAYLOAD_TOO_LARGE');
   response = await worker.fetch(request({ ...baseBody, data_classification: 'user-data' }), env, {});
@@ -104,7 +140,7 @@ try {
   check('compiled messages와 해시를 반환', body.trace.compiled_messages.length === 3 && /^[a-f0-9]{64}$/.test(body.trace.prompt_hash));
   check('제약과 첫 턴 지시문을 정확히 조립', body.trace.compiled_messages[0].content.includes('추가 제약') && body.trace.compiled_messages[2].content.includes('문장과 감상에 짧게 반응하세요.'));
   check('생성 파라미터와 Solar 모델을 전달', providerPayloads[0].model === 'solar-pro3' && providerPayloads[0].temperature === 0.7 && providerPayloads[0].max_tokens === 180);
-  check('호출 한도와 KST 일일 사용량 반환', body.limits.daily.used === 1 && body.limits.daily.limit === 2 && body.limits.daily.timezone === 'Asia/Seoul');
+  check('호출 한도와 KST 일일 사용량 반환', body.limits.daily.used === 1 && body.limits.daily.limit === 2 && body.limits.daily.remaining === 1 && body.limits.daily.timezone === 'Asia/Seoul');
   check('원문 없이 요청별 사용량 로그 저장', [...kv.rows.keys()].some((k) => k.startsWith('pe:run:')) && ![...kv.rows.values()].some((v) => v.includes('가상의 한 문장')));
 
   const followup = structuredClone(baseBody);
@@ -126,7 +162,7 @@ try {
   response = await worker.fetch(request(baseBody, 'judy-test-token', '/api/prompt-experiments/run', { headers: { Origin: 'https://other.example' } }), { ...env, PROMPT_EXPERIMENT_DAILY_LIMIT: '100' }, {});
   check('브라우저 Origin 요청은 403', response.status === 403 && (await response.json()).error.code === 'FORBIDDEN_ORIGIN');
 
-  const minuteEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100', PROMPT_EXPERIMENT_MINUTE_LIMIT: '1' };
+  const minuteEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100', PROMPT_EXPERIMENT_MINUTE_LIMIT: '1' };
   response = await worker.fetch(request(), minuteEnv, {});
   check('분당 제한 전 요청은 성공', response.status === 200);
   response = await worker.fetch(request(), minuteEnv, {});
@@ -137,12 +173,27 @@ try {
   const openapi = await readFile(new URL('openapi.yaml', contractRoot), 'utf8');
   check('JSON Schema와 OpenAPI 계약 파일이 유효한 핵심 식별자를 가짐', schema.$schema.includes('2020-12') && schema.properties.protocol_version.const === '1.0' && openapi.includes('openapi: 3.1.0'));
 
-  const exampleEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100' };
+  const exampleEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100' };
   for (const name of ['first-turn', 'followup-turn', 'quote', 'thought']) {
     const example = JSON.parse(await readFile(new URL(`examples/${name}.json`, contractRoot), 'utf8'));
     response = await worker.fetch(request(example), exampleEnv, {});
     check(`${name} 문서 예제가 런타임 계약을 통과`, response.status === 200);
   }
+
+  const parallelEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '1', PROMPT_EXPERIMENT_MINUTE_LIMIT: '1' };
+  const parallelResponses = await Promise.all(Array.from({ length: 10 }, () => worker.fetch(request(), parallelEnv, {})));
+  check('병렬 10건에서 원자적 limit=1은 정확히 1건만 승인', parallelResponses.filter((r) => r.status === 200).length === 1 && parallelResponses.filter((r) => r.status === 429).length === 9);
+
+  const timeoutKv = new MemoryKV();
+  const timeoutEnv = { ...env, OTA_KV: timeoutKv, PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100', PROMPT_EXPERIMENT_TIMEOUT_MS: '5' };
+  const timeoutWaits = [];
+  providerMode = 'timeout';
+  response = await worker.fetch(request(), timeoutEnv, { waitUntil: (p) => timeoutWaits.push(p) });
+  body = await response.json();
+  await Promise.all(timeoutWaits);
+  providerMode = 'success';
+  check('Solar timeout은 504 stable code로 종료', response.status === 504 && body.error.code === 'PROVIDER_TIMEOUT');
+  check('Solar timeout도 실패 메타데이터 로그를 남김', [...timeoutKv.rows.values()].some((v) => v.includes('PROVIDER_TIMEOUT')));
 } finally {
   globalThis.fetch = originalFetch;
 }
