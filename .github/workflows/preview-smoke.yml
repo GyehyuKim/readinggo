@@ -67,9 +67,10 @@ jobs:
         run: |
           set -o pipefail
           # DEV 전용 config/binding/secret만 사용한다. production Worker에는 버전조차 업로드하지 않는다.
-          # versions upload는 신규 Durable Object migration을 적용할 수 없다(code 10211).
-          # UI edge smoke에는 limiter가 필요 없으므로 preview version에서만 DO binding/migration을 제거한다.
-          # main의 non-versioned deploy는 원본 wrangler.dev.toml로 migration을 적용한다.
+          # versions upload는 Durable Object를 구현한 Worker의 preview URL을 생성하지 않는다.
+          # UI edge smoke에는 limiter가 필요 없으므로 별도 preview Worker 이름을 사용하고,
+          # preview version에서만 DO binding/migration을 제거한다. main의 non-versioned deploy는
+          # 원본 wrangler.dev.toml과 readinggo-dev 이름으로 migration을 적용한다.
           python3 - <<'PY'
           from pathlib import Path
           source = Path('wrangler.dev.toml').read_text()
@@ -83,7 +84,9 @@ jobs:
                   skipping = False
               if not skipping:
                   output.append(line)
-          Path('.wrangler.preview.toml').write_text('\n'.join(output) + '\n')
+          rendered = '\n'.join(output) + '\n'
+          rendered = rendered.replace('name = "readinggo-dev"', 'name = "readinggo-ui-preview"', 1)
+          Path('.wrangler.preview.toml').write_text(rendered)
           PY
           OUT=$(npx --yes wrangler@4 versions upload -c .wrangler.preview.toml \
             --var "SUPABASE_URL:$DEV_SUPABASE_URL" --var "RELEASE_SHA:$GITHUB_SHA" 2>&1 | tee /dev/stderr)
@@ -93,7 +96,7 @@ jobs:
             exit 1
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "✅ readinggo-dev preview Worker: $URL"
+          echo "✅ readinggo-ui-preview Worker version: $URL"
 
       - name: Install Playwright chromium
         if: steps.gate.outputs.enabled == 'true'
