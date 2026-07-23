@@ -16,6 +16,14 @@ binding = "ASSETS"
 binding = "OTA_KV"
 id = "3bca8bcf0a5641a283cd0c61c6471666"
 
+[[durable_objects.bindings]]
+name = "PROMPT_EXPERIMENT_LIMITER"
+class_name = "PromptExperimentLimiter"
+
+[[migrations]]
+tag = "prompt-experiment-limiter-v1"
+new_sqlite_classes = ["PromptExperimentLimiter"]
+
 [vars]
 ENVIRONMENT = "development"
 ARCHIVE_DAILY_CAP = "0"
@@ -24,6 +32,7 @@ LLM_MODEL = "solar-pro3"
 # Judy용 prompt experiment API (#1330). 인증 토큰은 PROMPT_EXPERIMENT_TOKEN Worker secret.
 PROMPT_EXPERIMENT_MINUTE_LIMIT = "60"
 PROMPT_EXPERIMENT_DAILY_LIMIT = "1000"
+PROMPT_EXPERIMENT_TIMEOUT_MS = "30000"
 VISION_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 VISION_MODEL = "gemini-2.5-flash"
 
