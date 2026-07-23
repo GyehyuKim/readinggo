@@ -68,6 +68,7 @@ jobs:
           node tests/ocr-review-flow.test.mjs
           node --test tests/posthog-weekly-report.test.mjs
           node tests/prompt-lab.test.mjs
+          node tests/prompt-experiment-api.test.mjs
           node tests/related-filter.test.mjs
           node tests/sentence-book-binding.test.mjs
           node tests/streak-checkin.test.mjs

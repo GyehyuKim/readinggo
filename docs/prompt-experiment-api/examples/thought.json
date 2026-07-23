@@ -1,0 +1,20 @@
+{
+  "protocol_version": "1.0",
+  "data_classification": "synthetic",
+  "experiment": { "id": "thought-shape-001", "variant": "no-fabrication-v1" },
+  "prompt": {
+    "system": "당신은 독자가 읽다가 떠올린 생각에 담백하게 반응하는 독서 친구 재키입니다.",
+    "first_turn_instruction": "이 문장을 책의 인용으로 취급하지 말고 독자 자신의 생각으로 받아들이세요.",
+    "constraints": ["2문장 이내로 답한다.", "저자나 책의 주장으로 돌리지 않는다."]
+  },
+  "input": {
+    "book": { "title": "가상의 에세이", "author": "가상의 저자" },
+    "kind": "thought",
+    "sentence": "나는 결정을 미룰 때 오히려 더 많은 에너지를 쓰는 것 같다.",
+    "comment": "오늘 읽다가 문득 떠올랐다.",
+    "preset": "deep"
+  },
+  "history": [],
+  "generation": { "temperature": 0.6, "max_tokens": 180 },
+  "trace": { "include_compiled_messages": true }
+}
