@@ -36,6 +36,7 @@ import './js/nest-theatre.js';
 import './js/follow-list-modal.js';
 import './js/library.js';
 import './js/settings-modal.js';
+import './js/nest-grow.js';
 import './js/shelf-import.js';
 import './js/streak-reminder.js';   // #1033 스트릭 리마인더 로컬 알림 (window.RG_streakReminder)
 import './js/sheet-drag.js';        // #1046 바텀시트 글로벌 drag-to-dismiss (grip 끌어 닫기)
