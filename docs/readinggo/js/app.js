@@ -621,6 +621,8 @@ function App() {
 
   // 단순 방문 보상 — 하루 첫 열람(데모: 세션 1회). 3단계 위계 중 가장 낮은 티어.
   useEffect(() => {
+    // 합성 검수 fixture는 reload/reset 뒤에도 결정적이어야 한다. 방문 보상으로 XP·DEV DB를 자동 변형하지 않는다.
+    if (window.RG_DEV_REVIEW && window.RG_DEV_REVIEW.current()) return;
     if (_rgVisitGranted) return;
     _rgVisitGranted = true;
     grantXp(XP_RULES.visit, 'visit');
