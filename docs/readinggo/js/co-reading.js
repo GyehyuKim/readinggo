@@ -980,7 +980,7 @@ function RoomModal({ roomId, onClose }) {
           id: s.id, page: s.page, q: s.text,
           nick: u.handle ? ('@' + u.handle) : '@익명',
           avatar: (u.display_name && u.display_name[0]) || <window.SparrowMark size={18} />,
-          claps: s.claps || s.clap_count || 0,
+          claps: s.clapCount,
           time: s.created_at,
           bookId: book.id, bookTitle: book.title || '',
           isMine: !!(myId && s.user_id === myId),
