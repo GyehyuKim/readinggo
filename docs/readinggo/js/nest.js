@@ -143,6 +143,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   // drafts[0] = 기존 단일 입력창(OCR·포커스 대상). drafts[1..] = (+)로 추가된 행. 항상 최소 1행.
   const [drafts, setDrafts] = _useState(() => _loadDrafts(state.book.id));
   const [quickSentPage, setQuickSentPage] = _useState('');
+  const [sentenceSubmitting, setSentenceSubmitting] = _useState(false);
+  const _sentenceSubmittingRef = _useRef(false);
   const [sentFlip, setSentFlip] = _useState(false); // 문장 저장 시 일기장 넘기기 효과
   // 빠른입력 OCR (#498/#1265) — 책 사진 → 전체화면 임시 검토
   const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
@@ -545,7 +547,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   };
   // 한 문장 섹션 [저장/한번에 기록] (#497·#1198) — 초안(drafts) 1개면 단일 저장(기존 경로 그대로),
   //   2개 이상이면 배치로 한번에 기록(세리머니·스트릭·XP는 1회, 문장만 N개 영속).
-  const submitSentence = () => {
+  const submitSentence = async () => {
     const ready = drafts.map((x) => ({ text: (x.text || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
     if (!ready.length) { showToast('한 문장을 입력해주세요'); return; }
     // #589/#1202: 한 문장 전용/공유 페이지(quickSentPage = 덮을 때의 쪽). 비우면 현재 진도.
@@ -556,13 +558,25 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     if (total) sp = Math.min(total, sp);
     // 진도(current_page)는 문장 저장으로 뒤로 밀지 않음 — 문장이 앞쪽이면 현재 유지, 뒤쪽이면 따라 올림.
     const progressPage = Math.max(cur, sp);
-    if (ready.length === 1) {
-      handleCheckin({ page: progressPage, sentence: ready[0].text, visibility: ready[0].visibility, kind: 'quote', sentPage: sp });
-    } else {
-      // 배치: 공유 페이지(sp)를 모든 문장에 적용. 세리머니는 1회(§5.4.2).
-      handleCheckin({ page: progressPage, sentences: ready.map((x) => ({ ...x, page: sp })), kind: 'quote', sentPage: sp });
+    if (_sentenceSubmittingRef.current) return;
+    _sentenceSubmittingRef.current = true;
+    setSentenceSubmitting(true);
+    try {
+      if (ready.length === 1) {
+        await Promise.resolve(handleCheckin({ page: progressPage, sentence: ready[0].text, visibility: ready[0].visibility, kind: 'quote', sentPage: sp, awaitPersistence: true }));
+      } else {
+        // 배치: 공유 페이지(sp)를 모든 문장에 적용. 세리머니는 1회(§5.4.2).
+        await Promise.resolve(handleCheckin({ page: progressPage, sentences: ready.map((x) => ({ ...x, page: sp })), kind: 'quote', sentPage: sp, awaitPersistence: true }));
+      }
+      const visibility = await window.readDefaultSentenceVisibility();
+      setDrafts([{ text: '', visibility }]);
+      setQuickSentPage('');
+    } catch (e) {
+      // app.js 가 저장 오류를 안내하고 낙관 상태를 롤백한다. 초안·문장 페이지는 재시도를 위해 보존.
+    } finally {
+      _sentenceSubmittingRef.current = false;
+      setSentenceSubmitting(false);
     }
-    window.readDefaultSentenceVisibility().then((visibility) => setDrafts([{ text: '', visibility }])); setQuickSentPage(''); // 확정 후 초안·임시저장 비움
   };
   // 쪽수 stepper (#717) — 빈 값이면 현재 쪽 기준 ±delta, [0, total] 클램프.
   // type="number" 네이티브 스피너가 빈 값(=0)에서 증감해 0으로 점프하던 버그 대체.
@@ -904,7 +918,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             {nestState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
           </span>
           <button onClick={() => { setSentFlip(true); setTimeout(() => { submitSentence(); setSentFlip(false); }, 280); }}
-            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.2px', flexShrink: 0 }}>
+            disabled={sentenceSubmitting} aria-busy={sentenceSubmitting}
+            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: sentenceSubmitting ? 'default' : 'pointer', opacity: sentenceSubmitting ? 0.6 : 1, letterSpacing: '-0.2px', flexShrink: 0 }}>
             {_draftCount > 1 ? `${_draftCount}개 한번에 기록` : '남기기'}
           </button>
         </div>
