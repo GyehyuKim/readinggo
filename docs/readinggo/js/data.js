@@ -533,6 +533,14 @@ function ocrExtractSentence(file) {
     .catch(() => ({ text: '', error: 'ocr_network_failure', stage: 'network', status: 0 }));
 }
 
+// 책을 담을 때 쓰는 상태 선택의 정본. 사용자 여정·책장 순서와 같은
+// 읽는 중 → 읽고 싶은 책 → 읽은 책 순서이며 저장 status 값은 그대로 유지한다.
+const RG_SHELF_STATUS_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'reading', label: '읽는 중', hint: '지금 읽는 책으로' }),
+  Object.freeze({ value: 'wish', label: '읽고 싶은 책', hint: '관심 책에 담아요' }),
+  Object.freeze({ value: 'completed', label: '읽은 책', hint: '완독으로 담아요' }),
+]);
+
 window.RG_BOOKS=RG_BOOKS; window.BOOK_BY_ID=BOOK_BY_ID; window.getBook=getBook;
 window.INITIAL_PROGRESS=INITIAL_PROGRESS;
 window.NEST_STAGES=NEST_STAGES; window.NEST_CYCLE_XP=NEST_CYCLE_XP;
@@ -551,3 +559,4 @@ window.loadBooks=loadBooks; window.fuzzySearch=fuzzySearch; window.recommendRela
 window.recommendNextBooks=recommendNextBooks; window.extractBookSummary=extractBookSummary;
 window.ocrExtractSentence=ocrExtractSentence;
 window.normalizeIsbn13=normalizeIsbn13; window.filterRelatedCandidates=filterRelatedCandidates;
+window.RG_SHELF_STATUS_OPTIONS=RG_SHELF_STATUS_OPTIONS;

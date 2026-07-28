@@ -335,11 +335,7 @@ function LibraryView({ state, onActivateUserBook }) {
   };
 
   // 📦 검토함(#1048) 액션 — 항목별 목적지(책장 토글)·이동(commit, 별점 보존)·제외(remove) + 일괄.
-  const STAGED_DESTS = [
-    { value: 'completed', label: '읽은책' },
-    { value: 'wish', label: '읽고싶어요' },
-    { value: 'reading', label: '읽는중' },
-  ];
+  const STAGED_DESTS = window.RG_SHELF_STATUS_OPTIONS;
   const stagedDestOf = (it) => stagedStatus[it.id] || it.suggested_status || 'completed';
   const setStagedDest = (id, st) => setStagedStatus((m) => ({ ...m, [id]: st }));
   // 검토함 → 내 서재로 이동. commit 이 myBooks.addBatch 라우팅(별점 보존) 후 staging row 삭제.
