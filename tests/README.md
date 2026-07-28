@@ -20,7 +20,7 @@
 ## 로컬 실행
 
 ```bash
-python tests/data/validate-books.py
+node tests/sentence-actions-identity.test.mjs
 ```
 
 ## 추가 룰
