@@ -273,9 +273,11 @@ const AppleGlyph = () => (
   </svg>
 );
 
-// #1321: OAuth 설정 전에도 로그인 이후 UI를 확인하는 DEV 전용 로컬 검수 모드.
+// #1321/#1348: 실계정 OAuth 없이 로그인 이후 UI를 확인하는 DEV 전용 로컬 검수 모드.
 // Vite가 production 빌드에서 이 상수와 연결된 JSX/카피를 dead-code 제거한다.
 // 인증 세션을 만들지 않고 local DataStore만 사용하므로 운영 사용자·운영 DB에 접근하지 않는다.
+// DEV Supabase의 social provider는 의도적으로 비활성이다. 버튼은 production UI 확인을 위해
+// 유지하되, development 빌드에서는 검수 모드를 사용하라는 안내를 함께 표시한다.
 const RG_DEV_REVIEW_ENABLED = import.meta.env.VITE_READINGGO_ENV === 'development';
 const RG_DEV_REVIEW_SESSION_KEY = 'rg_dev_review_mode';
 
@@ -313,6 +315,11 @@ function LoginScreen({ onLogin, onBack, onReview }) {
           <div style={{ fontSize: 27, fontWeight: 900, color: 'var(--ink)' }}>Reading<span style={{ color: 'var(--brand)' }}>Go</span></div>
         </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>지금까지 남긴 기록을<br />계정에 안전하게 간직해요.</div>
+        {RG_DEV_REVIEW_ENABLED && (
+          <div role="note" style={{ fontSize: 12, color: 'var(--ink-2)', maxWidth: 300, lineHeight: 1.55, background: 'var(--brand-tint)', borderRadius: 10, padding: '9px 12px' }}>
+            DEV에서는 실제 Google·카카오 로그인을 연결하지 않아요. 아래 개발 검수 모드를 이용해 주세요.
+          </div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 300, marginTop: 8 }}>
           <button onClick={() => social('google')} aria-label="Google로 시작하기"
             style={{ ...SOCIAL_BTN_BASE, border: '1.5px solid var(--line)', background: '#fff', color: 'var(--ink)', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
