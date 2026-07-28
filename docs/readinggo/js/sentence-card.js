@@ -21,7 +21,9 @@ function SentenceCard({ item, bookId, noBlind }) {
   const cardTitle = item.bookTitle || (bk && bk.id === bookId ? bk.title : '') || '';
   // optimistic likeCount: item.claps(피드 로드 시점) + 현재 상태 - 초기 상태 delta (#156)
   // #664: 하한 0 클램프 — item.claps(피드 카운트)가 기존 self-clap을 미반영할 때 해제 시 음수(-1) 표시되던 버그. SentenceActions(:633)와 동일 가드.
-  const likeCount = Math.max(0, (item.claps || 0) + (liked ? 1 : 0) - (initialLikedRef.current ? 1 : 0));
+  const rawLikeCount = Number(item.claps);
+  const baseLikeCount = Number.isFinite(rawLikeCount) ? rawLikeCount : 0;
+  const likeCount = Math.max(0, baseLikeCount + (liked ? 1 : 0) - (initialLikedRef.current ? 1 : 0));
   // #641: 자기 문장 좋아요 허용(저장 통일) — mine 도 liked 상태 로드.
   React.useEffect(() => {
     if (!canReact) return;
@@ -75,7 +77,7 @@ function SentenceCard({ item, bookId, noBlind }) {
             <path d="M6 10.5C6 10.5 1 7.2 1 4a2.5 2.5 0 0 1 5 0 2.5 2.5 0 0 1 5 0c0 3.2-5 6.5-5 6.5Z"
               fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
           </svg>
-          좋아요 {likeCount}
+          {likeCount > 0 ? `좋아요 ${likeCount}` : '좋아요'}
         </span>
         {/* #650 A: 외부 공유 — 이미지 카드 + Web Share/텍스트 폴백 (share-card.js) */}
         {window.shareSentence ? (

@@ -56,7 +56,11 @@
   }
   // 추천 점수 (#787) — claps 임베드 count 추출 + 신선도 감쇠 + 좋아요 가중.
   // 데이터가 적으면 clap=0 → log항=0 → freshness(최신순)로 수렴 → 저트래픽서도 안전.
-  function _clapCount(r) { return (r && r.clap_count && r.clap_count[0] && r.clap_count[0].count) || 0; }
+  function _clapCount(r) {
+    const raw = r && r.clap_count && r.clap_count[0] && r.clap_count[0].count;
+    const count = Number(raw);
+    return Number.isFinite(count) ? Math.max(0, count) : 0;
+  }
   function _recScore(r) {
     const W = (window.RG_CONFIG && window.RG_CONFIG.FEED_RECOMMEND) || {};
     const halfLife = W.halfLifeDays || 10, clapW = (W.clapWeight == null ? 1.2 : W.clapWeight);
@@ -475,7 +479,7 @@
           .order('created_at', { ascending: false }).limit(pool);
         if (me) q = q.neq('user_id', me);
         let rows = unwrap(await q) || [];
-        rows = rows.map(r => ({ ...r, clapCount: (r.clap_count && r.clap_count[0] && r.clap_count[0].count) || 0 }));
+        rows = rows.map(r => ({ ...r, clapCount: _clapCount(r) }));
         if (likes) { rows.sort((a, b) => b.clapCount - a.clapCount); rows = rows.slice(0, limit || 5); }
         return rows;
       },
