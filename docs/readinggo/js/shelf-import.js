@@ -541,13 +541,8 @@ window.ShelfImportModal = ShelfImportModal;
 // 파싱이 준 상태 칩 라벨(#1039) — 검수 카드에 표시(읽음/읽는 중/읽고 싶음).
 const FLEX_STATUS_LABEL = { completed: '읽음', reading: '읽는 중', wish: '읽고 싶음' };
 
-// status 없는 임포트 행의 목적지 선택지(§8). value = 앱 책장 키(wish/reading/completed).
-// (미정의로 needDest 리뷰 렌더 시 ReferenceError 크래시하던 것 픽스 — #SHELF_DESTS)
-const SHELF_DESTS = [
-  { value: 'wish', label: '읽고 싶어요', hint: '관심 책에 담아요' },
-  { value: 'reading', label: '읽는 중', hint: '지금 읽는 책으로' },
-  { value: 'completed', label: '다 읽었어요', hint: '완독으로 담아요' },
-];
+// status 없는 임포트 행도 책 찾아담기와 같은 공용 목적지 순서·문구를 쓴다(#1343).
+const SHELF_DESTS = window.RG_SHELF_STATUS_OPTIONS;
 
 /* ── #1039 유연 도서기록 임포트 모달 — 붙여넣기/파일 → /api/parse-books → 검수 → 검토함 ──
    ShelfImportModal(이미지)의 텍스트 형제. 매칭·검수·검토함 코어(RG_shelfImport·importStaging)는

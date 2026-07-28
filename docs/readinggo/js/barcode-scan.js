@@ -398,7 +398,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
         </div>
       )}
 
-      {/* 책장 선택 시트 — search.js 와 동일 UX(읽고싶어요/읽는중/완독) */}
+      {/* 책장 선택 시트 — search.js 와 같은 공용 상태 순서·문구(#1343) */}
       {pendingBook && (
         <div onClick={() => { setPendingBook(null); handleClose(); }}
           style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 10002 }}>
@@ -406,11 +406,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
             style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px 24px' }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', marginBottom: 4 }}>어떤 책장에 놓을까요?</div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingBook.title}</div>
-            {[
-              ['wish', '읽고 싶어요'],
-              ['reading', '지금 읽는 중'],
-              ['completed', '다 읽었어요'],
-            ].map(([k, label]) => (
+            {window.RG_SHELF_STATUS_OPTIONS.map(({ value: k, label }) => (
               <button key={k} onClick={() => chooseShelf(k)}
                 style={{ width: '100%', padding: '14px', marginBottom: 8, borderRadius: 12, border: '1.5px solid var(--line)', background: k === 'reading' ? 'var(--brand-tint)' : 'var(--card)', color: 'var(--ink)', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
                 {label}

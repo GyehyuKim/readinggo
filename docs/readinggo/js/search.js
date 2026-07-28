@@ -421,7 +421,7 @@ const SearchModal = ({
           )}
         </div>
       </div>
-      {/* 책장 선택 시트 (#409) — 책 탭 후 읽고싶어요/읽는중/다읽었어요 분기 */}
+      {/* 책장 선택 시트 (#409, #1343) — 공용 상태 순서·문구를 사용 */}
       {pendingBook && (
         <div onClick={() => setPendingBook(null)}
           style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 10000 }}>
@@ -429,16 +429,19 @@ const SearchModal = ({
             style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px 24px' }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', marginBottom: 4 }}>어떤 책장에 놓을까요?</div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingBook.title}</div>
-            {[
-              ['wish', '읽고 싶어요', <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>],
-              ['reading', '지금 읽는 중', <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>],
-              ['completed', '다 읽었어요', <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>],
-            ].map(([k, label, icon]) => (
+            {window.RG_SHELF_STATUS_OPTIONS.map(({ value: k, label }) => {
+              const icon = k === 'reading'
+                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 3 0 0 1 3-3h7z"/></svg>
+                : k === 'wish'
+                  ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                  : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>;
+              return (
               <button key={k} onClick={() => chooseShelf(k)}
                 style={{ width: '100%', padding: '14px', marginBottom: 8, borderRadius: 12, border: '1.5px solid var(--line)', background: k === 'reading' ? 'var(--brand-tint)' : 'var(--card)', color: 'var(--ink)', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ display: 'inline-flex', flexShrink: 0, color: k === 'reading' ? 'var(--brand-3)' : 'var(--ink-2)' }}>{icon}</span>{label}
               </button>
-            ))}
+              );
+            })}
             <button onClick={() => setPendingBook(null)}
               style={{ width: '100%', padding: '10px', marginTop: 4, borderRadius: 12, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
           </div>
