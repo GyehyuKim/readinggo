@@ -41,7 +41,7 @@ function SocialView({ state }) {
 
 // ① 발견 레이어 = 기존 피드 화면 그대로 (인기 책·한 문장 피드·유저 찾기, feed.md §5.7 보존).
 function DiscoverLayer({ state }) {
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
   const [tab, setTab] = useState('recommend');  // 'following' | 'recommend' (#789: '최근' 탭 제거, 추천 메인화)
   const [items, setItems] = useState(null);  // null=로딩, []=빈
   const [findOpen, setFindOpen] = useState(false); // 친구 찾기 패널 (#250)
@@ -50,6 +50,7 @@ function DiscoverLayer({ state }) {
   const [followed, setFollowed] = useState({});    // userId -> true
   const [top3, setTop3] = useState([]);            // 지금 인기 있는 책 Top5 (§5.7, #525, #578)
   const [myStatus, setMyStatus] = useState({});    // bookId -> 'wish'|'reading'|'completed' — 랭킹 현재상태 강조 (#525)
+  const findPanelRef = useRef(null);
 
   // 지금 인기 있는 책 Top5 — 공개 집계 RPC (§5.7). 마운트 1회 로드.
   useEffect(() => {
@@ -92,6 +93,25 @@ function DiscoverLayer({ state }) {
     }, 250);
     return () => { alive = false; clearTimeout(t); };
   }, [fq, findOpen]);
+
+  // iOS WebKit은 키보드 open/close 때 visual viewport와 .main 스크롤을 따로 갱신한다.
+  // 패널이 열린 동안 각 resize 뒤 가장 가까운 가시 위치로만 복구해 검색창이 위로 말리지 않게 한다(#1340).
+  useEffect(() => {
+    if (!findOpen) return;
+    const keepFindPanelVisible = () => {
+      requestAnimationFrame(() => {
+        if (findPanelRef.current) findPanelRef.current.scrollIntoView({ block: 'nearest' });
+      });
+    };
+    const vv = window.visualViewport;
+    window.addEventListener('resize', keepFindPanelVisible, { passive: true });
+    if (vv) vv.addEventListener('resize', keepFindPanelVisible, { passive: true });
+    keepFindPanelVisible();
+    return () => {
+      window.removeEventListener('resize', keepFindPanelVisible);
+      if (vv) vv.removeEventListener('resize', keepFindPanelVisible);
+    };
+  }, [findOpen]);
   const doFollow = (u) => {
     if (!(DataStore.friends && DataStore.friends.follow)) return;
     setFollowed(m => ({ ...m, [u.id]: true }));
@@ -204,8 +224,11 @@ function DiscoverLayer({ state }) {
         </button>
       </div>
       {findOpen && (
-        <div style={{ padding: '0 16px 12px' }}>
-          <input value={fq} onChange={e => setFq(e.target.value)} placeholder="@닉네임으로 친구 찾기" autoFocus
+        <div ref={findPanelRef} role="search" aria-label="유저 찾기" style={{ padding: '0 16px 12px' }}>
+          {/* iOS Safari/Chrome에서 autoFocus는 패널이 펼쳐지는 렌더와 동시에 키보드·visual viewport
+              resize·내부 스크롤을 겹쳐 실행해, 패널을 화면 위로 밀어낸 뒤 복구하지 못했다(#1340).
+              패널은 먼저 안정적으로 펼치고 사용자가 입력창을 탭할 때만 키보드를 연다. */}
+          <input value={fq} onChange={e => setFq(e.target.value)} placeholder="@닉네임으로 친구 찾기"
             style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
           {fres.map(u => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid var(--line-2)' }}>

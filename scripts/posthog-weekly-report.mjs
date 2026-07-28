@@ -18,6 +18,17 @@ export const FUNNEL_EVENTS = [
   'sentence_added',
   'book_completed',
 ];
+export const EVENT_REQUIRED_PROPERTIES = {
+  book_opened: ['book_id', 'entry_point'],
+  reading_session_end: ['book_id', 'pages_logged', 'is_complete'],
+  sentence_added: ['book_id', 'kind', 'source'],
+  answer_saved: ['book_id', 'lens', 'answer_length'],
+  book_completed: ['book_id', 'rating_present', 'review_present'],
+};
+
+const ALLOWED_ENVIRONMENTS = new Set(['development', 'production']);
+const ALLOWED_PLATFORMS = new Set(['web', 'ios', 'android']);
+const QUALITY_DETAIL_LIMIT = 50;
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -79,16 +90,32 @@ ORDER BY timestamp ASC
 LIMIT ${QUERY_ROW_LIMIT}`.trim();
 }
 
-function dataQualityQuery({ start, end }) {
+function dataQualityEventsQuery({ start, end }) {
   return `
 SELECT
-  countIf(empty(coalesce(properties.environment, ''))) AS missing_environment,
-  countIf(properties.environment = 'production' AND empty(coalesce(properties.release_sha, ''))) AS missing_release_sha
+  event,
+  distinct_id,
+  timestamp,
+  properties.environment,
+  properties.release_sha,
+  properties.schema_version,
+  properties.platform,
+  properties.book_id,
+  properties.entry_point,
+  properties.pages_logged,
+  properties.is_complete,
+  properties.kind,
+  properties.source,
+  properties.rating_present,
+  properties.review_present,
+  properties.lens,
+  properties.answer_length
 FROM events
 WHERE event IN (${eventList()})
-  AND (properties.environment = 'production' OR empty(coalesce(properties.environment, '')))
   AND timestamp >= ${sqlString(iso(start))}
-  AND timestamp < ${sqlString(iso(end))}`.trim();
+  AND timestamp < ${sqlString(iso(end))}
+ORDER BY timestamp ASC
+LIMIT ${QUERY_ROW_LIMIT}`.trim();
 }
 
 async function hogql(fetchImpl, apiKey, query) {
@@ -119,7 +146,7 @@ export async function fetchWeeklyData({ apiKey, bounds, fetchImpl = fetch }) {
   const [reportRows, retentionRows, qualityRows] = await Promise.all([
     hogql(fetchImpl, apiKey, reportEventsQuery(bounds)),
     hogql(fetchImpl, apiKey, retentionEventsQuery(bounds)),
-    hogql(fetchImpl, apiKey, dataQualityQuery(bounds)),
+    hogql(fetchImpl, apiKey, dataQualityEventsQuery(bounds)),
   ]);
 
   return {
@@ -134,11 +161,140 @@ export async function fetchWeeklyData({ apiKey, bounds, fetchImpl = fetch }) {
       timestamp,
     })),
     quality: {
-      missingEnvironment: Number(qualityRows[0]?.[0] || 0),
-      missingReleaseSha: Number(qualityRows[0]?.[1] || 0),
+      events: qualityRows.map(([
+        event, distinctId, timestamp, environment, releaseSha, schemaVersion, platform,
+        bookId, entryPoint, pagesLogged, isComplete, kind, source, ratingPresent,
+        reviewPresent, lens, answerLength,
+      ]) => ({
+        event,
+        distinctId: String(distinctId),
+        timestamp,
+        environment,
+        releaseSha,
+        schemaVersion,
+        platform,
+        properties: {
+          book_id: bookId,
+          entry_point: entryPoint,
+          pages_logged: pagesLogged,
+          is_complete: isComplete,
+          kind,
+          source,
+          rating_present: ratingPresent,
+          review_present: reviewPresent,
+          lens,
+          answer_length: answerLength,
+        },
+      })),
       reportRowsAtLimit: reportRows.length === QUERY_ROW_LIMIT,
       retentionRowsAtLimit: retentionRows.length === QUERY_ROW_LIMIT,
+      qualityRowsAtLimit: qualityRows.length === QUERY_ROW_LIMIT,
     },
+  };
+}
+
+function isMissing(value) {
+  return value === null || value === undefined || value === '';
+}
+
+const ANOMALY_METADATA = {
+  missing_environment: { severity: 'critical', label: 'environment 누락' },
+  invalid_environment: { severity: 'critical', label: 'environment 허용값 위반' },
+  missing_release_sha: { severity: 'warning', label: 'production release_sha 누락' },
+  missing_schema_version: { severity: 'warning', label: 'schema_version 누락' },
+  invalid_schema_version: { severity: 'warning', label: 'schema_version 불일치' },
+  missing_platform: { severity: 'warning', label: 'platform 누락' },
+  invalid_platform: { severity: 'warning', label: 'platform 허용값 위반' },
+  missing_required_property: { severity: 'warning', label: '필수 이벤트 속성 누락' },
+};
+
+function eventAnomalies(row) {
+  const anomalies = [];
+  if (isMissing(row.environment)) anomalies.push({ type: 'missing_environment' });
+  else if (!ALLOWED_ENVIRONMENTS.has(String(row.environment))) anomalies.push({ type: 'invalid_environment' });
+  if (row.environment === 'production' && isMissing(row.releaseSha)) anomalies.push({ type: 'missing_release_sha' });
+  if (isMissing(row.schemaVersion)) anomalies.push({ type: 'missing_schema_version' });
+  else if (Number(row.schemaVersion) !== 1) anomalies.push({ type: 'invalid_schema_version' });
+  if (isMissing(row.platform)) anomalies.push({ type: 'missing_platform' });
+  else if (!ALLOWED_PLATFORMS.has(String(row.platform))) anomalies.push({ type: 'invalid_platform' });
+  for (const property of EVENT_REQUIRED_PROPERTIES[row.event] || []) {
+    if (isMissing(row.properties[property])) anomalies.push({ type: 'missing_required_property', property });
+  }
+  return anomalies;
+}
+
+function displayValue(value) {
+  return isMissing(value) ? '(누락)' : String(value);
+}
+
+export function analyzeDataQuality(quality) {
+  const events = quality.events || [];
+  const environmentCounts = new Map();
+  const activeIds = new Set();
+  const groups = new Map();
+  const totals = new Map();
+
+  for (const row of events) {
+    activeIds.add(row.distinctId);
+    const environment = displayValue(row.environment);
+    environmentCounts.set(environment, (environmentCounts.get(environment) || 0) + 1);
+    for (const anomaly of eventAnomalies(row)) {
+      const dimensions = {
+        type: anomaly.type,
+        event: row.event,
+        property: anomaly.property || '',
+        environment,
+        releaseSha: displayValue(row.releaseSha),
+        schemaVersion: displayValue(row.schemaVersion),
+        platform: displayValue(row.platform),
+      };
+      const key = JSON.stringify(dimensions);
+      if (!groups.has(key)) groups.set(key, { ...dimensions, count: 0, ids: new Set(), firstSeen: row.timestamp, lastSeen: row.timestamp });
+      const group = groups.get(key);
+      group.count += 1;
+      group.ids.add(row.distinctId);
+      if (new Date(row.timestamp) < new Date(group.firstSeen)) group.firstSeen = row.timestamp;
+      if (new Date(row.timestamp) > new Date(group.lastSeen)) group.lastSeen = row.timestamp;
+
+      if (!totals.has(anomaly.type)) totals.set(anomaly.type, { count: 0, ids: new Set(), groups: 0 });
+      const total = totals.get(anomaly.type);
+      total.count += 1;
+      total.ids.add(row.distinctId);
+    }
+  }
+
+  const anomalyGroups = [...groups.values()]
+    .map(({ ids, ...group }) => ({ ...group, users: ids.size, ...ANOMALY_METADATA[group.type] }))
+    .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type) || a.event.localeCompare(b.event));
+  for (const group of anomalyGroups) totals.get(group.type).groups += 1;
+  const anomalyTotals = [...totals.entries()]
+    .map(([type, total]) => ({
+      type,
+      ...ANOMALY_METADATA[type],
+      count: total.count,
+      users: total.ids.size,
+      groups: total.groups,
+    }))
+    .sort((a, b) => (a.severity === b.severity ? b.count - a.count : a.severity === 'critical' ? -1 : 1));
+  const status = quality.qualityRowsAtLimit
+    ? 'incomplete'
+    : anomalyTotals.some((row) => row.severity === 'critical')
+      ? 'critical'
+      : anomalyTotals.length ? 'warning' : 'ok';
+
+  return {
+    status,
+    scannedEvents: events.length,
+    scannedActiveIds: activeIds.size,
+    environmentCounts: Object.fromEntries([...environmentCounts.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    missingEnvironment: anomalyTotals.find((row) => row.type === 'missing_environment')?.count || 0,
+    missingReleaseSha: anomalyTotals.find((row) => row.type === 'missing_release_sha')?.count || 0,
+    anomalyTotals,
+    anomalyGroups: anomalyGroups.slice(0, QUALITY_DETAIL_LIMIT),
+    hiddenAnomalyGroups: Math.max(0, anomalyGroups.length - QUALITY_DETAIL_LIMIT),
+    reportRowsAtLimit: quality.reportRowsAtLimit,
+    retentionRowsAtLimit: quality.retentionRowsAtLimit,
+    qualityRowsAtLimit: quality.qualityRowsAtLimit,
   };
 }
 
@@ -214,7 +370,7 @@ export function calculateWeeklyReport({ reportEvents, retentionEvents, quality }
       status: quality.retentionRowsAtLimit ? 'incomplete' : latestEligible ? latestEligible.verdict : 'insufficient_sample',
       latestEligibleCohort: latestEligible,
     },
-    dataQuality: quality,
+    dataQuality: analyzeDataQuality(quality),
   };
 }
 
@@ -228,6 +384,7 @@ export function renderMarkdown(report) {
   if (report.dataQuality.missingReleaseSha) warnings.push(`production release_sha 누락 ${report.dataQuality.missingReleaseSha}건`);
   if (report.dataQuality.reportRowsAtLimit) warnings.push(`주간 이벤트가 ${QUERY_ROW_LIMIT.toLocaleString()}행 제한에 도달함`);
   if (report.dataQuality.retentionRowsAtLimit) warnings.push(`리텐션 이벤트가 ${QUERY_ROW_LIMIT.toLocaleString()}행 제한에 도달함`);
+  if (report.dataQuality.qualityRowsAtLimit) warnings.push(`품질 감사 이벤트가 ${QUERY_ROW_LIMIT.toLocaleString()}행 제한에 도달해 결과가 불완전함`);
   if (!warnings.length) warnings.push('감지된 누락/행 제한 없음');
 
   const latest = report.launchThreshold.latestEligibleCohort;
@@ -250,7 +407,23 @@ export function renderMarkdown(report) {
     (report.retention.length
       ? report.retention.map((row) => `| ${row.cohortWeek} | ${row.cohortSize} | ${row.retained} | ${percent(row.rate)} | ${row.sample === 'reference' ? '참고치(<10)' : row.verdict === 'pass' ? '달성' : '미달'} |`).join('\n')
       : '| - | 0 | 0 | - | 성숙 코호트 없음 |') +
-    `\n\n## 데이터 품질\n\n${warnings.map((warning) => `- ${warning}`).join('\n')}\n`;
+    `\n\n## 데이터 품질\n\n` +
+    `- 상태: **${report.dataQuality.status}**\n` +
+    `- 감사 범위: ${report.dataQuality.scannedEvents}건 · 활성 ID ${report.dataQuality.scannedActiveIds}개\n` +
+    `- 환경별 이벤트: ${Object.entries(report.dataQuality.environmentCounts).map(([environment, count]) => `\`${environment}\` ${count}건`).join(' · ') || '없음'}\n` +
+    `${warnings.map((warning) => `- ${warning}`).join('\n')}\n\n` +
+    `### 이상 유형 요약\n\n| 심각도 | 유형 | 그룹 | 이벤트 | 활성 ID |\n|---|---|---:|---:|---:|\n` +
+    (report.dataQuality.anomalyTotals.length
+      ? report.dataQuality.anomalyTotals.map((row) => `| ${row.severity} | ${row.label} | ${row.groups} | ${row.count} | ${row.users} |`).join('\n')
+      : '| - | 감지된 이상 없음 | 0 | 0 | 0 |') +
+    `\n\n### 이상 상세\n\n| 심각도 | 유형 | 이벤트 | 속성 | environment | release_sha | schema_version | platform | 건수 | 활성 ID | 최초 | 최근 |\n|---|---|---|---|---|---|---|---|---:|---:|---|---|\n` +
+    (report.dataQuality.anomalyGroups.length
+      ? report.dataQuality.anomalyGroups.map((row) => `| ${row.severity} | ${row.label} | \`${row.event}\` | ${row.property ? `\`${row.property}\`` : '-'} | \`${row.environment}\` | \`${row.releaseSha}\` | \`${row.schemaVersion}\` | \`${row.platform}\` | ${row.count} | ${row.users} | ${row.firstSeen} | ${row.lastSeen} |`).join('\n')
+      : '| - | 감지된 이상 없음 | - | - | - | - | - | - | 0 | 0 | - | - |') +
+    (report.dataQuality.hiddenAnomalyGroups
+      ? `\n\n> 상세 ${report.dataQuality.hiddenAnomalyGroups}개 그룹은 출력 상한으로 생략되었습니다. JSON artifact에서 전체 집계 유형을 확인하세요.`
+      : '') +
+    '\n';
 }
 
 export async function run({
