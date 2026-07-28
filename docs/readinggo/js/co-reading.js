@@ -102,6 +102,14 @@ function rgRoomStats(members, book) {
   return { count, todayCount, avgPct: count ? Math.round(pctSum / count) : 0 };
 }
 
+// 숲 한 문장 날짜 — Supabase created_at의 UTC 날짜를 로컬 timezone 변환 없이 고정 표기.
+function rgForestSentenceDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getUTCFullYear()}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
 // ●●●●○○ 오늘 불빛 — 읽은 수만큼 채움(최대 8개 표시).
 function RoomTodayDots({ today, count }) {
   const cap = Math.min(8, Math.max(count || 0, 0));
@@ -981,7 +989,7 @@ function RoomModal({ roomId, onClose }) {
           nick: u.handle ? ('@' + u.handle) : '@익명',
           avatar: (u.display_name && u.display_name[0]) || <window.SparrowMark size={18} />,
           claps: s.claps || s.clap_count || 0,
-          time: s.created_at,
+          time: rgForestSentenceDate(s.created_at),
           bookId: book.id, bookTitle: book.title || '',
           isMine: !!(myId && s.user_id === myId),
         };
