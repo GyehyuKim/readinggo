@@ -68,6 +68,7 @@ jobs:
           node tests/barcode-focus.test.mjs
           node tests/forest-like-count.test.mjs
           node tests/liked-sentence-consistency.test.mjs
+          node tests/library-reading-highlight.test.mjs
           node tests/nest-cycle.test.mjs
           node tests/ocr-response.test.mjs
           node tests/ocr-review-flow.test.mjs
