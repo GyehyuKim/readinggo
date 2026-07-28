@@ -204,6 +204,14 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setDrafts(_loadDrafts(state.book.id)); // 책 전환 시 그 책의 초안을 복원(#1198)
   }, [state.book.id]);
 
+  // 체크인 직후에는 id 없는 낙관 행을 먼저 그리되, 영속 성공 후 app 이 DataStore의
+  // 권위 행(id 포함)으로 교체하면 현재 책을 재시드하지 않고 문장 목록만 동기화한다.
+  // 안정 id가 생기기 전 액션을 열지 않는 SentenceActions 계약을 유지하면서 저장 직후
+  // 공개범위·좋아요·공유·수정·삭제·감상 액션이 나타나게 한다(#1338).
+  _useEffect(() => {
+    setNestState((ns) => ({ ...ns, myQuotes: state.myQuotes }));
+  }, [state.myQuotes]);
+
   // 초안 임시저장 (#1198) — drafts 변경마다 현재 책 키로 영속(리로드·네비게이션 보존).
   _useEffect(() => { _saveDrafts(nestState.book.id, drafts); }, [drafts, nestState.book.id]);
   _useEffect(() => {
