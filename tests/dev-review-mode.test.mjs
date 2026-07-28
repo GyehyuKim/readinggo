@@ -10,6 +10,7 @@ assert.match(source, /VITE_READINGGO_ENV === 'development'/, '검수 모드는 d
 assert.match(source, /if \(!RG_DEV_REVIEW_ENABLED\) return/, '진입·종료 핸들러는 production에서 거부해야 한다');
 assert.match(source, /reviewMode \? 'local'/, '검수 모드는 Supabase 인증 사용자가 아닌 local DataStore로 시작해야 한다');
 assert.match(source, /if \(!_supa \|\| reviewMode\) return/, '검수 중 Supabase 인증 구독을 시작하면 안 된다');
+assert.match(source, /RG_DEV_REVIEW\.current\(\)\) return;[\s\S]{0,180}grantXp\(XP_RULES\.visit/, '검수 fixture는 reload 시 방문 XP로 자동 변경되면 안 된다');
 assert.match(source, /disabled=\{reviewBusy\}/, '비동기 전환·리셋·종료 중 중복 클릭을 막아야 한다');
 assert.match(source, /finally \{ setReviewBusy\(false\); \}/, '비동기 검수 동작은 성공·실패 모두 busy를 해제해야 한다');
 assert.match(mainSource, /if \(!devReviewRestored && window\.RG_SB/, '복원된 검수 모드에서 Supabase 인증 조회를 건너뛰어야 한다');
