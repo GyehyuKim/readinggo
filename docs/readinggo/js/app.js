@@ -344,7 +344,7 @@ function LoginScreen({ onLogin, onBack, onReview }) {
         </div>
         {RG_DEV_REVIEW_ENABLED && onReview && (
           <div style={{ fontSize: 12, color: 'var(--ink-3)', maxWidth: 300, lineHeight: 1.5 }}>
-            테스트 데이터만 사용하는 개발 전용 화면이에요. 실제 계정 로그인과 서버 저장은 하지 않아요.
+            합성 검수 데이터는 브라우저에 즉시 저장되고 DEV 전용 DB와 동기화돼요. 실제 계정과 PRD 데이터는 읽거나 쓰지 않아요.
           </div>
         )}
         {sent ? (
@@ -380,6 +380,32 @@ function LoginScreen({ onLogin, onBack, onReview }) {
   );
 }
 
+function DevReviewPersonaPicker({ personas, onSelect, onClose, busy }) {
+  return (
+    <div className="stage"><div className="app" style={{ position: 'relative' }}>
+      <button onClick={onClose} disabled={busy} aria-label="페르소나 선택 닫기"
+        style={{ position: 'absolute', top: 16, left: 14, zIndex: 5, background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--ink-3)', padding: 6 }}>←</button>
+      <main style={{ padding: '64px 20px 28px', overflowY: 'auto', height: '100%' }}>
+        <h1 style={{ margin: 0, fontSize: 24, color: 'var(--ink)' }}>합성 검수 페르소나 선택</h1>
+        <p style={{ margin: '8px 0 18px', fontSize: 13, lineHeight: 1.6, color: 'var(--ink-2)' }}>
+          실제 사용자 기록이 아닌 창작 fixture예요. 페르소나별 변경은 브라우저에 즉시 저장되고 DEV 전용 DB와 동기화되며, PRD에는 접근하지 않아요.
+        </p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {(personas || []).map(persona => (
+            <button key={persona.id} onClick={() => onSelect(persona.id)} disabled={busy}
+              style={{ textAlign: 'left', padding: 16, borderRadius: 'var(--r-md)', border: '1px solid var(--brand-soft)', background: 'var(--brand-tint)', color: 'var(--ink)', cursor: 'pointer' }}>
+              <span style={{ display: 'block', fontSize: 16, fontWeight: 900 }}>{persona.name}</span>
+              <span style={{ display: 'block', marginTop: 4, fontSize: 12, fontWeight: 800, color: 'var(--brand-3)' }}>{persona.role}</span>
+              <span style={{ display: 'block', marginTop: 8, fontSize: 12.5, lineHeight: 1.55, color: 'var(--ink-2)' }}>{persona.description}</span>
+              <span style={{ display: 'block', marginTop: 8, fontSize: 11.5, fontWeight: 800, color: 'var(--ink-3)' }}>{persona.summary}</span>
+            </button>
+          ))}
+        </div>
+      </main>
+    </div></div>
+  );
+}
+
 let _rgVisitGranted = false;  // 데모: 방문 XP 세션 1회 적립 가드
 /* 인앱 브라우저(카카오 등) 안내 배너 (#1096) — 외부 기본 브라우저로 빼야 로그인·복사·공유가 풀린다.
    카카오는 openExternal 스킴으로 원클릭, 그 외(인스타·페북)는 안내만. dismiss 가능. */
@@ -407,6 +433,9 @@ function App() {
     if (!RG_DEV_REVIEW_ENABLED) return false;
     try { return sessionStorage.getItem(RG_DEV_REVIEW_SESSION_KEY) === '1'; } catch (e) { return false; }
   });
+  const [reviewPersona] = useState(() => RG_DEV_REVIEW_ENABLED && window.RG_DEV_REVIEW ? window.RG_DEV_REVIEW.current() : null);
+  const [reviewPersonas, setReviewPersonas] = useState(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [authUser, setAuthUser] = useState(reviewMode ? 'local' : (_supa ? undefined : 'local')); // undefined=확인중, null=로그아웃(게스트), 그외=OK
   const [dataReady, setDataReady] = useState(!_supa);
   const [showLogin, setShowLogin] = useState(false);        // 로그인 화면 온디맨드(벽 아님)
@@ -434,6 +463,7 @@ function App() {
   //   로컬이라 남의 숲을 모름). 토큰은 즉시 정리 — 새로고침·공유 시 재처리/노출 방지.
   const [invitePreview, setInvitePreview] = useState(null);
   useEffect(() => {
+    if (reviewMode) return;
     const token = new URLSearchParams(location.search).get('r');
     if (!token || !/^[A-Za-z0-9]+$/.test(token)) return;
     history.replaceState(null, '', location.pathname);
@@ -448,9 +478,9 @@ function App() {
         if (window.showToast) window.showToast('초대 링크를 여는 데 실패했어요');
       }
     })();
-  }, []);
+  }, [reviewMode]);
   // 로그인 화면 열기(저장 시점 트리거) — 설정/프로필/배너에서 호출.
-  useEffect(() => { window.RG_login = () => setShowLogin(true); return () => { window.RG_login = null; }; }, []);
+  useEffect(() => { window.RG_login = () => { if (!reviewMode) setShowLogin(true); }; return () => { window.RG_login = null; }; }, [reviewMode]);
   // 책 상세 통일(#11, 통일성) — 어디서 누르든 같은 책=같은 화면. 탭이 아니라 '소유'로 라우팅:
   // 소유 책이면 풀 BookDetailModal(진척·별점·내문장·관련·export, 책장과 동일), 미소유면 BookInfoModal(정보+등록).
   const [bookDetailId, setBookDetailId] = useState(null);        // 미소유 책 → BookInfoModal(canonical book id)
@@ -656,20 +686,41 @@ function App() {
     return window.RG_SB.onAuthChange(u => setAuthUser(u || null));
   }, [reviewMode]);
 
-  const enterDevReview = useCallback(() => {
-    if (!RG_DEV_REVIEW_ENABLED) return;
-    try { sessionStorage.setItem(RG_DEV_REVIEW_SESSION_KEY, '1'); } catch (e) {}
-    setReviewMode(true);
-    setAuthUser('local');
-    setDataReady(true);
-    setShowLogin(false);
+  const openDevReviewPicker = useCallback(() => {
+    if (!RG_DEV_REVIEW_ENABLED || !window.RG_DEV_REVIEW) return;
+    setReviewPersonas(window.RG_DEV_REVIEW.list());
   }, []);
 
-  const exitDevReview = useCallback(() => {
-    if (!RG_DEV_REVIEW_ENABLED) return;
-    try { sessionStorage.removeItem(RG_DEV_REVIEW_SESSION_KEY); } catch (e) {}
-    location.reload();
-  }, []);
+  const enterDevReview = useCallback(async (personaId) => {
+    if (!RG_DEV_REVIEW_ENABLED || !window.RG_DEV_REVIEW || reviewBusy) return;
+    setReviewBusy(true);
+    try {
+      await window.RG_DEV_REVIEW.activate(personaId);
+      location.reload();
+    } catch (e) { if (window.showToast) window.showToast('검수 페르소나를 시작하지 못했어요'); }
+    finally { setReviewBusy(false); }
+  }, [reviewBusy]);
+
+  const resetDevReview = useCallback(async () => {
+    if (!RG_DEV_REVIEW_ENABLED || !window.RG_DEV_REVIEW || reviewBusy) return;
+    setReviewBusy(true);
+    try {
+      await window.RG_DEV_REVIEW.reset();
+      location.reload();
+    } catch (e) { if (window.showToast) window.showToast('초기화하지 못했어요'); }
+    finally { setReviewBusy(false); }
+  }, [reviewBusy]);
+
+  const exitDevReview = useCallback(async () => {
+    if (!RG_DEV_REVIEW_ENABLED || reviewBusy) return;
+    setReviewBusy(true);
+    try {
+      if (window.RG_DEV_REVIEW) await window.RG_DEV_REVIEW.clear();
+      else sessionStorage.removeItem(RG_DEV_REVIEW_SESSION_KEY);
+      location.reload();
+    } catch (e) { if (window.showToast) window.showToast('검수 모드를 종료하지 못했어요'); }
+    finally { setReviewBusy(false); }
+  }, [reviewBusy]);
 
   // 로그인 성공 시 로그인 화면 자동 닫기(#1011). 웹은 OAuth 리디렉트가 페이지를 리로드해
   // showLogin 이 초기화되지만, 네이티브(#968 딥링크 복귀)는 리로드가 없어 인증돼도 로그인
@@ -716,7 +767,7 @@ function App() {
   // 401→catch 폴백 → "빈 상태"가 기존 상태를 덮어 둥지가 빈 화면이 되고, NestView가
   // 빈 둥지 UI로 갈아끼워지며 portal(ReadingMode)이 언마운트 → 타이머·세션 소멸 + 콘솔 400 에러.
   useEffect(() => {
-    if (!_supa) return;
+    if (!_supa || reviewMode) return;
     let busy = false;
     const onVis = async () => {
       if (document.hidden || busy || !window.SupabaseDataStore) return;
@@ -735,7 +786,7 @@ function App() {
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  }, [_supa]);
+  }, [_supa, reviewMode]);
 
   const switchTab = useCallback((tab) => {
     setActiveTab(tab);
@@ -763,7 +814,7 @@ function App() {
     // 게스트(로그아웃 + Supabase 모드): 저장-worthy 한 책·문장을 pending 에 포착 →
     // 로그인 시 syncPendingToSupabase 가 흡수(§7.7). DataStore 가 아직 localStorage 인 동안만.
     // 배치(#1198)는 pending 단일 캡처 대신 localStorage user_book.sentences 의 _guest 마킹으로 로그인 시 일괄 이전됨(syncPendingToSupabase §7.7). 단일만 레거시 pending 캡처.
-    if (_supa && window.SupabaseDataStore && window.DataStore !== window.SupabaseDataStore && sentence && !batch) {
+    if (_supa && !reviewMode && window.SupabaseDataStore && window.DataStore !== window.SupabaseDataStore && sentence && !batch) {
       try {
         const b = ns.book || {};
         window.localStorageAdapter.mutate(s => {
@@ -992,8 +1043,9 @@ function App() {
   _overlayBack(!!invitePreview, () => setInvitePreview(null));
 
   // Phase 1 인증 — 게스트 우선(onboarding.md §4). 로그인은 '저장' 시점에만 요구.
+  if (RG_DEV_REVIEW_ENABLED && reviewPersonas) return (<DevReviewPersonaPicker personas={reviewPersonas} onSelect={enterDevReview} onClose={() => setReviewPersonas(null)} busy={reviewBusy} />);
   if (_supa && authUser === undefined) return (<BootSplash text="확인 중..." />);
-  if (showLogin) return (<LoginScreen onLogin={(provider) => window.RG_SB.signInWithOAuth(provider || 'google')} onReview={RG_DEV_REVIEW_ENABLED ? enterDevReview : undefined} onBack={() => setShowLogin(false)} />);
+  if (showLogin) return (<LoginScreen onLogin={(provider) => { if (!reviewMode) return window.RG_SB.signInWithOAuth(provider || 'google'); }} onReview={RG_DEV_REVIEW_ENABLED ? openDevReviewPicker : undefined} onBack={() => setShowLogin(false)} />);
   // 로그인 사용자만 Supabase 데이터 로드 대기. 게스트(authUser===null)는 localStorage 로 즉시 진입.
   if (_supa && authUser && authUser !== 'local' && !dataReady) return (<BootSplash text="불러오는 중..." />);
 
@@ -1006,9 +1058,11 @@ function App() {
         <InAppBanner />
 
         {RG_DEV_REVIEW_ENABLED && reviewMode && (
-          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: 'var(--brand-tint)', borderBottom: '1px solid var(--brand-soft)', color: 'var(--brand-3)', fontSize: 12, fontWeight: 800 }}>
-            <span style={{ flex: 1 }}>DEV 검수 모드 · 테스트 데이터 · 서버에 저장되지 않음</span>
-            <button onClick={exitDevReview} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--paper)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>검수 종료</button>
+          <div role="status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'var(--brand-tint)', borderBottom: '1px solid var(--brand-soft)', color: 'var(--brand-3)', fontSize: 11.5, fontWeight: 800 }}>
+            <span style={{ flex: '1 1 100%' }}>DEV 검수 모드 · {reviewPersona ? reviewPersona.name : '합성 페르소나'} · 브라우저 즉시 저장 + DEV DB 동기화 · PRD 미사용</span>
+            <button onClick={openDevReviewPicker} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>전환</button>
+            <button onClick={resetDevReview} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>초기 데이터로 리셋</button>
+            <button onClick={exitDevReview} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--paper)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>검수 종료</button>
           </div>
         )}
 

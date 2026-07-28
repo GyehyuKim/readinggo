@@ -7,8 +7,6 @@ import './js/analytics.js'; // #1306 중앙 이벤트 메타데이터·PII 게�
 // 2) 백엔드 계층(순수 JS) — 기존 plain <script> 순서.
 import './js/config.js';
 import './js/turnstile.js';   // #1158/#1159 Turnstile 봇 검증 — RG_apiFetch/RG_turnstileToken (config 다음, app 이전)
-import './js/supabase-client.js';
-import './js/datastore-supabase.js';
 
 // 3) 데모/컴포넌트 — 기존 loadBabel 순서 그대로(주석은 index.html 의존성 메모).
 import './js/data.js';
@@ -48,8 +46,24 @@ import './js/inapp.js';             // #1096 인앱 브라우저(카카오 등) 
 //    기존 index.html IIFE 가 library.js 와 settings-modal.js 사이에서 await 하던 로직.
 //    app.js 는 모듈 평가 시 createRoot().render(<App/>) 를 실행하므로, 스왑 후 동적 import 로 마지막 마운트.
 async function boot() {
+  let devReviewRestored = false;
+  if (import.meta.env.VITE_READINGGO_ENV === 'development') {
+    try {
+      const { devReviewPersonas } = await import('./js/dev-review-personas.js');
+      window.RG_DEV_REVIEW = devReviewPersonas;
+      devReviewRestored = !!(await devReviewPersonas.restore());
+    } catch (e) {
+      console.warn('[ReadingGo] DEV 검수 페르소나 복원 스킵:', e.message);
+    }
+  }
   try {
-    if (window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured()) {
+    // 검수 세션 복원을 Supabase 모듈 평가보다 먼저 확정한다. 활성 검수 세션에서는
+    // auth listener/client 자체를 만들지 않아 세션 복원·token refresh·DB 요청을 원천 차단한다.
+    if (!devReviewRestored) {
+      await import('./js/supabase-client.js');
+      await import('./js/datastore-supabase.js');
+    }
+    if (!devReviewRestored && window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured()) {
       const u = await window.RG_SB.currentUser();
       if (u && window.SupabaseDataStore) {
         window.DataStore = window.SupabaseDataStore;

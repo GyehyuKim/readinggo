@@ -60,6 +60,9 @@ jobs:
       - name: Core regression tests
         run: |
           node tests/decode-entities.test.mjs
+          node tests/dev-review-personas.test.mjs
+          node tests/dev-review-datastore-sync.test.mjs
+          node tests/dev-review-persona-api.test.mjs
           node tests/forest-sentence-date.test.mjs
           node tests/book-detail-hierarchy.test.mjs
           node tests/barcode-focus.test.mjs

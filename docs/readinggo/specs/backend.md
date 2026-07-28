@@ -9,6 +9,7 @@
 > **v10 갱신 (2026-06-26, #1007)**: **독서 위키 Q&A — `POST /api/wiki-ask`** 신설(§7.9.2). "내 문장에게 묻기"의 호출 경로 — companion 형제 프록시(동일출처 가드·`callLLM` 키 서버 보관). 내가 모은 문장에만 근거(그라운딩·환각 가드), 질문당 1콜(Gemini Flash 텍스트, AI lock 안), RAG 불필요(전체 문장 한 프롬프트).
 > **v11 갱신 (2026-06-29, #1044)**: **책 데이터 소스 이전(알라딘 OpenAPI ToS 회피)** — §7.2.1 신설. 알라딘 OpenAPI 약관(영리·법인 이용 불가 + 취득정보 **저장·캐시 금지**)이 우리 canonical 캐시(`books` upsert, #489)와 정면 충돌 → 상업 출시 블로커. canonical 소스를 **국립중앙도서관 ISBN 서지정보 API**(쪽수·표지, 이용허락 제한 없음)와 **카카오 책검색**(검색·표지, 캐시 조건부 허용) 페어로, 외서는 **Google Books 실시간만**(영구 upsert 중단), 네이버 비권장. worker 이전 지점·출시 전 실계정 ToS 확인 게이트·Phasing 은 §7.2.1. **본 PR 은 spec-only — 코드 재배선은 후속 PR(#1044).**
 > **v12 갱신 (2026-07-03, #1044 코드 PR)**: §7.2.1 P1 **구현** — worker 에 provider 스위치(`KAKAO_REST_KEY`/`NLK_CERT_KEY` 자동 감지, 미설치 시 알라딘 폴백 = 무중단). 검색→카카오(영구 적재는 ISBN 국중도 재조회분만)·ISBN→국중도(+OpenLibrary 외서 폴백)·Google 영구 경로 2건 제거(검색 upsert·backfillPages PATCH)·imgProxy 화이트리스트 확장·archive 시드 게이트 격리(재설계 P2). 상세 §7.2.1 구현 상태.
+> **v13 갱신 (2026-07-28, #1350)**: DEV 소셜 로그인 provider에 의존하지 않는 합성 검수 환경 신설(§7.1.1). 브라우저 local-first 상태와 DEV 전용 Supabase 저장소를 분리하고, Production·실사용자 Auth/DataStore 경로는 fail-closed 한다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -37,6 +38,36 @@
     - **Apple**: [Apple Developer](https://developer.apple.com)(유료 $99/yr) → App ID + **Services ID** 생성, Sign in with Apple 활성화 → **Return URL** 에 Supabase 콜백 등록 → Sign in with Apple **Key(.p8)** 발급 → Supabase 대시보드 Auth→Providers→**Apple** enable + Services ID·Team ID·Key ID·.p8 입력. (Apple Dev 결제·활성화 대기는 iOS 출시 트랙 — [iOS-PLAN §8](../iOS-PLAN.md).)
     - **공통**: Supabase Auth→URL Configuration→**Redirect URLs** 에 웹 origin + 네이티브 스킴(`com.readinggo.app://login-callback`) 둘 다 등록(#968).
 - **푸시 알림**: Phase 2 **PWA 전환(웹푸시)** 이후로 후순위. Phase 0/1 은 알림 없음(인앱 토스트 시뮬).
+
+### 7.1.1 DEV 합성 검수 환경
+
+DEV는 Production OAuth provider 구성을 복제하지 않아도 제품 흐름을 검수할 수 있어야 한다. 로그인 화면은 Google·Kakao·이메일 진입점과 "DEV 소셜 로그인 미연결" 안내를 유지하되, 별도의 **합성 검수 페르소나** 선택 경로를 제공한다.
+
+#### 데이터·사용자 경계
+
+- 페르소나는 `product-explorer`, `community-listener`, `steady-builder` 3종만 허용하며 UI에서 **합성 데이터**임을 명시한다.
+- 이름은 계휴·Judy·Jerome의 검수 관점과 독서 성향만 참고한다. 실제 사용자 이메일, Auth UUID, 개인정보, credential, 문장·감상·대화 원문을 복사하지 않는다.
+- 책·독서 세션·한 문장·감상·재키 Q/A·스트릭·XP·위시리스트는 결정적 창작 fixture다. reset은 같은 초기 상태를 멱등하게 복구하며 중복 행을 만들지 않는다.
+- fake user를 `auth.users` 또는 운영 사용자 테이블에 만들지 않는다. 상태는 DEV 전용 `dev_review_persona_state` JSON 저장소만 사용한다.
+
+#### 저장·충돌 계약
+
+- 클라이언트는 persona별 localStorage namespace에 먼저 저장하고 UI를 즉시 갱신한 뒤 DEV Worker `/api/dev-review-personas`로 동기화한다. 원격 장애는 로컬 검수를 막지 않으며 dirty 상태를 유지한다.
+- 브라우저마다 128-bit random instance capability를 발급하고 서버 PK를 `(instance_id, persona_id)`로 구성해 검수자·브라우저 간 상태를 분리한다. instance 값은 사용자 인증이 아니라 비추측성 DEV namespace다.
+- 모든 PUT은 현재 server revision을 전달한다. 신규 행은 PK 충돌이 원자적으로 차단되고, 기존 행은 `revision=expected` 조건부 갱신만 허용한다. stale write는 `409`이며 최신 서버 상태를 덮어쓰지 않는다.
+- 로컬 write version을 캡처한 원격 저장이 성공해도 그 사이 더 최신 local write가 생겼다면 dirty를 해제하지 않는다. 전환·종료는 현재 persona의 최신 상태를 같은 직렬 큐에서 flush한다.
+
+#### Production·Auth 격리
+
+- 저장된 DEV 검수 세션 복원 여부를 Supabase 클라이언트 및 Supabase DataStore import보다 먼저 결정한다. 복원 성공 시 `createClient`, Auth session 복원/refresh, 사용자용 Supabase read/write를 시작하지 않는다.
+- 활성 검수 세션에서는 `RG_SB`, `SupabaseDataStore`, OAuth, 이메일 OTP 및 직접 사용자 프로필/팔로우 경로를 fail-closed 한다. 허용되는 서버 저장 경로는 DEV persona endpoint뿐이다.
+- Production 번들은 persona fixture·selector·reset UI·endpoint 문자열을 포함하지 않는다. Production Worker의 `/api/dev-review-personas`는 입력 검증이나 DB 접근보다 먼저 `404`를 반환한다.
+- DEV SQL은 `*.dev.sql`로 구분하며 Production migration/drift 집합에서 제외한다. DEV 테이블은 RLS를 활성화하고 `anon`·`authenticated` 직접 권한을 회수하며 Worker service role만 접근한다.
+
+#### Worker 입력 경계
+
+- Worker는 development 환경, 허용 persona ID, 32자리 hex instance, 최대 120KB, 허용 state 구조를 검증한다. 이메일·Auth UUID 형태 또는 예상하지 않은 top-level/도서 row는 거부한다.
+- PUT은 허용 앱 Origin이 반드시 있어야 하고 rate limit을 적용한다. 로컬/Capacitor 교차출처 검수의 CORS preflight에는 PUT을 명시적으로 허용한다.
 
 ### 7.2 DataStore 계약 (Phase 0 ↔ Phase 1 이음매) — v7 신설
 

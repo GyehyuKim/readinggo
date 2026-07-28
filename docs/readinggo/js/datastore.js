@@ -87,8 +87,16 @@ function _todayMinus(n) {
    Phase 1 에서는 이 객체를 supabaseAdapter 로 교체. */
 const localStorageAdapter = (function () {
   let _cache = null;
+  let _storageKey = RG_V41_KEY;
+  let _configuredSeed = null;
+  let _writeHook = null;
+
+  function _clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
 
   function _seed() {
+    if (_configuredSeed) return _clone(_configuredSeed);
     // INITIAL_STATE 의 단일 활성 책을 user_books[] 한 행으로 시드.
     // #1136: 신규 게스트 빈 시작 — INITIAL_STATE.book 이 빈 센티널({id:''})이면 유령 행 방지 위해 미시드.
     const _sb = (window.INITIAL_STATE && window.INITIAL_STATE.book) || null;
@@ -194,25 +202,42 @@ const localStorageAdapter = (function () {
   function read() {
     if (_cache) return _cache;
     try {
-      const raw = localStorage.getItem(RG_V41_KEY);
+      const raw = localStorage.getItem(_storageKey);
       if (raw) {
         _cache = JSON.parse(raw);
         return _cache;
       }
     } catch (e) {
-      console.warn('[DataStore] rg_v41 파싱 실패, 재시드:', e.message);
+      console.warn('[DataStore] 로컬 데이터 파싱 실패, 재시드:', e.message);
     }
     _cache = _seed();
     write(_cache);
     return _cache;
   }
 
-  function write(state) {
+  function _dirtyKey() { return `${_storageKey}_dirty`; }
+  function _versionKey() { return `${_storageKey}_version`; }
+  function _revisionKey() { return `${_storageKey}_server_revision`; }
+
+  function _markDirty() {
+    try { localStorage.setItem(_dirtyKey(), '1'); } catch (e) {}
+  }
+
+  function write(state, options) {
     _cache = state;
     try {
-      localStorage.setItem(RG_V41_KEY, JSON.stringify(state));
+      localStorage.setItem(_storageKey, JSON.stringify(state));
     } catch (e) {
-      console.warn('[DataStore] rg_v41 저장 실패:', e.message);
+      console.warn('[DataStore] 로컬 데이터 저장 실패:', e.message);
+    }
+    let version = 0;
+    try {
+      version = (Number(localStorage.getItem(_versionKey())) || 0) + 1;
+      localStorage.setItem(_versionKey(), String(version));
+    } catch (e) {}
+    if (_writeHook && !(options && options.notify === false)) {
+      _markDirty();
+      try { _writeHook(_clone(state), version); } catch (e) { console.warn('[DataStore] DEV 동기화 예약 실패:', e.message); }
     }
     return state;
   }
@@ -220,12 +245,88 @@ const localStorageAdapter = (function () {
   // mutate(fn): 현재 상태를 fn 으로 수정 후 저장. fn 의 반환값을 그대로 돌려준다.
   function mutate(fn) {
     const state = read();
+    const before = JSON.stringify(state);
     const out = fn(state);
-    write(state);
+    // 일부 조회 helper도 mutate를 통해 정규화한다. 실제 변화가 없으면 저장·dirty·동기화를 만들지 않는다.
+    if (JSON.stringify(state) !== before) write(state);
     return out;
   }
 
-  return { read, write, mutate };
+  // DEV 검수처럼 별도 로컬 namespace가 필요한 부팅 경로를 위한 안전한 어댑터 API.
+  // 기본값은 항상 rg_v41이며, 호출부가 localStorage/cache를 직접 만지지 않게 한다.
+  function configure({ storageKey, initialState }) {
+    if (!/^rg_dev_review_persona_[a-z0-9-]+$/.test(storageKey || '')) {
+      throw new Error('허용되지 않은 DEV 검수 저장소 키');
+    }
+    if (!initialState || !Array.isArray(initialState.user_books)) {
+      throw new Error('DEV 검수 초기 상태가 올바르지 않음');
+    }
+    _storageKey = storageKey;
+    _configuredSeed = _clone(initialState);
+    _writeHook = null;
+    _cache = null;
+    // 검수 도서 검색은 isolateSupabase()가 module-local loadBooks의 RG_SB 경로를 차단해
+    // 인라인 정적 카탈로그로 폴백시킨다. 합성 상태는 DEV Worker 격리 테이블로만 동기화한다.
+    return read();
+  }
+
+  function reset() {
+    if (!_configuredSeed || _storageKey === RG_V41_KEY) throw new Error('DEV 검수 저장소가 활성화되지 않음');
+    return write(_clone(_configuredSeed));
+  }
+
+  function currentKey() { return _storageKey; }
+
+  function replace(state) {
+    if (!_configuredSeed || !state || !Array.isArray(state.user_books)) throw new Error('DEV 검수 상태가 올바르지 않음');
+    return write(_clone(state), { notify: false });
+  }
+
+  function setWriteHook(hook) { _writeHook = typeof hook === 'function' ? hook : null; }
+
+  function isDirty() {
+    try { return localStorage.getItem(_dirtyKey()) === '1'; } catch (e) { return false; }
+  }
+
+  function clearDirty() {
+    try { localStorage.removeItem(_dirtyKey()); } catch (e) {}
+  }
+
+  function version() {
+    try { return Number(localStorage.getItem(_versionKey())) || 0; } catch (e) { return 0; }
+  }
+
+  function getRevision() {
+    try {
+      const raw = localStorage.getItem(_revisionKey());
+      return raw == null ? null : Number(raw);
+    } catch (e) { return null; }
+  }
+
+  function setRevision(revision) {
+    if (!Number.isInteger(revision) || revision < 1) throw new Error('DEV 검수 서버 revision이 올바르지 않음');
+    try { localStorage.setItem(_revisionKey(), String(revision)); } catch (e) {}
+    return revision;
+  }
+
+  function clearRevision() {
+    try { localStorage.removeItem(_revisionKey()); } catch (e) {}
+  }
+
+  function clientId() {
+    const key = 'rg_dev_review_client_id';
+    try {
+      const existing = localStorage.getItem(key);
+      if (/^[a-f0-9]{32}$/.test(existing || '')) return existing;
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      const created = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(key, created);
+      return created;
+    } catch (e) { throw new Error('DEV 검수 브라우저 식별자를 만들 수 없음'); }
+  }
+
+  return { read, write, mutate, configure, reset, currentKey, replace, setWriteHook, isDirty, markDirty: _markDirty, clearDirty, clientId, version, getRevision, setRevision, clearRevision };
 })();
 
 /* ── 내부 조회 헬퍼 ──────────────────────────────── */
@@ -320,6 +421,23 @@ function _npcFeedRows() {
 /* ── DataStore 계약 (§7.2) ───────────────────────────────
    localStorageAdapter 백킹의 실제 동작 구현 (스텁 아님). */
 const DataStore = {
+  // 저장소 선택/초기화는 어댑터 경계 안에서만 수행한다. production 기본 키는 rg_v41 불변.
+  local: {
+    configure(options) { return localStorageAdapter.configure(options); },
+    reset() { return localStorageAdapter.reset(); },
+    currentKey() { return localStorageAdapter.currentKey(); },
+    read() { return localStorageAdapter.read(); },
+    replace(state) { return localStorageAdapter.replace(state); },
+    setWriteHook(hook) { return localStorageAdapter.setWriteHook(hook); },
+    isDirty() { return localStorageAdapter.isDirty(); },
+    markDirty() { return localStorageAdapter.markDirty(); },
+    clearDirty() { return localStorageAdapter.clearDirty(); },
+    clientId() { return localStorageAdapter.clientId(); },
+    version() { return localStorageAdapter.version(); },
+    getRevision() { return localStorageAdapter.getRevision(); },
+    setRevision(revision) { return localStorageAdapter.setRevision(revision); },
+    clearRevision() { return localStorageAdapter.clearRevision(); },
+  },
   /* 설정 ─────────────────────────────────────────── */
   settings: {
     get() {
@@ -1166,4 +1284,5 @@ const DataStore = {
 };
 
 window.DataStore = DataStore;
+window.LocalDataStore = DataStore;
 window.localStorageAdapter = localStorageAdapter;

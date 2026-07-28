@@ -5,7 +5,7 @@
 코드/`.sql`은 main에 머지돼도 프로덕션 DB에 적용되지 않으면 런타임 400
 (`column ... does not exist`)으로 조용히 실패한다 (2026-06-16 QA: 11/22/23 누락).
 
-전략: docs/readinggo/supabase/*.sql 에서 `add column if not exists` 와
+전략: docs/readinggo/supabase/*.sql (`*.dev.sql` 제외)에서 `add column if not exists` 와
 `create table if not exists` 대상을 파싱하고, Supabase Management API 로
 라이브 프로젝트의 information_schema 를 조회해 **DB 에 없는 마이그레이션 객체**를
 보고한다.
@@ -48,6 +48,10 @@ def parse_expected() -> tuple[set[tuple[str, str]], set[str]]:
     cols: set[tuple[str, str]] = set()
     tables: set[str] = set()
     for f in sorted(SQL_DIR.glob("*.sql")):
+        # `*.dev.sql` is intentionally applied only to the isolated DEV project.
+        # Production drift checks must not require those DEV-only tables.
+        if f.name.endswith(".dev.sql"):
+            continue
         raw = _strip_sql_comments(f.read_text(encoding="utf-8"))
         for m in re.finditer(
             r"create\s+table\s+if\s+not\s+exists\s+(?:public\.)?(\w+)", raw, re.I
