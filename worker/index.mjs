@@ -73,7 +73,7 @@ export default {
     if (crossApp && request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: {
         'Access-Control-Allow-Origin': origin,
-        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, cf-turnstile-token',
         'Access-Control-Max-Age': '86400',
         'Vary': 'Origin',
@@ -127,6 +127,16 @@ export default {
     if (p === '/api/prompt-experiments/run') {
       if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
       return promptExperimentProxy(request, env, ctx);
+    }
+    // DEV 합성 검수 페르소나 상태 — 전용 DEV Supabase 테이블에만 저장.
+    // production에서는 인증·입력 처리보다 먼저 404. 실제 사용자/auth 테이블은 접근하지 않는다.
+    if (p === '/api/dev-review-personas') {
+      if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
+      const origin = request.headers.get('Origin');
+      if (request.method === 'PUT' && !origin) return json({ error: 'origin required' }, 403);
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'dev-review-personas'); if (rl) return rl; }
+      return devReviewPersonaProxy(request, env, url);
     }
     // 독서 위키 Q&A — "내 문장에게 묻기" (#1007). 사용자가 모은 한 문장(+감상)에만 근거해 답.
     // companion 형제 — 같은 LLM 프록시(callLLM)·동일출처 가드·키 서버보관. 클라가 내 문장만 전송.
@@ -2469,7 +2479,89 @@ async function bookUpsertProxy(request, env) {
 }
 
 // ── OTA Live Updates (#876) ───────────────────────────────
-// 설치 앱(Capgo @capgo/capacitor-updater)이 POST 로 현재 상태를 보내면 채널 매니페스트(KV)와 비교해
+const DEV_REVIEW_PERSONA_IDS = new Set(['product-explorer', 'community-listener', 'steady-builder']);
+const DEV_REVIEW_MAX_BYTES = 120000;
+
+function validDevReviewState(state) {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return false;
+  if (!Array.isArray(state.user_books) || !Array.isArray(state.wish_books)) return false;
+  const allowedKeys = new Set(['user_books', 'active_user_book_id', 'streak', 'xp', 'claps', 'bookmarks', 'wish_books', 'settings', 'pending']);
+  if (Object.keys(state).some(key => !allowedKeys.has(key))) return false;
+  if (state.user_books.length > 30 || state.wish_books.length > 30) return false;
+  if (!Number.isFinite(state.xp) || state.xp < 0 || state.xp > 10000000) return false;
+  if (state.active_user_book_id !== null
+    && (typeof state.active_user_book_id !== 'string' || !/^dev-[a-z0-9-]+$/.test(state.active_user_book_id))) return false;
+  if (!state.streak || !Number.isInteger(state.streak.current) || !Number.isInteger(state.streak.longest)) return false;
+  if (!state.claps || Array.isArray(state.claps) || typeof state.claps !== 'object') return false;
+  if (!state.bookmarks || Array.isArray(state.bookmarks) || typeof state.bookmarks !== 'object') return false;
+  if (!state.settings || Array.isArray(state.settings) || typeof state.settings !== 'object') return false;
+  if (!state.pending || Array.isArray(state.pending) || typeof state.pending !== 'object') return false;
+  if (state.wish_books.some(value => typeof value !== 'string' || !/^b[0-9]+$/.test(value))) return false;
+  if (state.user_books.some(row => !row || typeof row !== 'object' || Array.isArray(row)
+    || typeof row.id !== 'string' || !/^dev-[a-z0-9-]+$/.test(row.id)
+    || typeof row.book_id !== 'string' || !/^b[0-9]+$/.test(row.book_id)
+    || !['reading', 'completed', 'aborted'].includes(row.status)
+    || !Array.isArray(row.sessions) || row.sessions.length > 100
+    || !Array.isArray(row.sentences) || row.sentences.length > 100)) return false;
+  let serialized = '';
+  try { serialized = JSON.stringify(state); } catch { return false; }
+  if (!serialized || new TextEncoder().encode(serialized).length > DEV_REVIEW_MAX_BYTES) return false;
+  if (/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(serialized)) return false;
+  if (/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i.test(serialized)) return false;
+  return true;
+}
+
+async function devReviewPersonaProxy(request, env, url) {
+  const id = String(url.searchParams.get('id') || '');
+  const instanceId = String(url.searchParams.get('instance') || '');
+  if (!DEV_REVIEW_PERSONA_IDS.has(id)) return json({ error: 'invalid persona' }, 400);
+  if (!/^[a-f0-9]{32}$/.test(instanceId)) return json({ error: 'invalid instance' }, 400);
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'dev storage unconfigured' }, 503);
+  const base = `${env.SUPABASE_URL}/rest/v1/dev_review_persona_state`;
+  const headers = {
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  try {
+    if (request.method === 'GET') {
+      const response = await fetch(`${base}?instance_id=eq.${instanceId}&persona_id=eq.${encodeURIComponent(id)}&select=state,revision,updated_at&limit=1`, { headers });
+      if (!response.ok) return json({ error: 'dev storage unavailable' }, 502);
+      const rows = await response.json();
+      if (!rows || !rows.length) return json({ error: 'not found' }, 404);
+      return json({ id, state: rows[0].state, revision: Number(rows[0].revision), updatedAt: rows[0].updated_at || null }, 200);
+    }
+    if (request.method !== 'PUT') return json({ error: 'GET or PUT only' }, 405);
+    const contentLength = Number(request.headers.get('Content-Length') || 0);
+    if (contentLength > DEV_REVIEW_MAX_BYTES) return json({ error: 'state too large' }, 413);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: 'invalid request' }, 400); }
+    if (!validDevReviewState(body && body.state)) return json({ error: 'invalid synthetic state' }, 400);
+    const expected = body.expectedRevision;
+    if (expected !== null && (!Number.isInteger(expected) || expected < 1)) return json({ error: 'invalid revision' }, 400);
+    const creating = expected === null;
+    const target = creating
+      ? base
+      : `${base}?instance_id=eq.${instanceId}&persona_id=eq.${encodeURIComponent(id)}&revision=eq.${expected}`;
+    const nextRevision = creating ? 1 : expected + 1;
+    const response = await fetch(target, {
+      method: creating ? 'POST' : 'PATCH',
+      headers: { ...headers, Prefer: 'return=representation' },
+      body: JSON.stringify(creating
+        ? [{ instance_id: instanceId, persona_id: id, state: body.state, revision: nextRevision }]
+        : { state: body.state, revision: nextRevision }),
+    });
+    if (response.status === 409) return json({ error: 'revision conflict' }, 409);
+    if (!response.ok) return json({ error: 'dev storage unavailable' }, 502);
+    const rows = await response.json();
+    if (!rows || !rows.length) return json({ error: 'revision conflict' }, 409);
+    return json({ id, state: rows[0].state || body.state, revision: Number(rows[0].revision) }, 200);
+  } catch (error) {
+    return json({ error: 'dev storage unavailable' }, 502);
+  }
+}
+
+// OTA Live Updates (#876) — Capgo capacitor-updater protocol v7. KV 기반 채널 매니페스트.
 // 업데이트면 {version,url,checksum}, 없으면 {} 반환(Capgo 규약: url 생략 = no update).
 // custom_id 로 채널(beta|production) 선택. version_code(셸 versionCode)로 minNative 게이트 —
 // 구 셸에 새 네이티브 API 쓰는 번들이 내려가 크래시하는 것 방지(spec ota.md §1·§5).
@@ -2507,7 +2599,7 @@ function json(obj, status, maxAge) {
 const RL_LIMITS = {
   seed: 20, ocr: 30, 'extract-highlights': 20, 'shelf-import': 12,
   companion: 40, 'wiki-ask': 40, 'parse-books': 20, related: 40,
-  'book-upsert': 30, 'prompt-lab': 30,
+  'book-upsert': 30, 'prompt-lab': 30, 'dev-review-personas': 60,
 };
 async function rateLimited(request, env, name) {
   try {
