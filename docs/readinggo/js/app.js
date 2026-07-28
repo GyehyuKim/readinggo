@@ -316,7 +316,7 @@ function LoginScreen({ onLogin, onBack, onReview }) {
         </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', lineHeight: 1.5 }}>지금까지 남긴 기록을<br />계정에 안전하게 간직해요.</div>
         {RG_DEV_REVIEW_ENABLED && (
-          <div role="note" style={{ fontSize: 12, color: 'var(--ink-2)', maxWidth: 300, lineHeight: 1.55, background: 'var(--brand-tint)', borderRadius: 10, padding: '9px 12px' }}>
+          <div role="note" style={{ fontSize: 12, color: 'var(--ink-2)', maxWidth: 300, lineHeight: 1.55, background: 'var(--brand-tint)', borderRadius: 'var(--r-sm)', padding: '9px 12px' }}>
             DEV에서는 실제 Google·카카오 로그인을 연결하지 않아요. 아래 개발 검수 모드를 이용해 주세요.
           </div>
         )}
