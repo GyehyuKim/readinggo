@@ -21,5 +21,11 @@ assert.equal(text.includes('DEV 검수 모드'), expected, expected
 assert.equal(text.includes('개발 검수 모드로 둘러보기'), expected, expected
   ? 'development 번들에 검수 진입 버튼이 포함돼야 한다'
   : 'production 번들에 검수 진입 버튼이 포함되면 안 된다');
+assert.equal(text.includes('DEV에서는 실제 Google·카카오 로그인을 연결하지 않아요'), expected, expected
+  ? 'development 번들에 실로그인 미연결 안내가 포함돼야 한다'
+  : 'production 번들에 DEV 전용 안내가 포함되면 안 된다');
+for (const loginLabel of ['Google로 시작하기', '카카오로 시작하기', '이메일로 시작하기']) {
+  assert.equal(text.includes(loginLabel), true, `기존 로그인 UI가 유지돼야 한다: ${loginLabel}`);
+}
 
 console.log(`OK: ${expected ? 'development' : 'production'} review-mode boundary`);
