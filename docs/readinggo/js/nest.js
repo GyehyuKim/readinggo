@@ -143,6 +143,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   // drafts[0] = 기존 단일 입력창(OCR·포커스 대상). drafts[1..] = (+)로 추가된 행. 항상 최소 1행.
   const [drafts, setDrafts] = _useState(() => _loadDrafts(state.book.id));
   const [quickSentPage, setQuickSentPage] = _useState('');
+  const [sentenceSubmitting, setSentenceSubmitting] = _useState(false);
+  const _sentenceSubmittingRef = _useRef(false);
   const [sentFlip, setSentFlip] = _useState(false); // 문장 저장 시 일기장 넘기기 효과
   // 빠른입력 OCR (#498/#1265) — 책 사진 → 전체화면 임시 검토
   const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
@@ -556,6 +558,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     if (total) sp = Math.min(total, sp);
     // 진도(current_page)는 문장 저장으로 뒤로 밀지 않음 — 문장이 앞쪽이면 현재 유지, 뒤쪽이면 따라 올림.
     const progressPage = Math.max(cur, sp);
+    if (_sentenceSubmittingRef.current) return;
+    _sentenceSubmittingRef.current = true;
+    setSentenceSubmitting(true);
     try {
       if (ready.length === 1) {
         await Promise.resolve(handleCheckin({ page: progressPage, sentence: ready[0].text, visibility: ready[0].visibility, kind: 'quote', sentPage: sp, awaitPersistence: true }));
@@ -568,6 +573,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       setQuickSentPage('');
     } catch (e) {
       // app.js 가 저장 오류를 안내하고 낙관 상태를 롤백한다. 초안·문장 페이지는 재시도를 위해 보존.
+    } finally {
+      _sentenceSubmittingRef.current = false;
+      setSentenceSubmitting(false);
     }
   };
   // 쪽수 stepper (#717) — 빈 값이면 현재 쪽 기준 ±delta, [0, total] 클램프.
@@ -910,7 +918,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             {nestState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
           </span>
           <button onClick={() => { setSentFlip(true); setTimeout(() => { submitSentence(); setSentFlip(false); }, 280); }}
-            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.2px', flexShrink: 0 }}>
+            disabled={sentenceSubmitting} aria-busy={sentenceSubmitting}
+            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: sentenceSubmitting ? 'default' : 'pointer', opacity: sentenceSubmitting ? 0.6 : 1, letterSpacing: '-0.2px', flexShrink: 0 }}>
             {_draftCount > 1 ? `${_draftCount}개 한번에 기록` : '남기기'}
           </button>
         </div>
