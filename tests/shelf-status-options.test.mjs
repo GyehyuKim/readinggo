@@ -37,3 +37,15 @@ for (const file of ['search.js', 'barcode-scan.js']) {
     `${file}에 상태 순서·문구 중복 배열이 남으면 안 된다`
   );
 }
+
+const searchSource = readFileSync('docs/readinggo/js/search.js', 'utf8');
+assert.match(
+  searchSource,
+  /M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z/,
+  '읽는 중 책 아이콘의 오른쪽 페이지 path를 정확히 보존해야 한다'
+);
+assert.doesNotMatch(
+  searchSource,
+  /a3 3 3 0 0 1 3-3h7z/,
+  '읽는 중 책 아이콘 path에 여분의 좌표가 들어가면 안 된다'
+);
