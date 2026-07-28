@@ -377,9 +377,8 @@ function LibraryView({ state, onActivateUserBook }) {
   };
 
   const books = myBooks || [];
-  const activeBookId = (state.book || {}).id;   // #580: 활성 책 없으면 state.book undefined → 책장 렌더 크래시 방지
   const readingBooks = books.filter(b => b.status === 'reading')
-    .sort((a, b) => (a.id === activeBookId ? -1 : b.id === activeBookId ? 1 : (b.cur || 0) - (a.cur || 0)));
+    .sort((a, b) => (b.cur || 0) - (a.cur || 0));
   const completedBooks = books.filter(b => b.status === 'completed');
   const abortedBooks = books.filter(b => b.status === 'aborted');   // #593 읽다 중단한 책
 
@@ -730,10 +729,9 @@ function LibraryView({ state, onActivateUserBook }) {
               return (
                 <div
                   key={b.ubId || b.id}
-                  className={'shelf-grid-item' + (b.id === activeBookId ? ' active' : '')}
+                  className="shelf-grid-item"
                   onClick={() => setSelectedBookId(b.id)}
                 >
-                  {b.id === activeBookId && <span className="shelf-grid-active-pill">읽는중</span>}
                   {b.status === 'wish' && (
                     <button onClick={(e) => removeWish(e, b.id)} title="찜 삭제" aria-label="찜 삭제"
                       className="shelf-grid-remove-wish">{window.rgIcon('close',14)}</button>
