@@ -444,3 +444,14 @@
 | **AI provider** | **현재 이원화** — 텍스트 solar-pro3, vision Gemini | 활성 runtime 세부는 `architecture-asbuilt.md §11`을 사실 기준으로 한다. 제품 기능별 provider 변경은 별도 결정으로 append한다. |
 
 > 과거 결정은 감사 추적을 위해 삭제하지 않는다. 활성 스펙은 README §3·backend.md §7.1과 as-built 문서를 따른다.
+
+### v13 — 홈 상단 XP·Lv 유지 (2026-07-29, #1176)
+
+> 이 활성 결정은 #1086의 “상단바 XP·Lv 숫자 폐지” 부분과, 그 방향을 정합하려다 제품 방향에서 제외되어 닫힌 미병합 PR #1282를 대체한다. 과거 기록은 감사 추적을 위해 보존한다.
+
+| 항목 | 활성 결정 |
+|---|---|
+| 홈 상단 | **XP·Lv 숫자 표시 유지**. 현행 `app.js`의 `topbar-stats`와 일치 |
+| XP·레벨 계약 | XP 적립 수치와 `level = floor(sqrt(totalXp / 100)) + 1` 계산을 변경하지 않음 |
+| 범위 경계 | 둥지 IA와 둥지 성장 설명 UX는 별도 범위. 이 결정에서 대체 표기·새 게임 정책·새 수치를 정하지 않음 |
+| SSOT | XP 수치·레벨 계산은 [systems.md §6.3](../systems.md), 홈 상단 구성은 [nest.md §5.1](../nest.md) |
