@@ -33,7 +33,7 @@ review_cadence: milestone
 **현행 유지** — spec-align invariant(`tests/spec-align/`), 이슈 링크(`Closes/Refs #N`), DataStore 계약, render-smoke, biome, markdownlint.
 
 **추가 예정**(싸고 우리 드리프트에 직격):
-- **`lychee`** — `docs/**/*.md` 링크 깨짐(스펙 간 `[§5.5](./village.md)` rot) 차단.
+- **`lychee`** — `docs/**/*.md`의 삭제·이동된 스펙 링크 rot 차단.
 - **`Vale` 용어 게이트** — 알려진 stale 용어 자동 적발: `Netlify`→Cloudflare, `Babel/CDN`→Vite, `마을/village`→폐기(#440), `Gemini`(구현은 solar-pro3) 등. `warn`으로 시작 → 1회 정리 후 `error`.
 - **스펙+코드 동시 변경 차단** — `specs/**`와 `js/**`를 한 PR에서 같이 고치면 실패(본문에 `spec+code-exempt: <사유>` 없으면). §4.1을 honor-system에서 체크로.
 

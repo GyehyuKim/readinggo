@@ -14,8 +14,8 @@
 | 보류 | 🅿️ 배너 + [open-issues.md](./open-issues.md) 기록 | `specs/` | invariant 미부여 | 포함 |
 | 폐기 | ⛔ 배너 + [rejected.md](./rejected.md) 사유·위임처 | `specs/`(배너 제자리) 또는 `_archive/`(링크 정합 시) | invariant 제거 | (제자리 시 포함) |
 
-- 본 정책 적용 (#639): **`social.md`→`feed.md` 개명**(소셜→피드, #488), **`resurface.md` 보류**(Phase later), **`village.md` 폐기**(마을 제거, [rejected.md](./rejected.md)).
-- 폐기 스펙의 물리적 `_archive` 이동은 아웃바운드 상대 링크가 깨지므로 **배너+rejected.md 기록으로 갈음 가능**(village는 제자리 폐기 유지).
+- 본 정책 적용 (#639): **`social.md`→`feed.md` 개명**(소셜→피드, #488), **`resurface.md` 보류**(Phase later), **마을 스펙 폐기**(마을 제거, [rejected.md](./rejected.md); 파일 삭제 #1364).
+- 폐기 스펙은 기본적으로 배너+[rejected.md](./rejected.md) 기록으로 보존하되, 더 이상 참조 가치가 없고 링크를 모두 정리한 경우 삭제할 수 있다(#1364).
 
 ## 8. 미결 → 확정 사항
 
@@ -37,7 +37,7 @@
 | 친구 짹 → XP | **채택** (+1). XP 수치 SSOT = `systems.md` | systems |
 | 챕터 완료 XP + 공유 카드 | 채택하되 **후순위** | systems |
 | 휴식코스 (Pause) | **채택** (장기출장/시험기간용). 기간·빈도·스트릭 동결 **상세 미정** | systems (승원) |
-| 그룹 기능 | **마을** (파트 마일스톤·파트별 랭킹). 독서모임·메가스트림·서브모임 **폐기** | village (윤지) |
+| 그룹 기능 | **마을** (파트 마일스톤·파트별 랭킹). 독서모임·메가스트림·서브모임 **폐기** | 이후 #440에서 폐기 |
 | 마을 공동자산 (도서관/세계수) | **삭제** | village |
 | 운영자 짹 | **제거** | — |
 | 소셜 피드 범위 | **전체 공개** (팔로워 한정은 향후) | social (계휴) |
@@ -77,13 +77,14 @@
 | 푸시 알림 | **Phase 2 PWA 웹푸시** 이후 |
 | Phase | 0 정적웹 / 1 Supabase(반드시 도달) / 2 PWA+AI고도화 / 3 native 재검토 |
 
-**작업 분배 (3인)**
+**스펙 기본 검토 창구**
 
 | owner | 파일 |
 |---|---|
 | **gyehyu** | `feed.md` · `profile.md` · `backend.md` · `onboarding.md` · `meta/*` · `README.md` |
 | **seungwon** | `nest.md` · `systems.md` · `design.md` |
-| **yunji** | `village.md` (마을) |
+
+> 윤지는 파일 고정 오너가 아니라 승인 contributor다. 구현 범위는 [CONTRIBUTING.md](../../../../CONTRIBUTING.md) §0에 따라 사전 합의된 이슈로 정한다.
 
 ---
 
@@ -134,8 +135,8 @@
 | **#179 한 문장 공개 범위** | ⚠️ **`is_private` binary → `visibility` 3단계 확장**: `public`(전체)·`followers`(상호 팔로워)·`private`(나만). Instagram 모델. **작성자가 공개해야만 타인에게 보임.** RLS 강제(`followers`=양방향 follows). 마이그레이션 `06_privacy_v2.sql`. **SSOT=[feed.md §5.7.1](../feed.md)** | social/backend | §8.1 "is_private 재도입"을 **대체** |
 | **#159 로그인 방식** | **이메일 1회 가입 + 세션 유지**(Supabase 세션 자동 유지). 만료 시 재로그인. Google OAuth 병행. (§8.2 "매직링크 제외" **갱신**) | onboarding/backend | 재논의 결과 |
 | **이메일 템플릿 브랜딩** | 확인·매직링크 메일에 **ReadingGo 브랜딩 + 문의처(`readinggo.admin@gmail.com`)** 삽입 — 사용자가 발신 출처를 신뢰하고 클릭하도록. `admin-cli.mjs email-template set` | backend(운영) | 신규(#1 맥락) |
-| **#154 마을 Supabase 연동** | `village.js` 데모 하드코딩 → `DataStore.villages.listMine/listPublic/create/join` 실연동 | village(윤지) | 사용자 지시로 계휴 작업 |
-| **#170 본인 마을 제외** | 추천 공개 마을 목록에서 내가 생성/가입한 마을 `filter` 제외 | village(윤지) | — |
+| **#154 마을 Supabase 연동** | `village.js` 데모 하드코딩 → `DataStore.villages.listMine/listPublic/create/join` 실연동 | 폐기 #440 | 사용자 지시로 계휴 작업 |
+| **#170 본인 마을 제외** | 추천 공개 마을 목록에서 내가 생성/가입한 마을 `filter` 제외 | 폐기 #440 | — |
 | **#153 반별점 0.5** | 별 좌측 절반 탭=0.5점. nest.md §5.4 SSOT 반영 | nest(승원) | 스펙 반영(구현 승원) |
 | **#157 스포일러 토글 위치** | social.js 헤더 우측 `🔓` — 현재 미배선, 배선 대상으로 명시 | social(승원) | 스펙 현행화 |
 
@@ -155,7 +156,7 @@
 | **#184 읽기 모드** | 둥지→독서 타이머+상시 한 문장 입력(북모리식). 새 ReadingMode | **nest(승원)** | ⚠️ **승원 nest.md 정의 필요 — pending** |
 | **#185 활성 책 캐러셀** | 둥지 책 배너 좌우 ‹ › 리볼빙 전환(`RG_activateBook`) | **nest(승원)** | ⚠️ **승원 nest.md §5.3 반영 필요 — pending** |
 | **#7 NPC 닉네임** | 영문→한글 형용사+동물 30종(08_npc_rename.sql, 적용됨) | backend(운영) | — |
-| **마을 공유/나가기/알림** | 가짜 rgo.app 링크→실 공유 URL+Web Share(#8), `villages.leave` 실동작(#9), 알림 체크박스 라벨 명확화(#10) | village(윤지) | village.js — 윤지 검토 |
+| **마을 공유/나가기/알림** | 가짜 rgo.app 링크→실 공유 URL+Web Share(#8), `villages.leave` 실동작(#9), 알림 체크박스 라벨 명확화(#10) | 폐기 #440 | 당시 구현 이력 |
 | **로그인 redirect** | `site_url`·`uri_allow_list`를 Netlify URL로(서버 적용됨) — OAuth 후 localhost 폴백 해소 | backend(운영) | — |
 
 **(해소됨)** #184 읽기모드·#185 캐러셀·1000자·페이지 명시 → **nest.md §5.3/§5.4/§5.5 반영 완료**(코드=PR #187, 스펙=spec-nest-readingmode PR). #153 반별점은 nest.md §5.4 스펙 있고 **코드는 승원 구현중**.
@@ -169,7 +170,7 @@
 | 항목 | 결정 | 담당 | 비고 |
 |---|---|---|---|
 | **#148 책 검색 재설계** | **우리 DB(books) 즉시 검색**(`books.search` ilike) + 데모 + **알라딘 병합·중복제거**(isbn13 기준, DB→데모→알라딘 우선). **외국 작가 표기 변이(도스토옙스키/Dostoevsky)는 알라딘에 위임**(재발명 X). 알라딘 책 선택 시 `books` upsert(lazy-cache). Netlify `ALADIN_TTB_KEY` 설정 | backend/social | 키 없어 미동작이던 것 정상화 |
-| **#170 마을 추천/검색 필터** | 추천·검색 둘 다 `myVillageIds` 제외(렌더 단계 이중 방어) | village(윤지) | 버그 수정 |
+| **#170 마을 추천/검색 필터** | 추천·검색 둘 다 `myVillageIds` 제외(렌더 단계 이중 방어) | 폐기 #440 | 버그 수정 이력 |
 | **공개 범위 토글 라벨** | 아이콘(🌐/👥/🔒) → **텍스트 칩 "전체공개/친구공개/비공개"**(아이콘만은 헷갈림) | social/profile | UX |
 | **틴더 카드 책표지** | ~~카드 중앙 상단에 표지·제목·저자(카드 본문 불변)~~ → **2026-06-15 보류(§8.10/#540)**. 피드 임베드 author 추가는 유지 | social | #186 후속 · 보류(§8.10) |
 | ~~**앱 버전 체계**~~ | **폐기 (#799)** — `RG_VERSION`·버전 표기 전체 제거(불필요). 설정엔 `ReadingGo · beta`만 표시. 문의 `app_version` 첨부 중단(컬럼은 잔존, drop 안 함) | backend/profile | #799 |
@@ -224,7 +225,7 @@
 
 ### 8.8 post-beta 결정 7 (2026-06-05, QA6 라이브 피드백. 구현 PR #229. 충돌 시 §8.7 위에 **우선**)
 
-> 12건 이슈 #217~228. SSOT: 마을=[village.md §5.5.4](../village.md), 프로필=[profile.md §5.8](../profile.md), 검색쪽수=[backend.md §7](../backend.md).
+> 12건 이슈 #217~228. 당시 마을 스펙은 #440에서 폐기되고 #1364에서 삭제. 현행 SSOT: 프로필=[profile.md §5.8](../profile.md), 검색쪽수=[backend.md §7](../backend.md).
 
 | 항목 | 결정 | 이슈 | SSOT/owner |
 |---|---|---|---|
@@ -399,12 +400,12 @@
 | 피드 리액션 | 짹(좋아요) 1종 + 책갈피(🔖) 분리. v4.3까지의 👏🥹🔖 3종 칩 폐기 |
 | 관심 책 리스트 | 내서재 내 별도 섹션. 소셜 피드 책 상세에서 "관심 책에 추가" 로 저장. DB: `wish_books` |
 | 책갈피 | 소셜 피드 모이 카드 우측 상단 🔖 → 관심 문장 저장. DB: `sentence_bookmarks` |
-| ~~마을 탭 설계~~ | **v6 해소** — 독서모임 탭으로 전면 대체 ([§5.5](../village.md)) |
+| ~~마을 탭 설계~~ | **v6 해소** — 독서모임 탭으로 전면 대체(이후 #440에서 폐기) |
 | 외부 노출 슬로건 | "하루 한 페이지, 한 문장에서 시작해요." (내부 Duolingo 레퍼런스 외부 비노출) |
 | DB | 관계형 + `users.settings` JSONB |
 | Phase 분리 | 0 데모 / 1 Supabase 웹 / 2 Android+FCM |
 | **v5 — 결정 마찰 카피** | 모이 입력 화면 하단에 "그냥 펴진 페이지 한 줄도 좋아요. 좋은 문장을 고를 필요 없어요." 상시 표시 |
-| **v5 — 첫 7일 보호 주축** | [§5.6](../village.md) 운영자 짹 (Y Combinator do-things-that-don't-scale 패턴) |
+| **v5 — 첫 7일 보호 주축** | 운영자 짹 (Y Combinator do-things-that-don't-scale 패턴, 이후 폐기) |
 | **v5 — 첫 7일 둥지 진화 가속** | 첫 책에 한해 D1/D3/D7 일자 트리거로 🪵→🪹→🏠 진화. 8일차+는 페이지 기반 |
 | **v5 — 친구 짹 = +1 XP** | XP를 *사회적 화폐* 로 감각시키는 즉시 보상 메카닉 |
 | **v5 — 컷오프** | 자정 KST 유지. 새벽 3-4시 유예 채택 안 함 (사용자 행동 모순) |
@@ -413,8 +414,8 @@
 | **v5 — Duolingo 벤치마킹** | 게이미피케이션 세부 설계 시 의도적으로 인용 끊고 ReadingGo 고유 컨텍스트에서 발상 ([§14](../meta/rejected.md)) |
 | **v5 — 운영자 정의** | `users.is_operator` 신설. ✨ 표식. NPC와 분리 |
 | **v5 — XP destination** | 미해결, 별도 안건으로 보존 ([§13](../meta/open-issues.md)) |
-| ~~**v5 — T2 mini**~~ | **v6 해소** — 독서모임 탭 메가 스트림으로 흡수 ([§5.5](../village.md)) |
-| ~~**v5 — T2 좀비 사용자 처리**~~ | **v6 해소** — 독서모임 가입자 전용 공개 원칙으로 대체 ([§5.5](../village.md)) |
+| ~~**v5 — T2 mini**~~ | **v6 해소** — 당시 독서모임 탭 메가 스트림으로 흡수 |
+| ~~**v5 — T2 좀비 사용자 처리**~~ | **v6 해소** — 당시 독서모임 가입자 전용 공개 원칙으로 대체 |
 | **v5.1 — Phase 재정의** | Capacitor 처음부터 단일 코드베이스. Phase 0/1/2/3 모두 같은 `src/` 위에서 진행 |
 | **v5.1 — 모이 확장 필드 (`sentences.my_note`)** | 짧은 한 문장 강제(`text`) 유지 + *내 감상* 선택 필드(`my_note`) 분리. Rich Text 자유 노트 별도 타입은 [§13.5](../meta/open-issues.md) 학기 후 결정 |
 | **v5.1 — 챕터 ID 자동 매핑** | `sentences.chapter_id` 신설. 모이 작성 시 페이지로 챕터 자동 식별 (`books_toc.csv` 기준) |
@@ -428,7 +429,7 @@
 | **v5.1 — 위젯·자동백업·다크모드·PIN 채택** | Phase 2 P1~P2 |
 | **v5.1 — 수익 모델 검토** | 학기 후 별도 안건 ([§13.6](../meta/open-issues.md)). 어필리에이트(교보문고)만 Phase 1 파라미터 추가로 즉시 적용 |
 | **v5.1 — Rich Text 자유 노트** | *별도 타입 신설은 보류*. 모이 확장 필드(`my_note`)로 흡수. 별도 타입 채택 여부는 학기 후 ([§13.5](../meta/open-issues.md)) |
-| **v6 — 독서모임 탭** | 마을 탭 대체. 메가 스트림(자동) + 서브 모임(공개/비공개). 구경 불가. ([§5.5](../village.md)) |
+| **v6 — 독서모임 탭** | 당시 마을 탭 대체. 메가 스트림(자동) + 서브 모임(공개/비공개). 구경 불가. 이후 #440에서 폐기 |
 | **v6 — AI 도서 추천** | 완독 후 Gemini 기반 다음 책 3권 + 한 줄 이유. 교보문고 어필리에이트 연결. Phase 2 |
 | **v6 — AI 추출 책** | 완독 모이를 AI가 재구성 → 나만의 추출 책. 이미지/Markdown export. Phase 2 |
 | **v6 — SNS 이미지 카드 세부 스펙** | profile §5.10 신설 예정이었으나 **미생성** — v7에서 **후순위** 강등 ([ROADMAP](../../ROADMAP.md)). 한 문장 카드 + 마일스톤 카드 |

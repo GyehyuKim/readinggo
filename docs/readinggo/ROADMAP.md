@@ -8,7 +8,7 @@
 > 이하 v7 요지(2026-06-01):
 > - ~~**Capacitor·앱스토어·OCR → Phase 3 보류** (web-first)~~ → **v8에서 반전**(위 참조). 위젯·STT·푸시는 계속 후순위.
 > - **폐기**: 운영자 짹(전 단계), 첫 7일 둥지 가속, 주간 리그, 결정 마찰 카피, 메가스트림/서브모임, chapter_id 자동매핑.
-> - **복귀**: 마을(파트 마일스톤). **신규**: AI 도서 추천(Gemini 무료), 성 컬렉션, 페이지 블라인드, 휴식코스, DataStore 계약.
+> - 당시 **복귀**했던 마을은 이후 #440에서 폐기. **신규**: AI 도서 추천(Gemini 무료), 성 컬렉션, 페이지 블라인드, 휴식코스, DataStore 계약.
 > - Phase 정의·스택은 [`specs/README.md` §3](./specs/README.md), 결정 근거는 [`specs/meta/decisions.md`](./specs/meta/decisions.md)를 정본으로 본다.
 >
 > *v5.1 매트릭스(아래 §0~§6) 전면 재작성은 후속 작업. 북모리 항목의 v7 정본은 바로 아래 **v7 북모리 채택 결정** 표.*
@@ -26,8 +26,7 @@
 
 > 2026-06-02 북모리 정밀 재조사 + 계휴 결정. **북모리 벤치마크 항목은 이 표가 정본** (아래 §0~§6 v5.1 매트릭스보다 우선).
 > 근거(조사): [`COMPETITIVE-ANALYSIS.md` §1.2 북모리 정밀](./COMPETITIVE-ANALYSIS.md) · 같은 문서 §6 CL 트리아지 (원문 출처 URL은 그 문서 Sources).
-> 담당 구분 ([`CONTRIBUTING.md` §3.5](../../CONTRIBUTING.md) · [`specs/README.md`](./specs/README.md) 소유권):
-> **승원** = 둥지·표현·디자인 (nest/systems/design) · **계휴** = 기록·큐레이션·백엔드 (social/profile/backend/onboarding) · **윤지** = 마을 (village).
+> 과거 담당 구분은 현행 권한 기준이 아니다. 현재 contributor 권한과 작업 범위는 [`CONTRIBUTING.md` §0](../../CONTRIBUTING.md)을 따른다.
 > 범례: ★복구 = 원래 초안 의도 복원 · ★허브 = 다른 항목의 선행 의존.
 
 ### A. 채택 — Phase 0 (localStorage, 6/7 데모 목표)
