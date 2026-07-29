@@ -9,16 +9,16 @@
 
 ---
 
-## 0. 운영 권한 — 이슈는 열고, 구현·머지는 단일화
+## 0. 운영 권한 — 승인된 기여, 감독 머지
 
 - **이슈**: 공개 저장소의 Issues는 누구나 열고, 버그·아이디어·질문·우선순위 제안을 남길 수 있다. 이슈 작성은 구현 권한이나 작업 배정을 뜻하지 않는다.
-- **구현**: 코드·스펙·운영 문서 변경은 **김계휴(`gyehyu`)만** 수행한다. Hermes는 김계휴가 지시한 범위에서만 구현 작업을 보조하고 PR을 연다. 팀원의 제안은 이슈·코멘트·수용 기준으로 반영한다.
-- **PR과 머지**: 모든 변경은 `main`에 직접 push하지 않고 PR로만 반영한다. 필수 CI가 모두 green이고 base가 최신인 뒤에도, Hermes가 관련 이슈·diff·변경 범위·테스트 증거·미해결 대화를 확인한 **감독 게이트**를 통과해야 한다. 그 뒤 Hermes는 김계휴를 대신해 squash merge할 수 있다.
+- **구현**: 코드·스펙·운영 문서 변경은 **김계휴(`gyehyu`)와 승인 contributor 정윤지(`jyj23-jeong`, branch slug `yunji`)**가 수행한다. 정윤지는 김계휴와 사전에 합의된 이슈 범위에서만 구현·PR하고, Hermes는 김계휴가 지시한 범위에서 구현 작업을 보조하고 PR을 연다. 그 밖의 제안은 이슈·코멘트·수용 기준으로 반영한다.
+- **PR과 머지**: 모든 변경은 `main`에 직접 push하지 않고 PR로만 반영한다. 필수 CI가 모두 green이고 base가 최신인 뒤에도, Hermes가 관련 이슈·diff·변경 범위·테스트 증거·미해결 대화를 확인한 **감독 게이트**를 통과해야 한다. **contributor는 자신의 PR을 직접 머지하지 않으며**, 최종 반영은 김계휴 또는 그가 지시한 Hermes가 수행한다.
 - **중요**: CI green은 필요조건이지 자동 머지 승인이 아니다. Hermes의 확인에서 범위 이탈·회귀 위험·근거 부족이 발견되면 수정 요청 또는 보류한다.
 
-GitHub 개인 저장소의 한계상 "이슈만 가능한 collaborator" 역할은 제공되지 않는다. 따라서 구현 권한은 김계휴만 write collaborator로 유지해 시스템적으로 제한하고, 이슈는 공개 상태로 열어 둔다.
+GitHub 개인 저장소는 경로·브랜치 prefix별 Write 제한을 제공하지 않는다. 따라서 Write collaborator는 `GyehyuKim`과 승인된 `jyj23-jeong`으로 제한하고, 정윤지는 합의된 이슈·`yunji/*` 브랜치·감독 머지 규칙을 준수한다. 이슈는 공개 상태로 열어 둔다.
 
-> 이 §0은 이 문서 안의 기존 팀별 브랜치·파일 오너십 예시보다 우선한다. 기존 오너십은 제안·도메인 검토 창구로만 해석하며, 실제 변경은 `gyehyu`가 수행한다.
+> 이 §0은 이 문서 안의 파일 오너십 예시보다 우선한다. 오너십은 기본 검토 창구이며, 정윤지의 구현 가능 범위는 파일명이 아니라 사전에 합의된 이슈로 정한다.
 
 ---
 
@@ -26,18 +26,19 @@ GitHub 개인 저장소의 한계상 "이슈만 가능한 collaborator" 역할�
 
 형식: **`<owner>/<topic-slug>`**
 
-정규식: `^gyehyu/[a-z0-9]+(-[a-z0-9]+)*$`
+정규식: `^(gyehyu|yunji)/[a-z0-9]+(-[a-z0-9]+)*$`
 
-- `owner`는 구현 권한자의 고정 slug인 `gyehyu`만 쓴다. Hermes가 만드는 브랜치도 동일하다.
+- `owner`는 구현 주체의 고정 slug를 쓴다: 김계휴/Hermes=`gyehyu`, 정윤지=`yunji`.
 - `topic-slug` — kebab-case, 3~40자, 무슨 일인지 한눈에 보이게.
 
 **좋은 예**
 - `gyehyu/backend-datastore-contract`
+- `yunji/feed-empty-state`
 
 **나쁜 예 (금지)**
 - `patch-1`, `jerome3354-patch-9`, `update` — 의미 없음
 - `fix/whytree` — owner 없음
-- `seungwon/nest-castle-collection` — 팀원이 제안할 수는 있으나 구현 브랜치로 사용하지 않음
+- `seungwon/nest-castle-collection` — 승인 contributor slug가 아님
 - `gyehyu/WhyTree_Update` — PascalCase/underscore 금지
 - `feat/biz-plan-restructure` — owner 없음, type-prefix는 사용 안 함
 
@@ -119,7 +120,6 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 | `CLAUDE.md` · `AGENTS.md` · `CONTRIBUTING.md` | **gyehyu** | governance·머지 담당. 타인은 조율 후 |
 | `specs/backend.md` · `social.md` · `profile.md` · `onboarding.md` · `meta/*` · `specs/README.md` | **gyehyu** | 백엔드·소셜·내서재·온보딩 |
 | `specs/nest.md` · `systems.md` · `design.md` | **seungwon** | 둥지·XP·디자인 |
-| `specs/village.md` | **yunji** | 마을 |
 | 데모 코드 `docs/readinggo/js/*` · `index.html` | 해당 피처 오너 | 공용 `data.js`·`components.js`·`app.js` 변경 시 조율 |
 
 > 피처 spec 상세는 [`specs/README.md` 파일 소유권](./docs/readinggo/specs/README.md). 이 표는 *governance·공용 파일* 까지 포함한 상위 기준.
@@ -258,7 +258,7 @@ UI(레이아웃·컴포넌트·스타일)를 바꾸는 PR은 런타임 크래시
 ```
 docs(spec): Redefine phases for web-first v7
 feat: Add nest castle collection to 둥지 탭
-chore: Rename book-club.md to village.md
+chore: Rename legacy spec file
 ```
 
 본문(선택)은 **왜** 바꿨는지 1~3줄. 무엇을 바꿨는지는 diff가 말해준다.
@@ -299,7 +299,7 @@ TODOS.md 항목, 스펙 문서(`docs/spec-*.md`), PR 설명에 아래 레이블�
 - `git commit --no-verify` — 훅을 스킵하지 않는다. 훅이 실패하면 근본 원인을 고친다.
 - `git rebase -i` 로 이미 원격에 올라간 공유 브랜치 재작성.
 - `git checkout --orphan` — 브랜치 히스토리를 초기화하는 명령. 새 작업은 반드시 `main`에서 새 브랜치를 따는 방식으로 시작한다.
-- **무단 구현 PR** — 팀원·외부 사용자는 이슈와 코멘트로 제안한다. `gyehyu`/Hermes 외 계정의 구현 PR·fork 기반 코드 기여는 이 운영 정책의 반영 경로가 아니다.
+- **무단 구현 PR** — `gyehyu`/Hermes 또는 승인 contributor `jyj23-jeong` 외 계정은 이슈와 코멘트로 제안한다. 승인 contributor도 사전 합의된 이슈 밖의 구현 PR이나 자신의 PR 직접 머지는 금지한다.
 - `.env`, API 키, 비밀번호 커밋. `.gitignore`에 `.env` 등록되어 있으나 복사본도 금지.
 - 실제 사용자 개인정보(이름, 이메일, 연락처)를 평문으로 저장. 필요 시 익명화.
 
@@ -317,9 +317,9 @@ TODOS.md 항목, 스펙 문서(`docs/spec-*.md`), PR 설명에 아래 레이블�
 - [x] Require conversation resolution before merging
 - [x] Do not allow bypassing the above settings (관리자 포함)
 - [x] force push와 branch deletion 금지
-- [x] write collaborator는 `GyehyuKim`만 유지. 이슈는 public repo에서 누구나 생성 가능.
+- [x] Write collaborator는 `GyehyuKim`과 승인 contributor `jyj23-jeong`으로 제한. 이슈는 public repo에서 누구나 생성 가능.
 
-> GitHub 개인 저장소는 branch protection에서 사용자별 push restriction을 지원하지 않는다. 따라서 "단독 write collaborator + PR 보호" 조합이 이 저장소에서 구현 권한을 강제하는 실제 설정이다.
+> GitHub 개인 저장소는 branch protection에서 사용자별·경로별 push restriction을 지원하지 않는다. 따라서 최소 Write collaborator + PR 보호 + 합의 이슈 + contributor self-merge 금지를 함께 적용한다.
 
 ---
 
@@ -381,7 +381,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
 16. **Spec/코드 PR 분리 (§4.1).** spec 파일과 구현 코드를 같은 PR에 묶지 않는다. spec PR이 먼저, 코드 PR이 나중. 묶어야 할 사유가 있으면 PR 설명에 명시.
 17. **Stack Lock 준수.** `CLAUDE.md` Stack Lock 절에 명시된 결정 (web-first, Capacitor 보류, React CDN 유지, 백엔드 Supabase, **책 데이터 canonical = Phase 1 Supabase `books` / Phase 0 현재는 TSV·#490** 등) 외 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 근거: [LF: Lock Stack](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-lock-stack).
 18. **이슈 먼저, 그다음 PR(§4.2).** 의미 있는 작업은 **PR 생성 전에** `gh issue create`로 이슈를 먼저 열고(§4.3 형식) `Closes/Refs #N`로 연결한다. `gh issue list`로 기존 이슈도 점검한다. `no-issue:`는 오타·포맷 등 진짜 사소한 변경에만(상시 사용 금지). 이슈 없이 PR을 만들지 않는다.
-19. **구현·머지 권한(§0).** 이슈 제안자는 구현자가 아니다. 코드 변경은 `gyehyu` 또는 그가 지시한 Hermes만 수행한다. 필수 CI가 모두 green이라고 자동 머지하지 말고, Hermes가 PR의 이슈 연결·diff·테스트 근거·대화 해결을 확인한 뒤에만 머지한다.
+19. **구현·머지 권한(§0).** 이슈 제안자는 자동으로 구현자가 되지 않는다. 코드 변경은 `gyehyu`/Hermes와 승인 contributor `jyj23-jeong`이 수행하되, 윤지는 사전 합의된 이슈와 `yunji/*` 브랜치로 제한한다. 필수 CI가 모두 green이라고 자동 머지하거나 contributor가 self-merge하지 말고, Hermes가 PR의 이슈 연결·diff·테스트 근거·대화 해결을 확인한 뒤 계휴/Hermes가 머지한다.
 
 모순이 생기면 **이 `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타**의 우선순위를 따른다.
 

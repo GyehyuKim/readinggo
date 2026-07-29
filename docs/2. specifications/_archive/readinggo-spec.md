@@ -17,7 +17,7 @@
 |---|---|---|
 | 온보딩 | [`readinggo/specs/onboarding.md`](../readinggo/specs/onboarding.md) | §4 |
 | 둥지 탭 | [`readinggo/specs/nest.md`](../readinggo/specs/nest.md) | §5.1-5.4 |
-| 마을 | [`readinggo/specs/village.md`](../readinggo/specs/village.md) | §5.5 |
+| 마을 | 폐기된 과거 스펙(#440, 파일 삭제 #1364) | §5.5 |
 | 소셜 탭 | [`readinggo/specs/social.md`](../readinggo/specs/social.md) | §5.7 |
 | 내서재(프로필) | [`readinggo/specs/profile.md`](../readinggo/specs/profile.md) | §5.8-5.9 |
 | 시스템 로직 | [`readinggo/specs/systems.md`](../readinggo/specs/systems.md) | §6 |

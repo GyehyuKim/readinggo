@@ -5,7 +5,6 @@ Source (스펙 정본 — 이 순서로 한 파일씩 완주):
 - docs/readinggo/specs/nest.md (§5.1-5.5)
 - docs/readinggo/specs/social.md (§5.6-5.7)
 - docs/readinggo/specs/profile.md (§5.8-5.9)
-- docs/readinggo/specs/village.md (§5.5 마을)
 - docs/readinggo/specs/systems.md (§6 스트릭·XP·휴식)
 - docs/readinggo/specs/onboarding.md (§4 가입 여정)
 - docs/readinggo/specs/backend.md (§7 DataStore 계약·데이터 모델)
@@ -26,7 +25,7 @@ Exit: 아래 둘 다 만족하면 loop/spec-align-full/DONE 파일을 빈 내용
 Blocked (loop/spec-align-full/BLOCKED.md 에 누적 기록 후, 막힌 조항만 건너뛰고 계속 — 전체를 멈추지 말 것):
 - 스펙이 모호/두 해석 가능 → (a) 파일·절 (b) 해석 2개+ (c) 추천 해석.
 - 스펙 수정 필요(코드가 더 옳거나, 스펙이 과다/구식) → 어느 절을 어떻게 바꿀지 제안. 사용자가 별도 spec-only PR로 처리.
-- 타 owner 영역(nest/systems/design=승원, village=윤지)이라 코드 정합이 경계를 넘으면 → 어느 cross-owner 변경이 필요한지 명시 + decisions.md 플래그 제안만.
+- 타 owner 영역(nest/systems/design=승원)이라 코드 정합이 경계를 넘으면 → 어느 cross-owner 변경이 필요한지 명시 + decisions.md 플래그 제안만.
 
 Constraints:
 - React 18 + Babel standalone CDN. 빌드 도구·새 라이브러리 금지 (CLAUDE.md Stack Lock).
