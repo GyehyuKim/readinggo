@@ -8,6 +8,7 @@ function NestGrowView({ state }) {
   const [activeTab, setActiveTab] = _useStateNG('log'); // 'log' | 'complete'
   const [myBooks, setMyBooks] = _useStateNG([]);
   const [myQuotes, setMyQuotes] = _useStateNG([]);
+  const [myXpLog, setMyXpLog] = _useStateNG([]);
   const [loading, setLoading] = _useStateNG(true);
 
   const xp = (state && state.xp) || 0;
@@ -25,7 +26,10 @@ function NestGrowView({ state }) {
           ? DataStore.sentences.listMine()
           : []
       ).catch(() => []),
-    ]).then(([books, quotes]) => {
+      Promise.resolve(
+        DataStore.xp && DataStore.xp.getLog ? DataStore.xp.getLog() : []
+      ).catch(() => []),
+    ]).then(([books, quotes, xpLog]) => {
       if (!alive) return;
       setMyBooks(
         (books || [])
@@ -37,6 +41,7 @@ function NestGrowView({ state }) {
           }))
       );
       setMyQuotes(quotes || []);
+      setMyXpLog(xpLog || []);
       setLoading(false);
     });
     return () => { alive = false; };
@@ -80,6 +85,18 @@ function NestGrowView({ state }) {
           date: q.created_at,
         });
       });
+
+    myXpLog.forEach(entry => {
+      if (entry.key === 'streak7' || entry.key === 'streak30') {
+        events.push({
+          key: `${entry.key}-${entry.date}`,
+          ico: entry.ico || '🔥',
+          label: entry.label || (entry.key === 'streak7' ? '7일 연속 독서' : '30일 연속 독서'),
+          xp: entry.xp,
+          date: entry.date,
+        });
+      }
+    });
 
     return events.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   };

@@ -451,9 +451,8 @@ function App() {
   // 타인 프로필 모달(§5.8.2) — @핸들 탭으로 열림. SentenceCard 가 window.RG_openProfile 호출.
   const [profileHandle, setProfileHandle] = useState(null);
   useEffect(() => { window.RG_openProfile = (h) => setProfileHandle(h); return () => { window.RG_openProfile = null; }; }, []);
-  // 설정 모달(§5.8) — 프로필 ⚙️ 로 열림.
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  useEffect(() => { window.RG_openSettings = () => setSettingsOpen(true); return () => { window.RG_openSettings = null; }; }, []);
+  // 설정 탭 진입 — 이전 모달 방식에서 탭 전환으로 변경 (#library-tab-ux).
+  useEffect(() => { window.RG_openSettings = () => switchTab('settings'); return () => { window.RG_openSettings = null; }; }, []);
   // 같이읽기 방 모달(co-reading.md §5.3) — 방 카드·badge·미리보기에서 window.RG_openRoom(roomId) 로 열림.
   const [roomOpenId, setRoomOpenId] = useState(null);
   useEffect(() => { window.RG_openRoom = (id) => setRoomOpenId(id); return () => { window.RG_openRoom = null; }; }, []);
@@ -1034,7 +1033,6 @@ function App() {
   _overlayBack(showLogin, () => setShowLogin(false));
   _overlayBack(isSearchOpen, () => { setIsSearchOpen(false); setSearchPrefill(''); });
   _overlayBack(!!profileHandle, () => setProfileHandle(null));
-  _overlayBack(settingsOpen, () => setSettingsOpen(false));
   _overlayBack(!!companionSentence, () => setCompanionSentence(null));
   _overlayBack(!!bookDetailItem, () => setBookDetailItem(null));
   _overlayBack(!!bookDetailId, () => setBookDetailId(null));
@@ -1082,8 +1080,8 @@ function App() {
               <span className="stat xp" title="현재 XP (systems.md §6.3)">
                 <span>XP {(appState.xp || 0).toLocaleString()}</span>
               </span>
-              <span className="stat lv" title="레벨 (systems.md §6.3)">
-                <span>Lv.{calcLevel(appState.xp)}</span>
+              <span className="stat lv" title="완성한 둥지 수 (1,600 XP = 둥지 1개)">
+                <span>둥지 {Math.floor((appState.xp || 0) / ((window.NEST_CYCLE_XP) || 1600))}개</span>
               </span>
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               {/* #790: 돋보기 아이콘만으론 '책 추가' 동선 발견성이 낮음 → '도서 찾기' 라벨 + 틴트 배경칩으로 강조. */}
@@ -1142,6 +1140,9 @@ function App() {
               state={appState}
             />
           )}
+          {activeTab === 'nest-grow' && (
+            <NestGrowView key="nest-grow" state={appState} />
+          )}
           {activeTab === 'profile' && (
             <LibraryView
               key="library"
@@ -1149,11 +1150,14 @@ function App() {
               onActivateUserBook={handleActivateUserBook}
             />
           )}
+          {activeTab === 'settings' && (
+            <SettingsView key="settings" spoilerReveal={spoilerReveal} setSpoilerReveal={setSpoilerReveal} />
+          )}
           </SpoilerContext.Provider>
           </ErrorBoundary>
         </main>
 
-        {/* 하단 탭바 */}
+        {/* 하단 탭바 — 홈·함께·둥지·프로필·설정 (#library-tab-ux) */}
         <nav className="tabbar">
           {[
             { id: 'nest', label: '홈', svg: (
@@ -1170,10 +1174,17 @@ function App() {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             )},
-            { id: 'profile', label: '책장', svg: (
+            { id: 'nest-grow', label: '둥지', svg: (
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                <path d="M12 2C8 2 4 5 4 9c0 3 1.5 5.5 4 7h8c2.5-1.5 4-4 4-7 0-4-4-7-8-7z"/>
+                <path d="M8 14c0 2 1.5 4 4 5 2.5-1 4-3 4-5"/>
+                <circle cx="12" cy="9" r="2" fill="currentColor" stroke="none"/>
+              </svg>
+            )},
+            { id: 'profile', label: '프로필', svg: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
               </svg>
             )},
             { id: 'settings', label: '설정', svg: (
@@ -1185,9 +1196,8 @@ function App() {
           ].map(t => (
             <button
               key={t.id}
-              className={'tab' + (t.id !== 'settings' && activeTab === t.id ? ' active' : '')}
-              style={t.id === 'settings' && settingsOpen ? { opacity: 0.7 } : undefined}
-              onClick={() => { if (t.id === 'settings') setSettingsOpen(true); else switchTab(t.id); }}
+              className={'tab' + (activeTab === t.id ? ' active' : '')}
+              onClick={() => switchTab(t.id)}
             >
               <span className="ico">{t.svg}</span>
               <span>{t.label}</span>
@@ -1213,12 +1223,6 @@ function App() {
         {/* 타인 프로필 모달 (§5.8.2) — @핸들 탭으로 열림 */}
         {profileHandle && ReactDOM.createPortal(
           <UserProfileModal handle={profileHandle} onClose={() => setProfileHandle(null)} />,
-          document.body
-        )}
-
-        {/* 설정 모달 (§5.8) — 프로필 ⚙️ */}
-        {settingsOpen && ReactDOM.createPortal(
-          <SettingsModal onClose={() => setSettingsOpen(false)} spoilerReveal={spoilerReveal} setSpoilerReveal={setSpoilerReveal} />,
           document.body
         )}
 

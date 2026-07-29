@@ -37,6 +37,8 @@ function LibraryView({ state, onActivateUserBook }) {
   const [promptLabOpen, setPromptLabOpen] = _useState(false); // 합성 prompt 실험실 (#1304)
   const [promptLabAccess, setPromptLabAccess] = _useState(null); // 서버 역할 확인 결과. UI 숨김은 편의일 뿐 권한 아님.
   const [importOpen, setImportOpen] = _useState(false); // 타사 앱 밑줄 가져오기 (#1150)
+  const [bulkImportOpen, setBulkImportOpen] = _useState(false); // 한번에 추가하기 서브 선택지 토글
+  const [sentenceImportOpen, setSentenceImportOpen] = _useState(false); // 문장 가져오기 바텀시트
   const [wikiOpening, setWikiOpening] = _useState(false); // 독서 위키 상시 진입점 중복 탭 방지 (#1274)
   const openWikiAsk = async () => {
     if (wikiOpening) return;
@@ -85,153 +87,6 @@ function LibraryView({ state, onActivateUserBook }) {
       setHdlEditing(false); setHdlMsg(''); showToast('닉네임 저장됨 — 새로고침하면 피드에 반영돼요');
     } catch (e) { setHdlMsg('이미 사용 중이거나 저장 실패'); }
     finally { setHdlBusy(false); }
-  };
-  // 데이터 내보내기 (#568 — SettingsModal에서 이동, 서재에서 직접)
-  // 내보낼 원천 수집 — JSON·Markdown 두 포맷이 공유 (#920).
-  const collectExport = async () => {
-    const [meRow, books, sents] = await Promise.all([
-      Promise.resolve((DataStore.profile && DataStore.profile.get) ? DataStore.profile.get() : null).catch(() => null),
-      Promise.resolve((DataStore.myBooks && DataStore.myBooks.list) ? DataStore.myBooks.list() : []).catch(() => []),
-      Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : []).catch(() => []),
-    ]);
-    return { meRow, books: books || [], sents: sents || [] };
-  };
-  // 다운로드 트리거 (BOM 포함 — 한글 깨짐 방지). book-detail-modal.js exportMarkdown 과 동일 패턴.
-  const downloadBlob = (parts, type, filename) => {
-    const blob = new Blob(parts, { type });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-  const exportData = async () => {
-    try {
-      const me = window.RG_ME || {};
-      const { meRow, books, sents } = await collectExport();
-      const payload = { app: 'ReadingGo', exported_at: new Date().toISOString(), profile: meRow, books, sentences: sents };
-      downloadBlob([JSON.stringify(payload, null, 2)], 'application/json',
-        `readinggo-export-${(meRow && meRow.handle) || me.handle || 'me'}.json`);
-      showToast('데이터를 내보냈어요 (JSON)');
-    } catch (e) { showToast('내보내기 실패'); }
-  };
-  // CSV 내보내기 (#1150) — 한 문장을 스프레드시트로. 한 행=한 문장(책제목·저자·페이지·문장·메모·작성일).
-  const exportCsv = async () => {
-    try {
-      const me = window.RG_ME || {};
-      const { meRow, books, sents } = await collectExport();
-      const handle = (meRow && meRow.handle) || me.handle || 'me';
-      const fmtDate = (v) => {
-        if (!v) return '';
-        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
-        const t = (typeof v === 'number') ? v : Date.parse(v);
-        if (!t || isNaN(t)) return '';
-        const d = new Date(t);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      };
-      const bookMeta = {};
-      books.forEach(ub => {
-        const b = (ub && ub.book) || {};
-        const key = ub.book_id || b.id || ub.id;
-        if (key) bookMeta[key] = { title: b.title || '', author: b.author || '' };
-      });
-      const esc = (v) => {
-        const s = String(v == null ? '' : v);
-        const needsQuote = s.indexOf(',') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0;
-        return needsQuote ? '"' + s.split('"').join('""') + '"' : s;
-      };
-      const rows = [['책제목', '저자', '페이지', '문장', '메모', '작성일']];
-      (sents || []).forEach(s => {
-        const key = s.book_id || (s.user_book && s.user_book.book_id) || '';
-        const meta = bookMeta[key] || {};
-        const eb = (s.user_book && s.user_book.book) || {};
-        rows.push([
-          meta.title || eb.title || '', meta.author || eb.author || '',
-          (typeof s.page === 'number') ? s.page : '', s.text || '',
-          s.my_note || s.note || '', fmtDate(s.created_at || s.createdAt || s.when),
-        ]);
-      });
-      const csv = rows.map(r => r.map(esc).join(',')).join('\r\n');
-      downloadBlob(['﻿', csv], 'text/csv;charset=utf-8', `readinggo-export-${handle}.csv`);
-      showToast('데이터를 내보냈어요 (CSV)');
-    } catch (e) { showToast('내보내기 실패'); }
-  };
-  // Markdown 내보내기 (#920) — 책·완독·한 문장·감상을 사람이 읽기 좋은 .md 로 직렬화.
-  const exportMarkdown = async () => {
-    try {
-      const me = window.RG_ME || {};
-      const { meRow, books, sents } = await collectExport();
-      // 날짜 정규화 — book-detail-modal.js exportMarkdown 과 동일.
-      const fmtDate = (v) => {
-        if (!v) return '';
-        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
-        const t = (typeof v === 'number') ? v : Date.parse(v);
-        if (!t || isNaN(t)) return '';
-        const d = new Date(t);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      };
-      // 책 id → 표시 메타. myBooks.list 행은 {id, book_id, book:{...}} (양 어댑터 정규화).
-      const bookMeta = {};
-      books.forEach(ub => {
-        const b = (ub && ub.book) || {};
-        const key = ub.book_id || b.id || ub.id;
-        if (key) bookMeta[key] = { title: b.title || '제목 없음', author: b.author || '' };
-      });
-      // 문장을 책별로 묶기 — book_id 또는 임베드(user_book.book_id)로 귀속.
-      const byBook = {};
-      (sents || []).forEach(s => {
-        const key = s.book_id || (s.user_book && s.user_book.book_id) || '_unknown';
-        (byBook[key] = byBook[key] || []).push(s);
-      });
-      const handle = (meRow && meRow.handle) || me.handle || 'me';
-      const lines = ['# ReadingGo 독서 기록', '', `**@${handle}**`, `내보낸 날짜: ${fmtDate(Date.now())}`, ''];
-      const completed = books.filter(b => b && b.status === 'completed');
-      const reading = books.filter(b => b && b.status !== 'completed');
-      lines.push(`읽은 책 ${completed.length}권 · 읽는 중 ${reading.length}권 · 한 문장 ${(sents || []).length}개`, '');
-
-      // 한 문장 블록 직렬화 (페이지 오름차순) — 본문/잔여 공통.
-      const emitQuotes = (qs) => {
-        qs.slice().sort((a, b2) => (a.page || 0) - (b2.page || 0)).forEach(q => {
-          const date = fmtDate(q.created_at || q.createdAt || q.when);
-          lines.push(`**p.${q.page ?? '?'}${date ? ` · ${date}` : ''}**`);
-          lines.push(`> ${q.text || ''}`);
-          const note = q.my_note || q.note || '';
-          if (note) lines.push('', note);
-          lines.push('');
-        });
-      };
-      // 책별 섹션 — 내 책 순서대로, 그 뒤 책 없는 문장(있으면).
-      const emitBook = (ub) => {
-        const b = (ub && ub.book) || {};
-        const key = ub.book_id || b.id || ub.id;
-        lines.push('', '---', '', `## ${b.title || '제목 없음'}`);
-        const metaBits = [b.author, (b.total_pages > 0 ? `${b.total_pages}쪽` : ''), (b.isbn13 ? `ISBN ${b.isbn13}` : '')].filter(Boolean);
-        if (metaBits.length) lines.push(metaBits.join(' · '));
-        if (ub.status === 'completed') {
-          const r = (typeof ub.rating === 'number') ? `★ ${ub.rating.toFixed(1)} / 5` : '';
-          const cd = fmtDate(ub.completed_at);
-          const head = [r, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · ');
-          if (head) lines.push('', head);
-          if (ub.review_text) lines.push(`> ${ub.review_text}`);
-        }
-        const qs = byBook[key] || [];
-        if (qs.length) { lines.push('', `### 내 한 문장 (${qs.length})`, ''); emitQuotes(qs); }
-        delete byBook[key];
-      };
-      books.forEach(emitBook);
-      // 내 책 목록에 없는 책의 문장(좋아요·임포트 등 잔여) — 책 제목으로 묶어 보존.
-      Object.keys(byBook).forEach(key => {
-        const qs = byBook[key];
-        if (!qs || !qs.length) return;
-        const meta = bookMeta[key] || {};
-        const title = meta.title || (qs[0] && qs[0].user_book && qs[0].user_book.book && qs[0].user_book.book.title) || '기타';
-        lines.push('', '---', '', `## ${title}`, '', `### 내 한 문장 (${qs.length})`, '');
-        emitQuotes(qs);
-      });
-      downloadBlob(['﻿', lines.join('\n')], 'text/markdown;charset=utf-8',
-        `readinggo-export-${handle}.md`);
-      showToast('데이터를 내보냈어요 (Markdown)');
-    } catch (e) { showToast('내보내기 실패'); }
   };
   const isAdmin = !!(window.RG_ME && window.RG_ME.isAdmin);
 
@@ -487,8 +342,6 @@ function LibraryView({ state, onActivateUserBook }) {
             </span>
           </div>
         )}
-        {/* #1238: 첫 소셜 신호가 생기기 전에는 0·0·0을 전시하지 않는다. 데이터와 기존 버튼 동작은 그대로 유지. */}
-        {(followCounts.following > 0 || followCounts.followers > 0 || savedCount > 0) && (
         <div style={{display:'flex', justifyContent:'space-around', marginTop:14, padding:'0 8px'}}>
           <button onClick={() => setFollowModal('following')}
             style={{textAlign:'center', background:'none', border:'none', cursor:'pointer', padding:0}}>
@@ -506,10 +359,9 @@ function LibraryView({ state, onActivateUserBook }) {
             <div style={{fontSize:11, color:'var(--ink-3)', marginTop:2, display:'flex', alignItems:'center', justifyContent:'center', gap:3}}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
               좋아요
-            </div>{/* #641: 구 저장(📌) → ❤️ 좋아요 단일화. 동작·모달 동일(좋아요한 문장 모아보기) */}
+            </div>
           </button>
         </div>
-        )}
       </div>
 
       {/* 독서 위키 상시 진입점 (#1274) — 활성 책 문장 수와 무관하게 책장에서 발견 가능. */}
@@ -528,15 +380,6 @@ function LibraryView({ state, onActivateUserBook }) {
         </button>
       </div>
 
-      {/* 둥지 캐릭터(NestTheatre) — 프로필 헤더 아래로 이동 (#508, #428 갱신) */}
-      <div style={{margin:'0 0 20px'}}>
-        {window.NestTheatre && <NestTheatre xp={state.xp} />}
-      </div>
-
-      {/* 독서 활동 잔디 (#195) */}
-      <div style={{padding:'0 16px', marginBottom:28}}>
-        <ActivityHeatmap days={182} />
-      </div>
 
       {/* 📖 독서 기록 섹션(총 독서시간·일평균) 제거 (#471). duration_sec 저장(#430)은 유지(미표시). */}
 
@@ -546,31 +389,13 @@ function LibraryView({ state, onActivateUserBook }) {
       <div style={{padding:'0 16px', marginBottom:20}}>
         {/* 상시 임포트 진입점 — 텍스트/파일 가져오기(#1039, 1순위)와 스샷 복원(#772, #832)을 나란히.
             DESIGN 3차(텍스트·아이콘) 버튼 위계. 빈 서가 큰 CTA(아래)는 유지. 텍스트/파일을 먼저(왼쪽). */}
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, gap:8}}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
           <div style={{fontSize:16, fontWeight:900, color:'var(--ink)', letterSpacing:'-0.3px'}}>내 서재</div>
-          <div style={{display:'flex', alignItems:'center', gap:10, flexShrink:0}}>
-            <button onClick={() => window.RG_openTextImport && window.RG_openTextImport()}
-              title="노션·엑셀·메모에서 복사해 붙여넣거나 파일로 가져오기"
-              style={{display:'inline-flex', alignItems:'center', gap:4, background:'transparent', border:'none', color:'var(--brand-3)', fontSize:12, fontWeight:800, cursor:'pointer', padding:'4px 2px', whiteSpace:'nowrap'}}>
-              {window.rgIcon('paste',13)} 붙여넣기·파일
-            </button>
-            <button onClick={() => window.RG_openShelfImport && window.RG_openShelfImport()}
-              title="책장 스크린샷으로 읽은 책 한 번에 복원"
-              style={{display:'inline-flex', alignItems:'center', gap:4, background:'transparent', border:'none', color:'var(--brand-3)', fontSize:12, fontWeight:800, cursor:'pointer', padding:'4px 2px', whiteSpace:'nowrap'}}>
-              {window.rgIcon('camera',13)} 스샷
-            </button>
-          </div>
+          <button onClick={() => setBulkImportOpen(true)}
+            style={{display:'inline-flex', alignItems:'center', gap:4, background:'var(--brand-tint)', border:'1px solid var(--brand-soft)', borderRadius:999, padding:'5px 10px', color:'var(--brand-3)', fontSize:12, fontWeight:800, cursor:'pointer', lineHeight:1}}>
+            + 책 추가하기
+          </button>
         </div>
-
-        {/* ⓑ #1060: '책 찾아 담기'를 '내 서재' 타이틀 바로 아래로(어느 탭이든 상시 노출). 구는 '읽고 싶은 책'
-            탭 하위에만 있어 위시 전용처럼 보였고, 눌러보기 전엔 다른 책장에도 담을 수 있는 걸 몰랐다. 검색 모달은
-            읽고 싶은 책·읽는 중·읽은 책 어디로든 담으므로(#409) 상시 노출 + 카피로 다중 책장을 드러낸다. */}
-        <button onClick={() => window.RG_openSearch && window.RG_openSearch()}
-          title="검색해서 읽고 싶은 책·읽는 중·읽은 책 어디로든 담기"
-          style={{width:'100%', margin:'0 0 16px', padding:'12px 14px', borderRadius:12, border:'1px dashed var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13.5, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, flexWrap:'wrap'}}>
-          <span style={{display:'inline-flex', alignItems:'center', gap:5}}>{window.rgIcon('search',15)} 책 찾아 담기</span>
-          <span style={{fontSize:11.5, fontWeight:700, color:'var(--ink-3)'}}>읽고 싶은 책·읽는 중·읽은 책</span>
-        </button>
 
         {/* 📦 검토함 (#1048) — 임포트가 책장 직행 대신 여기로 적재. 항목별 책장 토글 + [내 서재로][제외] + 일괄.
             로그인 전용(local/게스트는 stagedItems=[]로 미노출). 영속(import_staging) — 세션 넘어 유지. */}
@@ -748,25 +573,20 @@ function LibraryView({ state, onActivateUserBook }) {
               {activeSubtab === 'completed' && (ratingFilter.size ? '이 별점의 완독한 책이 없어요' : '완독한 책이 없어요')}
               {activeSubtab === 'aborted' && '중단한 책이 없어요'}
             </div>
-            {/* 빈 서가 박멸 — 텍스트/파일 가져오기 1순위(#1039), 스샷 복원(#772)은 형제로 아래에. */}
-            <div style={{marginTop:14, display:'flex', flexDirection:'column', alignItems:'center', gap:8}}>
-              <button onClick={() => window.RG_openTextImport && window.RG_openTextImport()}
-                title="노션·엑셀·메모에서 복사해 붙여넣거나 파일로 가져오기"
-                style={{padding:'10px 16px', borderRadius:12, border:'1.5px solid var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:13, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:5}}>
-                {window.rgIcon('paste',14)} 붙여넣기·파일로 가져오기
-              </button>
-              <button onClick={() => window.RG_openShelfImport && window.RG_openShelfImport()}
-                style={{background:'transparent', border:'none', color:'var(--brand-3)', fontWeight:800, fontSize:12.5, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:5, padding:'4px 8px'}}>
-                {window.rgIcon('camera',13)} 스샷으로 복원
-              </button>
-            </div>
+            {/* 빈 서가 CTA — 위 '내 서재' 타이틀 하단 버튼 2개로 통합, 여기선 안내 텍스트만 */}
           </div>
         )}
 
         {/* 탭별 문장·감상 섹션 */}
         {myBooks !== null && (
           <div style={{marginTop:24, padding:'0 4px'}}>
-            <div style={{fontSize:16, fontWeight:900, marginBottom:12, color:'var(--ink)'}}>💬 이 책들의 문장·감상</div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
+              <div style={{fontSize:16, fontWeight:900, color:'var(--ink)'}}>💬 이 책들의 문장·감상</div>
+              <button onClick={() => setSentenceImportOpen(true)}
+                style={{display:'inline-flex', alignItems:'center', gap:4, background:'var(--brand-tint)', border:'1px solid var(--brand-soft)', borderRadius:999, padding:'5px 10px', color:'var(--brand-3)', fontSize:12, fontWeight:800, cursor:'pointer', lineHeight:1}}>
+                + 밑줄 가져오기
+              </button>
+            </div>
             {tabQuotes.length > 0 ? (
               <div style={{display:'flex', flexDirection:'column', gap:10}}>
                 {tabQuotes.map((q, i) => (
@@ -783,41 +603,6 @@ function LibraryView({ state, onActivateUserBook }) {
           </div>
         )}
 
-        {/* 서비스 외부 공유 (#650 B) — 친구에게 ReadingGo 권하기. 철학 한 줄 + 링크(#1092 — 책 인용 미동반).
-            referral 코드·보상은 Phase 1 후속(referral.md §4) — 현재는 소개+링크만 graceful. */}
-        <button onClick={() => {
-          // 앱 초대는 특정 책 인용 없이 우리 철학 한 줄만(#1092). 미리보기는 링크 OG 카드가 담당.
-          if (window.shareService) window.shareService({ source: 'library' });
-        }}
-          style={{marginTop:20, width:'100%', padding:'12px', borderRadius:12, border:'none', background:'var(--brand)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
-          {window.rgIcon('share',15)} 친구에게 ReadingGo 공유하기
-        </button>
-
-        {/* 내 데이터 (#568 설정→서재 이동 · #920 JSON+Markdown · #1150 CSV + 가져오기)
-            데이터 주권 — 내보내기(JSON/CSV/Markdown) + 타사 앱 밑줄 가져오기.
-            2차 tonal 버튼(DESIGN.md §버튼 위계 — ghost 금지). */}
-        <div style={{marginTop:24, marginBottom:4}}>
-          <div style={{fontWeight:800, fontSize:14, color:'var(--ink)'}}>내 데이터</div>
-          <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:3, lineHeight:1.5}}>기록은 당신 것 — 언제든 가져가고, 다른 앱에 흩어진 밑줄도 불러올 수 있어요.</div>
-        </div>
-        <div style={{marginTop:8, display:'flex', gap:8}}>
-          {[
-            { fn: exportData, label: 'JSON', title: '구조화 데이터(백업·재가져오기용)' },
-            { fn: exportCsv, label: 'CSV', title: '스프레드시트(엑셀·구글시트)' },
-            { fn: exportMarkdown, label: 'Markdown', title: '사람이 읽기 좋은 독서 기록 문서' },
-          ].map(b => (
-            <button key={b.label} onClick={b.fn} title={`${b.title}로 내보내기`}
-              style={{flex:1, padding:'12px 8px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, fontSize:13.5, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
-              {window.rgIcon('download',15)} {b.label}
-            </button>
-          ))}
-        </div>
-        {/* 타사 앱 밑줄 가져오기 (#1150) — 교보·밀리 등 저장한 밑줄 스크린샷 → vision 추출 → 담기 */}
-        <button onClick={() => setImportOpen(true)}
-          style={{marginTop:8, display:'block', width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', textAlign:'left', cursor:'pointer'}}>
-          <div style={{fontWeight:800, fontSize:14, display:'flex', alignItems:'center', gap:6}}>{window.rgIcon('upload',15)} 타사 앱 밑줄 가져오기</div>
-          <div style={{fontWeight:600, fontSize:12, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>교보·밀리 등에서 저장한 밑줄 <b>스크린샷</b>을 올리면 문장만 골라 담아요</div>
-        </button>
       </div>
 
       {/* 책 상세 모달 */}
@@ -834,6 +619,25 @@ function LibraryView({ state, onActivateUserBook }) {
         <DataImport onClose={() => setImportOpen(false)} />,
         document.body
       )}
+      {sentenceImportOpen && ReactDOM.createPortal(
+        <>
+          <div onClick={() => setSentenceImportOpen(false)}
+            style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200}} />
+          <div style={{position:'fixed', bottom:0, left:0, right:0, background:'var(--bg)', borderRadius:'20px 20px 0 0', padding:'20px 16px 48px', zIndex:201, boxShadow:'0 -4px 24px rgba(0,0,0,0.15)'}}>
+            <div style={{width:36, height:4, background:'var(--line)', borderRadius:2, margin:'0 auto 20px'}} />
+            <div style={{fontSize:15, fontWeight:900, color:'var(--ink)', marginBottom:16}}>밑줄 가져오기</div>
+            <button onClick={() => { setImportOpen(true); setSentenceImportOpen(false); }}
+              style={{width:'100%', padding:'14px 16px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left'}}>
+              {window.rgIcon('upload',16)}
+              <span style={{flex:1}}>
+                <span style={{display:'block'}}>타사 앱 밑줄 가져오기</span>
+                <span style={{display:'block', fontSize:11.5, fontWeight:600, color:'var(--ink-3)', marginTop:2}}>교보·밀리 등 밑줄 스크린샷 → 문장만 골라 담기</span>
+              </span>
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
       {adminOpen && ReactDOM.createPortal(
         <AdminDashboardModal onClose={() => setAdminOpen(false)} />,
         document.body
@@ -844,6 +648,43 @@ function LibraryView({ state, onActivateUserBook }) {
       )}
       {followModal && ReactDOM.createPortal(
         <FollowListModal mode={followModal} onClose={() => setFollowModal(null)} />,
+        document.body
+      )}
+      {bulkImportOpen && ReactDOM.createPortal(
+        <>
+          <div onClick={() => setBulkImportOpen(false)}
+            style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200}} />
+          <div style={{position:'fixed', bottom:0, left:0, right:0, background:'var(--bg)', borderRadius:'20px 20px 0 0', padding:'20px 16px 48px', zIndex:201, boxShadow:'0 -4px 24px rgba(0,0,0,0.15)'}}>
+            <div style={{width:36, height:4, background:'var(--line)', borderRadius:2, margin:'0 auto 20px'}} />
+            <div style={{fontSize:15, fontWeight:900, color:'var(--ink)', marginBottom:16}}>책 추가하기</div>
+            <div style={{display:'flex', flexDirection:'column', gap:10}}>
+              <button onClick={() => { window.RG_openSearch && window.RG_openSearch(); setBulkImportOpen(false); }}
+                style={{width:'100%', padding:'14px 16px', borderRadius:12, border:'1.5px solid var(--brand)', background:'var(--brand-tint)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left'}}>
+                {window.rgIcon('search',16)}
+                <span style={{flex:1}}>
+                  <span style={{display:'block'}}>책 찾아 담기</span>
+                  <span style={{display:'block', fontSize:11.5, fontWeight:600, color:'var(--ink-3)', marginTop:2}}>제목·저자로 검색해서 책장에 담기</span>
+                </span>
+              </button>
+              <button onClick={() => { window.RG_openTextImport && window.RG_openTextImport(); setBulkImportOpen(false); }}
+                style={{width:'100%', padding:'14px 16px', borderRadius:12, border:'1.5px solid var(--line)', background:'var(--card)', color:'var(--ink)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left'}}>
+                {window.rgIcon('paste',16)}
+                <span style={{flex:1}}>
+                  <span style={{display:'block'}}>텍스트/파일로 가져오기</span>
+                  <span style={{display:'block', fontSize:11.5, fontWeight:600, color:'var(--ink-3)', marginTop:2}}>노션·엑셀·메모 붙여넣기 또는 파일 업로드</span>
+                </span>
+              </button>
+              <button onClick={() => { window.RG_openShelfImport && window.RG_openShelfImport(); setBulkImportOpen(false); }}
+                style={{width:'100%', padding:'14px 16px', borderRadius:12, border:'1.5px solid var(--line)', background:'var(--card)', color:'var(--ink)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left'}}>
+                {window.rgIcon('camera',16)}
+                <span style={{flex:1}}>
+                  <span style={{display:'block'}}>사진으로 가져오기</span>
+                  <span style={{display:'block', fontSize:11.5, fontWeight:600, color:'var(--ink-3)', marginTop:2}}>책장 스크린샷으로 읽은 책 한 번에 복원</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </>,
         document.body
       )}
     </section>

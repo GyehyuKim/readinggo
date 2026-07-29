@@ -900,6 +900,19 @@ const DataStore = {
         return s.xp;
       });
     },
+    logParts(parts, date) {
+      if (!parts || !parts.length) return;
+      const day = date || _today();
+      localStorageAdapter.mutate(s => {
+        if (!s.xp_log) s.xp_log = [];
+        parts.forEach(p => {
+          s.xp_log.push({ key: p.key, label: p.label, xp: p.xp, ico: p.ico, date: day });
+        });
+      });
+    },
+    getLog() {
+      return localStorageAdapter.mutate(s => s.xp_log || []);
+    },
   },
 
   /* 완독 / 성(🏰) ─────────────────────────────────

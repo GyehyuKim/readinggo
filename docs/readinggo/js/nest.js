@@ -431,6 +431,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const xpReward = computeCheckinXp({ isNewDay: true, isComplete, newStreak: ns.streak });
     const xpGain = xpReward.total;
     ns.xp += xpGain;
+    try { if (window.DataStore && DataStore.xp && DataStore.xp.logParts) DataStore.xp.logParts(xpReward.parts, today); } catch (e) {}
 
     const newLv = getNestStageByXp(ns.xp).lv;   // XP 증가 후 둥지 단계
     const nestUp = newLv > prevLv;
