@@ -145,7 +145,6 @@ castles.list()                             → Castle[]        // DB 조회 없�
 
 // 일일 기록 (추가)
 sessions.calendar(days?)               → {readDates, shieldDates}  // 스트릭 캘린더 — 최근 N일(기본 35) 읽은/방패 날짜
-sessions.heatmap(days?)                → [{date, pages}]           // v7.2: 활동 히트맵(#195) — 일별 읽은 쪽수 합(기본 180일 — 드리프트 정정 2026-07-09: days||180)
 
 // 소셜 (좋아요 / 관심책 / 콕찌르기 / 팔로우)
 claps.toggle(sentenceId)               → boolean            // ❤️ 좋아요 = 한 문장 반응+저장 단일화 (#641, true=liked). 자기 문장도 허용(self=저장, XP 비부여)
@@ -336,7 +335,7 @@ reading_sessions
   user_id          uuid                 -- 비정규화
   session_date     date
   current_page     int
-  pages_read_today int                  -- v7.2: addToday가 전일 대비 증분 누적 기록 → 활동 히트맵(#195, sessions.heatmap)
+  pages_read_today int                  -- addToday가 전일 대비 읽은 쪽수를 누적 기록
   duration_sec     int  DEFAULT 0       -- #430: 그날 읽기 세션 누적 시간(초) — 프로필 독서 시간 통계
   xp_earned        int
   created_at       timestamptz

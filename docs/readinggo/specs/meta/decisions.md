@@ -189,13 +189,13 @@
 
 | 항목 | 결정 | 담당 | 비고 |
 |---|---|---|---|
-| **#195 활동 히트맵** | 프로필에 **GitHub식 잔디**(최근 26주 일별 읽은 쪽수, 농도 4단계). `sessions.heatmap(days)` + `addToday`가 `pages_read_today`(전일 대비 증분 누적) 기록. ActivityHeatmap 컴포넌트 | profile/backend | profile.md §5.8.10 |
+| **#195 활동 히트맵** | ~~프로필에 GitHub식 잔디 제공~~ → 팀 결정으로 기능 삭제(#1363). 일일 읽기 기록 자체는 유지 | profile/backend | superseded 2026-07-30 |
 | **#190 대시보드 A+B** | **A**: 실사용자(NPC 제외) 카드. **B**: 최근 7일 추세 막대(체크인)+가입(+N). `admin.stats`에 realUsers·trend 추가. C(리텐션 코호트·인기책)는 Phase 2 유지 | profile/backend | §5.8.9 확장 |
 | **#191 멀티 디바이스** | **refetch-on-focus**만(탭 포커스 시 Supabase 상태 재로드 → 다른 기기 변경 반영). 기기별 목록 관리자는 보류(#191 유지) | backend/profile | 합의 범위 |
 | **#153 반별점** | 좌측 절반 탭=0.5 (Ceremony·BookDetailModal). 코드=PR #199 | nest | 계휴 구현(승원 미push) |
 | **로컬 dev 서버** | 라이브(Netlify)만 사용 → 로컬 8888 python 서버 종료. CI/CD(#198)로 main 머지=자동 배포 | ops | — |
 
-**후속**: align_v7.py에 ActivityHeatmap invariant 추가(#200 머지 후 — 지금 추가 시 spec PR CI 빨간불).
+**후속 기록**: 당시 ActivityHeatmap invariant 추가를 검토했으나 기능은 이후 #1363에서 폐기했다.
 
 ---
 

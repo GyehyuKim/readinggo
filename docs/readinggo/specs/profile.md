@@ -189,12 +189,6 @@
 - **C단계 (v7.2, #190)**: **인기책 TOP**(등록·완독 수)·**활성 사용자 7/30일**(리텐션 프록시). 전역 집계라 RPC `admin_popular_books`/`admin_active_users`(SECURITY DEFINER + 본문 `is_admin()` 가드, `12_admin_insights.sql`). 리텐션 **코호트**·퍼널은 후속
 - 보안: stats 집계는 anon count 허용 범위, 전역 RPC는 is_admin() 가드로 비admin 차단. is_admin 체크는 클라 UI 조건부 렌더
 
-#### 5.8.10 독서 활동 히트맵 (#195)
-- 프로필에 **GitHub식 잔디** — 최근 **26주(182일)** 일별 읽은 쪽수를 농도 4단계로 시각화
-- **월(月) 라벨 (v7.2, #207)**: 주 컬럼 위에 월이 바뀌는 지점마다 `M월` 표기 (GitHub 잔디식)
-- 데이터: `DataStore.sessions.heatmap(days)` → `[{date, pages}]`. 쪽수 원천 = `reading_sessions.pages_read_today`(`sessions.addToday`가 전일 대비 증분 누적 기록, [backend.md §7.2](./backend.md))
-- 셀 hover = 날짜·쪽수. 상단 요약 = 활동일·총 쪽수. 스트릭 캘린더(§nest 5.x)의 장기 확장판
-
 ### 5.9 닉네임 규칙 (v7.1 — Model A: 닉네임 1개 통합 / v8.2 #568 인라인 편집 이동) — [§4](./onboarding.md) E-1 참조
 
 표시이름/아이디 구분 제거. 고유·변경가능 **닉네임 1개**(=`users.handle`)를 피드·프로필에 표시. 내부 식별은 불변 `users.id`(UUID) — 닉 변경해도 기록 유지. 저장 시 `display_name`도 동기화.
