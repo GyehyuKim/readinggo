@@ -339,16 +339,6 @@
         } catch (e) {}
         return { readDates, shieldDates };
       },
-      // 활동 히트맵(#195) — 최근 days 일, 날짜별 읽은 쪽수 합계. [{date, pages}]
-      async heatmap(days) {
-        const id = await uid();
-        const since = new Date(Date.now() - (days || 180) * 86400 * 1000).toISOString().slice(0, 10);
-        const rows = unwrap(await sb().from('reading_sessions').select('session_date, pages_read_today')
-          .eq('user_id', id).gte('session_date', since)) || [];
-        const byDate = {};
-        rows.forEach((r) => { byDate[r.session_date] = (byDate[r.session_date] || 0) + (r.pages_read_today || 0); });
-        return Object.keys(byDate).map((date) => ({ date, pages: byDate[date] }));
-      },
     },
 
     /* 한 문장 (sentences) */
