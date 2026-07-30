@@ -61,20 +61,29 @@ try {
   let failProvider = false;
   let grantRows = [{ role:'editor', target_handle:'융디' }];
   let profileIsAdmin = false;
+  let promotionRpcCalls = 0;
+  let promotionRpcFailure = false;
+  let concurrentPromotion = false;
   globalThis.fetch = async (url, init = {}) => {
     const s = String(url);
     if (s === `${SB}/auth/v1/user`) return Response.json({ id:'11111111-1111-1111-1111-111111111111' });
     if (s.includes('/rest/v1/users?')) return Response.json([{ id:'11111111-1111-1111-1111-111111111111', handle:'융디', is_admin:profileIsAdmin }]);
     if (s.includes('/rest/v1/prompt_lab_grants?')) return Response.json(grantRows);
     if (s.includes('/rest/v1/prompt_lab_fixtures?id=eq.')) return Response.json([fixture]);
-    if (s.includes(`/rest/v1/prompt_lab_prompt_versions?id=eq.${candidate.id}`)) return Response.json([candidate]);
-    if (s.includes(`/rest/v1/prompt_lab_prompt_versions?id=eq.${archived.id}`)) return Response.json([archived]);
     if (s.includes('/rest/v1/prompt_lab_prompt_versions?status=eq.active')) return Response.json([active]);
     if (s.includes('/rest/v1/prompt_lab_prompt_versions?status=eq.candidate')) return Response.json([candidate]);
-    if (s.includes('/rest/v1/prompt_lab_prompt_versions?id=eq.') && init.method === 'PATCH') return new Response(null, { status:204 });
-    if (s === `${SB}/rest/v1/prompt_lab_prompt_versions` && init.method === 'POST') {
+    if (s === `${SB}/rest/v1/rpc/prompt_lab_promote_atomic` && init.method === 'POST') {
+      promotionRpcCalls += 1;
       const row = JSON.parse(init.body);
-      return Response.json([{ id:'00000000-0000-0000-0000-000000000030', version_no:3, ...row }]);
+      if (promotionRpcFailure || (concurrentPromotion && promotionRpcCalls % 2 === 0)) {
+        return Response.json({ code:'P0001', message:'prompt_lab_already_active' }, { status:400 });
+      }
+      const source = row.p_action === 'promote' ? candidate : archived;
+      return Response.json({
+        id:`00000000-0000-0000-0000-00000000003${promotionRpcCalls}`,
+        version_no:2 + promotionRpcCalls, status:'active', prompt_body:source.prompt_body,
+        change_reason:row.p_reason, created_by:row.p_actor_id, based_on_version:source.id,
+      });
     }
     if (s === `${LLM}/chat/completions`) {
       const payload = JSON.parse(init.body);
@@ -118,6 +127,22 @@ try {
   response = await worker.fetch(req('/api/prompt-lab', { action:'rollback', versionId:archived.id, reason:'회귀 감지' }, 'admin-token'), env, {});
   body = await response.json();
   check('admin promoter는 archived 버전으로 rollback', response.status === 200 && body.version.status === 'active' && body.version.prompt_body === archived.prompt_body);
+  check('promote와 rollback은 각각 단일 RPC만 호출', promotionRpcCalls === 2);
+
+  concurrentPromotion = true;
+  const concurrentResponses = await Promise.all([
+    worker.fetch(req('/api/prompt-lab', { action:'promote', versionId:candidate.id, reason:'동시 요청 A' }, 'admin-token'), env, {}),
+    worker.fetch(req('/api/prompt-lab', { action:'promote', versionId:candidate.id, reason:'동시 요청 B' }, 'admin-token'), env, {}),
+  ]);
+  check('동시 승격 요청은 하나만 성공하고 나머지는 conflict', concurrentResponses.filter((r) => r.status === 200).length === 1
+    && concurrentResponses.filter((r) => r.status === 409).length === 1);
+  concurrentPromotion = false;
+
+  promotionRpcFailure = true;
+  response = await worker.fetch(req('/api/prompt-lab', { action:'promote', versionId:candidate.id, reason:'부분 실패' }, 'admin-token'), env, {});
+  body = await response.json();
+  check('RPC 부분 실패는 transaction conflict로 반환', response.status === 409 && body.error === 'request conflict');
+  check('RPC 실패 뒤 Worker 보상 write나 별도 audit를 시도하지 않음', promotionRpcCalls === 5);
 
   grantRows = [{ role:'editor', target_handle:'융디' }]; failProvider = true; labSystems.length = 0;
   response = await worker.fetch(req('/api/prompt-lab', { action:'run', fixtureId:fixture.id }, 'yunji-token'), env, {});
@@ -144,6 +169,13 @@ try {
   check('권한 seed는 계정을 생성하지 않음', !/insert into public\.users/i.test(sqlStatements));
   check('baseline UPDATE DELETE 차단 trigger 존재', /before update or delete on public\.prompt_lab_fixtures/i.test(sql));
   check('Prompt Lab 테이블 RLS 활성·브라우저 role revoke', /enable row level security/i.test(sql) && /revoke all on table public\.prompt_lab_prompt_versions from anon, authenticated/i.test(sql));
+  const atomicSql = readFileSync(join(root, 'docs', 'readinggo', 'supabase', '48_prompt_lab_promotion_atomic.sql'), 'utf8');
+  const atomicStatements = atomicSql.replace(/--[^\n]*/g, '');
+  check('승격 RPC는 transaction advisory lock으로 동시 요청 직렬화', /pg_advisory_xact_lock/.test(atomicStatements));
+  check('승격 RPC 내부에서 active archive·새 active·audit를 함께 기록', /update public\.prompt_lab_prompt_versions[\s\S]*insert into public\.prompt_lab_prompt_versions[\s\S]*insert into public\.prompt_lab_audit_log/.test(atomicStatements));
+  check('승격 RPC는 DB에서도 현재 admin과 active promoter를 모두 확인', /u\.is_admin = true/.test(atomicStatements) && /g\.role = 'promoter'/.test(atomicStatements) && /g\.status = 'active'/.test(atomicStatements));
+  check('승격 RPC는 브라우저 실행권한을 회수하고 service role만 허용', /revoke all on function public\.prompt_lab_promote_atomic[\s\S]*from public, anon, authenticated/.test(atomicStatements)
+    && /grant execute on function public\.prompt_lab_promote_atomic[\s\S]*to service_role/.test(atomicStatements));
   const sqlPrompt = (sql.match(/\$prompt\$([\s\S]*?)\$prompt\$/) || [])[1];
   const workerLiteral = (workerSource.match(/const COMPANION_SYSTEM = ('[^\n]+');/) || [])[1];
   const workerPrompt = workerLiteral ? Function(`return ${workerLiteral}`)() : '';

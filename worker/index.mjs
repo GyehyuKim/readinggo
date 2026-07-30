@@ -804,7 +804,14 @@ async function promptLabDb(env, path, opts) {
   const init = Object.assign({}, opts || {});
   init.headers = promptLabHeaders(env, init.headers);
   const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, init);
-  if (!r.ok) { const e = new Error('Prompt Lab storage failed'); e.status = 502; throw e; }
+  if (!r.ok) {
+    const details = await r.json().catch(() => ({}));
+    const e = new Error('Prompt Lab storage failed');
+    e.status = 502;
+    e.dbCode = details && details.code;
+    e.dbMessage = details && details.message;
+    throw e;
+  }
   if (r.status === 204) return null;
   const text = await r.text();
   return text ? JSON.parse(text) : null;
@@ -885,43 +892,26 @@ async function promptLabRows(env, table, filter) {
 
 async function promptLabPromoteVersion(env, actor, sourceId, reason, action) {
   promptLabNeed(actor, 'canPromote');
-  const sources = await promptLabRows(env, 'prompt_lab_prompt_versions',
-    `id=eq.${sourceId}&select=id,status,prompt_body,version_no&limit=1`);
-  const source = sources[0];
-  if (!source) { const e = new Error('version not found'); e.status = 404; throw e; }
-  if (action === 'promote' && source.status !== 'candidate') {
-    const e = new Error('candidate required'); e.status = 409; throw e;
-  }
-  if (action === 'rollback' && source.status !== 'archived') {
-    const e = new Error('archived version required'); e.status = 409; throw e;
-  }
-  const activeRows = await promptLabRows(env, 'prompt_lab_prompt_versions',
-    'status=eq.active&select=id,prompt_body&limit=1');
-  const active = activeRows[0];
-  if (!active) { const e = new Error('active version missing'); e.status = 409; throw e; }
-  await promptLabDb(env, `prompt_lab_prompt_versions?id=eq.${active.id}`, {
-    method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'archived' }),
-  });
   try {
-    const inserted = await promptLabDb(env, 'prompt_lab_prompt_versions', {
-      method: 'POST', headers: { Prefer: 'return=representation' },
+    const activeVersion = await promptLabDb(env, 'rpc/prompt_lab_promote_atomic', {
+      method: 'POST',
       body: JSON.stringify({
-        status: 'active', prompt_body: source.prompt_body,
-        change_reason: promptLabText(reason, 500) || (action === 'promote' ? 'candidate 승격' : 'active rollback'),
-        created_by: actor.id, based_on_version: source.id,
+        p_actor_id: actor.id,
+        p_source_version_id: sourceId,
+        p_action: action,
+        p_reason: promptLabText(reason, 500),
       }),
     });
-    const activeVersion = inserted && inserted[0];
-    ACTIVE_PROMPT_CACHE = { body: source.prompt_body, expiresAt: Date.now() + 60000 };
-    await promptLabAudit(env, actor, action, {
-      promptVersionId: activeVersion && activeVersion.id,
-      metadata: { sourceVersionId: source.id, previousActiveId: active.id, reason: promptLabText(reason, 500) },
-    });
+    ACTIVE_PROMPT_CACHE = { body: activeVersion.prompt_body, expiresAt: Date.now() + 60000 };
     return activeVersion;
   } catch (e) {
-    await promptLabDb(env, `prompt_lab_prompt_versions?id=eq.${active.id}`, {
-      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'active' }),
-    }).catch(() => {});
+    if (e && e.dbCode === 'P0001') {
+      const mapped = new Error('Prompt Lab transaction rejected');
+      mapped.status = e.dbMessage === 'prompt_lab_forbidden' ? 403
+        : e.dbMessage === 'prompt_lab_version_not_found' ? 404
+          : 409;
+      throw mapped;
+    }
     throw e;
   }
 }
