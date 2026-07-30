@@ -4,6 +4,35 @@
    ========================================================= */
 const { useState: _useStateNG, useEffect: _useEffectNG } = React;
 
+function rgNestTimestamp(raw) {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  const timestamp = typeof raw === 'number' ? raw : Date.parse(raw);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function rgNestDayKey(raw) {
+  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const timestamp = rgNestTimestamp(raw);
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function rgNestUniqueQuoteDays(quotes) {
+  const datesSeen = new Set();
+  return [...(quotes || [])]
+    .sort((a, b) => rgNestTimestamp(b.created_at) - rgNestTimestamp(a.created_at))
+    .reduce((rows, quote) => {
+      const day = rgNestDayKey(quote.created_at);
+      if (!day || datesSeen.has(day)) return rows;
+      datesSeen.add(day);
+      rows.push({ day, quote });
+      return rows;
+    }, []);
+}
+
 function NestGrowView({ state }) {
   const [activeTab, setActiveTab] = _useStateNG('log'); // 'log' | 'complete'
   const [myBooks, setMyBooks] = _useStateNG([]);
@@ -43,11 +72,10 @@ function NestGrowView({ state }) {
   }, []);
 
   const fmtDate = (raw) => {
-    if (!raw) return '';
-    try {
-      const d = new Date(raw);
-      return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-    } catch (e) { return ''; }
+    const timestamp = rgNestTimestamp(raw);
+    if (!timestamp) return '';
+    const d = new Date(timestamp);
+    return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
   };
 
   // 완독 + 한 문장 기록 이벤트 합산, 날짜 내림차순
@@ -65,23 +93,17 @@ function NestGrowView({ state }) {
       });
     });
 
-    const datesSeen = new Set();
-    [...myQuotes]
-      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-      .forEach(q => {
-        const day = (q.created_at || '').slice(0, 10);
-        if (!day || datesSeen.has(day)) return;
-        datesSeen.add(day);
-        events.push({
-          key: `quote-${day}`,
-          ico: window.rgIcon('book', 22),
-          label: '한 문장 기록',
-          xp: rules.dailyMission || 20,
-          date: q.created_at,
-        });
+    rgNestUniqueQuoteDays(myQuotes).forEach(({ day, quote: q }) => {
+      events.push({
+        key: `quote-${day}`,
+        ico: window.rgIcon('book', 22),
+        label: '한 문장 기록',
+        xp: rules.dailyMission || 20,
+        date: q.created_at,
       });
+    });
 
-    return events.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    return events.sort((a, b) => rgNestTimestamp(b.date) - rgNestTimestamp(a.date));
   };
 
   const events = buildEvents();
