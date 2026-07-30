@@ -131,6 +131,21 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - 주간 자동 리포트는 production만 조회하고 WAU, 핵심 이벤트 사용자·건수, 4단계 퍼널, W1 리텐션, 누락 환경/SHA 데이터 품질 경고를 GitHub Actions summary와 artifact로 남긴다.
 - PostHog Personal API key는 읽기 전용 GitHub Secret으로만 보관한다. 미설정이면 workflow는 명시적으로 실패하되 앱 배포를 막지 않는다.
 
+### 3.1.3 둥지 성장 설명 관찰 계약 (#1308, 구현 후속)
+
+전용 둥지 탭의 설명 UX가 현재 단계·다음 성장·완성 누적을 찾게 하는지 출시 후 관찰한다. 아래 이벤트는 코드 PR에서 구현하며, 이 spec-only PR에서는 발화된 것으로 간주하지 않는다.
+
+| 이벤트 | 발화 시점 | 필수 속성 |
+|---|---|---|
+| `nest_tab_viewed` | 사용자가 `nest-grow` 목적지에 진입할 때 1회 | `cycle_stage`(1–4), `completed_nest_count` |
+| `nest_growth_guide_opened` | `둥지가 자라는 법` 안내를 열 때마다 | `cycle_stage`, `completed_nest_count` |
+| `nest_completion_viewed` | `둥지 완성` 서브탭으로 전환할 때마다 | `cycle_stage`, `completed_nest_count` |
+
+- `totalXp`, 한 문장 원문, 책 정보는 이벤트에 넣지 않는다. 공통 `environment`·`release_sha`·`schema_version`·`platform`은 §3.1.1 계약을 따른다.
+- **단계별 안내 열람률** = 주간 `nest_growth_guide_opened` 고유 활성 ID / 같은 `cycle_stage`의 `nest_tab_viewed` 고유 활성 ID.
+- **완성 이력 확인률** = 주간 `nest_completion_viewed` 고유 활성 ID / `nest_tab_viewed` 고유 활성 ID. `completed_nest_count=0`과 1 이상을 나눠 본다.
+- 시간대·주 경계와 고유 ID 해석은 §3.1.2를 재사용한다. 출시 전 목표치·합격선은 정하지 않으며, 단계별 차이를 다음 설명 개선의 근거로 기록한다.
+
 **⏳ 후속 (해당 기능 도입 시):**
 
 ```js
