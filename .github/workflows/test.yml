@@ -84,6 +84,7 @@ jobs:
           node tests/streak-checkin.test.mjs
           node tests/supabase-books.test.mjs
           node tests/turnstile-execution.test.mjs
+          node tests/turnstile-interactive-timeout.test.mjs
           node tests/turnstile-retry.test.mjs
           node tests/wiki-ask-response.test.mjs
           cd docs/readinggo && npm run test:analytics

@@ -17,11 +17,12 @@
 (function () {
   var SITE_KEY = (window.RG_CONFIG && window.RG_CONFIG.TURNSTILE_SITE_KEY) || '';
   var SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=RG_onTurnstileLoad';
-  var TOKEN_TIMEOUT_MS = 6000;
+  var TOKEN_TIMEOUT_MS = 15000;          // 스크립트 로드·비상호작용 검증 상한
+  var INTERACTIVE_TIMEOUT_MS = 120000;   // 사람이 보안 확인을 완료할 시간
 
   var widgetId = null;
   var scriptInjected = false;
-  var pending = null;   // { resolve } — 진행 중인 execute 의 콜백 대기
+  var pending = null;   // { resolve, timer, interactive } — 진행 중인 execute 의 콜백 대기
 
   // 스크립트 지연 주입(첫 토큰 요청 시, 중복 방지). 부팅엔 주입 안 함 — networkidle 지연 방지.
   function _ensureScript() {
@@ -63,9 +64,14 @@
       var el = document.createElement('div');
       challengeWrap.appendChild(caption);
       challengeWrap.appendChild(el);
-      // 바깥 탭 = 닫기(이탈구) — 챌린지를 안 풀어도 앱이 잠기지 않는다. 토큰은 '' fail-open
-      // (기존 6s 타임아웃 동작과 동일; 워커 secret 활성 시 403 → 호출부 토스트 안내).
-      challengeWrap.addEventListener('click', function (e) { if (e.target === challengeWrap) _challenge(false); });
+      // 바깥 탭 = 취소(이탈구) — 챌린지를 풀지 않아도 앱이 잠기지 않는다. 진행 중 요청을
+      // 명시적으로 종료하고 위젯을 reset한다(워커 secret 활성 시 빈 토큰 요청은 403 안내).
+      challengeWrap.addEventListener('click', function (e) {
+        if (e.target !== challengeWrap) return;
+        _challenge(false);
+        try { window.turnstile.reset(widgetId); } catch (_) {}
+        _settle('');
+      });
       document.body.appendChild(challengeWrap);
       widgetId = window.turnstile.render(el, {
         sitekey: SITE_KEY,
@@ -76,7 +82,7 @@
         // normal + appearance:'interaction-only' = 챌린지 필요할 때만 표시(인비저블 동작 유지).
         size: 'normal',
         appearance: 'interaction-only',
-        'before-interactive-callback': function () { _challenge(true); },
+        'before-interactive-callback': function () { _challenge(true); _markInteractive(); },
         'after-interactive-callback': function () { _challenge(false); },
         callback: function (token) { _challenge(false); _settle(token || ''); },
         'error-callback': function () { _challenge(false); _settle(''); },
@@ -87,7 +93,26 @@
   };
 
   function _settle(v) {
-    if (pending) { var p = pending; pending = null; p.resolve(v); }
+    if (pending) {
+      var p = pending;
+      pending = null;
+      if (p.timer) clearTimeout(p.timer);
+      p.resolve(v);
+    }
+  }
+
+  // Turnstile이 사람의 상호작용을 요구한 뒤에도 짧은 로드 timeout으로 빈 토큰을 보내면
+  // 사용자가 체크 중인 요청이 먼저 403으로 실패한다(#1377). 챌린지가 보이는 동안은 별도의
+  // 충분한 상호작용 시간을 주고 callback/error/timeout/바깥 탭만 요청을 종료한다.
+  function _markInteractive() {
+    if (!pending || pending.interactive) return;
+    pending.interactive = true;
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.timer = setTimeout(function () {
+      _challenge(false);
+      try { window.turnstile.reset(widgetId); } catch (_) {}
+      _settle('');
+    }, INTERACTIVE_TIMEOUT_MS);
   }
 
   function _run() {
@@ -104,11 +129,19 @@
       var done = false;
       var finish = function (v) { if (!done) { done = true; resolve(v); } };
       // 이전 대기가 남아 있으면(동시 호출 등) fail-open 처리하고 이번 것으로 교체.
-      if (pending) { var prev = pending; pending = null; prev.resolve(''); }
-      pending = { resolve: finish };
-      setTimeout(function () { if (!done) { pending = null; finish(''); } }, TOKEN_TIMEOUT_MS);
+      if (pending) {
+        var prev = pending;
+        pending = null;
+        if (prev.timer) clearTimeout(prev.timer);
+        prev.resolve('');
+      }
+      pending = { resolve: finish, timer: null, interactive: false };
+      pending.timer = setTimeout(function () {
+        // before-interactive-callback 이 passive timer와 같은 tick에 도착한 경우도 조기 종료하지 않는다.
+        if (!done && pending && !pending.interactive) _settle('');
+      }, TOKEN_TIMEOUT_MS);
       if (window.turnstile && widgetId !== null) _run();
-      // 아직 로드/렌더 전이면 RG_onTurnstileLoad 가 렌더 후 pending 을 처리(6s 내).
+      // 아직 로드/렌더 전이면 RG_onTurnstileLoad 가 렌더 후 pending 을 처리(15s 내).
     });
   };
 
