@@ -25,9 +25,9 @@
 
 - **코스**: KAIST IMMS BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습 (2026 Spring, 이지수 교수)
 - **프로젝트**: **ReadingGo** — 독서 습관 앱. "하루 한 페이지, 한 문장"을 게이미피케이션(스트릭·XP·둥지 진화·성 컬렉션)과
-  소셜(마을·전체 공개 피드·짹·NPC)로 매일 읽게 만든다. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
+  소셜(함께읽기·전체 공개 피드·짹·NPC)로 매일 읽게 만든다. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
 - **형태**: **Capacitor 채택**(런칭 결정, 2026-06) — 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드 = **Vite 전환 완료**(#871). Phase 0 데모(현행) → Phase 1 Supabase. *이전 web-first·Capacitor Phase 3 보류는 해제* (`CLAUDE.md` Stack Lock · `iOS-PLAN.md`).
-- **팀 (dev 3인)**: 김계휴(`gyehyu`, 구현·머지), 이승원(둥지·XP·디자인 제안), 정윤지(마을 제안). 구현 권한은 `gyehyu`와 그가 지시한 Hermes에만 있다.
+- **팀 (dev 3인)**: 김계휴(`gyehyu`, 구현·감독 머지), 이승원(둥지·XP·디자인 제안), 정윤지(`jyj23-jeong`, 승인 contributor). 정윤지는 계휴와 사전에 합의된 이슈를 `yunji/*` 브랜치에서 구현·PR하고 자신의 PR을 직접 머지하지 않는다.
 - **주요 산출물**: `docs/readinggo/` (Phase 0 데모), `docs/readinggo/specs/` (피처별 spec, v7).
 - **언어**: 모든 커뮤니케이션과 문서는 **한국어**가 기본. 코드 식별자만 영어.
 
@@ -40,7 +40,7 @@
 | 스펙 전체 지도 | `docs/readinggo/specs/README.md` |
 | 데이터 모델 · DataStore 계약 | `docs/readinggo/specs/backend.md` |
 | 둥지·XP·스트릭 규칙 | `docs/readinggo/specs/nest.md`, `systems.md` |
-| 마을 | `docs/readinggo/specs/village.md` |
+| 같이읽기 | `docs/readinggo/specs/co-reading.md` |
 | 소셜·내서재 | `docs/readinggo/specs/social.md`, `profile.md` |
 | 데모 코드 | `docs/readinggo/index.html` + `docs/readinggo/js/*` |
 | 도서 데이터 | **canonical = Supabase `books`** (#490). `loadBooks()` Supabase 1순위·게스트 anon RLS read. 구 정적 `books.tsv`는 제거됨(#972) — 폴백은 인라인 `RG_BOOKS`(12) 최소치. 어느 단계든 책 정보 하드코딩 금지 |
@@ -57,7 +57,7 @@ find .git -name "desktop.ini" -type f -delete
 # 1. 최신화
 git checkout main && git pull origin main
 
-# 2. 브랜치 생성 (규칙: gyehyu/<topic-slug>; 구현은 gyehyu/Hermes만)
+# 2. 브랜치 생성 (계휴/Hermes: gyehyu/*, 승인 contributor 윤지: yunji/*)
 git checkout -b gyehyu/example-topic
 
 # 3. 편집 및 커밋 (Conventional Commits)
@@ -81,7 +81,7 @@ gh pr create --title "..." --body "..."
 
 **이슈 동기화**: PR은 관련 이슈를 연결(`Closes #N` 완료 / `Refs #N` 관련)하고, 작업 중 발견한 새 일은 이슈로 만든다 (CONTRIBUTING §4.2–4.3).
 
-**운영 권한**: 이슈는 누구나 만들고 의견을 남길 수 있다. 그러나 구현 브랜치·코드/스펙 변경·PR 작성은 `gyehyu`와 그가 지시한 Hermes만 수행한다. CI green은 자동 머지 승인이 아니며, Hermes가 PR의 이슈 연결·diff·테스트 근거·미해결 대화를 확인한 뒤에만 머지한다 (`CONTRIBUTING.md` §0).
+**운영 권한**: 이슈는 누구나 만들고 의견을 남길 수 있다. 구현 브랜치·코드/스펙 변경·PR 작성은 `gyehyu`/Hermes와 승인 contributor `jyj23-jeong`이 수행하되, 윤지는 사전 합의된 이슈와 `yunji/*` 브랜치로 범위를 제한하고 self-merge하지 않는다. CI green은 자동 머지 승인이 아니며, Hermes가 PR의 이슈 연결·diff·테스트 근거·미해결 대화를 확인한 뒤 계휴/Hermes가 머지한다 (`CONTRIBUTING.md` §0).
 
 ---
 

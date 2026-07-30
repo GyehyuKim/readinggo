@@ -115,7 +115,6 @@ Confetti: 18조각, 8색 `#3FD17F #FFC233 #FF8A3D #5AB5F0 #F08A9A #B690F0 #2EB86
 
 **상호작용 (v7)**:
 - **소셜 피드 반응 = 짹 1버튼** (한 문장 좋아요, 토글). 받으면 XP +1 ([systems.md §6.3](./systems.md))
-- **마을 둥지 카드 반응 = 콕찌르기(🪱) 1버튼** (불 꺼진 친구에게만, 일 1회) — [village.md](./village.md)
 - 짹 = 작성된 한 문장에 대한 좋아요 / 콕찌르기 = 오늘 안 읽은 친구에게 독려 넛지
 
 NPC 운영: pg_cron(또는 Phase 0 시드) 진도 증가 + 시드 한 문장 게시. LLM 호출 없음. [systems.md §6.4](./systems.md).

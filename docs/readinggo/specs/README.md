@@ -13,9 +13,8 @@
 |---|---|---|
 | **온보딩** | [`onboarding.md`](./onboarding.md) | [§4](./onboarding.md) 가입 여정 A~H |
 | **둥지 탭** | [`nest.md`](./nest.md) | §5.1-5.4 둥지 진화·활성책·일일미션·성 컬렉션 |
-| **마을** (⚠️ 폐기, #440) | [`village.md`](./village.md) | §5.5 마을 — 탭 삭제(소셜로 일원화). 이력 보존용 |
 | **소셜 탭** | [`feed.md`](./feed.md) | [§5.7](./feed.md) |
-| **같이읽기(방)** | [`co-reading.md`](./co-reading.md) | 신설 (#987, 부모 #925) — 피드→'함께' 재편 + 방 코어. `village.md`(폐기 #440) 재설계 부활 |
+| **같이읽기(방)** | [`co-reading.md`](./co-reading.md) | 신설 (#987, 부모 #925) — 피드→'함께' 재편 + 방 코어 |
 | **내서재(프로필)** | [`profile.md`](./profile.md) | [§5.8](./profile.md)-5.9 (v6: AI 도서 추천 포함) |
 | **바코드 스캔 등록** | [`barcode-scan.md`](./barcode-scan.md) | 신설 (#943) — 뒤표지 ISBN 스캔 → 정확 매칭. 무의존 `BarcodeDetector`(Phase 0) |
 | **임포트: 유연 도서기록** | [`flexible-import.md`](./flexible-import.md) | 신설 (#1039) — 붙여넣기 텍스트 → LLM 파싱 → shelf-import 매칭·검수·검토함 코어 재사용. 스크린샷(#772)은 폴백 |
@@ -40,7 +39,7 @@
 ### 어디를 고치나
 | 변경 종류 | 대상 파일 |
 |---|---|
-| 화면 스펙 (홈·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `feed.md`, `profile.md`). `village.md`는 ⚠️ 폐기(#440, 이력 보존용) |
+| 화면 스펙 (홈·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `feed.md`, `profile.md`) |
 | 가입 여정 | `onboarding.md` |
 | 시스템 로직 (스트릭·방패·XP·NPC·휴식코스) | `systems.md` |
 | 데이터 모델·플랫폼 | `backend.md` |
@@ -58,8 +57,8 @@
 ### Cross-file 참조 규칙
 다른 spec 파일을 가리킬 때:
 ```markdown
-[§5.5](./village.md)        ← 일반 참조
-[village.md §5.5.4](./village.md#554-마을-내부-화면)  ← 정확한 앵커
+[§5.6](./co-reading.md)        ← 일반 참조
+[co-reading.md §5.3](./co-reading.md#53-방-내부-화면)  ← 정확한 앵커
 ```
 같은 파일 내 참조는 `§X.Y` 그대로 둔다. 헤더 anchor는 GitHub 규칙 (한글 그대로, 공백 → `-`, 점·괄호 제거).
 
@@ -70,7 +69,6 @@
 
 | 피처 파일 | owner | 비고 |
 |---|---|---|
-| `village.md` (마을, ⚠️ 폐기 #440) | **yunji** | 탭 삭제됨(`village.js`/`town.js` 제거). 이력 보존, spec PR은 윤지 |
 | `nest.md` · `systems.md` · `design.md` | **seungwon** | 둥지·XP 보상체계·디자인 |
 | `feed.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 소셜·내서재·백엔드·로그인 |
 | `meta/*` · `README.md` | **gyehyu** | 결정 기록·통합 (머지 담당) |

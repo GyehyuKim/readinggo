@@ -10,7 +10,7 @@
 | 항목 | 검토 시점 | 기각 사유 | 재검토 트리거 |
 |---|---|---|---|
 | **OCR — 웹 환경** (Tesseract.js / Cloud Vision API) | 2026-05-22 → **superseded** | 당시 기각 사유: 라이브러리 무게·정확도 또는 외부 API 비용 | 현재 웹 OCR은 Worker `/api/ocr`(Upstage)로 구현. 역사 기록을 삭제하지 않고 superseded로 보존 |
-| **마을 탭** (커뮤니티 게시판, [village.md](../village.md)) | 2026-06 (#440·#639) | 소셜/피드로 일원화 — 별도 탭 분산이 핵심 루프(읽기·한 문장)를 희석. **위임**: 공개 한 문장·발견은 [feed.md](../feed.md), 같은 책 독자 연결은 추천 피드로 흡수 | 커뮤니티 수요·사용자 N 폭증 시 재검토 |
+| **마을 탭** (커뮤니티 게시판) | 2026-06 (#440·#639) | 소셜/피드로 일원화 — 별도 탭 분산이 핵심 루프(읽기·한 문장)를 희석. **위임**: 공개 한 문장·발견은 [feed.md](../feed.md), 같은 책 독자 연결은 추천 피드로 흡수 | 커뮤니티 수요·사용자 N 폭증 시 재검토 |
 | **OCR — 네이티브** (Capacitor + ML Kit/Vision) | 2026-05-22 → **채택 후 superseded** | Capacitor 셰은 현재 채택됐지만 ML Kit/Vision OCR 플러그인은 미설치 | 현재 OCR은 Worker 경유. 네이티브 플러그인은 별도 Stack Lock 결정 없이 채택된 것으로 간주하지 않음 |
 | **음성 받아쓰기 — 웹** (Web Speech API) | 2026-05-22 | 브라우저별 지원 불일치, Chrome은 사실상 외부 API | — |
 | **음성 받아쓰기 — 네이티브** (Capacitor) | 2026-05-23 | (이전 기각 사유 해제) | **Phase 3 채택 — `@capacitor-community/speech-recognition`** |

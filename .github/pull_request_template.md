@@ -17,7 +17,7 @@
 - [ ] `spec-align` CI 통과 (새 기능은 `tests/spec-align/align_v7.py`에 invariant 추가)
 
 ## 체크리스트
-- [ ] 브랜치 `<owner>/<topic-slug>` 형식 (§1)
+- [ ] 브랜치 `<owner>/<topic-slug>` 형식 (`gyehyu/*` 또는 승인 contributor의 `yunji/*`, §1)
 - [ ] `main` 기준 최신 (rebase 또는 `Update branch`) (§3.0)
 - [ ] 1 PR = 1 논리 단위 · **spec/코드 분리** (§4·§4.1)
 - [ ] **관련 이슈 연결(`Closes`/`Refs`) 또는 새 이슈 생성** (§4.2)
@@ -26,6 +26,6 @@
 - [ ] `.env`·API 키·개인정보 없음 (§6)
 
 ## Hermes 감독 머지 게이트
-<!-- CI green은 자동 머지 승인이 아님. 구현·머지는 gyehyu/Hermes만 수행한다. -->
+<!-- CI green은 자동 머지 승인이 아님. contributor는 self-merge하지 않고 계휴/Hermes의 감독 머지를 기다린다. -->
 - [ ] 필수 CI 전체 green 및 `main` 최신화
 - [ ] Hermes가 관련 이슈, diff 범위, 테스트 증거, 미해결 대화를 확인
