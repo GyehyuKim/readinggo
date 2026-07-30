@@ -161,7 +161,6 @@
 │ [둥지 기록] 탭                   │
 │   📖 한 문장 기록  +20 XP  날짜  │
 │   🏰 OO 완독      +200 XP 날짜  │
-│   🔥 7일 연속 기록 +100 XP 날짜  │
 │   (DataStore.myBooks completedAt│
 │    + sentences.listMine 기반)   │
 ├─────────────────────────────────┤

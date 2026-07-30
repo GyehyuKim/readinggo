@@ -624,7 +624,7 @@ function LibraryView({ state, onActivateUserBook }) {
           <div onClick={() => setSentenceImportOpen(false)}
             style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200}} />
           <div style={{position:'fixed', bottom:0, left:0, right:0, background:'var(--bg)', borderRadius:'20px 20px 0 0', padding:'20px 16px 48px', zIndex:201, boxShadow:'0 -4px 24px rgba(0,0,0,0.15)'}}>
-            <div style={{width:36, height:4, background:'var(--line)', borderRadius:2, margin:'0 auto 20px'}} />
+            <div style={{width:36, height:4, background:'var(--line)', borderRadius:'var(--r-sm)', margin:'0 auto 20px'}} />
             <div style={{fontSize:15, fontWeight:900, color:'var(--ink)', marginBottom:16}}>밑줄 가져오기</div>
             <button onClick={() => { setImportOpen(true); setSentenceImportOpen(false); }}
               style={{width:'100%', padding:'14px 16px', borderRadius:12, border:'1.5px solid var(--brand-soft)', background:'var(--brand-soft)', color:'var(--brand-3)', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left'}}>
@@ -655,7 +655,7 @@ function LibraryView({ state, onActivateUserBook }) {
           <div onClick={() => setBulkImportOpen(false)}
             style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200}} />
           <div style={{position:'fixed', bottom:0, left:0, right:0, background:'var(--bg)', borderRadius:'20px 20px 0 0', padding:'20px 16px 48px', zIndex:201, boxShadow:'0 -4px 24px rgba(0,0,0,0.15)'}}>
-            <div style={{width:36, height:4, background:'var(--line)', borderRadius:2, margin:'0 auto 20px'}} />
+            <div style={{width:36, height:4, background:'var(--line)', borderRadius:'var(--r-sm)', margin:'0 auto 20px'}} />
             <div style={{fontSize:15, fontWeight:900, color:'var(--ink)', marginBottom:16}}>책 추가하기</div>
             <div style={{display:'flex', flexDirection:'column', gap:10}}>
               <button onClick={() => { window.RG_openSearch && window.RG_openSearch(); setBulkImportOpen(false); }}

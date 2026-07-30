@@ -1080,8 +1080,8 @@ function App() {
               <span className="stat xp" title="현재 XP (systems.md §6.3)">
                 <span>XP {(appState.xp || 0).toLocaleString()}</span>
               </span>
-              <span className="stat lv" title="완성한 둥지 수 (1,600 XP = 둥지 1개)">
-                <span>둥지 {Math.floor((appState.xp || 0) / ((window.NEST_CYCLE_XP) || 1600))}개</span>
+              <span className="stat lv" title="레벨 (systems.md §6.3)">
+                <span>Lv.{calcLevel(appState.xp)}</span>
               </span>
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               {/* #790: 돋보기 아이콘만으론 '책 추가' 동선 발견성이 낮음 → '도서 찾기' 라벨 + 틴트 배경칩으로 강조. */}
