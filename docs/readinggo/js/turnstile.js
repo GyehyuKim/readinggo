@@ -69,6 +69,9 @@
       document.body.appendChild(challengeWrap);
       widgetId = window.turnstile.render(el, {
         sitekey: SITE_KEY,
+        // 요청 시점에 _run()이 execute()하는 지연 실행 계약. 기본값(render)은 위젯 렌더 직후
+        // 자동 실행되어 아래 수동 execute와 경합하고 빈 토큰/403을 만든다(#1375).
+        execution: 'execute',
         // #1222: size 유효값은 compact/flexible/normal 뿐('invisible' 은 throw).
         // normal + appearance:'interaction-only' = 챌린지 필요할 때만 표시(인비저블 동작 유지).
         size: 'normal',
