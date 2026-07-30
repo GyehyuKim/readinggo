@@ -5,7 +5,7 @@
    설계(staged rollout·fail-open):
    - **지연 로드**: 부팅 시 스크립트를 주입하지 않는다(외부 요청이 networkidle 을 막아 부팅/
      스모크가 느려지는 것 방지). 첫 RG_turnstileToken() 호출 때 스크립트를 async 주입하고
-     위젯 1개(normal + interaction-only — 평소 비표시)를 렌더한다.
+     위젯 1개(normal + interaction-only + execution:'execute' — 평소 비표시·요청 시 수동 실행)를 렌더한다.
      (#1222: 구 size:'invisible' 은 유효값이 아니라 api.js 가 매 로드마다 TurnstileError 를 던졌다.)
    - RG_turnstileToken() 은 호출마다 execute 로 **새 토큰**을 얻는다(토큰은 1회용·~300s TTL).
      위젯이 아직 준비 전이면 로드·렌더를 기다렸다가 실행하고, ~6s 안에 안 되면 '' 로 **fail-open**.
@@ -69,6 +69,9 @@
       document.body.appendChild(challengeWrap);
       widgetId = window.turnstile.render(el, {
         sitekey: SITE_KEY,
+        // 요청 시점에 _run()이 execute()하는 지연 실행 계약. 기본값(render)은 위젯 렌더 직후
+        // 자동 실행되어 아래 수동 execute와 경합하고 빈 토큰/403을 만든다(#1375).
+        execution: 'execute',
         // #1222: size 유효값은 compact/flexible/normal 뿐('invisible' 은 throw).
         // normal + appearance:'interaction-only' = 챌린지 필요할 때만 표시(인비저블 동작 유지).
         size: 'normal',
