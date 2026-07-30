@@ -82,6 +82,7 @@ jobs:
           node tests/sentence-book-binding.test.mjs
           node --test tests/shelf-status-options.test.mjs
           node tests/streak-checkin.test.mjs
+          node tests/home-ocr-multi.test.mjs
           node tests/supabase-books.test.mjs
           node tests/turnstile-execution.test.mjs
           node tests/turnstile-interactive-timeout.test.mjs
