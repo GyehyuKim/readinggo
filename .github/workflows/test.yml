@@ -76,6 +76,7 @@ jobs:
           node --test tests/posthog-weekly-report.test.mjs
           node tests/prompt-lab.test.mjs
           node tests/prompt-experiment-api.test.mjs
+          node tests/reading-activity-removed.test.mjs
           node tests/related-filter.test.mjs
           node tests/sentence-input-reset.test.mjs
           node tests/sentence-book-binding.test.mjs
