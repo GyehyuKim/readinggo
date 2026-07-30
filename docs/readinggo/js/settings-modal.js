@@ -197,6 +197,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
               {[
                 { value: 'public', label: '전체 공개', description: '피드에 공개돼요' },
+                { value: 'friends', label: '친구 공개', description: '맞팔 친구만 볼 수 있어요' },
                 { value: 'private', label: '나만 보기', description: '나만 볼 수 있어요' },
               ].map((option) => (
                 <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: sentenceVisibilityBusy ? 'default' : 'pointer', opacity: sentenceVisibilityBusy ? 0.6 : 1 }}>
@@ -333,3 +334,362 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
 // 진입 동의 배너 (#331) — 비차단 하단 바. 필수(서비스 운영) + 선택(AI·분석). opt-in 허들↓.
 
 window.SettingsModal = SettingsModal;
+
+/* ── SettingsView: 풀페이지 설정 탭 (#library-tab-ux) ──────────────── */
+function SettingsView({ spoilerReveal, setSpoilerReveal }) {
+  const [subPage, setSubPage] = useState(null); // null | 'export'
+  const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes');
+  const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced');
+  const [sentenceVisibility, setSentenceVisibility] = useState('public');
+  const [sentenceVisibilityBusy, setSentenceVisibilityBusy] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    const settingsApi = window.DataStore && window.DataStore.settings;
+    if (!(settingsApi && settingsApi.get)) { setSentenceVisibilityBusy(false); return () => { alive = false; }; }
+    Promise.resolve(settingsApi.get()).then((s) => {
+      if (!alive) return;
+      setSentenceVisibility(s && s.default_sentence_visibility === 'private' ? 'private' : 'public');
+    }).catch(() => {
+      if (alive) showToast('기본 공개 범위를 불러오지 못했어요.');
+    }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
+    return () => { alive = false; };
+  }, []);
+  const saveSentenceVisibility = (next) => {
+    if (sentenceVisibilityBusy || next === sentenceVisibility) return;
+    const settingsApi = window.DataStore && window.DataStore.settings;
+    if (!(settingsApi && settingsApi.update)) { showToast('기본 공개 범위를 저장하지 못했어요.'); return; }
+    setSentenceVisibilityBusy(true);
+    Promise.resolve(settingsApi.update({ default_sentence_visibility: next }))
+      .then(() => setSentenceVisibility(next))
+      .catch(() => showToast('기본 공개 범위를 저장하지 못했어요.'))
+      .finally(() => setSentenceVisibilityBusy(false));
+  };
+  const isSupabase = window.DataStore === window.SupabaseDataStore;
+  const [wishPublic, setWishPublic] = useState(!!(window.RG_ME && window.RG_ME.wishlist_public));
+  const toggleWishPublic = () => {
+    if (!isSupabase) { showToast('로그인 후 이용할 수 있어요'); return; }
+    const next = !wishPublic;
+    Promise.resolve(
+      window.DataStore && window.DataStore.profile && window.DataStore.profile.update
+        ? window.DataStore.profile.update({ wishlist_public: next }) : null
+    ).then(() => {
+      setWishPublic(next);
+      if (window.RG_ME) window.RG_ME.wishlist_public = next;
+      showToast(next ? '읽고 싶은 책이 공개됐어요' : '읽고 싶은 책이 비공개로 바뀌었어요');
+    }).catch(() => showToast('저장 실패 — 잠시 후 다시'));
+  };
+  const [acctEmail, setAcctEmail] = useState('');
+  useEffect(() => {
+    let alive = true;
+    if (window.RG_SB && window.RG_SB.currentUser) {
+      Promise.resolve(window.RG_SB.currentUser())
+        .then((u) => { if (alive) setAcctEmail((u && u.email) || ''); })
+        .catch(() => {});
+    }
+    return () => { alive = false; };
+  }, []);
+  const [inqMsg, setInqMsg] = useState('');
+  const [inqBusy, setInqBusy] = useState(false);
+  const [inqDone, setInqDone] = useState(false);
+  const sendInquiry = () => {
+    const m = inqMsg.trim();
+    if (!m) { showToast('문의 내용을 적어주세요'); return; }
+    if (!(DataStore.inquiries && DataStore.inquiries.create)) { showToast('로그인 후 이용해주세요'); return; }
+    setInqBusy(true);
+    Promise.resolve(DataStore.inquiries.create({ message: m }))
+      .then(() => { setInqDone(true); setInqMsg(''); showToast('문의가 전송됐어요 — 운영자가 확인합니다'); })
+      .catch(() => showToast('전송 실패 — 잠시 후 다시'))
+      .finally(() => setInqBusy(false));
+  };
+  const logout = () => {
+    if (window.RG_SB && window.RG_SB.signOut) {
+      Promise.resolve(window.RG_SB.signOut()).finally(() => window.location.reload());
+    }
+  };
+  const [delOpen, setDelOpen] = useState(false);
+  const [delConfirm, setDelConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteAccount = async () => {
+    const token = (window.RG_SB && window.RG_SB.accessToken) ? await window.RG_SB.accessToken() : null;
+    if (!token) { showToast('로그인 상태가 아니에요'); setDelConfirm(false); return; }
+    setDeleting(true);
+    try {
+      const r = await fetch(((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/delete-account', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) throw new Error('실패');
+      try { await window.RG_SB.signOut(); } catch (e) {}
+      try { localStorage.clear(); } catch (e) {}
+      window.location.reload();
+    } catch (e) { setDeleting(false); showToast('계정 삭제 실패 — 잠시 후 다시 시도해주세요'); }
+  };
+
+  // 내보내기 함수 (library.js에서 이동)
+  const collectExport = async () => {
+    const [meRow, books, sents] = await Promise.all([
+      Promise.resolve((DataStore.profile && DataStore.profile.get) ? DataStore.profile.get() : null).catch(() => null),
+      Promise.resolve((DataStore.myBooks && DataStore.myBooks.list) ? DataStore.myBooks.list() : []).catch(() => []),
+      Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : []).catch(() => []),
+    ]);
+    return { meRow, books: books || [], sents: sents || [] };
+  };
+  const downloadBlob = (parts, type, filename) => {
+    const blob = new Blob(parts, { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const exportJson = async () => {
+    try {
+      const me = window.RG_ME || {};
+      const { meRow, books, sents } = await collectExport();
+      const payload = { app: 'ReadingGo', exported_at: new Date().toISOString(), profile: meRow, books, sentences: sents };
+      downloadBlob([JSON.stringify(payload, null, 2)], 'application/json',
+        `readinggo-export-${(meRow && meRow.handle) || me.handle || 'me'}.json`);
+      showToast('데이터를 내보냈어요 (JSON)');
+    } catch (e) { showToast('내보내기 실패'); }
+  };
+  const exportCsv = async () => {
+    try {
+      const me = window.RG_ME || {};
+      const { meRow, books, sents } = await collectExport();
+      const handle = (meRow && meRow.handle) || me.handle || 'me';
+      const fmtDate = (v) => { if (!v) return ''; if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10); const t = (typeof v === 'number') ? v : Date.parse(v); if (!t || isNaN(t)) return ''; const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+      const bookMeta = {};
+      books.forEach(ub => { const b = (ub && ub.book) || {}; const key = ub.book_id || b.id || ub.id; if (key) bookMeta[key] = { title: b.title || '', author: b.author || '' }; });
+      const esc = (v) => { const s = String(v == null ? '' : v); return (s.indexOf(',') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('"') >= 0) ? '"' + s.split('"').join('""') + '"' : s; };
+      const rows = [['책제목', '저자', '페이지', '문장', '메모', '작성일']];
+      (sents || []).forEach(s => { const key = s.book_id || (s.user_book && s.user_book.book_id) || ''; const meta = bookMeta[key] || {}; const eb = (s.user_book && s.user_book.book) || {}; rows.push([meta.title || eb.title || '', meta.author || eb.author || '', (typeof s.page === 'number') ? s.page : '', s.text || '', s.my_note || s.note || '', fmtDate(s.created_at || s.createdAt || s.when)]); });
+      downloadBlob(['﻿', rows.map(r => r.map(esc).join(',')).join('\r\n')], 'text/csv;charset=utf-8', `readinggo-export-${handle}.csv`);
+      showToast('데이터를 내보냈어요 (CSV)');
+    } catch (e) { showToast('내보내기 실패'); }
+  };
+  const exportMarkdown = async () => {
+    try {
+      const me = window.RG_ME || {};
+      const { meRow, books, sents } = await collectExport();
+      const fmtDate = (v) => { if (!v) return ''; if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10); const t = (typeof v === 'number') ? v : Date.parse(v); if (!t || isNaN(t)) return ''; const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+      const bookMeta = {};
+      books.forEach(ub => { const b = (ub && ub.book) || {}; const key = ub.book_id || b.id || ub.id; if (key) bookMeta[key] = { title: b.title || '제목 없음', author: b.author || '' }; });
+      const byBook = {};
+      (sents || []).forEach(s => { const key = s.book_id || (s.user_book && s.user_book.book_id) || '_unknown'; (byBook[key] = byBook[key] || []).push(s); });
+      const handle = (meRow && meRow.handle) || me.handle || 'me';
+      const lines = ['# ReadingGo 독서 기록', '', `**@${handle}**`, `내보낸 날짜: ${fmtDate(Date.now())}`, ''];
+      const completed = books.filter(b => b && b.status === 'completed');
+      const reading = books.filter(b => b && b.status !== 'completed');
+      lines.push(`읽은 책 ${completed.length}권 · 읽는 중 ${reading.length}권 · 한 문장 ${(sents || []).length}개`, '');
+      const emitQuotes = (qs) => { qs.slice().sort((a, b2) => (a.page || 0) - (b2.page || 0)).forEach(q => { const date = fmtDate(q.created_at || q.createdAt || q.when); lines.push(`**p.${q.page ?? '?'}${date ? ` · ${date}` : ''}**`); lines.push(`> ${q.text || ''}`); const note = q.my_note || q.note || ''; if (note) lines.push('', note); lines.push(''); }); };
+      const emitBook = (ub) => { const b = (ub && ub.book) || {}; const key = ub.book_id || b.id || ub.id; lines.push('', '---', '', `## ${b.title || '제목 없음'}`); const metaBits = [b.author, (b.total_pages > 0 ? `${b.total_pages}쪽` : ''), (b.isbn13 ? `ISBN ${b.isbn13}` : '')].filter(Boolean); if (metaBits.length) lines.push(metaBits.join(' · ')); if (ub.status === 'completed') { const r2 = (typeof ub.rating === 'number') ? `★ ${ub.rating.toFixed(1)} / 5` : ''; const cd = fmtDate(ub.completed_at); const head = [r2, cd ? `완독 ${cd}` : ''].filter(Boolean).join(' · '); if (head) lines.push('', head); if (ub.review_text) lines.push(`> ${ub.review_text}`); } const qs = byBook[key] || []; if (qs.length) { lines.push('', `### 내 한 문장 (${qs.length})`, ''); emitQuotes(qs); } delete byBook[key]; };
+      books.forEach(emitBook);
+      Object.keys(byBook).forEach(key => { const qs = byBook[key]; if (!qs || !qs.length) return; const meta = bookMeta[key] || {}; const title = meta.title || (qs[0] && qs[0].user_book && qs[0].user_book.book && qs[0].user_book.book.title) || '기타'; lines.push('', '---', '', `## ${title}`, '', `### 내 한 문장 (${qs.length})`, ''); emitQuotes(qs); });
+      downloadBlob(['﻿', lines.join('\n')], 'text/markdown;charset=utf-8', `readinggo-export-${handle}.md`);
+      showToast('데이터를 내보냈어요 (Markdown)');
+    } catch (e) { showToast('내보내기 실패'); }
+  };
+
+  const grpLabel = (text) => (
+    <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 24, marginBottom: 8, paddingLeft: 2 }}>{text}</div>
+  );
+  const Toggle = ({ on, onToggle, disabled }) => (
+    <button onClick={onToggle} disabled={disabled} aria-pressed={on}
+      style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: disabled ? 'default' : 'pointer', background: on ? 'var(--brand)' : 'var(--ink-3)', position: 'relative', transition: 'background .2s', opacity: disabled ? 0.45 : 1 }}>
+      <span style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
+    </button>
+  );
+
+  // 서브페이지: 내 데이터 내보내기
+  if (subPage === 'export') {
+    return (
+      <div style={{ paddingBottom: 24 }}>
+        <button onClick={() => setSubPage(null)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer', padding: '4px 0 20px' }}>
+          ← 내 데이터 내보내기
+        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { label: 'JSON으로 내보내기', sub: '모든 데이터 · 개발자 친화적', fn: exportJson },
+            { label: 'Markdown으로 내보내기', sub: '책별 한 문장 정리 · 노션·옵시디언 호환', fn: exportMarkdown },
+            { label: 'CSV로 내보내기', sub: '한 문장 목록 · 스프레드시트 호환', fn: exportCsv },
+          ].map(({ label, sub, fn }) => (
+            <button key={label} onClick={fn}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: 'var(--r-md)', border: '1.5px solid var(--line)', background: 'var(--card)', textAlign: 'left', cursor: 'pointer' }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>{label}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3 }}>{sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ paddingBottom: 24 }}>
+
+      {/* 공유 CTA */}
+      <button onClick={() => { if (window.shareService) window.shareService({ source: 'settings' }); }}
+        style={{ width: '100%', padding: '14px', borderRadius: 'var(--r-md)', border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        {rgIcon('share', 15)} 친구에게 ReadingGo 공유하기
+      </button>
+
+      {/* 읽기 환경 */}
+      {grpLabel('읽기 환경')}
+      <div style={{ borderRadius: 'var(--r-md)', border: '1.5px solid var(--line)', background: 'var(--card)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', gap: 10 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--ink)' }}>스포일러 모두 보기</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>안 읽은 페이지의 한 문장도 표시</div>
+          </div>
+          <Toggle on={spoilerReveal} onToggle={() => setSpoilerReveal(v => !v)} />
+        </div>
+        <div style={{ height: 1, background: 'var(--line)' }} />
+        <div style={{ padding: '14px' }}>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>{rgIcon('chat', 15)} 재키 질문 결</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 10, lineHeight: 1.4 }}>재키가 던지는 질문의 방향. 다음 질문부터 반영돼요.</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {(window.RG_COMPANION_PRESETS || []).map((p) => {
+              const on = qPreset === p.key;
+              return (
+                <button key={p.key} onClick={() => { setQPreset(p.key); if (window.RG_companionPreset) window.RG_companionPreset.set(p.key); }}
+                  aria-pressed={on}
+                  style={{ padding: '6px 12px', borderRadius: 16, border: on ? 'none' : '1px solid var(--line)', background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--ink-2)', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {rgIcon(p.icon, 14)} {p.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 개인정보·데이터 */}
+      {grpLabel('개인정보·데이터')}
+      <div style={{ borderRadius: 'var(--r-md)', border: '1.5px solid var(--line)', background: 'var(--card)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)' }}>독서 대화 AI·분석 활용</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>한 문장·대화를 AI가 읽고 질문을 만들어요. 끄면 로컬 질문만.</div>
+          </div>
+          <Toggle on={consentOn} onToggle={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); if (window.RG_applyConsent) window.RG_applyConsent(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '고마워요! 더 나은 질문을 드릴게요' : '로컬 모드로 전환됐어요', { sparrow: nv === 'yes' }); }} />
+        </div>
+        <div style={{ height: 1, background: 'var(--line)' }} />
+        <fieldset disabled={sentenceVisibilityBusy} style={{ margin: 0, padding: '14px', border: 'none' }}>
+          <legend style={{ float: 'left', width: '100%', padding: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', marginBottom: 10 }}>한 문장 기본 공개 범위</legend>
+          <div style={{ display: 'flex', gap: 8, clear: 'both' }}>
+            {[{ value: 'public', label: '전체 공개' }, { value: 'friends', label: '친구 공개' }, { value: 'private', label: '나만 보기' }].map((opt) => {
+              const sel = sentenceVisibility === opt.value;
+              return (
+                <label key={opt.value} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, cursor: sentenceVisibilityBusy ? 'default' : 'pointer', padding: '10px 12px', borderRadius: 'var(--r-sm)', border: `1.5px solid ${sel ? 'var(--brand)' : 'var(--line)'}`, background: sel ? 'var(--brand-tint)' : 'var(--paper)', opacity: sentenceVisibilityBusy ? 0.6 : 1 }}>
+                  <input type="radio" name="sv-range-sv" value={opt.value} checked={sel} onChange={() => saveSentenceVisibility(opt.value)} style={{ margin: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 800, color: sel ? 'var(--brand-3)' : 'var(--ink)' }}>{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+        <div style={{ height: 1, background: 'var(--line)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('bookmark', 14)} 읽고 싶은 책 공개</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>{isSupabase ? '내 위시리스트를 다른 사람 프로필에서 볼 수 있어요' : '로그인하면 이용할 수 있어요'}</div>
+          </div>
+          <Toggle on={isSupabase && wishPublic} onToggle={toggleWishPublic} disabled={!isSupabase} />
+        </div>
+        <div style={{ height: 1, background: 'var(--line)' }} />
+        <button onClick={() => setSubPage('export')}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)' }}>내 데이터 내보내기</span>
+          <span style={{ fontSize: 18, color: 'var(--ink-3)', lineHeight: 1 }}>›</span>
+        </button>
+      </div>
+
+      {/* 계정 */}
+      {grpLabel('계정')}
+      <div style={{ borderRadius: 'var(--r-md)', border: '1.5px solid var(--line)', background: 'var(--card)', overflow: 'hidden' }}>
+        {(window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured() && window.DataStore !== window.SupabaseDataStore) ? (
+          <div style={{ padding: '14px' }}>
+            <button onClick={() => { if (window.RG_login) window.RG_login(); }}
+              style={{ width: '100%', padding: '12px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+              로그인하고 내 기록 저장하기
+            </button>
+          </div>
+        ) : (
+          <>
+            {acctEmail && (
+              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'var(--ink-3)' }}>{rgIcon('user', 16)}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acctEmail}</span>
+              </div>
+            )}
+            <div style={{ height: 1, background: 'var(--line)' }} />
+            <div style={{ display: 'flex', gap: 8, padding: '12px 14px' }}>
+              <button onClick={() => { if (!window.confirm('이 기기만 남기고 다른 모든 기기에서 로그아웃할까요?')) return; if (window.RG_SB && window.RG_SB.signOutOtherDevices) { Promise.resolve(window.RG_SB.signOutOtherDevices()).then(() => showToast('다른 기기에서 로그아웃했어요')).catch(() => showToast('실패 — 잠시 후 다시')); } }}
+                style={{ flex: 1, padding: '11px', borderRadius: 'var(--r-sm)', border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                {rgIcon('devices', 14)} 다른 기기 로그아웃
+              </button>
+              <button onClick={logout}
+                style={{ flex: 1, padding: '11px', borderRadius: 'var(--r-sm)', border: '1.5px solid var(--line)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                이 기기 로그아웃
+              </button>
+            </div>
+            {isSupabase && (
+              <div style={{ padding: '0 14px 12px' }}>
+                {!delOpen ? (
+                  <button onClick={() => setDelOpen(true)}
+                    style={{ padding: '6px 0', border: 'none', background: 'transparent', color: 'var(--ink-3)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>계정 관리</button>
+                ) : !delConfirm ? (
+                  <button onClick={() => setDelConfirm(true)}
+                    style={{ padding: '6px 0', border: 'none', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
+                ) : (
+                  <div style={{ padding: '12px', borderRadius: 'var(--r-sm)', border: '1.5px solid var(--danger, #E5484D)', background: 'rgba(229,72,77,0.06)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 기록이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={deleteAccount} disabled={deleting}
+                        style={{ flex: 1, padding: '11px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--danger, #E5484D)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}>
+                        {deleting ? '삭제 중…' : '삭제 확정'}
+                      </button>
+                      <button onClick={() => setDelConfirm(false)} disabled={deleting}
+                        style={{ flex: 1, padding: '11px', borderRadius: 'var(--r-sm)', border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* 지원 */}
+      {grpLabel('지원')}
+      <div style={{ borderRadius: 'var(--r-md)', border: '1.5px solid var(--line)', background: 'var(--card)', padding: '14px' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 900, color: 'var(--ink-2)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>{rgIcon('mail', 15)} 운영자에게 문의</div>
+        {inqDone ? (
+          <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--paper)', borderRadius: 'var(--r-sm)', padding: 12 }}>
+            전송됐어요. 운영자가 확인 후 답변드립니다
+            <button onClick={() => setInqDone(false)} style={{ marginLeft: 8, background: 'none', border: 'none', color: 'var(--brand-3)', fontWeight: 800, cursor: 'pointer' }}>다시 쓰기</button>
+          </div>
+        ) : (
+          <>
+            <textarea value={inqMsg} onChange={(e) => { if (e.target.value.length <= 2000) setInqMsg(e.target.value); }}
+              placeholder="버그·불편·제안 무엇이든 적어주세요 (최대 2000자)" rows={3}
+              style={{ width: '100%', boxSizing: 'border-box', borderRadius: 'var(--r-sm)', border: '1.5px solid var(--line)', padding: 10, fontSize: 14, lineHeight: 1.5, resize: 'none', background: 'var(--paper)' }} />
+            <button onClick={sendInquiry} disabled={inqBusy}
+              style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: inqBusy ? 'default' : 'pointer', opacity: inqBusy ? 0.6 : 1 }}>
+              {inqBusy ? '보내는 중…' : '문의 보내기'}
+            </button>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>또는 readinggo.admin@gmail.com</div>
+          </>
+        )}
+      </div>
+
+      {/* 정보 */}
+      {grpLabel('정보')}
+      <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>
+        ReadingGo · beta
+        <span style={{ margin: '0 6px' }}>·</span>
+        <a href="./privacy.html" target="_blank" rel="noopener" style={{ color: 'var(--ink-3)', textDecoration: 'underline' }}>개인정보처리방침</a>
+      </div>
+
+    </div>
+  );
+}
+
+window.SettingsView = SettingsView;

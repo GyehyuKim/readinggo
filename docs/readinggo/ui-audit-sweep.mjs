@@ -94,7 +94,7 @@ console.log('패스 2 — 재방문 게스트(시드)');
     for (const t of ['내일도 짹 →', '내일도 짹', '계속하기', '확인']) if (await clickText(page, t)) break;
     await page.waitForTimeout(800);
   });
-  for (const tab of ['함께', '책장', '설정']) {
+  for (const tab of ['함께', '둥지', '프로필', '설정']) {
     await step('tab-' + tab, async () => {
       if (!(await clickText(page, tab))) throw new Error('탭 못 찾음');
       await page.waitForTimeout(2000); await shot(page, 'tab-' + tab);

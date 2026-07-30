@@ -106,11 +106,11 @@ INVARIANTS = [
     ("S4", "present", "NEST_STAGES 5단계 + getNestStageByXp", ADAPTER_FILES,
         r"NEST_STAGES[\s\S]*getNestStageByXp|getNestStageByXp[\s\S]*NEST_STAGES"),
     # #522: 둥지 단계는 XP 단일 소스. NestTheatre 가 xp prop 으로 받아 getNestStageByXp 로 계산하고,
-    # 프로필(LibraryView)은 state.xp 를 그대로 넘긴다 → 세리머니(newLv)와 항상 일치(책 진도% 재도입 금지).
+    # 전용 둥지 탭(NestGrowView)은 state.xp 를 그대로 넘긴다 → 세리머니(newLv)와 항상 일치(책 진도% 재도입 금지).
     ("S4", "present", "NestTheatre 둥지 단계 = XP 단일 소스 (#522)",
         ["nest-theatre.js"], r"function NestTheatre\(\{\s*xp"),
-    ("S4", "present", "프로필 NestTheatre 에 state.xp 전달 (#522 단일 소스)",
-        ["library.js"], r"NestTheatre\s+xp=\{state\.xp\}"),
+    ("S4", "present", "둥지 탭 NestTheatre 에 XP 전달 (#522 단일 소스)",
+        ["nest-grow.js"], r"NestTheatre\s+xp=\{xp\}"),
     ("S4", "present", "둥지 단계 안내 가이드 팝업 (#511)",
         ["nest-theatre.js"], r"둥지가 자라는 방법"),
     ("S4", "present", "세리머니 한 문장 카드 정직 표시 — bookQuoteCount (#549)",
@@ -209,8 +209,8 @@ INVARIANTS = [
         ["sentence-collection-modal.js"], r"savedExtra"),
     ("B", "present", "한 줄 소개 인라인 편집 — 프로필 헤더 (#515)",
         ["library.js"], r"bioEditing[\s\S]*saveBio|saveBio[\s\S]*bioEditing"),
-    ("B", "present", "프로필 헤더 → 둥지 순서 (#508)",
-        ["library.js"], r"프로필 정보 \(#508\)[\s\S]*프로필 헤더 아래로 이동 \(#508"),
+    ("B", "present", "하단 내비 둥지·프로필·설정 분리 (PR #1366)",
+        ["app.js"], r"id:\s*'nest-grow'[\s\S]*id:\s*'profile'[\s\S]*id:\s*'settings'"),
 
     # ── C: post-beta 기능 (스펙↔구현 동기화 강제, decisions §8.4/§8.5) ──
     # 읽기 모드(ReadingMode/타이머) invariant 폐기 (#505) — 홈 빠른입력으로 일원화, 독서시간 측정 폐기
