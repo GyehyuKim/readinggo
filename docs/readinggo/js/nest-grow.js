@@ -33,17 +33,45 @@ function rgNestUniqueQuoteDays(quotes) {
     }, []);
 }
 
+function rgNestGrowthModel(rawXp) {
+  const parsed = typeof rawXp === 'number' ? rawXp : Number(rawXp);
+  const totalXp = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+  const cycleXp = window.nestCycleXp
+    ? window.nestCycleXp(totalXp)
+    : totalXp % 1600;
+  const completedNestCount = window.nestCastleCount
+    ? window.nestCastleCount(totalXp)
+    : Math.floor(totalXp / 1600);
+  const progress = window.nestStageProgress(totalXp);
+  const nextXp = progress.next ? progress.next.minXp : 1600;
+
+  return {
+    totalXp,
+    cycleXp,
+    completedNestCount,
+    nestNumber: completedNestCount + 1,
+    cycleStage: Math.min(4, Math.max(1, progress.stage.lv)),
+    next: progress.next,
+    remainingXp: Math.max(0, nextXp - cycleXp),
+  };
+}
+
 function NestGrowView({ state }) {
   const [activeTab, setActiveTab] = _useStateNG('log'); // 'log' | 'complete'
   const [myBooks, setMyBooks] = _useStateNG([]);
   const [myQuotes, setMyQuotes] = _useStateNG([]);
   const [loading, setLoading] = _useStateNG(true);
 
-  const xp = (state && state.xp) || 0;
+  const growth = rgNestGrowthModel(state && state.xp);
+  const xp = growth.totalXp;
   const CYCLE = (window.NEST_CYCLE_XP) || 1600;
-  const nestNum = Math.floor(xp / CYCLE) + 1;
-  const castleCount = Math.floor(xp / CYCLE);
-  const cycleXp = xp % CYCLE;
+  const nestNum = growth.nestNumber;
+  const castleCount = growth.completedNestCount;
+  const cycleXp = growth.cycleXp;
+  const analyticsProps = {
+    cycle_stage: growth.cycleStage,
+    completed_nest_count: castleCount,
+  };
 
   _useEffectNG(() => {
     let alive = true;
@@ -69,6 +97,10 @@ function NestGrowView({ state }) {
       setLoading(false);
     });
     return () => { alive = false; };
+  }, []);
+
+  _useEffectNG(() => {
+    if (window.rgTrack) window.rgTrack('nest_tab_viewed', analyticsProps);
   }, []);
 
   const fmtDate = (raw) => {
@@ -108,9 +140,17 @@ function NestGrowView({ state }) {
 
   const events = buildEvents();
 
+  const selectSubTab = (id) => {
+    if (id === activeTab) return;
+    setActiveTab(id);
+    if (id === 'complete' && window.rgTrack) {
+      window.rgTrack('nest_completion_viewed', analyticsProps);
+    }
+  };
+
   const subTabBtn = (id, label) => (
     <button
-      onClick={() => setActiveTab(id)}
+      onClick={() => selectSubTab(id)}
       style={{
         flex: 1, padding: '11px 0',
         background: 'transparent', border: 'none',
@@ -138,20 +178,31 @@ function NestGrowView({ state }) {
         <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.4px' }}>
           {nestNum}번째 둥지
         </div>
-        {castleCount > 0 && (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            marginTop: 6, padding: '3px 10px', borderRadius: 999,
-            background: 'var(--gold-soft)', border: '1px solid var(--gold-soft)',
-            fontSize: 12, fontWeight: 700, color: 'var(--gold-shadow)',
-          }}>
-            🏰 완성된 둥지 {castleCount}개
-          </div>
-        )}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          marginTop: 6, padding: '3px 10px', borderRadius: 999,
+          background: 'var(--gold-soft)', border: '1px solid var(--gold-soft)',
+          fontSize: 12, fontWeight: 700, color: 'var(--gold-shadow)',
+        }}>
+          🏰 완성된 둥지 {castleCount}개
+        </div>
       </div>
 
       {/* NestTheatre */}
-      <window.NestTheatre xp={xp} />
+      <window.NestTheatre
+        xp={xp}
+        onGuideOpen={() => {
+          if (window.rgTrack) window.rgTrack('nest_growth_guide_opened', analyticsProps);
+        }}
+      />
+      <div style={{
+        marginTop: 10, textAlign: 'center',
+        color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 800,
+      }}>
+        {growth.next
+          ? `${growth.next.name}까지 ${growth.remainingXp.toLocaleString()} XP`
+          : '둥지 완성까지 0 XP'}
+      </div>
 
       {/* 서브탭 */}
       <div style={{
@@ -314,3 +365,4 @@ function NestGrowView({ state }) {
 }
 
 window.NestGrowView = NestGrowView;
+window.rgNestGrowthModel = rgNestGrowthModel;

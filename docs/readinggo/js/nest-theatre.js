@@ -44,7 +44,7 @@ const NEST_CRACK_SVG = (
   </svg>
 );
 
-function NestTheatre({ xp, health = 100 }) {
+function NestTheatre({ xp, health = 100, onGuideOpen }) {
   // 둥지 = 누적 활동(XP). 책 진척률 아님 (#313). pct = 현재 레벨 내 진행도.
   const [showGuide, setShowGuide] = _useState(false); // 둥지 단계 안내 팝업 (#511)
   // 진척은 "현재 단계 구간" 기준 (#682) — 현재 단계 시작 XP=0, 다음 단계 임계값=분모.
@@ -62,7 +62,10 @@ function NestTheatre({ xp, health = 100 }) {
       className={`nest-theatre nest-img-mode ${hstate.cls}`}
       style={{'--health': pct, '--decay': hstate.decay, '--stage-color': stage.color}}
     >
-      <button onClick={() => setShowGuide(true)} aria-label="둥지 단계 안내"
+      <button onClick={() => {
+        setShowGuide(true);
+        if (typeof onGuideOpen === 'function') onGuideOpen();
+      }} aria-label="둥지 단계 안내"
         style={{position:'absolute', top:10, right:10, zIndex:2,
           display:'inline-flex', alignItems:'center', gap:4,
           background:'rgba(255,255,255,0.82)', backdropFilter:'blur(8px)',
