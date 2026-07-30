@@ -89,6 +89,29 @@ function _ocrFailureMessage(code) {
 }
 window._ocrFailureMessage = _ocrFailureMessage;
 
+// 홈 앨범 다중 OCR 결과를 기존 초안에 안전하게 합친다(#1378).
+// 사용자가 직접 쓴 내용·공개범위는 보존하고, 빈 행을 먼저 채운 뒤 새 행을 붙인다.
+function _mergeOcrDrafts(existing, texts, visibility) {
+  const drafts = Array.isArray(existing) && existing.length
+    ? existing.map((item) => ({ ...item }))
+    : [{ text: '', visibility: null }];
+  const seen = new Set(drafts.map((item) => String(item.text || '').trim()).filter(Boolean));
+  const additions = [];
+  (texts || []).forEach((value) => {
+    const text = String(value || '').trim();
+    if (!text || text.length > 200 || seen.has(text)) return;
+    seen.add(text);
+    additions.push({ text, visibility });
+  });
+  additions.forEach((item) => {
+    const emptyIndex = drafts.findIndex((draft) => !String(draft.text || '').trim());
+    if (emptyIndex >= 0) drafts[emptyIndex] = item;
+    else drafts.push(item);
+  });
+  return drafts;
+}
+window._mergeOcrDrafts = _mergeOcrDrafts;
+
 /* ── NestView ─────────────────────────────────────────── */
 
 // 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 둥지 진척 즉시 반영.
@@ -148,6 +171,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const [sentFlip, setSentFlip] = _useState(false); // 문장 저장 시 일기장 넘기기 효과
   // 빠른입력 OCR (#498/#1265) — 책 사진 → 전체화면 임시 검토
   const [quickOcrBusy, setQuickOcrBusy] = _useState(false);
+  const [quickOcrProgress, setQuickOcrProgress] = _useState(null); // 다중 앨범 { done, total }
   const [quickOcrFile, setQuickOcrFile] = _useState(null);
   const [ocrReview, setOcrReview] = _useState(null);
   const [ocrSaving, setOcrSaving] = _useState(false);
@@ -508,6 +532,58 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         }
       })
       .finally(() => setQuickOcrBusy(false));
+  };
+
+  // 홈 앨범 다중 선택(#1378) — 한 장은 기존 크롭·단발 검토, 여러 장은 책 상세와 같은
+  // 강조 추출 API를 순차 호출해 홈 초안에 누적한다. 저장은 기존 N개 한번에 기록 경로가 담당.
+  const runOcrAlbumBatch = async (files) => {
+    if (!files || files.length < 2 || quickOcrBusy) return;
+    setQuickOcrBusy(true);
+    setQuickOcrProgress({ done: 0, total: files.length });
+    rgTrack('ocr_batch_started', { count: files.length, source: 'home_album' });
+    const extracted = [];
+    let failed = 0;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file || file.size > 8 * 1024 * 1024) {
+          failed++;
+          setQuickOcrProgress({ done: i + 1, total: files.length });
+          continue;
+        }
+        try {
+          const fd = new FormData();
+          fd.append('document', file, file.name || `page-${i + 1}.jpg`);
+          const response = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
+          if (!response.ok) failed++;
+          else {
+            const data = await response.json();
+            const sentences = data && Array.isArray(data.sentences) ? data.sentences : [];
+            extracted.push(...sentences);
+            rgTrack('highlights_extracted', { page_idx: i, n: sentences.length, source: 'home_album' });
+          }
+        } catch (e) { failed++; }
+        setQuickOcrProgress({ done: i + 1, total: files.length });
+        if (i < files.length - 1) await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+
+      const validCount = new Set(extracted.map((text) => String(text || '').trim()).filter((text) => text && text.length <= 200)).size;
+      if (validCount > 0) {
+        const visibility = await window.readDefaultSentenceVisibility();
+        setDrafts((current) => _mergeOcrDrafts(current, extracted, visibility));
+        if (failed > 0) showToast(`사진 ${failed}장은 처리하지 못했어요 — 찾은 문장 ${validCount}개만 담았어요`);
+        else showToast(`사진에서 찾은 문장 ${validCount}개를 담았어요`);
+      } else if (failed >= files.length) {
+        showToast('사진을 처리하지 못했어요 — 잠시 후 다시 시도해 주세요');
+      } else if (failed > 0) {
+        showToast('일부 사진을 처리하지 못했고, 강조 문장도 찾지 못했어요');
+      } else {
+        showToast('강조된 문장을 찾지 못했어요 — 더 또렷한 사진으로');
+      }
+    } finally {
+      setQuickOcrProgress(null);
+      setQuickOcrBusy(false);
+    }
   };
 
   const saveOcrReview = async () => {
@@ -925,8 +1001,13 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         </div>
         <input ref={_quickOcrInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setQuickOcrFile(f); e.target.value = ''; }} />
-        <input ref={_quickAlbumInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-          onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setQuickOcrFile(f); e.target.value = ''; }} />
+        <input ref={_quickAlbumInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+          onChange={(e) => {
+            const files = [...(e.target.files || [])];
+            e.target.value = '';
+            if (files.length === 1) setQuickOcrFile(files[0]);
+            else if (files.length > 1) runOcrAlbumBatch(files);
+          }} />
       </div>
 
       {/* 크롭 오버레이 */}
@@ -939,7 +1020,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       {quickOcrBusy && (
         <div style={{ position: 'fixed', inset: 0, height: 'var(--app-h, 100dvh)', background: 'rgba(0,0,0,0.62)', zIndex: 1100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: '#fff' }}>
           <div className="rg-spinner" />
-          <div style={{ fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>{window.rgIcon('camera', 17)} 사진에서 글자를 읽는 중…</div>
+          <div style={{ fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>{window.rgIcon('camera', 17)} {quickOcrProgress ? `사진을 읽는 중… ${quickOcrProgress.done}/${quickOcrProgress.total}` : '사진에서 글자를 읽는 중…'}</div>
         </div>
       )}
 

@@ -22,7 +22,7 @@ function sourceSection(startToken, endToken) {
   return src.slice(sectionStart, sectionEnd);
 }
 
-const ocrSuccessFlow = sourceSection('const runOcrQuick', 'const saveOcrReview');
+const ocrSuccessFlow = sourceSection('const runOcrQuick', 'const runOcrAlbumBatch');
 const ocrSaveFlow = sourceSection('const saveOcrReview', '// 입력 페이지 정규화');
 const ocrCloseFlow = sourceSection('const closeOcrReview', '// 읽는 중 책 목록');
 const ocrPhotoInputs = sourceSection('{/* 사진으로 입력(OCR)', '{/* 크롭 오버레이 */');
@@ -53,10 +53,11 @@ check('실패 시 검토값 보존 안내', /내용을 유지했으니 다시 �
 check('취소·뒤로가기·Escape 후 시작 버튼 포커스 복귀', /window\.history\.back\(\)/.test(ocrCloseFlow)
   && /e\.key === 'Escape'/.test(ocrCloseFlow) && /_ocrTriggerRef\.current\.focus\(\)/.test(ocrCloseFlow));
 check('카메라 입력은 후면 촬영 capture 계약', /type="file" accept="image\/\*" capture="environment"/.test(ocrPhotoInputs));
-check('앨범 입력은 capture 없는 별도 image input', /ref=\{_quickAlbumInputRef\} type="file" accept="image\/\*" style=/.test(ocrPhotoInputs)
+check('앨범 입력은 capture 없는 별도 다중 image input', /ref=\{_quickAlbumInputRef\} type="file" accept="image\/\*" multiple style=/.test(ocrPhotoInputs)
   && !/ref=\{_quickAlbumInputRef\}[^>]*capture=/.test(ocrPhotoInputs));
-check('카메라·앨범은 같은 크롭 및 OCR 파이프라인 사용',
-  (ocrPhotoInputs.match(/setQuickOcrFile\(f\)/g) || []).length === 2
+check('카메라와 앨범 한 장은 같은 크롭 및 OCR 파이프라인 사용',
+  /ref=\{_quickOcrInputRef\}[\s\S]{0,220}setQuickOcrFile\(f\)/.test(ocrPhotoInputs)
+  && /files\.length === 1\) setQuickOcrFile\(files\[0\]\)/.test(ocrPhotoInputs)
   && /<OcrCropOverlay file=\{quickOcrFile\}[\s\S]{0,200}runOcrQuick\(blob\)/.test(src));
 
 console.log(`\n${pass} passed, ${fail} failed`);
