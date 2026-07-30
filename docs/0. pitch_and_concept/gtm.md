@@ -3,6 +3,11 @@
 > 작성 2026-07-02. Refs #1124. Google Play Console 승인 완료 시점.
 > 소스: [pitch.md](./pitch.md) 포지셔닝, [onboarding.md](../readinggo/specs/onboarding.md) 여정,
 > [DESIGN.md](../readinggo/DESIGN.md) 브랜드, 코드 실측(app.js·nest.js).
+>
+> **Launch v1 확정(2026-07-30, #1307)**: Google Play를 우선해 **2026-08-01에
+> 출시**한다. iOS는 이번 런칭에서 App Store 앱을 내지 않고 웹으로만 안내한다.
+> 유료 집행은 [analytics.md §3.1.2](../readinggo/specs/analytics.md#312-wau리텐션주간-리포트)의
+> W1 리텐션 기준을 확인할 때까지 보류한다. 실행 캘린더는 §9가 정본이다.
 
 ## 0. 한 줄 전략
 
@@ -119,3 +124,137 @@ analytics.md 이벤트 위에서. 북극성: **주간 문장 수**(WSS — 진�
 3. **온보딩 P1 2건** — 빈 상태 카피 · 세리머니 CTA (반나절)
 4. **#1044 데이터소스 이전** — 병행 트랙 (별도 이슈, 최대 작업)
 5. 내부 테스트 트랙 업로드 → 검수 통과 → 공개
+
+## 9. Launch v1 운영안 — 2026-08-01 (#1307)
+
+### 9.1 확정 범위와 운영 원칙
+
+| 항목 | 결정 |
+|---|---|
+| D0 | **2026-08-01(토), KST** — 날짜를 미루지 않는다 |
+| 출시 채널 | **Google Play 우선** |
+| iOS | 이번 런칭은 **web-only**. App Store 출시·사전예약을 CTA로 쓰지 않는다 |
+| 초기 목표 | 출시 후 2개월 오가닉 1,000 다운로드. 달성 보장이 아니라 추적 목표로만 사용 |
+| 유료 집행 | W1 리텐션 확인 전 **0원·보류**. 광고 계정 개설·결제도 이 문서 범위 밖 |
+| 실행 총괄 | **Jerome** — 이슈 #1307에 명시된 담당자 |
+| 금지 | 계정 URL·담당자를 추정하지 않는다. 사용자 후기·다운로드 수를 만들지 않는다 |
+
+공식 Instagram·Threads의 계정명과 URL은 아직 근거가 없다. 아래 게시 전에
+`TODO(owner-needed: Jerome, 2026-07-30): 공식 Instagram/Threads 계정 URL 확정`을
+해소하고, 해소 전에는 계정 URL을 문안이나 링크 프로필에 넣지 않는다. 실제 계정 개설,
+게시, DM·외부 발송, 광고 결제는 사람이 별도로 실행한다.
+
+### 9.2 링크와 UTM 계약
+
+#### 링크 기준
+
+- 웹 기준 URL: `https://readinggo.hyuniverse.workers.dev`
+- Play 기준 URL:
+  `https://play.google.com/store/apps/details?id=com.readinggo.app`
+- D0 게시 전 필수 확인:
+  `TODO(owner-needed: Jerome, 2026-08-01 게시 전): Play 공개 링크를 비로그인
+  브라우저에서 열어 설치 화면 노출 확인`
+- Android CTA는 Play 링크, iOS CTA는 웹 링크를 쓴다. 운영체제를 자동 판별하는
+  별도 랜딩 페이지가 확인되지 않았으므로 하나의 통합 링크가 있는 것처럼 쓰지 않는다.
+
+#### UTM 규칙
+
+| 키 | 허용값·형식 |
+|---|---|
+| `utm_source` | `acquaintance` / `instagram` / `threads` |
+| `utm_medium` | 지인 개별 발송=`direct_message`, SNS 게시=`organic_social` |
+| `utm_campaign` | 전 채널 공통 `launch_20260801` |
+| `utm_content` | `d_minus_2` / `d0` / `d_plus_3` / `d_plus_7` |
+
+- 전부 영문 소문자 `snake_case`로 쓴다. 사람 이름·계정명·이메일·초대 토큰 등
+  개인 식별값은 UTM에 넣지 않는다.
+- 웹 링크는 `?utm_source=...&utm_medium=...&utm_campaign=launch_20260801&utm_content=...`
+  순서로 붙인다.
+- Play 링크는 기존 query 뒤에 URL-encoded `referrer`를 붙인다. 예:
+  `&referrer=utm_source%3Dinstagram%26utm_medium%3Dorganic_social%26utm_campaign%3Dlaunch_20260801%26utm_content%3Dd0`.
+- 한 링크를 여러 채널에 복사하지 않는다. 채널별 URL을 §9.4 기록표에 그대로 남긴다.
+- 제품 분석 이벤트에는 전체 URL query/hash를 보내지 않는다는
+  [개인정보 최소화 계약](../readinggo/specs/analytics.md#311-런칭-측정-계약)을 유지한다.
+  유입은 Play Console·각 SNS의 집계치와 UTM별 집계로 보고, 개인 단위로 제품 행동과
+  결합하지 않는다.
+
+### 9.3 최소 콘텐츠 캘린더
+
+한 시점당 **원본 콘텐츠 1개**를 만들고, 채널 문법에 맞게 길이만 줄여 재사용한다.
+게시 시각은 아직 합의되지 않았으므로 임의 지정하지 않고 각 날짜 KST 업무 시작 시
+Jerome이 확정한다.
+
+| 시점·마감 | 채널 | 실행 문안·소재 | CTA | 담당 | 1차 측정 |
+|---|---|---|---|---|---|
+| **D-2, 7/30** | 지인 시드 / Instagram / Threads | “하루 한 페이지, 한 문장에서 시작해요. ReadingGo가 8월 1일 Google Play에 나옵니다.” + 홈 또는 한 문장 기록 화면 1장 | Android: “8/1 Play에서 설치” 예고. iOS: “웹에서 먼저 한 문장 남기기” | Jerome | 채널별 링크 클릭. 지인 발송 대상 수·답장 수는 §9.4에 수기 기록 |
+| **D0, 8/1** | 지인 시드 / Instagram / Threads | “ReadingGo 첫 출시 🌱 하루 한 문장으로 시작하는 독서 습관—둥지를 키우고 책장을 채워보세요.” + 스토어 피처 그래픽 | Android: “Google Play에서 설치”. iOS: “웹에서 시작” | Jerome | 채널별 링크 클릭, Play 신규 획득·설치 |
+| **D+3, 8/4** | Instagram / Threads | 첫 기록 3단계: 책 등록 → 한 페이지 읽기 → 마음에 남은 한 문장 기록. 실제 사용자 후기 대신 제품 화면만 사용 | “오늘 읽은 책에서 한 문장 남기기” | Jerome | 콘텐츠 저장·공유·답글, 링크 클릭, production `sentence_added` 활성 ID |
+| **D+7, 8/8** | 지인 시드 / Instagram / Threads | “일주일 동안 몇 쪽보다 중요한 건 다시 펼친 날이에요.” + 스트릭/둥지 화면. 실측값이 없으면 숫자 성과를 쓰지 않는다 | 기존 사용자: “오늘 다시 읽고 기록”. 미설치자: Android 설치 / iOS 웹 시작 | Jerome | 링크 클릭, production `reading_session_end` 활성 ID, 서비스 공유 완료 수 |
+
+#### 채널별 게시 규격
+
+| 채널 | 최소 형식 | 운영 규칙 |
+|---|---|---|
+| 지인 시드 | 인사 1문장 + 핵심 약속 1문장 + 운영체제별 링크 + 피드백 요청 1문장 | 무차별 단체방 게시 금지. 수신 동의가 있는 기존 지인·베타 사용자에게만 개별 발송 |
+| Instagram | 세로 이미지/화면 1개 이상 + 본문 첫 두 줄에 약속·CTA | `TODO/owner-needed` 계정 URL 확정 전 게시 금지. 링크 접근 방식(프로필/스토리 등)은 실제 계정 기능 확인 후 기록 |
+| Threads | 문장형 본문 3~5줄 + 본문 또는 답글의 측정 링크 | Instagram 문안을 그대로 잘라 의미가 끊기지 않게 하고, 과장된 성과 수치 금지 |
+
+피드백 경로는 스토어 정본에 공개된
+[`readinggo.admin@gmail.com`](mailto:readinggo.admin@gmail.com)을 사용한다.
+D+3 게시 말미에는 “써보고 막힌 점을 화면과 함께
+readinggo.admin@gmail.com으로 알려주세요”를 넣는다. 새 설문 URL이나 DM 계정을
+있는 것처럼 만들지 않는다.
+
+### 9.4 실행 기록표
+
+Jerome은 게시·발송 직후 아래 표를 채운다. 숫자가 없으면 `0`이 아니라 `미집계`,
+실행하지 않았으면 `미실행`으로 적는다.
+
+| 날짜 | 콘텐츠 | 채널 | 실제 계정/게시 URL | 실제 측정 링크 | 게시 시각(KST) | 도달/발송 | 링크 클릭 | 설치·활성 참고 | 메모 |
+|---|---|---|---|---|---|---:|---:|---|---|
+| 7/30 | D-2 | 지인 시드 | 해당 없음 | TODO | TODO | TODO | TODO | 해당 없음 | |
+| 7/30 | D-2 | Instagram | TODO/owner-needed | TODO | TODO | TODO | TODO | 해당 없음 | |
+| 7/30 | D-2 | Threads | TODO/owner-needed | TODO | TODO | TODO | TODO | 해당 없음 | |
+| 8/1 | D0 | 지인 시드 | 해당 없음 | TODO | TODO | TODO | TODO | TODO | |
+| 8/1 | D0 | Instagram | TODO/owner-needed | TODO | TODO | TODO | TODO | TODO | |
+| 8/1 | D0 | Threads | TODO/owner-needed | TODO | TODO | TODO | TODO | TODO | |
+| 8/4 | D+3 | Instagram | TODO/owner-needed | TODO | TODO | TODO | TODO | TODO | |
+| 8/4 | D+3 | Threads | TODO/owner-needed | TODO | TODO | TODO | TODO | TODO | |
+| 8/8 | D+7 | 지인 시드 | 해당 없음 | TODO | TODO | TODO | TODO | TODO | |
+| 8/8 | D+7 | Instagram | TODO/owner-needed | TODO | TODO | TODO | TODO | TODO | |
+| 8/8 | D+7 | Threads | TODO/owner-needed | TODO | TODO | TODO | TODO | TODO | |
+
+### 9.5 주간 회고와 유료 판단
+
+#### 회고 일정
+
+| 시점 | 검토 범위 | 결과 |
+|---|---|---|
+| **D+3, 8/4** | D-2·D0 실행 누락, 링크 오류, 채널별 클릭, Play 설치 가능 여부, 수신 피드백 | 즉시 고칠 운영 오류와 D+7 문안 수정 |
+| **D+7, 8/8** | 채널별 도달→클릭, Play 획득, production 핵심 이벤트 활성 ID·건수, 데이터 품질 경고 | 다음 주 유지할 채널 1개와 수정할 퍼널 단계 1개 선택 |
+| **D+14, 8/15** | 최근 **성숙** W1 코호트, 2주 누적 오가닉 다운로드, 콘텐츠별 클릭·제품 행동 | 유료 `계속 보류` 또는 `별도 유료 실험안 검토 가능` 기록 |
+
+회고는 KST 주 경계와 production 데이터만 사용하는
+[analytics.md §3.1.2](../readinggo/specs/analytics.md#312-wau리텐션주간-리포트)를
+따른다. 각 회고에서 다음을 한 줄씩 남긴다.
+
+1. **실행**: 예정 콘텐츠가 채널별로 게시됐는가. 미실행 사유는 무엇인가.
+2. **획득**: 채널별 도달/발송 → 링크 클릭 → Play 획득 중 어디서 가장 크게 줄었는가.
+3. **활성**: `book_opened → reading_session_end → sentence_added → book_completed`
+   퍼널에서 다음 주에 하나만 고칠 단계는 무엇인가.
+4. **정성**: 반복된 피드백 1~3개. 한 사람의 의견을 전체 사용자 결론으로 확대하지 않는다.
+5. **다음 행동**: 담당·마감이 있는 행동 최대 3개.
+
+#### paid 판단 게이트
+
+유료 집행은 날짜만 됐다고 시작하지 않는다. D+14 회고에서 아래를 모두 충족했을 때만
+**별도 예산·채널·중단 기준 문서를 검토할 수 있다**. 이 문서는 광고 실행 권한이 아니다.
+
+- 가장 최근 성숙 코호트의 표본이 10 이상이다.
+- 그 코호트의 W1 리텐션이 50% 이상이다.
+- production 환경·release SHA 누락 등 주간 리포트의 데이터 품질 경고가 없다.
+- D0 링크와 Play 설치 경로가 정상이며, 채널별 유입 기록이 §9.4에 남아 있다.
+
+하나라도 미충족이면 `유료 계속 보류`로 기록하고 다음 성숙 코호트에서 다시 본다.
+표본 10 미만은 참고치일 뿐 50% 통과 판정에 사용하지 않는다. 유료를 검토하게 되더라도
+실제 광고 계정 개설·결제·외부 집행은 별도 승인과 작업으로 분리한다.
