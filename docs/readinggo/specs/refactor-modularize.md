@@ -47,13 +47,13 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 | `UserProfileModal` | ~218 | `user-profile-modal.js` | ✅ #780 |
 | `SentenceCollectionModal` | ~108 | `sentence-collection-modal.js` | ✅ #780 (SentenceActions 의존) |
 | ~~`TinderCards`~~ | ~90 | ~~`tinder-cards.js`~~ | #780 추출 후 **#782 완전 삭제** (#186 제품 범위 제외 확정) |
-| `ActivityHeatmap` | ~65 | (잔류) | core |
+| ~~`ActivityHeatmap`~~ | ~65 | **삭제됨(#1363)** | 팀 결정으로 기능 폐기 |
 | `ConsentBanner` | ~38 | (잔류) | core — `RG_consent`/`RG_applyConsent`와 동거 |
-| ~~`StreakCalendarModal`~~ | ~48 | **삭제됨(#833)** | 미사용(렌더 호출 0)·`ActivityHeatmap`이 독서활동 시각화 대체 |
+| ~~`StreakCalendarModal`~~ | ~48 | **삭제됨(#833)** | 미사용(렌더 호출 0) |
 | `Toast`·`BookCover`·`Confetti` | ~70 합 | (잔류) | 공유 프리미티브 |
 
 - 공유 컨텍스트·유틸(`SpoilerContext`·`isSentenceBlinded`·`showToast`·`rgTrack`·`decodeEntities`)·동의(`RG_consent`/`RG_applyConsent`)는 `components.js`에 **core 호스트로 잔류**(다수 파일이 window 전역으로 소비). 순수 이동: 훅만 재선언, `DataStore`는 bare(런타임 재할당).
-- **판단**: 잔류 모달(Activity/Consent/Streak)은 작고 충돌 빈도 낮아 YAGNI로 둠. 큰 3개만 분리해 blast radius·충돌면 축소.
+- **당시 판단**: 작은 잔류 컴포넌트는 YAGNI로 두었으나, ActivityHeatmap은 이후 #1363에서 제품 범위와 코드에서 모두 제거했다.
 
 - `nest.js`·`library.js`는 1차 완료 후 별도 spec 갱신으로 진행 → **§3.2**.
 

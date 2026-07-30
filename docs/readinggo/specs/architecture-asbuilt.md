@@ -54,10 +54,10 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `config.js` | 90 | `RG_CONFIG`·`RG_VALIDATE`·`RG_COMPANION_PRESETS`·`RG_companionPreset`·`RG_flag` | 설정·검증·플래그 |
 | `data.js` | 495 | `ALL_BOOKS`·`getBook`·`loadBooks`·`fuzzySearch`·`NEST_STAGES`·`XP_RULES`·`computeCheckinXp`·`nest*` | 시드·도서·XP/둥지 로직 |
 | `datastore.js` | 732 | `localStorageAdapter`·`DataStore`·`getBook` | localStorage 어댑터 |
-| `datastore-supabase.js` | 992 | `SupabaseDataStore` | Supabase 어댑터 |
+| `datastore-supabase.js` | 1188 | `SupabaseDataStore` | Supabase 어댑터 |
 | `supabase-client.js` | 98 | `RG_SB` | Supabase 클라이언트·auth |
 | `icons.js` | 117 | `RG_ICONS`·`rgIcon`·`NEST_ART`·`nestArt`·`SectionLabel` | 공용 아이콘(인라인 SVG) |
-| `components.js` | 307 | `BookCover`·`Toast`·`showToast`·`decodeEntities`·`rgTrack`·`ConsentBanner`·`ActivityHeatmap` 등 | 공용 UI·유틸 |
+| `components.js` | 188 | `BookCover`·`Toast`·`showToast`·`decodeEntities`·`rgTrack`·`ConsentBanner` 등 | 공용 UI·유틸 |
 | `sentence-card.js` | 225 | `SentenceCard`·`SentenceActions` | 한 문장 카드·액션(좋아요/공개범위) |
 | `book-info-modal.js` | 209 | `BookInfoModal` | 책 정보 모달 |
 | `book-detail-modal.js` | 591 | `BookDetailModal` | 책 상세(서재) |
