@@ -10,6 +10,7 @@
 > **v11 갱신 (2026-06-29, #1044)**: **책 데이터 소스 이전(알라딘 OpenAPI ToS 회피)** — §7.2.1 신설. 알라딘 OpenAPI 약관(영리·법인 이용 불가 + 취득정보 **저장·캐시 금지**)이 우리 canonical 캐시(`books` upsert, #489)와 정면 충돌 → 상업 출시 블로커. canonical 소스를 **국립중앙도서관 ISBN 서지정보 API**(쪽수·표지, 이용허락 제한 없음)와 **카카오 책검색**(검색·표지, 캐시 조건부 허용) 페어로, 외서는 **Google Books 실시간만**(영구 upsert 중단), 네이버 비권장. worker 이전 지점·출시 전 실계정 ToS 확인 게이트·Phasing 은 §7.2.1. **본 PR 은 spec-only — 코드 재배선은 후속 PR(#1044).**
 > **v12 갱신 (2026-07-03, #1044 코드 PR)**: §7.2.1 P1 **구현** — worker 에 provider 스위치(`KAKAO_REST_KEY`/`NLK_CERT_KEY` 자동 감지, 미설치 시 알라딘 폴백 = 무중단). 검색→카카오(영구 적재는 ISBN 국중도 재조회분만)·ISBN→국중도(+OpenLibrary 외서 폴백)·Google 영구 경로 2건 제거(검색 upsert·backfillPages PATCH)·imgProxy 화이트리스트 확장·archive 시드 게이트 격리(재설계 P2). 상세 §7.2.1 구현 상태.
 > **v13 갱신 (2026-07-28, #1350)**: DEV 소셜 로그인 provider에 의존하지 않는 합성 검수 환경 신설(§7.1.1). 브라우저 local-first 상태와 DEV 전용 Supabase 저장소를 분리하고, Production·실사용자 Auth/DataStore 경로는 fail-closed 한다.
+> **v14 갱신 (2026-08-01, #1392)**: 공개 UGC 신고·사용자 차단·운영자 검토 데이터 모델과 DataStore 계약을 신설. 상세 UX·정책 동의·출시 게이트는 [feed.md §5.7.4](./feed.md#574-공개-ugc-안전--동의신고차단검토-1392-p0)가 SSOT다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -171,6 +172,15 @@ users.publicStreak(userId)             → number              // 타인 스트�
 users.isHandleAvailable(handle)        → boolean             // 닉네임 중복 검사 (본인 제외)
 users.publicShelf(userId)              → UserBook[]          // v7.2: 타인 책장 — 읽는 중+완독(status 포함) (#4)
 users.publicWishlist(userId)           → WishBook[]          // v8.2: 타인 위시리스트 — wishlist_public=true인 경우만 반환, 아니면 [] (#558)
+moderation.report({targetType, targetId, reason, detail?}) → ModerationReport
+moderation.blockUser(userId)            → void
+moderation.unblockUser(userId)          → void
+moderation.listBlockedUsers()            → User[]
+moderation.isBlocked(userId)             → boolean
+// targetType ∈ {'sentence','user'}, reason ∈ {'sexual','violence','hate_or_harassment','spam','illegal','other'}.
+// 게스트는 서버 신고·차단 불가: 로그인 유도 후 재시도한다. Supabase 어댑터는 RPC를 사용해
+// 대상 존재·자기대상 금지·멱등·팔로우 해제를 한 트랜잭션에서 강제한다. local 어댑터는 DEV/fixture
+// 표면 일치를 위한 로컬 숨김만 제공하고 Play 정책 충족 근거로 간주하지 않는다.
 users.bookContrib(userId, bookId)      → {userBook, sentences[]}  // v7.2: 그 사람의 그 책 평점·후기·한 문장 (#5)
 
 // 운영 대시보드 — is_admin=true 전용 (#161, Phase 2 기본)
@@ -383,6 +393,42 @@ claps                                       -- ❤️ 좋아요 = 한 문장 반
   created_at      timestamptz
   UNIQUE(from_user_id, to_sentence_id)
 
+moderation_reports                          -- #1392: 공개 UGC/사용자 신고
+  id              uuid PK
+  reporter_id     uuid FK users.id ON DELETE CASCADE
+  target_type     text CHECK ('sentence'|'user')
+  target_id       uuid                     -- target_type에 따라 sentences.id 또는 users.id; RPC가 존재 검증
+  reason          text CHECK ('sexual'|'violence'|'hate_or_harassment'|'spam'|'illegal'|'other')
+  detail          text NULL CHECK (char_length(detail) <= 500)
+  status          text DEFAULT 'open' CHECK ('open'|'reviewed'|'actioned'|'dismissed')
+  action          text NULL CHECK ('dismiss'|'hide_sentence'|'suspend_user')
+  moderator_id    uuid NULL FK users.id
+  moderator_note  text NULL CHECK (char_length(moderator_note) <= 1000)
+  created_at      timestamptz
+  reviewed_at     timestamptz NULL
+  UNIQUE(reporter_id, target_type, target_id)
+
+user_blocks                                 -- #1392: 사용자 차단
+  blocker_id      uuid FK users.id ON DELETE CASCADE
+  blocked_id      uuid FK users.id ON DELETE CASCADE
+  created_at      timestamptz
+  PRIMARY KEY (blocker_id, blocked_id)
+  CHECK (blocker_id <> blocked_id)
+
+moderation_hidden_sentences                 -- #1392: 운영자 공개 숨김(원문 보존)
+  sentence_id     uuid PK FK sentences.id ON DELETE CASCADE
+  report_id       uuid NULL FK moderation_reports.id
+  hidden_by       uuid FK users.id
+  reason          text NULL
+  created_at      timestamptz
+
+moderation_suspended_users                  -- #1392: 운영자 공개 정지(계정/본인 기록은 보존)
+  user_id         uuid PK FK users.id ON DELETE CASCADE
+  report_id       uuid NULL FK moderation_reports.id
+  suspended_by    uuid FK users.id
+  reason          text NULL
+  created_at      timestamptz
+
 pokes                                       -- "콕찌르기" 🪱 (미기록 친구 독려)
   id              uuid PK
   from_user_id    uuid FK users.id
@@ -481,6 +527,8 @@ sentences(user_id, created_at desc), sentences(user_book_id, created_at)
 reading_sessions(user_id, session_date desc)
 books(rank_recent), books(rank_steady)
 claps(to_sentence_id)                          -- v7 변경 (구 to_session_id)
+moderation_reports(reporter_id, created_at desc), moderation_reports(status, created_at)
+user_blocks(blocker_id, blocked_id), user_blocks(blocked_id, blocker_id)
 pokes(to_user_id, day)
 users using gin (handle gin_trgm_ops)
 books using gin (title gin_trgm_ops)
@@ -499,6 +547,9 @@ village_parts(village_id, part_order)                    -- v7 신설
 - `reading_sessions`, `streak`, `user_books`: insert/update 본인. select 모두 (마을 그리드·완독 별점 공개)
 - `follows`: follower_id가 본인인 행만 insert/delete
 - `claps`: from_user_id가 본인인 행만 insert
+- `moderation_reports`: authenticated 사용자는 RPC를 통한 본인 신고 생성과 본인 신고의 id/status만 조회. 원문 detail·운영자 메모를 포함한 전체 조회·상태 변경은 `is_admin()`만. 클라이언트 직접 insert/update는 회수한다.
+- `user_blocks`: authenticated 사용자는 RPC를 통한 본인 차단/해제 및 본인 block 목록 조회만. 자기 자신 차단 금지. 차단 RPC는 양방향 follows를 함께 삭제한다.
+- `moderation_hidden_sentences`, `moderation_suspended_users`: write/select는 `is_admin()`만. 공개 피드·사용자 검색·프로필용 읽기 RPC/뷰는 숨김 문장, 정지 사용자, 뷰어가 차단한 사용자와 뷰어를 차단한 사용자를 서버에서 제외한다.
 - `pokes`: from_user_id가 본인인 행만 insert. to_user_id가 본인이면 select (수신 확인용)
 - `wish_books`: insert/update/delete = 본인만. select = 소유자 OR 대상 user의 `wishlist_public=true` (v8.2, #558, `25_wishlist_public.sql`)
 - `import_staging`: all(select/insert/update/delete) = 본인만(`user_id = auth.uid()`). grant authenticated만(로그인 전용 — anon 미부여). #1048, `37_import_staging.sql`(수동 적용)
