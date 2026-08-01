@@ -65,6 +65,7 @@ assert.ok(hardening.includes("where status in ('open', 'reviewed')"), 'only acti
 assert.ok(hardening.includes("on conflict (reporter_id, target_type, target_id) where status in ('open', 'reviewed')"), 'dismissed/actioned reports must create a new open report');
 assert.ok(app.includes("se.visibility !== 'private' && !allowPublic"), 'public guest sentences must remain local until consent');
 assert.ok(app.includes("pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)"), 'pending book marker must survive sentence failure');
+assert.ok(app.includes('pb.remote_user_book_id'), 'partial retry must reuse the already-created remote book');
 assert.ok(app.includes('syncedSentenceKeys.has(sentenceKey(se))'), 'guest sentences without local ids must still clear after success');
 
 console.log('✅ UGC moderation contract passed');

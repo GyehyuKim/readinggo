@@ -113,6 +113,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
     const syncedSentenceKeys = new Set();
     const sentenceKey = (se) => se && (se.id || [se.text || '', se.page ?? '', se.created_at || '', se.visibility || 'public'].join('\u001f'));
     let pendingBookSynced = false, pendingSentenceSynced = false;
+    let pendingBookRemoteId = pb && pb.remote_user_book_id ? pb.remote_user_book_id : null;
     for (const ub of guestBooks) {
       const bk = ub.book || {};
       const newUb = await DS.myBooks.add({
@@ -140,11 +141,12 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
     // 문장 없이 등록만 한 활성 책(레거시 pending) — 중복 아니면 책만 이전.
     if (pb && !guestBooks.some(ub => ub.book && ub.book.title === pb.title)) {
       try {
-        const newUb = await DS.myBooks.add({
+        const newUb = pendingBookRemoteId ? { id: pendingBookRemoteId } : await DS.myBooks.add({
           book: { isbn13: pb.isbn13 || '', title: pb.title, author: pb.author || '', publisher: pb.publisher || '', total_pages: pb.total_pages || 0, cover_url: pb.cover_url || '' },
           current_page: pb.current_page || 0,
         });
         if (newUb && newUb.id) {
+          pendingBookRemoteId = newUb.id;
           lastUbId = activeNewId = newUb.id;
           pendingBookSynced = true;
           try { await DS.sessions.addToday({ userBookId: newUb.id, page: pb.current_page || 0 }); } catch (e) {}
@@ -162,6 +164,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
     la.mutate(s => {
       s.pending = s.pending || {};
       if (pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)) delete s.pending.book;
+      else if (s.pending.book && pendingBookRemoteId) s.pending.book.remote_user_book_id = pendingBookRemoteId;
       if (pendingSentenceSynced) delete s.pending.sentence;
       (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se => {
         if (se && syncedSentenceKeys.has(sentenceKey(se))) delete se._guest;

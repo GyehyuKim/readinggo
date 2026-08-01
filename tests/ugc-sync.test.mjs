@@ -18,13 +18,14 @@ function extractFunction(name) {
 
 function harness(state, { failSentenceOnce = false } = {}) {
   let sentenceAttempts = 0;
+  let bookAdds = 0;
   const added = [];
   const localStorageAdapter = {
     read: () => state,
     mutate: (fn) => { state = fn(state); },
   };
   const SupabaseDataStore = {
-    myBooks: { add: async ({ book }) => ({ id: `remote-${book.title}` }) },
+    myBooks: { add: async ({ book }) => { bookAdds++; return { id: `remote-${book.title}` }; } },
     sessions: { addToday: async () => true },
     sentences: { add: async (row) => {
       sentenceAttempts++;
@@ -36,7 +37,7 @@ function harness(state, { failSentenceOnce = false } = {}) {
   };
   const context = { window: { localStorageAdapter, SupabaseDataStore }, console: { log() {}, warn() {} }, Set };
   const fn = vm.runInNewContext(`(${extractFunction('syncPendingToSupabase')})`, context);
-  return { run: fn, state: () => state, added };
+  return { run: fn, state: () => state, added, bookAdds: () => bookAdds };
 }
 
 {
@@ -55,11 +56,13 @@ function harness(state, { failSentenceOnce = false } = {}) {
   const h = harness(initial, { failSentenceOnce: true });
   await h.run({ allowPublic: false });
   assert.ok(h.state().pending.book, 'book marker must survive a sentence failure');
+  assert.equal(h.state().pending.book.remote_user_book_id, 'remote-부분 성공 책');
   assert.ok(h.state().pending.sentence, 'failed sentence must survive for retry');
   await h.run({ allowPublic: false });
   assert.equal(h.state().pending.book, undefined);
   assert.equal(h.state().pending.sentence, undefined);
   assert.deepEqual(h.added.map((x) => x.text), ['재시도 문장']);
+  assert.equal(h.bookAdds(), 1, 'retry must reuse the already-created remote book');
 }
 
 console.log('✅ UGC guest synchronization behavior passed');
