@@ -419,7 +419,22 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setRepairCard(null); // 이번 진입 동안만 숨김 — 다음 진입 때 아직 복구 가능하면 다시 권유(주 1회는 datastore가 강제)
   };
 
-  const handleCheckin = ({ page, sentence, visibility, kind, sentPage, sentences, awaitPersistence }) => {
+  const handleCheckin = async ({ page, sentence, visibility, kind, sentPage, sentences, awaitPersistence }) => {
+    // #1392 공개 UGC 동의는 세션/XP/낙관 UI를 건드리기 전에 확인한다.
+    // 실패 뒤 DataStore에서 막으면 reading_sessions만 저장되는 부분 상태가 생길 수 있다.
+    if (window.DataStore === window.SupabaseDataStore && (sentence || (Array.isArray(sentences) && sentences.length))) {
+      const settings = await window.DataStore.settings.get();
+      const fallbackVisibility = settings.default_sentence_visibility === 'private' ? 'private' : 'public';
+      const requested = Array.isArray(sentences) && sentences.length
+        ? sentences.map((item) => item && item.visibility)
+        : [visibility];
+      const hasPublicUgc = requested.some((value) => (value || fallbackVisibility) !== 'private');
+      const terms = settings && settings.ugc_terms;
+      if (hasPublicUgc && !(terms && terms.version === window.RG_UGC_TERMS_VERSION && terms.accepted_at)) {
+        window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
+        throw new Error('ugc_terms_required');
+      }
+    }
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 (#203)
     const previousNestState = nestState;

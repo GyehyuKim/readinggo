@@ -349,9 +349,17 @@
         const id = await uid();
         // #1261: 호출부의 문장별 명시값이 우선. 없으면 계정 설정, 알 수 없는 값은 public.
         let sentenceVisibility = visibility === 'private' || visibility === 'followers' || visibility === 'public' ? visibility : null;
+        let settings = null;
         if (!sentenceVisibility) {
-          const settings = await A.settings.get();
+          settings = await A.settings.get();
           sentenceVisibility = settings.default_sentence_visibility === 'private' ? 'private' : 'public';
+        }
+        if (sentenceVisibility !== 'private') {
+          settings = settings || await A.settings.get();
+          if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION)) {
+            window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
+            throw new Error('ugc_terms_required');
+          }
         }
         return unwrap(await sb().from('sentences').insert({
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
@@ -388,6 +396,13 @@
       // note_private(감상 비공개)는 유지. is_private는 deprecated — visibility로 대체(v7.2).
       async setVisibility(sentenceId, patch) {
         // patch: { visibility?: 'public'|'followers'|'private', note_private?: boolean }
+        if (patch && (patch.visibility === 'public' || patch.visibility === 'followers')) {
+          const settings = await A.settings.get();
+          if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION && settings.ugc_terms.accepted_at)) {
+            window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
+            throw new Error('ugc_terms_required');
+          }
+        }
         return unwrap(await sb().from('sentences').update(patch).eq('id', sentenceId).eq('user_id', await uid()).select().single());
       },
       async listByBook(userBookId) {
@@ -805,14 +820,14 @@
     users: {
       async search(query) {
         if (!query) return [];
-        return unwrap(await sb().from('users').select('id,handle,display_name,avatar_url')
+        return unwrap(await sb().from('users_public').select('id,handle,display_name,avatar_url')
           .ilike('handle', '%' + query + '%').limit(20));
       },
       // 타인 프로필(§5.8.2 전체 공개) — 핸들로 단건 + 공개 완독책/한문장 (RLS select using(true))
       async getByHandle(handle) {
         const h = (handle || '').replace(/^@/, '').trim();
         if (!h) return null;
-        return unwrap(await sb().from('users').select('*').eq('handle', h).maybeSingle());
+        return unwrap(await sb().from('users_public').select('*').eq('handle', h).maybeSingle());
       },
       // 핸들(@아이디) 사용 가능 여부 — 중복검사. 본인이 이미 쓰는 핸들이면 사용 가능.
       async isHandleAvailable(handle) {
@@ -823,6 +838,7 @@
         return !rows || rows.length === 0 || (!!me && rows[0] && rows[0].id === me);
       },
       async publicBooks(userId) {
+        if (await A.moderation.isBlocked(userId)) return [];
         return unwrap(await sb().from('user_books').select('*, book:books(*)')
           .eq('user_id', userId).eq('status', 'completed').order('completed_at', { ascending: false }));
       },
@@ -837,6 +853,7 @@
       },
       // 타인 책장 전체 — 읽는 중 + 완독 (status 포함). 책장 필터용 (#4)
       async publicShelf(userId) {
+        if (await A.moderation.isBlocked(userId)) return [];
         return unwrap(await sb().from('user_books').select('*, book:books(*)')
           .eq('user_id', userId).in('status', ['reading', 'completed'])
           .order('status', { ascending: true }).order('completed_at', { ascending: false }));
@@ -844,6 +861,7 @@
       // 타인 위시리스트 — wishlist_public=true 인 경우만 반환, 아니면 [] (#558)
       async publicWishlist(userId) {
         if (!userId) return [];
+        if (await A.moderation.isBlocked(userId)) return [];
         // users 행의 wishlist_public 을 먼저 확인. RLS도 동일 조건이지만 클라에서도 guard.
         const userRow = unwrap(await sb().from('users').select('wishlist_public').eq('id', userId).maybeSingle());
         if (!userRow || !userRow.wishlist_public) return [];
@@ -852,12 +870,44 @@
       },
       // 타인의 특정 책 기여 — 그 책 평점·후기 + 공개 한 문장 (#5)
       async bookContrib(userId, bookId) {
+        if (await A.moderation.isBlocked(userId)) return { userBook: null, sentences: [] };
         const ub = unwrap(await sb().from('user_books').select('id, rating, review_text, status, current_page')
           .eq('user_id', userId).eq('book_id', bookId).maybeSingle());
         const sents = unwrap(await sb().from('sentences_public').select('id, text, page, created_at')
           .eq('user_id', userId).eq('user_book_id', ub ? ub.id : '00000000-0000-0000-0000-000000000000')
           .order('page', { ascending: true }));
         return { userBook: ub || null, sentences: sents || [] };
+      },
+    },
+
+    /* 공개 UGC 안전 (#1392) — 직접 table write 대신 SECURITY DEFINER RPC만 사용. */
+    moderation: {
+      async acceptTerms(version) {
+        return unwrap(await sb().rpc('moderation_accept_terms', { p_version: version }));
+      },
+      async report({ targetType, targetId, reason, detail }) {
+        const row = unwrap(await sb().rpc('moderation_report', {
+          p_target_type: targetType,
+          p_target_id: targetId,
+          p_reason: reason,
+          p_detail: detail || null,
+        }));
+        return Array.isArray(row) ? row[0] : row;
+      },
+      async blockUser(userId) {
+        unwrap(await sb().rpc('moderation_block_user', { p_user_id: userId }));
+        return true;
+      },
+      async unblockUser(userId) {
+        unwrap(await sb().rpc('moderation_unblock_user', { p_user_id: userId }));
+        return true;
+      },
+      async listBlockedUsers() {
+        return unwrap(await sb().rpc('moderation_list_blocked')) || [];
+      },
+      async isBlocked(userId) {
+        if (!userId) return false;
+        return !!unwrap(await sb().rpc('moderation_is_blocked', { p_user_id: userId }));
       },
     },
 
@@ -1079,6 +1129,18 @@
       // 문의 상태 변경 (open→answered→closed). RLS는 is_admin update
       async inquirySetStatus(id, status) {
         return unwrap(await sb().from('inquiries').update({ status }).eq('id', id).select().single());
+      },
+      // UGC 신고 큐·조치 (#1392). RLS/RPC가 is_admin을 서버에서 재검증한다.
+      async moderationReports() {
+        return unwrap(await sb().rpc('moderation_admin_reports')) || [];
+      },
+      async moderationAction(reportId, action, note) {
+        unwrap(await sb().rpc('moderation_admin_action', { p_report_id: reportId, p_action: action, p_note: note || null }));
+        return true;
+      },
+      async moderationReview(reportId, note) {
+        unwrap(await sb().rpc('moderation_admin_review', { p_report_id: reportId, p_note: note || null }));
+        return true;
       },
       // 인기책 TOP / 활성 사용자(리텐션 프록시) — RPC(SECURITY DEFINER + is_admin 가드) (#190, 12_admin_insights.sql)
       async popularBooks(lim = 5) {

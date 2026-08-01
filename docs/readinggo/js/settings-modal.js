@@ -212,6 +212,12 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               ))}
             </div>
           </fieldset>
+          {isSupabase && (
+            <button onClick={() => window.RG_openBlockedUsers && window.RG_openBlockedUsers()}
+              style={{ width: '100%', marginTop: 8, padding: '11px 12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}>
+              차단한 사용자 관리
+            </button>
+          )}
           {/* 위시리스트 공개 (#558) */}
           <div style={{ marginTop: 8, padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>

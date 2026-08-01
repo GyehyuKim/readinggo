@@ -40,6 +40,14 @@ function UserProfileModal({ handle, onClose }) {
     })();
     return () => { alive = false; };
   }, [handle]);
+  useEffect(() => {
+    const hide = (e) => {
+      const d = (e && e.detail) || {};
+      if (data && data.user && ((d.targetType === 'user' && d.targetId === data.user.id) || d.userId === data.user.id)) onClose();
+    };
+    window.addEventListener('rg:moderation-hidden', hide);
+    return () => window.removeEventListener('rg:moderation-hidden', hide);
+  }, [data, onClose]);
   // 책 드릴다운 — 그 사람의 그 책 평점·후기·한 문장 (#5)
   useEffect(() => {
     if (!bookView || !data) return;
@@ -57,6 +65,20 @@ function UserProfileModal({ handle, onClose }) {
     const target = data.user.id;
     const p = following ? DS.friends.unfollow(target) : DS.friends.follow(target);
     Promise.resolve(p).then(() => setFollowing(!following)).catch(() => {});
+  };
+  const reportUser = () => {
+    if (!data || !data.user || !window.RG_openReport) return;
+    window.RG_openReport({ targetType: 'user', targetId: data.user.id, userId: data.user.id, label: '@' + data.user.handle });
+  };
+  const blockUser = async () => {
+    if (!data || !data.user) return;
+    if (!window.confirm('@' + data.user.handle + '님을 차단할까요? 이 사용자의 공개 콘텐츠가 보이지 않아요.')) return;
+    try {
+      await window.DataStore.moderation.blockUser(data.user.id);
+      window.dispatchEvent(new CustomEvent('rg:moderation-hidden', { detail: { targetType: 'user', targetId: data.user.id, userId: data.user.id } }));
+      if (window.showToast) window.showToast('사용자를 차단했어요');
+      onClose();
+    } catch (e) { if (window.showToast) window.showToast('차단하지 못했어요. 잠시 후 다시 시도해 주세요.'); }
   };
   const pageStyle = { position: 'fixed', inset: 0, background: 'var(--bg, #fff)', zIndex: 1000, overflowY: 'auto', WebkitOverflowScrolling: 'touch' };
   const headStyle = { position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: 'var(--bg, #fff)', borderBottom: '1px solid var(--line)' };
@@ -100,7 +122,11 @@ function UserProfileModal({ handle, onClose }) {
                 const blinded = !revealed[s.id] && isSentenceBlinded(bookView.bookId, s.page);
                 return (
                   <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 8 }}>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{s.page}p</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{s.page}p</div>
+                      <button onClick={() => window.RG_openReport && window.RG_openReport({ targetType: 'sentence', targetId: s.id, userId: data.user.id, label: '@' + data.user.handle + '님의 한 문장' })}
+                        style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', fontSize: 11, fontWeight: 800, cursor: 'pointer', padding: 6 }}>신고</button>
+                    </div>
                     {blinded
                       ? <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>
                       : <div style={{ fontFamily: 'var(--font-quote)', fontSize: 14, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5 }}>"{s.text}"</div>}
@@ -139,6 +165,10 @@ function UserProfileModal({ handle, onClose }) {
                 {following ? '팔로잉 ✓' : '+ 팔로우'}
               </button>
             )}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+              <button onClick={reportUser} style={{ padding: '7px 12px', borderRadius: 12, border: 'none', background: 'var(--paper-2)', color: 'var(--ink-2)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>프로필 신고</button>
+              <button onClick={blockUser} style={{ padding: '7px 12px', borderRadius: 12, border: 'none', background: 'var(--paper-2)', color: 'var(--danger, #E5484D)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>사용자 차단</button>
+            </div>
             {data.user.bio && <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8 }}>{data.user.bio}</div>}
           </div>
 
@@ -209,7 +239,11 @@ function UserProfileModal({ handle, onClose }) {
             const blinded = !revealed[s.id] && isSentenceBlinded(bid, s.page);
             return (
               <div key={s.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>{bt ? bt + ' · ' : ''}{s.page}p</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>{bt ? bt + ' · ' : ''}{s.page}p</div>
+                  <button onClick={() => window.RG_openReport && window.RG_openReport({ targetType: 'sentence', targetId: s.id, userId: data.user.id, label: '@' + data.user.handle + '님의 한 문장' })}
+                    style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', fontSize: 11, fontWeight: 800, cursor: 'pointer', padding: 6 }}>신고</button>
+                </div>
                 {blinded ? (
                   <div className="spoiler-blind" onClick={() => setRevealed((r) => ({ ...r, [s.id]: true }))}>내가 아직 안 읽은 부분 · 탭하면 보기</div>
                 ) : (

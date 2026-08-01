@@ -81,6 +81,17 @@ function buildStateFromGuest() {
   }
 }
 
+function hasPendingPublicUgc() {
+  const la = window.localStorageAdapter;
+  if (!la) return false;
+  try {
+    const local = la.read() || {};
+    const guestPublic = (local.user_books || []).some((ub) => (ub.sentences || []).some((se) => se && se._guest && se.visibility !== 'private'));
+    const pendingSentence = local.pending && local.pending.sentence;
+    return guestPublic || !!(pendingSentence && pendingSentence.text && pendingSentence.visibility !== 'private');
+  } catch (e) { return false; }
+}
+
 // 게스트(로그아웃) 상태에서 남긴 책·문장·대화(my_note)를 로그인 직후 Supabase 로 흡수
 // (backend.md §7.7). 데모 시드(_seed)는 제외 — 게스트가 직접 남긴 문장(_guest 태그, #370)을
 // 가진 책만 백필한다. 해자("축적되는 대화 데이터")가 가입 시 유실되던 구조 수정.
@@ -99,6 +110,8 @@ async function syncPendingToSupabase() {
   if (!guestBooks.length && !pb) return;
   try {
     let lastUbId = null, activeNewId = null;
+    const syncedSentenceIds = new Set();
+    let pendingBookSynced = false, pendingSentenceSynced = false;
     for (const ub of guestBooks) {
       const bk = ub.book || {};
       const newUb = await DS.myBooks.add({
@@ -116,7 +129,10 @@ async function syncPendingToSupabase() {
       const gsents = (ub.sentences || []).filter(se => se && se._guest)
         .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
       for (const se of gsents) {
-        try { await DS.sentences.add({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind, visibility: se.visibility }); } catch (e) {}
+        try {
+          await DS.sentences.add({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind, visibility: se.visibility });
+          if (se.id) syncedSentenceIds.add(se.id);
+        } catch (e) { console.warn('[ReadingGo] 게스트 문장 1건 백필 보류:', e.message); }
       }
     }
     // 문장 없이 등록만 한 활성 책(레거시 pending) — 중복 아니면 책만 이전.
@@ -128,19 +144,29 @@ async function syncPendingToSupabase() {
         });
         if (newUb && newUb.id) {
           lastUbId = activeNewId = newUb.id;
+          pendingBookSynced = true;
           try { await DS.sessions.addToday({ userBookId: newUb.id, page: pb.current_page || 0 }); } catch (e) {}
-          if (pend.sentence && pend.sentence.text) { try { await DS.sentences.add({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text, visibility: pend.sentence.visibility }); } catch (e) {} }
+          if (pend.sentence && pend.sentence.text) {
+            try {
+              await DS.sentences.add({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text, visibility: pend.sentence.visibility });
+              pendingSentenceSynced = true;
+            } catch (e) { console.warn('[ReadingGo] pending 문장 백필 보류:', e.message); }
+          }
         }
       } catch (e) {}
     }
     if (activeNewId || lastUbId) { try { await DS.activeBook.set(activeNewId || lastUbId); } catch (e) {} }
-    // 재동기화 방지 — pending 비우고 _guest 플래그 제거(이전 끝난 문장 표식 해제).
+    // 성공한 항목만 표식을 제거한다. 동의/네트워크 오류 항목은 다음 로그인에서 재시도할 수 있게 보존.
     la.mutate(s => {
-      s.pending = {};
-      (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se => { if (se && se._guest) delete se._guest; }));
+      s.pending = s.pending || {};
+      if (pendingBookSynced) delete s.pending.book;
+      if (pendingSentenceSynced) delete s.pending.sentence;
+      (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se => {
+        if (se && se.id && syncedSentenceIds.has(se.id)) delete se._guest;
+      }));
       return s;
     });
-    console.log('[ReadingGo] ✅ 게스트 책·문장·대화(my_note) → Supabase 백필 완료 (#370)');
+    console.log('[ReadingGo] ✅ 성공한 게스트 책·문장·대화(my_note) → Supabase 백필 반영 (#370/#1392)');
   } catch (e) { console.warn('[ReadingGo] 게스트 백필 실패:', e); }
 }
 
@@ -438,6 +464,7 @@ function App() {
   const [reviewBusy, setReviewBusy] = useState(false);
   const [authUser, setAuthUser] = useState(reviewMode ? 'local' : (_supa ? undefined : 'local')); // undefined=확인중, null=로그아웃(게스트), 그외=OK
   const [dataReady, setDataReady] = useState(!_supa);
+  const [ugcTermsRequired, setUgcTermsRequired] = useState(false); // #1392 로그인 사용자의 공개 UGC 정책 동의
   const [showLogin, setShowLogin] = useState(false);        // 로그인 화면 온디맨드(벽 아님)
   const [guestBannerOff, setGuestBannerOff] = useState(false); // 게스트 안내 배너 세션 닫기
   const [showConsent, setShowConsent] = useState(() => !!(window.RG_consent && window.RG_consent.get() === null)); // 진입 동의 배너 (#331)
@@ -744,7 +771,11 @@ function App() {
     let alive = true;
     (async () => {
       try {
-        await syncPendingToSupabase();   // 게스트 → 로그인: pending 책·문장 흡수(§7.7)
+        const settings = await window.SupabaseDataStore.settings.get().catch(() => ({}));
+        const ugcAccepted = !!(settings && settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION);
+        if (alive) setUgcTermsRequired(!ugcAccepted && hasPendingPublicUgc());
+        // 공개 UGC 정책 동의 전에는 게스트 문장을 서버에 올리지 않는다. 로컬 원본은 보존한다(#1392).
+        if (ugcAccepted) await syncPendingToSupabase();
         backfillCompanionSessions();     // 과거 my_note → companion_sessions 1회 채움(#394, 비차단)
         const next = await buildStateFromSupabase();
         // PostHog 유저 식별 (analytics.md §3.2·§5.4) — 선택 동의('yes')한 로그인 유저만 person profile 연결.
@@ -762,6 +793,21 @@ function App() {
     })();
     return () => { alive = false; };
   }, [authUser]);
+
+  useEffect(() => {
+    const requireTerms = () => setUgcTermsRequired(true);
+    window.addEventListener('rg:ugc-terms-required', requireTerms);
+    return () => window.removeEventListener('rg:ugc-terms-required', requireTerms);
+  }, []);
+
+  const finishUgcAcceptance = useCallback(async () => {
+    setUgcTermsRequired(false);
+    try {
+      await syncPendingToSupabase();
+      const next = await buildStateFromSupabase();
+      if (next) setAppState(s => ({ ...s, ...next }));
+    } catch (e) { console.warn('[ReadingGo] UGC 동의 후 게스트 백필 보류:', e); }
+  }, []);
 
   // 멀티 디바이스 정합(#191) — 탭이 다시 보일 때 Supabase 상태 재로드(다른 기기 변경 반영, stale view 방지)
   // ⚠️ 가드(장시간 세션 버그 — 1h QA 재현): 게스트/세션만료 상태에서 재로드하면 모든 fetch가
@@ -1102,6 +1148,8 @@ function App() {
 
         {/* 전역 Toast — 헤더 아래, 스크롤 콘텐츠 밖에서 제목을 가리지 않음 (#1239) */}
         <Toast />
+        {window.ModerationHost && <window.ModerationHost />}
+        {window.UgcTermsGate && <window.UgcTermsGate open={ugcTermsRequired} onAccepted={finishUgcAcceptance} onClose={() => setUgcTermsRequired(false)} />}
 
         {/* 게스트 안내 배너 — 로그인 없이 둘러보는 중. 로그인=저장 (onboarding.md §4 E). */}
         {isGuest && !guestBannerOff && (
