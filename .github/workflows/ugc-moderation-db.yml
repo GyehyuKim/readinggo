@@ -23,3 +23,8 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: node scripts/ugc-moderation-db.mjs "${{ github.event_name == 'pull_request' && 'validate-dev' || inputs.mode }}"
+      - name: Audit production migration 49 policies
+        if: github.event_name == 'pull_request'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/ugc-moderation-db.mjs audit-prod
