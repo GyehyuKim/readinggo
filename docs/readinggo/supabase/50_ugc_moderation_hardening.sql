@@ -24,14 +24,17 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare v_uid uuid := auth.uid();
+declare
+  v_uid uuid := auth.uid();
+  v_new jsonb := to_jsonb(new);
+  v_old jsonb := to_jsonb(old);
 begin
   if v_uid is null or public.is_admin() then return new; end if;
-  if tg_table_name = 'users' and old.id = v_uid and (
-    new.handle is distinct from old.handle
-    or new.display_name is distinct from old.display_name
-    or new.avatar_url is distinct from old.avatar_url
-    or new.bio is distinct from old.bio
+  if tg_table_name = 'users' and (v_old->>'id')::uuid = v_uid and (
+    (v_new->>'handle') is distinct from (v_old->>'handle')
+    or (v_new->>'display_name') is distinct from (v_old->>'display_name')
+    or (v_new->>'avatar_url') is distinct from (v_old->>'avatar_url')
+    or (v_new->>'bio') is distinct from (v_old->>'bio')
   ) then
     if public.moderation_user_suspended(v_uid) then
       raise exception 'ugc_user_suspended' using errcode = '42501';
@@ -39,8 +42,8 @@ begin
     if not public.moderation_terms_accepted(v_uid) then
       raise exception 'ugc_terms_required' using errcode = '42501';
     end if;
-  elsif tg_table_name = 'user_books' and new.review_text is distinct from old.review_text
-    and nullif(trim(new.review_text), '') is not null then
+  elsif tg_table_name = 'user_books' and (v_new->>'review_text') is distinct from (v_old->>'review_text')
+    and nullif(trim(v_new->>'review_text'), '') is not null then
     if public.moderation_user_suspended(v_uid) then
       raise exception 'ugc_user_suspended' using errcode = '42501';
     end if;
