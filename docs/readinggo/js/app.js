@@ -95,7 +95,7 @@ function hasPendingPublicUgc() {
 // 게스트(로그아웃) 상태에서 남긴 책·문장·대화(my_note)를 로그인 직후 Supabase 로 흡수
 // (backend.md §7.7). 데모 시드(_seed)는 제외 — 게스트가 직접 남긴 문장(_guest 태그, #370)을
 // 가진 책만 백필한다. 해자("축적되는 대화 데이터")가 가입 시 유실되던 구조 수정.
-async function syncPendingToSupabase() {
+async function syncPendingToSupabase({ allowPublic = false } = {}) {
   const la = window.localStorageAdapter;
   const DS = window.SupabaseDataStore;
   if (!la || !DS) return;
@@ -110,7 +110,8 @@ async function syncPendingToSupabase() {
   if (!guestBooks.length && !pb) return;
   try {
     let lastUbId = null, activeNewId = null;
-    const syncedSentenceIds = new Set();
+    const syncedSentenceKeys = new Set();
+    const sentenceKey = (se) => se && (se.id || [se.text || '', se.page ?? '', se.created_at || '', se.visibility || 'public'].join('\u001f'));
     let pendingBookSynced = false, pendingSentenceSynced = false;
     for (const ub of guestBooks) {
       const bk = ub.book || {};
@@ -129,9 +130,10 @@ async function syncPendingToSupabase() {
       const gsents = (ub.sentences || []).filter(se => se && se._guest)
         .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
       for (const se of gsents) {
+        if (se.visibility !== 'private' && !allowPublic) continue;
         try {
           await DS.sentences.add({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind, visibility: se.visibility });
-          if (se.id) syncedSentenceIds.add(se.id);
+          syncedSentenceKeys.add(sentenceKey(se));
         } catch (e) { console.warn('[ReadingGo] 게스트 문장 1건 백필 보류:', e.message); }
       }
     }
@@ -146,7 +148,7 @@ async function syncPendingToSupabase() {
           lastUbId = activeNewId = newUb.id;
           pendingBookSynced = true;
           try { await DS.sessions.addToday({ userBookId: newUb.id, page: pb.current_page || 0 }); } catch (e) {}
-          if (pend.sentence && pend.sentence.text) {
+          if (pend.sentence && pend.sentence.text && (pend.sentence.visibility === 'private' || allowPublic)) {
             try {
               await DS.sentences.add({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text, visibility: pend.sentence.visibility });
               pendingSentenceSynced = true;
@@ -159,10 +161,10 @@ async function syncPendingToSupabase() {
     // 성공한 항목만 표식을 제거한다. 동의/네트워크 오류 항목은 다음 로그인에서 재시도할 수 있게 보존.
     la.mutate(s => {
       s.pending = s.pending || {};
-      if (pendingBookSynced) delete s.pending.book;
+      if (pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)) delete s.pending.book;
       if (pendingSentenceSynced) delete s.pending.sentence;
       (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se => {
-        if (se && se.id && syncedSentenceIds.has(se.id)) delete se._guest;
+        if (se && syncedSentenceKeys.has(sentenceKey(se))) delete se._guest;
       }));
       return s;
     });
@@ -774,8 +776,8 @@ function App() {
         const settings = await window.SupabaseDataStore.settings.get().catch(() => ({}));
         const ugcAccepted = !!(settings && settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION);
         if (alive) setUgcTermsRequired(!ugcAccepted && hasPendingPublicUgc());
-        // 공개 UGC 정책 동의 전에는 게스트 문장을 서버에 올리지 않는다. 로컬 원본은 보존한다(#1392).
-        if (ugcAccepted) await syncPendingToSupabase();
+        // 비공개 게스트 데이터는 동의 전에도 이전하고, 공개 문장만 동의 전까지 로컬에 보존한다.
+        await syncPendingToSupabase({ allowPublic: ugcAccepted });
         backfillCompanionSessions();     // 과거 my_note → companion_sessions 1회 채움(#394, 비차단)
         const next = await buildStateFromSupabase();
         // PostHog 유저 식별 (analytics.md §3.2·§5.4) — 선택 동의('yes')한 로그인 유저만 person profile 연결.
@@ -803,7 +805,7 @@ function App() {
   const finishUgcAcceptance = useCallback(async () => {
     setUgcTermsRequired(false);
     try {
-      await syncPendingToSupabase();
+      await syncPendingToSupabase({ allowPublic: true });
       const next = await buildStateFromSupabase();
       if (next) setAppState(s => ({ ...s, ...next }));
     } catch (e) { console.warn('[ReadingGo] UGC 동의 후 게스트 백필 보류:', e); }
