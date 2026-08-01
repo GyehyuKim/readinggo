@@ -28,3 +28,8 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: node scripts/ugc-moderation-db.mjs audit-prod
+      - name: Apply reviewed migration 50 to production
+        if: github.event_name == 'pull_request' && github.head_ref == 'gyehyu/ugc-moderation-hardening'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/ugc-moderation-db.mjs apply-prod
