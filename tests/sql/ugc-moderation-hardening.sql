@@ -9,6 +9,7 @@ declare
   v_ub uuid;
   v_first uuid;
   v_second uuid;
+  v_result jsonb;
 begin
   insert into auth.users(id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
   values
@@ -49,9 +50,10 @@ begin
   reset role;
   perform set_config('request.jwt.claim.sub', v_reporter::text, true);
   set local role authenticated;
-  select (public.moderation_report('sentence', v_sentence, 'spam', null)->>'id')::uuid into v_second;
+  select public.moderation_report('sentence', v_sentence, 'spam', null) into v_result;
+  v_second := (v_result->>'id')::uuid;
   if v_second = v_first then raise exception 'dismissed_report_false_success'; end if;
-  if not exists(select 1 from public.moderation_reports where id=v_second and status='open') then raise exception 'rereport_not_open'; end if;
+  if v_result->>'status' <> 'open' then raise exception 'rereport_not_open'; end if;
 
   reset role;
   update public.users set settings = settings - 'ugc_terms' where id = v_reporter;
