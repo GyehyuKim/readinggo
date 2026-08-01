@@ -15,6 +15,7 @@ async function query(ref, sql) {
   return response.json();
 }
 
+const migration49 = fs.readFileSync('docs/readinggo/supabase/49_ugc_moderation.sql', 'utf8');
 const migration = fs.readFileSync('docs/readinggo/supabase/50_ugc_moderation_hardening.sql', 'utf8');
 const tests = fs.readFileSync('tests/sql/ugc-moderation-hardening.sql', 'utf8');
 const audit = `
@@ -26,7 +27,7 @@ do $$ begin
 end $$;`;
 
 if (mode === 'validate-dev') {
-  await query(refs.dev, `begin; ${migration} ${tests} rollback;`);
+  await query(refs.dev, `begin; ${migration49} ${migration} ${tests} rollback;`);
   console.log('OK: DEV migration transaction and separate-identity RLS tests rolled back');
 } else if (mode === 'audit-prod') {
   await query(refs.prod, audit);
