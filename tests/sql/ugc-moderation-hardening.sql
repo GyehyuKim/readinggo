@@ -12,19 +12,19 @@ declare
 begin
   insert into auth.users(id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
   values
-    ('00000000-0000-4000-8000-000000001396', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-reporter@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
-    ('00000000-0000-4000-8000-000000001397', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-target@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
-    ('00000000-0000-4000-8000-000000001398', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-admin@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now())
+    ('13960000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-reporter@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+    ('13970000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-target@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+    ('13980000-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-admin@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now())
   on conflict(id) do nothing;
   insert into public.users(id, handle, display_name, is_admin)
   values
-    ('00000000-0000-4000-8000-000000001396', 'ugc_tx_reporter', 'UGC reporter', false),
-    ('00000000-0000-4000-8000-000000001397', 'ugc_tx_target', 'UGC target', false),
-    ('00000000-0000-4000-8000-000000001398', 'ugc_tx_admin', 'UGC admin', true)
+    ('13960000-0000-4000-8000-000000000001', 'ugc_tx_reporter', 'UGC reporter', false),
+    ('13970000-0000-4000-8000-000000000002', 'ugc_tx_target', 'UGC target', false),
+    ('13980000-0000-4000-8000-000000000003', 'ugc_tx_admin', 'UGC admin', true)
   on conflict(id) do update set is_admin=excluded.is_admin;
-  v_reporter := '00000000-0000-4000-8000-000000001396';
-  v_target := '00000000-0000-4000-8000-000000001397';
-  v_admin := '00000000-0000-4000-8000-000000001398';
+  v_reporter := '13960000-0000-4000-8000-000000000001';
+  v_target := '13970000-0000-4000-8000-000000000002';
+  v_admin := '13980000-0000-4000-8000-000000000003';
 
   select id into v_book from public.books limit 1;
   if v_book is null then
