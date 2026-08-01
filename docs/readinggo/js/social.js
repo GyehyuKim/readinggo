@@ -146,6 +146,7 @@ function DiscoverLayer({ state }) {
           bookCover: bk.cover_url || '',
           bookAuthor: bk.author || '',
           isMine: !!(myId && s.user_id === myId),
+          userId: s.user_id || (u && u.id) || null,
         };
       }));
     }).catch(() => { if (alive) setItems([]); });

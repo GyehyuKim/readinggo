@@ -1205,6 +1205,17 @@ const DataStore = {
     publicWishlist(/* userId */) { return []; },
   },
 
+  /* 공개 UGC 안전 (#1392) — 게스트는 서버 신고·차단 대상이 아니므로 로그인 경계로 실패한다.
+     동일 표면을 제공해 피처 코드가 저장소를 직접 판별하지 않게 한다. */
+  moderation: {
+    async acceptTerms() { throw new Error('moderation_login_required'); },
+    async report() { throw new Error('moderation_login_required'); },
+    async blockUser() { throw new Error('moderation_login_required'); },
+    async unblockUser() { return true; },
+    async listBlockedUsers() { return []; },
+    async isBlocked() { return false; },
+  },
+
   /* 스포일러 (read-side 계산, 저장 컬럼 없음) ─────────
      spoiler.myCurrentPage: 활성/지정 책의 내 현재 페이지 → 블라인드 판정용. */
   spoiler: {

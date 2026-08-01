@@ -11,6 +11,7 @@ const { useState, useEffect } = React;
 function AdminDashboardModal({ onClose }) {
   const [stats, setStats] = useState(null);
   const [inqs, setInqs] = useState(undefined); // 문의 목록
+  const [reports, setReports] = useState(undefined); // UGC 신고 큐 (#1392)
   const [popular, setPopular] = useState(null); // 인기책 TOP (#190)
   const [active, setActive] = useState(null);   // 활성 사용자 7/30일 (#190)
   const [completion, setCompletion] = useState(null); // 완독률 (#744 ③)
@@ -22,6 +23,8 @@ function AdminDashboardModal({ onClose }) {
     Promise.resolve(DS.admin.stats()).then(setStats).catch(() => setStats({}));
     if (DS.admin.inquiries) Promise.resolve(DS.admin.inquiries()).then((r) => setInqs(r || [])).catch(() => setInqs([]));
     else setInqs([]);
+    if (DS.admin.moderationReports) Promise.resolve(DS.admin.moderationReports()).then((r) => setReports(r || [])).catch(() => setReports([]));
+    else setReports([]);
     if (DS.admin.popularBooks) Promise.resolve(DS.admin.popularBooks(5)).then((r) => setPopular(r || [])).catch(() => setPopular([]));
     if (DS.admin.activeUsers) Promise.resolve(DS.admin.activeUsers()).then(setActive).catch(() => setActive(null));
     // 고도화 (#744 ③) — 완독률·코호트 리텐션·콘텐츠 공명 (29_admin_insights_v2.sql)
@@ -38,6 +41,26 @@ function AdminDashboardModal({ onClose }) {
     Promise.resolve(DS.admin.inquirySetStatus(q.id, next)).catch(() => {});
   };
   const _stColor = { open: '#E5484D', answered: '#F59E0B', closed: 'var(--ink-3)' };
+  const moderate = async (report, action) => {
+    const DS = window.SupabaseDataStore;
+    if (!(DS && DS.admin && DS.admin.moderationAction)) return;
+    const label = action === 'dismiss' ? '기각' : action === 'hide_sentence' ? '문장 숨김' : '사용자 정지';
+    if (!window.confirm('이 신고를 ' + label + ' 처리할까요?')) return;
+    try {
+      await DS.admin.moderationAction(report.id, action, label);
+      setReports((list) => (list || []).map((x) => x.id === report.id ? { ...x, status: action === 'dismiss' ? 'dismissed' : 'actioned', action } : x));
+      if (window.showToast) window.showToast(label + ' 처리했어요');
+    } catch (e) { if (window.showToast) window.showToast('신고 처리에 실패했어요'); }
+  };
+  const markReviewed = async (report) => {
+    const DS = window.SupabaseDataStore;
+    if (!(DS && DS.admin && DS.admin.moderationReview)) return;
+    try {
+      await DS.admin.moderationReview(report.id, '운영 대시보드에서 검토 시작');
+      setReports((list) => (list || []).map((x) => x.id === report.id ? { ...x, status: 'reviewed' } : x));
+      if (window.showToast) window.showToast('검토 중으로 표시했어요');
+    } catch (e) { if (window.showToast) window.showToast('검토 상태를 저장하지 못했어요'); }
+  };
   const rows = [
     ['👤 가입자', stats && stats.users],
     ['🙋 실사용자', stats && stats.realUsers],   // NPC 제외 (#190 A)
@@ -226,6 +249,28 @@ function AdminDashboardModal({ onClose }) {
             </div>
           </div>
           {/* 문의 목록 */}
+          <div style={{ marginTop: 22 }}>
+            <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10 }}>안전 신고{reports && reports.length ? ' (' + reports.length + ')' : ''}</div>
+            {reports === undefined ? (
+              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>불러오는 중…</div>
+            ) : reports.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>접수된 신고가 없어요</div>
+            ) : reports.map((r) => (
+              <div key={r.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>@{(r.reporter && r.reporter.handle) || '사용자'} · {r.target_type} · {String(r.created_at).slice(0, 10)}</div>
+                <div style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 800, marginTop: 4 }}>{r.reason} · {r.status}</div>
+                {r.detail && <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.detail}</div>}
+                {r.status === 'open' || r.status === 'reviewed' ? (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
+                    {r.status === 'open' && <button onClick={() => markReviewed(r)} style={{ border: 'none', borderRadius: 999, padding: '5px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer', background: 'var(--brand-soft)', color: 'var(--brand-3)' }}>검토 시작</button>}
+                    <button onClick={() => moderate(r, 'dismiss')} style={{ border: 'none', borderRadius: 999, padding: '5px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>기각</button>
+                    {r.target_type === 'sentence' && <button onClick={() => moderate(r, 'hide_sentence')} style={{ border: 'none', borderRadius: 999, padding: '5px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer', background: '#F59E0B', color: '#fff' }}>문장 숨김</button>}
+                    {r.target_type === 'user' && <button onClick={() => moderate(r, 'suspend_user')} style={{ border: 'none', borderRadius: 999, padding: '5px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer', background: '#E5484D', color: '#fff' }}>사용자 정지</button>}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
           <div style={{ marginTop: 22 }}>
             <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>{window.rgIcon('mail', 15)}{'문의' + (inqs && inqs.length ? ' (' + inqs.length + ')' : '')}</div>
             {inqs === undefined ? (

@@ -13,6 +13,8 @@ function SentenceCard({ item, bookId, noBlind }) {
   // 실 피드(Supabase)면 item.id(UUID)·item.isMine·item.bookTitle 사용, 데모면 합성값 폴백.
   const sentenceId = item.id || `${bookId}:${item.page}:${item.nick}`;
   const isMine = (typeof item.isMine !== 'undefined') ? item.isMine : (item.nick === '@jerome' || item.nick === 'jerome');
+  const targetUserId = item.userId || item.user_id || null;
+  const [moderationHidden, setModerationHidden] = useState(false);
   const canReact = !!item.id;  // 실 sentence(UUID)만 좋아요 가능 — 합성 id 는 uuid 컬럼 400 (architect L1)
   const [liked, setLiked] = useState(false);
   const initialLikedRef = React.useRef(false);
@@ -32,6 +34,16 @@ function SentenceCard({ item, bookId, noBlind }) {
       initialLikedRef.current = v;
     }).catch(() => {});
   }, [sentenceId]);
+  React.useEffect(() => {
+    const hide = (e) => {
+      const d = (e && e.detail) || {};
+      if ((d.targetType === 'sentence' && d.targetId === item.id)
+        || (d.targetType === 'user' && targetUserId && d.targetId === targetUserId)
+        || (d.userId && targetUserId && d.userId === targetUserId)) setModerationHidden(true);
+    };
+    window.addEventListener('rg:moderation-hidden', hide);
+    return () => window.removeEventListener('rg:moderation-hidden', hide);
+  }, [item.id, targetUserId]);
   const toggleLike = () => {
     if (!canReact) return;
     Promise.resolve(DataStore.claps.toggle(sentenceId)).then((isLiked) => {
@@ -49,6 +61,7 @@ function SentenceCard({ item, bookId, noBlind }) {
   const revealAll = React.useContext(SpoilerContext);
   const [revealed, setRevealed] = useState(false);
   const blinded = !noBlind && !revealAll && !revealed && isSentenceBlinded(bookId, item.page);
+  if (moderationHidden) return null;
   return (
     <div className="sentence-card">
       <div className="who">
@@ -88,6 +101,13 @@ function SentenceCard({ item, bookId, noBlind }) {
             </svg>
             공유
           </span>
+        ) : null}
+        {!isMine && item.id && targetUserId ? (
+          <button className="chip" title="이 한 문장 신고" aria-label="이 한 문장 신고"
+            onClick={() => window.RG_openReport && window.RG_openReport({ targetType: 'sentence', targetId: item.id, userId: targetUserId, label: item.nick || '다른 사용자의 한 문장' })}
+            style={{ minHeight: 32 }}>
+            신고
+          </button>
         ) : null}
       </div>
     </div>
@@ -136,7 +156,18 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     followers: { ...chip, background: 'rgba(88,130,255,0.1)', borderColor: 'rgba(88,130,255,0.4)', color: 'var(--ink-2)' },
     private:   { ...chip, background: 'rgba(120,120,130,0.1)', borderColor: 'rgba(120,120,130,0.35)', color: 'var(--ink-3)' },
   };
-  const cycleVis = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.setVisibility)) return; const next = _SA_VIS[(_SA_VIS.indexOf(vis) + 1) % _SA_VIS.length]; setVis(next); sentence.visibility = next; Promise.resolve(DataStore.sentences.setVisibility(id, { visibility: next })).catch(() => {}); window.dispatchEvent(new CustomEvent('rg:sentence-vis', { detail: { id, visibility: next } })); };
+  const cycleVis = (e) => {
+    stop(e);
+    if (!(DataStore.sentences && DataStore.sentences.setVisibility)) return;
+    const next = _SA_VIS[(_SA_VIS.indexOf(vis) + 1) % _SA_VIS.length];
+    Promise.resolve(DataStore.sentences.setVisibility(id, { visibility: next })).then(() => {
+      setVis(next);
+      sentence.visibility = next;
+      window.dispatchEvent(new CustomEvent('rg:sentence-vis', { detail: { id, visibility: next } }));
+    }).catch((error) => {
+      if (!error || error.message !== 'ugc_terms_required') showToast('공개 범위를 바꾸지 못했어요');
+    });
+  };
   // #683: 수정 = 인라인 편집 폼 열기 (동반자 대화 모달 X). 드래프트를 현재 값으로 리셋 후 진입.
   const edit = (e) => { stop(e); setDText(sentence.text || ''); setDPage(sentence.page == null ? '' : String(sentence.page)); setEditing(true); };
   const cancelEdit = (e) => { stop(e); setEditing(false); };
@@ -176,6 +207,10 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     </svg>
     공유
   </button> : null;
+  const targetUserId = sentence.userId || sentence.user_id || null;
+  const reportBtn = (!mine && targetUserId && window.RG_openReport) ? (
+    <button onClick={(e) => { stop(e); window.RG_openReport({ targetType: 'sentence', targetId: id, userId: targetUserId, label: '다른 사용자의 한 문장' }); }} title="신고" style={chip}>신고</button>
+  ) : null;
   // #683: 인라인 편집 폼 — 문장 본문(textarea) + 페이지(number). 저장은 DataStore 계약 경유.
   const inputBase = { width: '100%', boxSizing: 'border-box', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--card)', color: 'var(--ink)', fontSize: 13, padding: '8px 10px', fontFamily: 'inherit' };
   const btnBase = { ...chip, padding: '6px 14px', fontSize: 12 };
@@ -216,6 +251,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
         <>
           {likeBtn}
           {shareBtn}
+          {reportBtn}
         </>
       )}
     </div>
