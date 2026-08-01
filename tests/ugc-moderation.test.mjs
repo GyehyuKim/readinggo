@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const migration = read('docs/readinggo/supabase/49_ugc_moderation.sql');
+const hardening = read('docs/readinggo/supabase/50_ugc_moderation_hardening.sql');
 const supa = read('docs/readinggo/js/datastore-supabase.js');
 const local = read('docs/readinggo/js/datastore.js');
 const moderation = read('docs/readinggo/js/moderation.js');
@@ -50,12 +51,21 @@ assert.ok(moderation.includes('api.acceptTerms(RG_UGC_TERMS_VERSION)'), 'accepta
 assert.ok(moderation.includes('rg:moderation-hidden'), 'immediate hide event missing');
 assert.ok(card.includes('RG_openReport'), 'SentenceCard report entry missing');
 assert.ok(profile.includes('프로필 신고') && profile.includes('사용자 차단'), 'profile safety actions missing');
-assert.ok(app.includes('if (ugcAccepted) await syncPendingToSupabase()'), 'guest sync must wait for UGC acceptance');
-assert.ok(app.includes('syncedSentenceIds.has'), 'guest sync must clear only successful rows');
+assert.ok(app.includes('await syncPendingToSupabase({ allowPublic: ugcAccepted })'), 'private guest sync must run before UGC acceptance');
+assert.ok(app.includes('syncedSentenceKeys.has'), 'guest sync must clear only successful rows');
 assert.ok(nest.includes('공개 UGC 동의는 세션/XP/낙관 UI를 건드리기 전에 확인한다'), 'public check-in must preflight terms before persistence');
 assert.ok(card.includes("error.message !== 'ugc_terms_required'"), 'visibility UI must not move before a rejected public update');
 assert.ok(admin.includes('moderationReports') && admin.includes('moderationAction'), 'admin moderation queue missing');
 assert.ok(admin.includes('moderationReview') && admin.includes('검토 시작'), 'reviewed-state transition missing');
 assert.ok(guidelines.includes('성적이거나') && guidelines.includes('신고와 차단'), 'public community guidelines incomplete');
+
+assert.ok(hardening.includes('moderation_guard_public_profile_write'), 'public profile writes need a DB consent/suspension guard');
+assert.ok(hardening.includes('moderation_guard_public_review_write'), 'public review writes need a DB consent/suspension guard');
+assert.ok(hardening.includes("where status in ('open', 'reviewed')"), 'only active reports may be unique');
+assert.ok(hardening.includes("on conflict (reporter_id, target_type, target_id) where status in ('open', 'reviewed')"), 'dismissed/actioned reports must create a new open report');
+assert.ok(app.includes("se.visibility !== 'private' && !allowPublic"), 'public guest sentences must remain local until consent');
+assert.ok(app.includes("pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)"), 'pending book marker must survive sentence failure');
+assert.ok(app.includes('pb.remote_user_book_id'), 'partial retry must reuse the already-created remote book');
+assert.ok(app.includes('syncedSentenceKeys.has(sentenceKey(se))'), 'guest sentences without local ids must still clear after success');
 
 console.log('✅ UGC moderation contract passed');
