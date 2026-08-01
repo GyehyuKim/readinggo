@@ -10,15 +10,26 @@ declare
   v_first uuid;
   v_second uuid;
 begin
-  select id into v_admin from public.users where coalesce(is_admin, false) limit 1;
-  select id into v_reporter from public.users where id <> coalesce(v_admin, gen_random_uuid()) order by created_at limit 1;
-  select id into v_target from public.users where id not in (coalesce(v_admin, gen_random_uuid()), coalesce(v_reporter, gen_random_uuid())) order by created_at limit 1;
-  if v_admin is null or v_reporter is null or v_target is null then
-    raise exception 'ugc_test_requires_admin_and_two_users';
-  end if;
+  insert into auth.users(id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+  values
+    ('00000000-0000-4000-8000-000000001396', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-reporter@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+    ('00000000-0000-4000-8000-000000001397', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-target@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+    ('00000000-0000-4000-8000-000000001398', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ugc-admin@example.invalid', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now())
+  on conflict(id) do nothing;
+  insert into public.users(id, handle, display_name, is_admin)
+  values
+    ('00000000-0000-4000-8000-000000001396', 'ugc_tx_reporter', 'UGC reporter', false),
+    ('00000000-0000-4000-8000-000000001397', 'ugc_tx_target', 'UGC target', false),
+    ('00000000-0000-4000-8000-000000001398', 'ugc_tx_admin', 'UGC admin', true)
+  on conflict(id) do update set is_admin=excluded.is_admin;
+  v_reporter := '00000000-0000-4000-8000-000000001396';
+  v_target := '00000000-0000-4000-8000-000000001397';
+  v_admin := '00000000-0000-4000-8000-000000001398';
 
   select id into v_book from public.books limit 1;
-  if v_book is null then raise exception 'ugc_test_requires_book'; end if;
+  if v_book is null then
+    insert into public.books(title) values ('UGC transaction book') returning id into v_book;
+  end if;
   insert into public.user_books(user_id, book_id, status) values (v_target, v_book, 'reading')
     on conflict(user_id, book_id) do update set status = excluded.status returning id into v_ub;
   insert into public.sentences(user_id, user_book_id, text, visibility)
