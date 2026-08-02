@@ -140,14 +140,26 @@
       //   누구나 카탈로그를 오염시킬 수 있었다. 이제 워커 /api/book-upsert(service_role, 입력검증·캡·
       //   레이트리밋) 경유. 반환 shape(캐노니컬 books 행 전체 + id)은 동일 — 호출부 4곳 무변경.
       async upsert(book) {
-        const res = await fetch(((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/book-upsert', {  // #1230 네이티브 절대경로
+        const token = async (refresh) => {
+          const auth = sb().auth;
+          const result = refresh ? await auth.refreshSession() : await auth.getSession();
+          if (result.error) throw result.error;
+          return result.data && result.data.session && result.data.session.access_token;
+        };
+        const send = (accessToken) => fetch(((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/book-upsert', {  // #1230 네이티브 절대경로
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            isbn13: book.isbn13, title: book.title, author: book.author,
-            publisher: book.publisher, total_pages: book.total_pages, cover_url: book.cover_url,
-          }),
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+          body: JSON.stringify({ isbn13: book.isbn13 }),
         });
+        let accessToken = await token(false);
+        if (!accessToken) throw new Error('book-upsert는 로그인 세션이 필요합니다.');
+        let res = await send(accessToken);
+        // 모바일이 백그라운드에 오래 머문 뒤 첫 요청이 만료 토큰이면 갱신 후 정확히 한 번 재시도한다.
+        if (res.status === 401) {
+          accessToken = await token(true);
+          if (!accessToken) throw new Error('book-upsert 세션 갱신에 실패했습니다.');
+          res = await send(accessToken);
+        }
         if (!res.ok) throw new Error('book-upsert 실패: ' + res.status);
         return await res.json();
       },
