@@ -214,6 +214,7 @@ export default {
     if (p === '/api/book-upsert') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
+      { const auth = await requireSupabaseUser(request, env); if (auth) return auth; }
       { const rl = await rateLimited(request, env, 'book-upsert'); if (rl) return rl; }
       return bookUpsertProxy(request, env);
     }
@@ -491,6 +492,29 @@ async function deleteAccountProxy(request, env) {
     if (!r.ok) { const t = await r.text(); return json({ error: 'delete failed', detail: String(t).slice(0, 200) }, 502); }
   } catch (e) { return json({ error: 'delete failed' }, 502); }
   return json({ ok: true }, 200, 0);
+}
+
+// service-role 쓰기 프록시의 권한 경계. Origin은 브라우저 CORS 힌트일 뿐 인증이 아니므로,
+// 같은 Supabase 프로젝트가 발급한 현재 사용자 access token을 GoTrue에서 검증한다.
+async function requireSupabaseUser(request, env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'supabase unconfigured' }, 503);
+  const auth = request.headers.get('Authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!token) return json({ error: 'unauthorized' }, 401);
+  try {
+    const response = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) return json({ error: 'invalid session' }, 401);
+    const user = await response.json().catch(() => null);
+    if (!user || !user.id) return json({ error: 'invalid session' }, 401);
+    return null;
+  } catch (e) {
+    return json({ error: 'auth check failed' }, 401);
+  }
 }
 
 /* ── Solar prompt experiment API (#1330) — DEV·합성 데이터 전용 ─────── */

@@ -140,9 +140,16 @@
       //   누구나 카탈로그를 오염시킬 수 있었다. 이제 워커 /api/book-upsert(service_role, 입력검증·캡·
       //   레이트리밋) 경유. 반환 shape(캐노니컬 books 행 전체 + id)은 동일 — 호출부 4곳 무변경.
       async upsert(book) {
+        const { data, error } = await sb().auth.getSession();
+        if (error) throw error;
+        const accessToken = data && data.session && data.session.access_token;
+        if (!accessToken) throw new Error('book-upsert는 로그인 세션이 필요합니다.');
         const res = await fetch(((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/book-upsert', {  // #1230 네이티브 절대경로
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + accessToken,
+          },
           body: JSON.stringify({
             isbn13: book.isbn13, title: book.title, author: book.author,
             publisher: book.publisher, total_pages: book.total_pages, cover_url: book.cover_url,

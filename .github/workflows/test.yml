@@ -66,6 +66,7 @@ jobs:
           node tests/forest-sentence-date.test.mjs
           node tests/book-detail-hierarchy.test.mjs
           node tests/barcode-focus.test.mjs
+          node tests/book-upsert-auth.test.mjs
           node tests/forest-like-count.test.mjs
           node tests/liked-sentence-consistency.test.mjs
           node tests/library-reading-highlight.test.mjs
@@ -212,6 +213,8 @@ jobs:
 
   migrations:
     name: migrations (Supabase 마이그레이션 적용 검증)
+    # PR head 스크립트에는 Production 관리 토큰을 제공하지 않는다. merge된 main push에서만 read-only 검사.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
