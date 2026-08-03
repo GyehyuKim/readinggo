@@ -66,6 +66,7 @@ jobs:
           node tests/forest-sentence-date.test.mjs
           node tests/book-detail-hierarchy.test.mjs
           node tests/barcode-focus.test.mjs
+          node tests/book-upsert-auth.test.mjs
           node tests/forest-like-count.test.mjs
           node tests/liked-sentence-consistency.test.mjs
           node tests/library-reading-highlight.test.mjs
@@ -212,10 +213,12 @@ jobs:
 
   migrations:
     name: migrations (Supabase 마이그레이션 적용 검증)
+    # PR head 스크립트에는 Production 관리 토큰을 제공하지 않는다 (#1398).
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
       # docs/readinggo/supabase/*.sql 의 add column/create table 가 라이브 DB에

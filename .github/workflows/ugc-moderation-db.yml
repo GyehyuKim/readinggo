@@ -3,6 +3,13 @@ name: UGC moderation database gate
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'docs/readinggo/supabase/49_ugc_moderation.sql'
+      - 'docs/readinggo/supabase/50_ugc_moderation_hardening.sql'
+      - 'scripts/ugc-moderation-db.mjs'
+      - 'tests/ugc-moderation.test.mjs'
+      - 'tests/ugc-sync.test.mjs'
+      - '.github/workflows/ugc-moderation-db.yml'
   workflow_dispatch:
     inputs:
       mode:
@@ -11,25 +18,50 @@ on:
         type: choice
         options: [validate-dev, audit-prod, apply-prod]
 
+permissions:
+  contents: read
+
 jobs:
-  database-gate:
+  pr-static-gate:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
-      - name: Run UGC database gate
+      - name: Run tokenless UGC regression gate
+        run: |
+          node tests/ugc-moderation.test.mjs
+          node tests/ugc-sync.test.mjs
+
+  validate-dev:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'validate-dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+      - name: Validate DEV database
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: node scripts/ugc-moderation-db.mjs "${{ github.event_name == 'pull_request' && 'validate-dev' || inputs.mode }}"
-      - name: Audit production migration 49 policies
-        if: github.event_name == 'pull_request'
+        run: node scripts/ugc-moderation-db.mjs validate-dev
+
+  production:
+    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'audit-prod' || inputs.mode == 'apply-prod')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+      - name: Run approved Production database action
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: node scripts/ugc-moderation-db.mjs audit-prod
-      - name: Apply reviewed migration 50 to production
-        if: github.event_name == 'pull_request' && github.head_ref == 'gyehyu/ugc-moderation-hardening'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: node scripts/ugc-moderation-db.mjs apply-prod
+        run: node scripts/ugc-moderation-db.mjs "${{ inputs.mode }}"

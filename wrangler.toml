@@ -31,6 +31,12 @@ binding = "ASSETS"
 binding = "OTA_KV"
 id = "e22049c87f9d44139242316c3c445bf9"
 
+# 인증 upstream보다 먼저 적용하는 원자적 per-IP 상한 (#1398).
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1398"
+simple = { limit = 30, period = 60 }
+
 # 비밀 아님(클라에도 공개). service_role·UPSTAGE 키만 `wrangler secret put` 로.
 [vars]
 SUPABASE_URL = "https://cttllwwkaddghqttyhkg.supabase.co"

@@ -215,6 +215,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'book-upsert'); if (rl) return rl; }
+      { const auth = await requireSupabaseUser(request, env); if (auth) return auth; }
       return bookUpsertProxy(request, env);
     }
     // 표지 이미지 프록시 (#676) — 알라딘 CDN은 CORS 헤더가 없어 클라가 캔버스로 그리면 tainted canvas.
@@ -491,6 +492,28 @@ async function deleteAccountProxy(request, env) {
     if (!r.ok) { const t = await r.text(); return json({ error: 'delete failed', detail: String(t).slice(0, 200) }, 502); }
   } catch (e) { return json({ error: 'delete failed' }, 502); }
   return json({ ok: true }, 200, 0);
+}
+
+// 전역 books service-role 쓰기 전에 동일 Supabase 프로젝트의 사용자 세션을 검증한다.
+// rateLimited 다음에 호출해 무효 토큰으로 GoTrue를 소진시키는 인증 전 DoS도 제한한다.
+async function requireSupabaseUser(request, env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'supabase unconfigured' }, 503);
+  const auth = request.headers.get('Authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!token) return json({ error: 'unauthorized' }, 401);
+  try {
+    const response = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) return json({ error: 'invalid session' }, 401);
+    const user = await response.json().catch(() => null);
+    return user && user.id ? null : json({ error: 'invalid session' }, 401);
+  } catch (e) {
+    return json({ error: 'auth check failed' }, 503);
+  }
 }
 
 /* ── Solar prompt experiment API (#1330) — DEV·합성 데이터 전용 ─────── */
@@ -2414,58 +2437,36 @@ async function upsertBook(SB, SRK, book) {
 
 // ── 책 캐노니컬 upsert (#1191) ─────────────────────────────
 // 클라의 옛 books.upsert(직접 RLS write)를 대체 — service_role 로만 쓰는 controlled write.
-// 클라의 두-갈래 로직을 그대로 보존해 반환 shape(캐노니컬 books 행 전체 + id)이 동일:
-//   ① 유효 ISBN-13(978/979) → 기존 upsertBook(#1117 게이트 + merge-duplicates) 후 행 재조회.
-//   ② ISBN-13 없음/무효 → 제목 매칭(있으면 반환), 없으면 삽입(client parity: null isbn 은 충돌 없음).
-// 입력 검증·길이 캡으로 오염을 원천 제한(열린 RLS 와 달리 통제된 쓰기).
+// 요청 body의 제목/저자/표지를 전역 카탈로그에 쓰지 않는다. ISBN으로 기존 행을 찾거나,
+// 저장 허용된 국중도/OpenLibrary에서 서버가 다시 조회한 canonical 메타만 적재한다.
 async function bookUpsertProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   const SB = env.SUPABASE_URL, SRK = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SB || !SRK) return json({ error: 'supabase unconfigured' }, 503);
   let b = {};
   try { b = await request.json(); } catch (e) {}
-  const cap = (v, n) => { const s = (v == null ? '' : String(v)).trim(); return s ? s.slice(0, n) : ''; };
-  const title = cap(b.title, 300);
-  if (!title) return json({ error: 'title required' }, 400);
-  const isbn13 = cap(b.isbn13, 13);
-  let total_pages = Number(b.total_pages);
-  if (!Number.isFinite(total_pages) || total_pages <= 0 || total_pages > 100000) total_pages = null;
-  const book = {
-    isbn13: isbn13 || null, title,
-    author: cap(b.author, 300) || null,
-    publisher: cap(b.publisher, 200) || null,
-    total_pages,
-    cover_url: cap(b.cover_url, 1000) || null,
-  };
+  const isbn13 = String(b.isbn13 == null ? '' : b.isbn13).trim();
+  if (!/^97[89]\d{10}$/.test(isbn13)) return json({ error: 'valid ISBN-13 required' }, 400);
   const H = { apikey: SRK, Authorization: `Bearer ${SRK}` };
 
-  // ① 유효 ISBN-13 → 기존 헬퍼로 merge-upsert(#1117 게이트) 후 캐노니컬 행 재조회
-  if (/^97[89]\d{10}$/.test(isbn13)) {
-    await upsertBook(SB, SRK, book);
+  const readCanonical = async () => {
     const r = await fetch(`${SB}/rest/v1/books?isbn13=eq.${isbn13}&select=*&limit=1`, { headers: H });
     const rows = await r.json().catch(() => []);
-    if (Array.isArray(rows) && rows[0]) return json(rows[0]);
-    // 게이트에 걸려 미적재된 경우만 아래 삽입 폴백으로
-  }
+    return Array.isArray(rows) ? rows[0] || null : null;
+  };
+  const existing = await readCanonical();
+  if (existing) return json(existing);
 
-  // ② ISBN-13 없음/무효 → 제목 매칭(client parity)
-  {
-    const r = await fetch(`${SB}/rest/v1/books?title=eq.${encodeURIComponent(title)}&select=*&limit=1`, { headers: H });
-    const rows = await r.json().catch(() => []);
-    if (Array.isArray(rows) && rows[0]) return json(rows[0]);
+  let canonical = null;
+  try { canonical = await nlkByIsbn(isbn13, env); } catch (e) { /* trusted fallback below */ }
+  if (!canonical || !canonical.title) {
+    try { canonical = await openLibraryByIsbn(isbn13); } catch (e) { canonical = null; }
   }
-  // 없으면 삽입 — isbn 있으면 merge-duplicates(중복 충돌 무해화), 없으면 순삽입
-  const path = book.isbn13 ? '/rest/v1/books?on_conflict=isbn13' : '/rest/v1/books';
-  const prefer = book.isbn13 ? 'resolution=merge-duplicates,return=representation' : 'return=representation';
-  const ins = await fetch(`${SB}${path}`, {
-    method: 'POST',
-    headers: { ...H, 'Content-Type': 'application/json', Prefer: prefer },
-    body: JSON.stringify(book),
-  });
-  const created = await ins.json().catch(() => null);
-  const row = Array.isArray(created) ? created[0] : created;
-  if (!row || !row.id) return json({ error: 'upsert failed' }, 500);
-  return json(row);
+  if (!canonical || !canonical.title) return json({ error: 'canonical metadata unavailable' }, 422);
+
+  await upsertBook(SB, SRK, { ...canonical, isbn13 });
+  const created = await readCanonical();
+  return created ? json(created) : json({ error: 'upsert failed' }, 502);
 }
 
 // ── OTA Live Updates (#876) ───────────────────────────────
@@ -2593,9 +2594,17 @@ const RL_LIMITS = {
 };
 async function rateLimited(request, env, name) {
   try {
-    if (!env.OTA_KV) return null;
     const ip = request.headers.get('CF-Connecting-IP') || 'noip';
     const limit = RL_LIMITS[name] || 30;
+    // Cloudflare native binding은 동일 위치의 병렬 요청을 원자적으로 계산한다. 특히 인증보다
+    // 앞에 실행되는 book-upsert는 무효 JWT로 GoTrue를 소진시키지 못하게 이 경로를 우선한다.
+    if (env.RATE_LIMITER && name === 'book-upsert') {
+      const result = await env.RATE_LIMITER.limit({ key: `${name}:${ip}` });
+      return result && result.success === false
+        ? json({ error: 'rate limited', retryAfter: 60 }, 429)
+        : null;
+    }
+    if (!env.OTA_KV) return null;
     const bucket = Math.floor(Date.now() / 60000);            // 1분 창
     const key = `rl:${name}:${ip}:${bucket}`;
     const cur = parseInt((await env.OTA_KV.get(key)) || '0', 10) || 0;
