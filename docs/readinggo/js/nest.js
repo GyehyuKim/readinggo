@@ -189,6 +189,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
   const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
   const [ceremony, setCeremony] = _useState(null);
+  // 세리머니 문장 카드 → 현재 책 입력으로 잠시 이동하고, 브라우저/Android 뒤로가기로 결과 화면 복원(#1403).
+  const _sentenceCeremonyRef = _useRef(null);
   const [showConfetti, setShowConfetti] = _useState(false);
   // 둥지 단계 = 활성 책 진척률(book.cur/book.total). 체력/days 추적 없음.
   const _pctOf = (bk) => bk && bk.total ? Math.round(bk.cur / bk.total * 100) : 0;
@@ -717,6 +719,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   // 세리머니 닫힘 → 대기 중 마일스톤 회고를 게이트 통과 시 1개 띄움 (#938, A2).
   // 세리머니와 겹치지 않게 닫은 뒤 약간의 텀을 두고 연다. 게이트(마일스톤별 1회·하루 1회)는 DataStore.milestone.
   const closeCeremony = () => {
+    _sentenceCeremonyRef.current = null;
     setCeremony(null);
     const m = pendingMilestoneRef.current;
     pendingMilestoneRef.current = null;
@@ -729,6 +732,30 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       setTimeout(() => { if (window.RG_openMilestoneRecap) window.RG_openMilestoneRecap(m); }, 280);
     } catch (e) { /* 회고는 부가 연출 — 실패해도 본 흐름 무중단 */ }
   };
+
+  const openSentenceFromCeremony = () => {
+    if (!ceremony || !_quickSentRef.current) return;
+    _sentenceCeremonyRef.current = ceremony;
+    window.history.pushState({ rgCeremonySentence: true, bookId: nestState.book.id }, '');
+    setCeremony(null);
+    setTimeout(() => {
+      const input = _quickSentRef.current;
+      if (!input) return;
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input.focus({ preventScroll: true });
+    }, 0);
+  };
+
+  _useEffect(() => {
+    const onPop = () => {
+      const previous = _sentenceCeremonyRef.current;
+      if (!previous) return;
+      _sentenceCeremonyRef.current = null;
+      setCeremony(previous);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   // 이 책 한 문장 (#499) — 현재 책의 전체 기간 최신순(오늘만 아님). 오늘 작성분은 '오늘' 라벨.
   const bookQuotes = (nestState.myQuotes || [])
@@ -1228,6 +1255,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           data={ceremony}
           onClose={closeCeremony}
           onComplete={handleComplete}
+          onAddSentence={openSentenceFromCeremony}
         />,
         document.body
       )}

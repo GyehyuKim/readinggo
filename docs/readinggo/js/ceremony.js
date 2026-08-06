@@ -7,7 +7,7 @@
 const { useState: _useState, useEffect: _useEffect } = React;
 
 /* ── Ceremony ─────────────────────────────────────────── */
-function Ceremony({ data, onClose, onComplete }) {
+function Ceremony({ data, onClose, onComplete, onAddSentence }) {
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
   // nestUp(레벨업) 시 2-step: 0=일반 체크인 화면, 1=둥지 진화 축하 화면 (#426)
@@ -114,11 +114,16 @@ function Ceremony({ data, onClose, onComplete }) {
             <div className="lbl">XP</div>
           </div>
           {/* 한 문장 카드 (#549) — 문장 입력 시 '저장됨', 미입력 시 거짓 표시 대신 이 책 누적 수/0건 독려 */}
-          <div className="reward-card gold">
+          <button
+            type="button"
+            className="reward-card gold reward-card-action"
+            onClick={onAddSentence}
+            aria-label={`${savedSentence ? '한 문장 저장됨' : (bookQuoteCount > 0 ? `이 책 한 문장 ${bookQuoteCount}개` : '이 책 한 문장 0개')}. 한 문장 남기기로 이동`}
+          >
             <span className="ico">{savedSentence ? window.rgIcon('bookmark', 22) : (bookQuoteCount > 0 ? window.rgIcon('book', 22) : window.rgIcon('pen', 22))}</span>
             <div className="val">{savedCount > 1 ? `${savedCount}개` : (savedSentence ? '저장됨' : (bookQuoteCount > 0 ? `${bookQuoteCount}개` : '0개'))}</div>
             <div className="lbl">{savedSentence ? '한 문장' : (bookQuoteCount > 0 ? '이 책 한 문장' : '한 문장 남겨봐요')}</div>
-          </div>
+          </button>
         </div>
 
         {xpParts && xpParts.length > 1 && (
