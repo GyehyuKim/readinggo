@@ -617,7 +617,14 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       if (_ocrHistoryRef.current) window.history.back(); else closeOcrReview();
     } catch (e) {
       _ocrSavingRef.current = false; setOcrSaving(false);
-      setOcrErrors((prev) => ({ ...prev, status: '저장하지 못했어요. 내용을 유지했으니 다시 시도해주세요.' }));
+      const rawCode = e && (e.message === 'ugc_terms_required' ? e.message : e.code);
+      const code = typeof rawCode === 'string' && /^[A-Za-z0-9_]{1,48}$/.test(rawCode) ? rawCode : 'unknown';
+      const status = code === 'ugc_terms_required'
+        ? '공개 저장을 위한 커뮤니티 안내에 동의한 뒤 다시 저장해주세요. 내용은 그대로 유지했어요.'
+        : '저장하지 못했어요. 내용을 유지했으니 다시 시도해주세요.';
+      // #1404: 원문·사용자 ID는 제외하고 안전한 분류값만 남긴다.
+      rgTrack('checkin_save_failed', { source: 'ocr_review', stage: code === 'ugc_terms_required' ? 'consent' : 'persistence', code });
+      setOcrErrors((prev) => ({ ...prev, status }));
     }
   };
 
