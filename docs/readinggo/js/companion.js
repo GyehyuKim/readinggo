@@ -16,6 +16,7 @@ const COMPANION_QS = [
   '이 문장을 누군가에게 들려준다면 누구일까요?',
   '이 문장에서 어떤 장면이나 기억이 떠올랐어요?',
 ];
+const COMPANION_MAX_TURNS = 10;
 function pickCompanionQ(text) {
   const i = (text ? text.length : 0) % COMPANION_QS.length;
   return COMPANION_QS[i];
@@ -106,20 +107,23 @@ function CompanionModal({ sentence, onClose }) {
   // 내 감상(자유 메모) 초안 — my_note 의 비-Q/A 블록(rgSplitNote.free). 저장 시 재키 Q/A 보존.
   const [noteDraft, setNoteDraft] = _useState(() => rgSplitNote(sentence.note).free);
   const [noteSaving, setNoteSaving] = _useState(false);
-  const [exchanges, setExchanges] = _useState(() => parseNoteToExchanges(sentence.note));
+  const initialExchanges = parseNoteToExchanges(sentence.note);
+  const initiallyAtCap = initialExchanges.length >= COMPANION_MAX_TURNS;
+  const [exchanges, setExchanges] = _useState(initialExchanges);
   const [question, setQuestion] = _useState(null);
-  const [loading, setLoading] = _useState(_startMode !== 'note');   // 감상 모드 진입 시 재키 로딩 스피너 숨김
+  const [loading, setLoading] = _useState(_startMode !== 'note' && !initiallyAtCap);   // 감상 모드·캡 도달 진입 시 스피너 숨김
   const [answer, setAnswer] = _useState('');
-  const [done, setDone] = _useState(false);
+  const [done, setDone] = _useState(initiallyAtCap);
   const [rated, setRated] = _useState(null);               // 질문 평가 👍/👎 (#371)
   const [editing, setEditing] = _useState(false);          // 한 문장 본문 편집 (#325)
   const [stext, setStext] = _useState(sentence.text || '');
   const [skind, setSkind] = _useState(sentence.kind === 'thought' ? 'thought' : 'quote'); // 인용↔내 의견 (#381)
   const _compTailRef = _useRef(null);                      // 대화 말단 anchor (#407 화면 점프 방지)
+  const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
   // 재키 질문 결 프리셋 (#375) — 대화 화면에서도 전환 (#935). 설정과 같은 RG_companionPreset(localStorage) 공유.
   // 바꾸면 다음 질문(genCompanionQuestion/Followup)이 현재 프리셋을 읽어 반영. '작가의 시선'(author)도 여기서 즉시.
   const [qPreset, setQPreset] = _useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced');
-  const pickPreset = (k) => { setQPreset(k); if (window.RG_companionPreset) window.RG_companionPreset.set(k); rgTrack('companion_preset_set', { preset: k, where: 'chat' }); };
+  const pickPreset = (k) => { setQPreset(k); if (window.RG_companionPreset) window.RG_companionPreset.set(k); if (consent === 'yes') rgTrack('companion_preset_set', { preset: k, where: 'chat' }); };
   // 질문 결 가로 스크롤 어포던스 (#1116) — 프리셋 7개가 모달 폭(430)을 넘겨 이미 가로 스크롤되지만
   // 넘침을 알 힌트(스크롤바·엣지)가 없어 화면 밖 결(작가의 시선 등)을 못 보던 문제. 스크롤 위치에 따라
   // 좌/우 페이드 마스크를 켜 "더 있음"을 알린다. 새 의존성 없이 CSS mask 만 추가(Stack Lock 준수).
@@ -133,8 +137,6 @@ function CompanionModal({ sentence, onClose }) {
   };
   _useEffect(() => { if (mode === 'jacky') _syncPresetFade(); }, [mode]);
   const _presetMask = `linear-gradient(to right, ${presetFade.l ? 'transparent' : '#000'} 0, #000 16px, #000 calc(100% - 16px), ${presetFade.r ? 'transparent' : '#000'} 100%)`;
-  const MAX = 5; // 멀티턴 무료 캡 (#655, 이전 3). 5턴 초과 무제한은 수익화 후속(워커 exchanges slice 상향).
-  const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
   const bt = sentence.bookTitle || '', au = sentence.author || '';
   const saveText = () => {
     const v = stext.trim();
@@ -150,9 +152,12 @@ function CompanionModal({ sentence, onClose }) {
     let alive = true;
     setLoading(true);
     const past = parseNoteToExchanges(sentence.note);
-    const gen = (consent !== 'yes')
-      ? Promise.resolve(pickCompanionQ(sentence.text))
-      : (past.length ? genCompanionFollowup(sentence.text, past, bt, au, sentence.kind) : genCompanionQuestion(sentence.text, bt, au, sentence.kind));
+    if (past.length >= COMPANION_MAX_TURNS) { setLoading(false); setDone(true); return; }
+    // 질문 생성은 사용자가 요청한 핵심 서비스 처리다. 선택 동의는 아래 archiveCompanion과
+    // 리플레이·식별 분석만 제어하며, 미동의자도 최소 문장/책/해당 대화만 전송해 같은 추론을 받는다.
+    const gen = past.length
+      ? genCompanionFollowup(sentence.text, past, bt, au, sentence.kind)
+      : genCompanionQuestion(sentence.text, bt, au, sentence.kind);
     gen.then((q) => { if (alive) { setQuestion(q); setLoading(false); } });
     return () => { alive = false; };
   }, [mode]);
@@ -199,15 +204,15 @@ function CompanionModal({ sentence, onClose }) {
   };
   const submit = () => {
     const a = answer.trim();
-    if (!a) return; // 빈 답은 no-op — '마치기' 제거(#655) 후 종료는 모달 이탈(✕/바깥)로만. 빈 전송으로 대화 끝내지 않음.
+    if (!a || !question || exchanges.length >= COMPANION_MAX_TURNS) return;
     const ex = [...exchanges, { q: question, a }];
     setExchanges(ex); setAnswer('');
     persist(ex).then((saved) => {
-      if (saved) rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
+      if (saved && consent === 'yes') rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
     });
     archiveCompanion(sentence.bookId, sentence.text, question, a); // 서버 아카이브 (#295)
-    // 5턴 도달 또는 미동의(단발) → 따뜻한 마무리로 종료. 이 5턴 경계가 향후 '더 이야기하기 = 업그레이드' 수익화 훅(#655).
-    if (ex.length >= MAX || consent !== 'yes') { setQuestion(null); setDone(true); return; }
+    // 저장된 Q/A 포함 누적 10턴 도달 시 종료. 선택 동의 여부는 이용 가능 턴 수와 무관하다(#1409).
+    if (ex.length >= COMPANION_MAX_TURNS) { setQuestion(null); setDone(true); return; }
     setLoading(true); setQuestion(null); setRated(null);
     genCompanionFollowup(sentence.text, ex, bt, au, sentence.kind).then((q) => { setQuestion(q); setLoading(false); });
   };
@@ -215,13 +220,17 @@ function CompanionModal({ sentence, onClose }) {
   const regen = () => {
     if (loading || !question) return;
     const cur = question;
-    rgTrack('companion_q_regen', { book_id: sentence.bookId || '' });
+    if (consent === 'yes') rgTrack('companion_q_regen', { book_id: sentence.bookId || '' });
     setLoading(true); setQuestion(null); setRated(null);
     const gen = exchanges.length ? genCompanionFollowup(sentence.text, exchanges, bt, au, sentence.kind, cur)
       : genCompanionQuestion(sentence.text, bt, au, sentence.kind, cur);
     gen.then((q) => { setQuestion(q); setLoading(false); });
   };
-  const rate = (val) => { rgTrack('companion_q_rated', { book_id: sentence.bookId || '', value: val }); setRated(val); };
+  const rate = (val) => { if (consent === 'yes') rgTrack('companion_q_rated', { book_id: sentence.bookId || '', value: val }); setRated(val); };
+  const openConversationRecord = () => {
+    onClose();
+    if (sentence.bookId && window.RG_openBookshelfRecord) window.RG_openBookshelfRecord(sentence.bookId, sentence.id);
+  };
   const _JackAvatar = ({ size = 28 }) => (
     <div style={{ width: size, height: size, borderRadius: '50%', background: 'rgba(63,209,127,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -361,9 +370,15 @@ function CompanionModal({ sentence, onClose }) {
 
           {/* 현재 상태 */}
           {done ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(63,209,127,0.08)', borderRadius: 12 }}>
-              <_JackAvatar size={28} />
-              <span style={{ fontSize: 13, color: 'var(--ink-2)', fontStyle: 'italic' }}>오늘 재키랑 깊이 이야기했네요</span>
+            <div style={{ padding: '12px 14px', background: 'rgba(63,209,127,0.08)', borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <_JackAvatar size={28} />
+                <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>이 문장과 재키의 대화를 10턴까지 나눴어요.</span>
+              </div>
+              <button onClick={openConversationRecord}
+                style={{ width: '100%', marginTop: 10, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--brand-soft)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+                책장에서 이 문장 대화 기록 보기
+              </button>
             </div>
           ) : loading ? (
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10 }}>

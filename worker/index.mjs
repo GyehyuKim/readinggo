@@ -1126,6 +1126,7 @@ async function companionProxy(request, env) {
   } catch (e) {
     const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
     if (e && e.status === 422) return json({ error: 'sentence 필요' }, 422);
+    if (e && e.status === 409) return json({ error: 'turn limit reached' }, 409);
     // 일반 사용자 경로의 기존 graceful fallback 보존.
     return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
   }
@@ -1144,7 +1145,14 @@ async function generateCompanionQuestion(body, env, systemPrompt, strictLab) {
   const preset = String((body && body.preset) || '').slice(0, 20).trim();
   const presetTone = PRESET_TONE[preset] || '';
   // 멀티턴 — 이전 대화(질문/답변). 후속 질문 생성용 (#327).
-  const exchanges = Array.isArray(body && body.exchanges) ? body.exchanges.slice(0, 6) : [];
+  const rawExchanges = Array.isArray(body && body.exchanges) ? body.exchanges : [];
+  // 문장별 누적 10턴은 클라이언트뿐 아니라 비용 경계에서도 강제한다. 10개가 이미 저장된
+  // 요청은 새 질문을 만들 수 없고, 정상적인 다음 질문 입력은 직전 최대 9개뿐이다(#1409).
+  if (!strictLab && rawExchanges.length >= 10) { const e = new Error('turn limit reached'); e.status = 409; throw e; }
+  const exchanges = rawExchanges.slice(0, strictLab ? 6 : 9).map((e) => ({
+    q: String((e && e.q) || '').slice(0, 500),
+    a: String((e && e.a) || '').slice(0, 1000),
+  }));
   if (!sentence) { const e = new Error('sentence 필요'); e.status = 422; throw e; }
   // 키/설정 없으면 목 질문 폴백 (데모 안전 — companion.md §4)
   if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {

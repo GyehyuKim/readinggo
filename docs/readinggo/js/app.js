@@ -545,6 +545,14 @@ function App() {
   const [companionSentence, setCompanionSentence] = useState(null);
   // #1070: 두 번째 인자로 진입 모드 지정 — { mode: 'note'|'jacky' }. 카드 버튼이 문장별 선택을 전달(없으면 모달이 자체 추정).
   useEffect(() => { window.RG_openCompanion = (s, opts) => setCompanionSentence((opts && opts.mode) ? { ...s, _openMode: opts.mode } : s); return () => { window.RG_openCompanion = null; }; }, []);
+  // 재키 캡 CTA(#1409): 책장 탭으로 이동한 뒤 해당 책 상세(문장·Q/A 기록 포함)를 연다.
+  useEffect(() => {
+    window.RG_openBookshelfRecord = (bookId) => {
+      setActiveTab('profile');
+      if (bookId && window.RG_openBook) window.RG_openBook(bookId);
+    };
+    return () => { window.RG_openBookshelfRecord = null; };
+  }, []);
   // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState(null); // 저장(❤️) 진입 시 'fav' (#510)
