@@ -34,12 +34,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           ref: ${{ inputs.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
@@ -64,13 +64,13 @@ jobs:
           # --remote 필수: wrangler v4 local-first. 없으면 로컬 KV(빈 값)를 읽어 백업이 무의미(#990).
           # 최초 승격(아직 prod 없음)이면 빈 값 → 백업 스킵(graceful). wrangler v4 kv get 은
           # 키 부재 시 404 + exit 1 이므로(#1252) 부재를 허용해 빈 값으로 떨어뜨린다.
-          CUR=$(npx -y wrangler@4 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:production" 2>/dev/null || true)
+          CUR=$(npx -y wrangler@4.118.0 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:production" 2>/dev/null || true)
           if [ -z "$CUR" ]; then
             echo "ℹ️ 현재 production 매니페스트 없음(최초 승격) — :prev 백업 스킵."
           else
             echo "backing up current production manifest → :prev: $CUR"
             # --remote 필수: 없으면 로컬 KV 에만 써서 실제 백업이 안 됨(#990).
-            npx -y wrangler@4 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
+            npx -y wrangler@4.118.0 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
               "ota:android:production:prev" "$CUR"
             PREV_VER=$(echo "$CUR" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).version||"?")}catch{process.stdout.write("?")}})')
             echo "✅ 직전 production 백업 완료(ota:android:production:prev): $PREV_VER"
@@ -83,7 +83,7 @@ jobs:
         run: |
           set -o pipefail
           # --remote 필수: wrangler v4 local-first. 없으면 로컬 KV(빈 값)를 읽어 항상 실패한다(#990).
-          BETA=$(npx -y wrangler@4 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:beta")
+          BETA=$(npx -y wrangler@4.118.0 kv key get --remote --namespace-id e22049c87f9d44139242316c3c445bf9 "ota:android:beta")
           if [ -z "$BETA" ]; then
             echo "::error::beta 채널이 비어 있음(ota:android:beta). 먼저 main 머지로 beta 를 publish 하세요(ota-release.yml)."
             exit 1
@@ -93,7 +93,7 @@ jobs:
           test "$(printf '%s' "$BETA" | jq -r .sha)" = "${{ inputs.sha }}"
           echo "promoting beta manifest: $BETA"
           # --remote 필수: 없으면 로컬 KV 에만 써서 prod 가 실제로 안 바뀐다(#990).
-          npx -y wrangler@4 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
+          npx -y wrangler@4.118.0 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
             "ota:android:production" "$BETA"
           VER=$(echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).version))')
           URL=$(echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).url))')
