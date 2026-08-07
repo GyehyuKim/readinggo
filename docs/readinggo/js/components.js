@@ -111,8 +111,8 @@ function ConsentBanner({ onChoose }) {
   const primary = { flex: 1, padding: '10px 12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' };
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, background: 'var(--card)', borderTop: '1px solid var(--line)', boxShadow: '0 -4px 16px rgba(0,0,0,0.10)', padding: '14px 16px 16px' }}>
-      <div style={{ fontWeight: 900, fontSize: 14, color: 'var(--ink)', marginBottom: 6 }}>🍪 데이터 활용 동의</div>
-      <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 10 }}>서비스 운영(필수)과 더 나은 독서 파트너를 위한 AI·분석 활용(선택)에 동의해 주세요. 언제든 설정에서 바꿀 수 있어요.</div>
+      <div style={{ fontWeight: 900, fontSize: 14, color: 'var(--ink)', marginBottom: 6 }}>데이터 활용 동의</div>
+      <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 10 }}>재키 질문 생성은 서비스 제공에 필요한 최소 기록만 처리해요. 선택 동의는 대화 보관·개인화·분석 활용 여부이며 언제든 설정에서 바꿀 수 있어요.</div>
       {detail && (
         <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px', background: 'var(--paper-2)', borderRadius: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -120,7 +120,7 @@ function ConsentBanner({ onChoose }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-3)' }}>항상 켜짐</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 800 }}>선택 — 독서 대화 AI·분석 <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>(파트너 질문·익명 분석)</span></span>
+            <span style={{ fontSize: 13, fontWeight: 800 }}>선택 — 대화 데이터 활용 <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700 }}>(보관·개인화·분석)</span></span>
             <button onClick={() => setOptional((o) => !o)} aria-label="선택 동의 토글" style={{ flexShrink: 0, width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', background: optional ? 'var(--brand)' : 'var(--line)', position: 'relative' }}>
               <span style={{ position: 'absolute', top: 3, left: optional ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
             </button>

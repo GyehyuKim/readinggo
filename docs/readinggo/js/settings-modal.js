@@ -183,10 +183,10 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
           {groupLabel('개인정보·데이터')}
           <div style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>독서 대화 AI·분석 활용</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>한 문장·대화를 AI가 읽고 질문을 만들고, 익명으로 분석에 활용해요. 끄면 로컬 질문만(외부 전송·수집 없음).</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>대화 데이터 선택 활용</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>켜면 대화를 보관해 개인화·제품 분석에 활용해요. 꺼도 질문 생성에 필요한 최소 기록만 처리하며 재키 대화는 그대로 이용할 수 있어요.</div>
             </div>
-            <button onClick={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); if (window.RG_applyConsent) window.RG_applyConsent(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '고마워요! 더 나은 질문을 드릴게요' : '로컬 모드로 전환됐어요', { sparrow: nv === 'yes' }); }}
+            <button onClick={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); if (window.RG_applyConsent) window.RG_applyConsent(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '선택 활용에 동의했어요' : '선택 활용을 껐어요', { sparrow: nv === 'yes' }); }}
               aria-label="데이터 활용 동의 토글"
               style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer', background: consentOn ? 'var(--brand)' : 'var(--ink-3)', position: 'relative', transition: 'background .2s' }}>
               <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
@@ -571,10 +571,10 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
       <div style={{ borderRadius: 'var(--r-md)', border: '1.5px solid var(--line)', background: 'var(--card)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', gap: 10 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)' }}>독서 대화 AI·분석 활용</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>한 문장·대화를 AI가 읽고 질문을 만들어요. 끄면 로컬 질문만.</div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)' }}>대화 데이터 선택 활용</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>켜면 대화를 보관해 개인화·분석에 활용해요. 꺼도 최소 기록으로 재키 질문을 만들어요.</div>
           </div>
-          <Toggle on={consentOn} onToggle={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); if (window.RG_applyConsent) window.RG_applyConsent(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '고마워요! 더 나은 질문을 드릴게요' : '로컬 모드로 전환됐어요', { sparrow: nv === 'yes' }); }} />
+          <Toggle on={consentOn} onToggle={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); if (window.RG_applyConsent) window.RG_applyConsent(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '선택 활용에 동의했어요' : '선택 활용을 껐어요', { sparrow: nv === 'yes' }); }} />
         </div>
         <div style={{ height: 1, background: 'var(--line)' }} />
         <fieldset disabled={sentenceVisibilityBusy} style={{ margin: 0, padding: '14px', border: 'none' }}>
