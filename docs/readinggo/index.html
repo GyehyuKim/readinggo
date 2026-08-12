@@ -331,7 +331,7 @@ select{ font-size: 16px !important; min-width: 0; }
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
-  padding: calc(env(safe-area-inset-top) + 8px) 14px 8px;
+  padding: calc(var(--safe-top) + 8px) max(14px, var(--safe-right)) 8px max(14px, var(--safe-left));
 }
 .topbar-row{ display:flex; align-items:center; gap: 8px; }
 .brand-mark{
