@@ -13,6 +13,12 @@ import { App as CapApp } from '@capacitor/app';
 import { Browser as CapBrowser } from '@capacitor/browser';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import {
+  CapacitorBarcodeScanner,
+  CapacitorBarcodeScannerCameraDirection,
+  CapacitorBarcodeScannerScanOrientation,
+  CapacitorBarcodeScannerTypeHint,
+} from '@capacitor/barcode-scanner';
 
 window.React = React;
 window.ReactDOM = { createRoot, createPortal };
@@ -34,6 +40,18 @@ window.RG_NATIVE = !!(
 window.CapApp = CapApp;
 window.CapBrowser = CapBrowser;
 window.CapStatusBar = StatusBar;
+window.CapBarcodeScanner = CapacitorBarcodeScanner;
+window.CapBarcodeScannerOptions = {
+  hint: CapacitorBarcodeScannerTypeHint.EAN_13,
+  cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+  scanOrientation: CapacitorBarcodeScannerScanOrientation.PORTRAIT,
+  scanInstructions: '책 뒤표지의 ISBN 바코드를 비춰주세요',
+  scanButton: false,
+  cancelButtonAccessibilityLabel: '바코드 스캔 닫기',
+  torchButtonOnAccessibilityLabel: '플래시 끄기',
+  torchButtonOffAccessibilityLabel: '플래시 켜기',
+  android: { scanningLibrary: 'mlkit' },
+};
 // 스트릭 리마인더(#1033) — 매일 정해진 시각 *로컬* 알림(서버·FCM 불필요). 웹에선 권한/스케줄
 //   호출이 no-op(플러그인이 web 스텁) → 설정 토글은 네이티브에서만 실효. 실제 분기는 RG_NATIVE.
 window.CapLocalNotifications = LocalNotifications;
