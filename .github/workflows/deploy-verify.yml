@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
@@ -88,7 +88,7 @@ jobs:
         run: |
           SHORT="${SHA:0:7}"
           echo "live smoke 실패 → production 직전 버전으로 롤백"
-          if npx --yes wrangler@4 rollback --yes --message "auto: post-deploy smoke 실패 $SHORT" 2>&1 | tee /tmp/rb.log; then
+          if npx --yes wrangler@4.118.0 rollback --yes --message "auto: post-deploy smoke 실패 $SHORT" 2>&1 | tee /tmp/rb.log; then
             RB="✅ 롤백 성공 (직전 버전 승격)"
           else
             RB="⚠️ 롤백 명령 실패 — 수동 개입 필요 (RUNBOOK-DEPLOY §3: npx wrangler deploy 또는 대시보드 rollback)"

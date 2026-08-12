@@ -44,11 +44,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
@@ -111,7 +111,7 @@ jobs:
         run: |
           # --remote 필수: wrangler v4 는 local-first(기본=로컬 miniflare). 빼면 실제 R2 에 안 올라가고
           #   job 은 success 로 끝난다(로그에 "Resource location: local"). #990.
-          npx -y wrangler@4 r2 object put "readinggo-ota/${FILENAME}" \
+          npx -y wrangler@4.118.0 r2 object put "readinggo-ota/${FILENAME}" \
             --file "${FILENAME}" \
             --content-type application/zip \
             --remote
@@ -147,7 +147,7 @@ jobs:
           ')
           echo "manifest: $MANIFEST"
           # --remote 필수: 없으면 로컬 KV 에만 쓰여 실제 매니페스트가 안 올라간다(#990).
-          npx -y wrangler@4 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
+          npx -y wrangler@4.118.0 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
             "ota:android:beta" "$MANIFEST"
           {
             echo "### OTA beta published 🚀"
