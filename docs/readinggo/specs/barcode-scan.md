@@ -146,3 +146,12 @@ async function barcodeScanSupported() {
 - ISBN-10(구간 도서) 입력 시 → ISBN-13 변환(978 prefix + 체크섬) 후 매칭 — 현재는 EAN-13(=ISBN-13)만. 필요 판명 시 추가.
 - 다중 검출(한 프레임에 여러 바코드) 시 가장 큰/중앙 우선 — 현재 첫 EAN-13 채택. 실사용 데이터로 튜닝.
 - Android Chrome/Capacitor Android의 실제 기기별 autofocus·tap-to-focus 지원 편차는 실기기 검증표로 남긴다. 웹 API 미지원 기기는 ISBN 직접입력이 최종 폴백이다.
+
+## 9. Android 네이티브 스캐너 및 시스템 바 계약 (#1420)
+
+- Capacitor Android 앱은 WebView `BarcodeDetector` 대신 `@capacitor/barcode-scanner`의 ML Kit 경로를 사용한다. 후면 카메라·세로 방향·EAN-13을 요청하고 네이티브 카메라의 연속 자동초점과 플래시 UI를 사용한다.
+- 웹은 기존 `BarcodeDetector` + `getUserMedia` 경로를 유지하며, 네이티브 또는 웹 카메라 실패 시 ISBN 직접 입력으로 폴백한다.
+- 네이티브 플러그인 요구사항에 따라 Android `minSdkVersion`은 26이다.
+- API 36 edge-to-edge에서 스캔 헤더는 `--safe-top`·좌우 inset을, 하단 안내와 책장 선택 시트는 `--safe-bottom`을 소비한다.
+- 전역 safe-area 변수는 Capacitor SystemBars의 `--safe-area-inset-*` 값을 우선하고 표준 `env(safe-area-inset-*)`를 폴백으로 사용한다.
+- 검증은 Android `assembleDebug`, CAMERA 권한 및 DEV package ID 확인, 실제 기기의 978/979 ISBN 인식과 시스템 바 비침범 확인을 포함한다.

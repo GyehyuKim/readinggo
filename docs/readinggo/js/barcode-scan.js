@@ -11,6 +11,8 @@ let _bcSupportCache = null;
 function barcodeScanSupported() {
   if (_bcSupportCache !== null) return _bcSupportCache;
   _bcSupportCache = (async () => {
+    // Capacitor Android는 WebView BarcodeDetector 대신 네이티브 ML Kit 스캐너를 사용한다.
+    if (window.RG_NATIVE && window.CapBarcodeScanner) return true;
     if (typeof window === 'undefined' || !('BarcodeDetector' in window)) return false;
     try {
       const fmts = await window.BarcodeDetector.getSupportedFormats();
@@ -236,6 +238,25 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     if (!cameraSupported) { setStatus('manual'); return undefined; }
     setStatus('starting');
 
+    // Android 셸에서는 CameraX/ML Kit 기반 네이티브 스캐너를 연다. WebView getUserMedia의
+    // 기기별 초점 capability 누락을 우회하고 후면카메라 AF·플래시·EAN-13 디코딩을 사용한다.
+    if (window.RG_NATIVE && window.CapBarcodeScanner) {
+      (async () => {
+        try {
+          const result = await window.CapBarcodeScanner.scanBarcode(window.CapBarcodeScannerOptions || { hint: 9 });
+          if (cancelled) return;
+          const raw = result && result.ScanResult;
+          if (raw) onDetectedIsbn(raw);
+          else handleClose();
+        } catch (e) {
+          if (cancelled) return;
+          if (window.showToast) window.showToast('바코드 스캐너를 열 수 없어요 — ISBN을 직접 입력해요');
+          setStatus('manual');
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+
     (async () => {
       // detector 준비
       try {
@@ -335,7 +356,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     <div onClick={(e) => e.stopPropagation()}
       style={{ position: 'fixed', inset: 0, background: 'rgb(11, 13, 16)', zIndex: 10001, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
       {/* 헤더 — 닫기 */}
-      <div style={{ width: '100%', maxWidth: 430, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', color: '#fff', zIndex: 2 }}>
+      <div style={{ width: '100%', maxWidth: 430, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'calc(14px + var(--safe-top)) max(16px, var(--safe-right)) 14px max(16px, var(--safe-left))', color: '#fff', zIndex: 2 }}>
         <button onClick={handleClose} aria-label="닫기" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 34, height: 34, borderRadius: 999, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 18)}</button>
         <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.2px' }}>{cameraSupported ? '바코드로 등록' : 'ISBN으로 등록'}</span>
         <span style={{ width: 34 }} />
@@ -373,7 +394,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
 
       {/* 하단 안내 — 스캔 중 + "직접 입력" 폴백 토글 */}
       {(status === 'scanning' || status === 'resolving' || status === 'starting') && (
-        <div style={{ width: '100%', maxWidth: 430, padding: '16px 16px 28px', textAlign: 'center', color: 'rgba(255,255,255,0.92)', zIndex: 2 }}>
+        <div style={{ width: '100%', maxWidth: 430, padding: '16px max(16px, var(--safe-right)) calc(28px + var(--safe-bottom)) max(16px, var(--safe-left))', textAlign: 'center', color: 'rgba(255,255,255,0.92)', zIndex: 2 }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{overlayMsg}</div>
           {status === 'scanning' && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
@@ -403,7 +424,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
         <div onClick={() => { setPendingBook(null); handleClose(); }}
           style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 10002 }}>
           <div onClick={(e) => e.stopPropagation()}
-            style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px 24px' }}>
+            style={{ background: 'var(--card)', width: '100%', maxWidth: 430, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(24px + var(--safe-bottom))' }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)', marginBottom: 4 }}>어떤 책장에 놓을까요?</div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingBook.title}</div>
             {window.RG_SHELF_STATUS_OPTIONS.map(({ value: k, label }) => (
