@@ -39,6 +39,15 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // DEV 검수 앱은 Play production 앱과 나란히 설치할 수 있어야 한다.
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+            resValue "string", "app_name", "ReadingGo DEV"
+            resValue "string", "title_activity_main", "ReadingGo DEV"
+            resValue "string", "package_name", "com.readinggo.app.dev"
+            resValue "string", "custom_url_scheme", "com.readinggo.app.dev"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

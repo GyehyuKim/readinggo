@@ -47,6 +47,13 @@ jobs:
           grep -R -q 'readinggo-dev.hyuniverse.workers.dev' dist
           ! grep -R -q 'cttllwwkaddghqttyhkg.supabase.co' dist
 
+      # DEV 검수 앱은 production OTA 채널을 절대 구독하지 않는다.
+      - name: Disable production OTA for DEV APK
+        working-directory: docs/readinggo
+        run: |
+          node -e "const fs=require('fs');const p='capacitor.config.json';const c=JSON.parse(fs.readFileSync(p));c.appName='ReadingGo DEV';c.plugins.CapacitorUpdater.autoUpdate=false;delete c.plugins.CapacitorUpdater.updateUrl;fs.writeFileSync(p,JSON.stringify(c,null,2)+'\\n')"
+          ! grep -q 'readinggo.hyuniverse.workers.dev/api/ota' capacitor.config.json
+
       # dist → android 동기화 + 플러그인(capgo 등) 반영.
       - name: Capacitor sync (android)
         working-directory: docs/readinggo
