@@ -10,6 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SB = 'https://supabase.example';
 const LLM = 'https://llm.example';
 const env = {
+  ENVIRONMENT: 'development',
   SUPABASE_URL: SB,
   SUPABASE_SERVICE_ROLE_KEY: 'service-role-test',
   UPSTAGE_API_KEY: 'provider-key-test',
@@ -176,6 +177,29 @@ try {
   check('승격 RPC는 DB에서도 현재 admin과 active promoter를 모두 확인', /u\.is_admin = true/.test(atomicStatements) && /g\.role = 'promoter'/.test(atomicStatements) && /g\.status = 'active'/.test(atomicStatements));
   check('승격 RPC는 브라우저 실행권한을 회수하고 service role만 허용', /revoke all on function public\.prompt_lab_promote_atomic[\s\S]*from public, anon, authenticated/.test(atomicStatements)
     && /grant execute on function public\.prompt_lab_promote_atomic[\s\S]*to service_role/.test(atomicStatements));
+  const handoffSql = readFileSync(join(root, 'docs', 'readinggo', 'supabase', '51_prompt_lab_handoff.sql'), 'utf8');
+  const handoffStatements = handoffSql.replace(/--[^\n]*/g, '');
+  check('DEV handoff artifact는 버전·평가 근거·승인자·server 시각을 보존',
+    /'versionNo', v_active\.version_no/.test(handoffStatements)
+    && /'evaluationEvidence', v_evidence/.test(handoffStatements)
+    && /'devApprovedBy', p_actor_id/.test(handoffStatements)
+    && /'devApprovedAt', v_approved_at/.test(handoffStatements));
+  check('불완전 baseline 평가 근거는 handoff artifact 생성 거부',
+    /prompt_lab_handoff_evidence_incomplete/.test(handoffStatements)
+    && /fixture_type = 'baseline'/.test(handoffStatements));
+  check('PROD handoff는 현재 admin promoter를 재검증하고 active 교체와 audit를 원자 처리',
+    /prompt_lab_activate_handoff/.test(handoffStatements)
+    && /pg_advisory_xact_lock/.test(handoffStatements)
+    && /u\.is_admin = true/.test(handoffStatements)
+    && /update public\.prompt_lab_prompt_versions[\s\S]*insert into public\.prompt_lab_prompt_versions[\s\S]*insert into public\.prompt_lab_audit_log/.test(handoffStatements));
+  check('PROD handoff는 malformed artifact와 같은 DEV version 재적용을 거부',
+    /jsonb_typeof\(p_artifact\) <> 'object'/.test(handoffStatements)
+    && /prompt_lab_handoff_already_active/.test(handoffStatements)
+    && /metadata->'artifact'->>'versionId' = p_artifact->>'versionId'/.test(handoffStatements));
+  check('handoff RPC는 브라우저 권한을 회수하고 service role만 허용',
+    /revoke all on function public\.prompt_lab_create_handoff[\s\S]*from public, anon, authenticated/.test(handoffStatements)
+    && /revoke all on function public\.prompt_lab_activate_handoff[\s\S]*from public, anon, authenticated/.test(handoffStatements)
+    && (handoffStatements.match(/grant execute on function public\.prompt_lab_[a-z_]+\([^;]+to service_role/g) || []).length === 2);
   const sqlPrompt = (sql.match(/\$prompt\$([\s\S]*?)\$prompt\$/) || [])[1];
   const workerLiteral = (workerSource.match(/const COMPANION_SYSTEM = ('[^\n]+');/) || [])[1];
   const workerPrompt = workerLiteral ? Function(`return ${workerLiteral}`)() : '';

@@ -80,6 +80,7 @@ jobs:
           node tests/ocr-review-flow.test.mjs
           node --test tests/posthog-weekly-report.test.mjs
           node tests/prompt-lab.test.mjs
+          node tests/prompt-lab-prod-boundary.test.mjs
           node tests/prompt-experiment-api.test.mjs
           node tests/reading-activity-removed.test.mjs
           node tests/related-filter.test.mjs
@@ -114,6 +115,7 @@ jobs:
         run: |
           node tests/boot-smoke.mjs
           node tests/dev-review-mode.test.mjs
+          node tests/prompt-lab-build-boundary.test.mjs
 
   dev-isolation:
     name: dev-isolation (prod endpoint/write path 차단)
@@ -139,6 +141,7 @@ jobs:
         run: |
           node tests/dev-isolation.test.mjs
           node tests/dev-review-mode.test.mjs
+          EXPECT_PROMPT_LAB=1 node tests/prompt-lab-build-boundary.test.mjs
 
   render-smoke:
     name: render-smoke (탭 런타임 렌더)
