@@ -126,6 +126,8 @@ sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?, kind?, visibility?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
 //   ↳ #1261 visibility는 신규 문장별 명시값(public|followers|private). 호출부는 제출 시 개별 선택값을 우선하고,
 //      없으면 settings.default_sentence_visibility(public|private), 설정도 없거나 무효면 'public'을 전달한다.
+//   ↳ #1424 text는 private일 때 1~1,000자, public|followers일 때 1~200자. 200자 초과 OCR 단발 저장은
+//      호출부가 visibility:'private'를 명시하며, DB CHECK도 같은 조건을 강제해 클라이언트 우회를 차단한다.
 //      어댑터는 허용값만 저장하고 무효값은 'public'으로 정규화한다. DB DEFAULT 'public'은 방어선으로 유지한다.
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
 sentences.listByBook(userBookId)           → Sentence[]      // 내 책(user_book) 한 문장
@@ -357,7 +359,7 @@ sentences                                   -- "한 문장" (DB 테이블명 유
   user_book_id  uuid FK user_books.id
   session_id    uuid FK reading_sessions.id NULL
   page          int                  -- 스포일러 블라인드 판정 기준 (§social)
-  text          text                 -- 원문 인용. 1~200자 (CHECK + 클라, 04_constraints.sql)
+  text          text                 -- 원문 인용. private 1~1,000자 / public·followers 1~200자 (조건부 CHECK + 클라, #1424)
   my_note       text NULL            -- 내 감상·코멘트 (선택, 사후 추가·편집). ≤1000자 (CHECK)
   visibility    text default 'public' -- v7.2: 'public'|'followers'|'private' 3단계. RLS 강제 (§social 5.7.1, 06_privacy_v2.sql). is_private(boolean) 대체
   is_private    boolean default false -- DEPRECATED (v7.1→v7.2 visibility 마이그레이션 후 미사용. 마이그레이션 호환 위해 컬럼 보존)
