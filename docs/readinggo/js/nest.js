@@ -66,7 +66,7 @@ function _validateOcrReview(text, page, currentPage, totalPages) {
   const rawPage = String(page == null ? '' : page).trim();
   const fallbackPage = Math.max(1, parseInt(currentPage, 10) || 1);
   const parsedPage = rawPage === '' ? fallbackPage : Number(rawPage);
-  const textError = !sentence ? '한 문장을 입력해주세요.' : (sentence.length > 200 ? '한 문장은 200자 이내로 남겨주세요.' : '');
+  const textError = !sentence ? '한 문장을 입력해주세요.' : (sentence.length > 1000 ? '한 문장은 1,000자 이내로 남겨주세요.' : '');
   const pageError = (!Number.isInteger(parsedPage) || parsedPage < 1 || (totalPages > 0 && parsedPage > totalPages))
     ? `페이지는 1${totalPages > 0 ? `~${totalPages}` : ' 이상'} 범위로 입력해주세요.` : '';
   return { sentence, page: parsedPage, textError, pageError, valid: !textError && !pageError };
@@ -614,7 +614,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     _ocrSavingRef.current = true; setOcrSaving(true); setOcrErrors({ text: '', page: '', status: '저장 중입니다.' });
     try {
       const progressPage = Math.max(nestState.book.cur || 0, checked.page);
-      await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, kind: 'quote', sentPage: checked.page, awaitPersistence: true }));
+      const visibility = checked.sentence.length > 200 ? 'private' : undefined;
+      await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, visibility, kind: 'quote', sentPage: checked.page, awaitPersistence: true }));
       setOcrErrors({ text: '', page: '', status: '저장했습니다.' });
       if (_ocrHistoryRef.current) window.history.back(); else closeOcrReview();
     } catch (e) {
@@ -1090,8 +1091,10 @@ function NestView({ state, onCheckin, onOpenSearch }) {
                 aria-invalid={!!ocrErrors.text} aria-describedby="ocr-review-count ocr-review-text-error" />
               <div className="ocr-review-meta">
                 <span id="ocr-review-text-error" className="ocr-review-error">{ocrErrors.text}</span>
-                <span id="ocr-review-count" className={ocrReview.text.trim().length > 200 ? 'is-over' : ''}>{ocrReview.text.trim().length}/200자</span>
+                <span id="ocr-review-count" className={ocrReview.text.trim().length > 1000 ? 'is-over' : ''}>{ocrReview.text.trim().length}/1,000자</span>
               </div>
+              {ocrReview.text.trim().length > 200 && ocrReview.text.trim().length <= 1000 &&
+                <div className="ocr-review-help">200자를 넘어 나만 보기로 저장돼요.</div>}
             </div>
             <div className="ocr-review-field">
               <label htmlFor="ocr-review-page">페이지</label>

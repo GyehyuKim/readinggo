@@ -526,7 +526,9 @@ function ocrExtractSentence(file) {
   return window.RG_apiFetch('/api/ocr', { method: 'POST', body: fd })
     .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }))
     .then(({ status, body: d }) => {
-      if (d && d.text) return { text: String(d.text).slice(0, 1000) };
+      // 검토 화면이 1,000자 초과를 직접 차단하고 원문을 보존한다(#1424).
+      // 여기서 자르면 사용자가 초과 사실을 알거나 필요한 구간을 편집할 수 없다.
+      if (d && d.text) return { text: String(d.text) };
       if (d && d.empty) return { text: '', empty: true, code: d.code || 'ocr_empty', stage: d.stage || 'result' };
       return { text: '', error: (d && d.code) || 'ocr_failed', stage: (d && d.stage) || 'request', status };
     })
