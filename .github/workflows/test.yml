@@ -64,6 +64,7 @@ jobs:
           node tests/dev-review-datastore-sync.test.mjs
           node tests/dev-review-persona-api.test.mjs
           node tests/forest-sentence-date.test.mjs
+          node tests/feedback-flywheel.test.mjs
           node tests/book-detail-hierarchy.test.mjs
           node tests/barcode-focus.test.mjs
           node tests/book-upsert-auth.test.mjs

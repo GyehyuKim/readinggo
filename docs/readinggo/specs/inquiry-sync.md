@@ -1,140 +1,66 @@
-# 문의 자동 이슈화 스펙 (inquiries → GitHub 이슈 동기화)
+# 고객 피드백 플라이휠 스펙
 
-> **신설 (2026-06-17, #701)**: 오픈베타 피드백 루프. 앱 내 "운영자에게 문의"로 들어온 `inquiries` 행을 Worker 크론이 GitHub 이슈로 자동 동기화한다.
-> **개정 (2026-06-30, #1105)**: 이슈화 전에 **LLM이 문의를 한 번 정리·분류**(제목 정돈·요약/추정 의도·분류)한다. 원문(마스킹됨)은 본문에 항상 보존하고, LLM 실패/미설정 시 원문만으로 폴백한다 (§4.5).
-> **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수. 데이터 모델 본체는 [backend.md](./backend.md), 문의 수집 UI·admin 대시보드는 [profile.md](./profile.md) 참조.
+> **개정 (2026-08-13, #1407)**: 인증 actor 기반 제출 분리, 앱 내 상태 조회, GitHub 완료 reconciliation을 정의한다.
+> **편집 정책**: 데이터 모델 본체는 [backend.md](./backend.md), 설정 UI는 [profile.md](./profile.md)를 함께 따른다. 이번 변경은 스키마와 소비 코드가 동시에 결정되어야 하는 작은 계약 변경이므로 `CONTRIBUTING.md §4.1` 예외를 PR에 기록한다.
 
-## 1. 목적·범위
+## 1. 목적과 경계
 
-오픈베타에서 사용자 문의량이 늘어난다. 운영자가 admin 대시보드를 수동으로 들여다보는 대신, 문의를 **GitHub 이슈로 자동 전환**해 라벨·담당·마일스톤 등 기존 트리아지 워크플로우에 태운다.
+- 서버가 Supabase bearer session에서 `user_id`를 얻고 `public.users.is_admin`을 조회한다. 클라이언트가 actor나 문의 종류를 지정하지 않는다.
+- 비관리자 로그인 사용자의 직접 제출만 `customer_feedback`이며 GitHub 이슈를 만든다.
+- admin 제출은 `admin_note`로 저장하고 GitHub 자동화에서 제외한다.
+- 기존 문의는 `legacy`로 보존하며 새 자동화에 소급 편입하지 않는다.
+- 공개 GitHub 제목·본문·Worker 로그에는 문의 원문, 이메일, `user_id`, 내부 inquiry UUID 등 PII/식별자를 싣지 않는다. 운영자는 비공개 admin 데이터에서 원문을 확인한다.
 
-- **In**: `inquiries` 테이블에 새로 쌓이는 행(앱 내 문의 폼 경유, [profile.md](./profile.md) 설정 화면)
-- **Out**: `GyehyuKim/readinggo` 레포의 GitHub 이슈 (라벨 `source:beta-inquiry`)
-- **범위 밖**: 이슈 → 문의 역방향 동기화(이슈 답변을 앱에 노출)는 후속. 지금은 단방향(inquiry → issue)만.
+## 2. 데이터와 사용자 상태
 
-## 2. 결정 (계휴, 2026-06-17 / #701)
+`51_feedback_flywheel.sql`은 forward-only·재실행 안전 마이그레이션이다.
 
-| 안건 | 결정 | 근거 |
+| 컬럼 | 값 | 의미 |
 |---|---|---|
-| PII 처리 | **이메일·user_id 마스킹**. `message`·`app_version`만 게재 + message 본문 이메일 정규식 스크럽 | 레포가 **PUBLIC** → 개인정보 공개 노출 차단 |
-| 트리거 | **기존 Worker `scheduled()` 크론 폴링** (신규 cron 식 추가) | 공개 엔드포인트 신설 회피, `SERVICE_ROLE_KEY`·크론 인프라 재사용 |
-| 트리아지 | **1:1 + 라벨** + 길이·중복·공백 기본 가드. **LLM 정리·분류**(#1105, §4.5) — 원문→제목·요약·분류, 실패 시 원문 폴백 | SLC. LLM 정리는 가독성↑(예: #1104 화면 복붙으로 의도 불명). 중복 묶기(병합)는 여전히 후속 |
-| 멱등성 | `inquiries.github_issue_number` 컬럼 게이트 | 같은 문의 중복 이슈 방지 |
+| `submission_kind` | `legacy/customer_feedback/admin_note` | 기존 행 보존 / 직접 고객 제보 / 운영 내부 메모 |
+| `public_status` | `received/checking/answered` | 설정 표시 `접수/확인중/답변` |
+| `response_source` | `github_notify_ready` 또는 null | 자동 답변 출처 |
+| `github_reconciled_at` | timestamptz 또는 null | 마지막 성공 자동 답변 기록 시각 |
 
-## 3. 데이터 모델
+상태 전이는 `received`(저장) → `checking`(GitHub issue 번호 기록) → `answered`(아래 완료 게이트 통과)다. 사용자는 RLS로 자신의 문의만 `listMine()`에서 보고, 답변 상태일 때 `response`를 함께 본다.
 
-신규 마이그레이션 `32_inquiry_github_sync.sql`(드리프트 정정 2026-07-09 — 29번은 `29_admin_insights_v2.sql`가 선점, 실제 파일은 32번):
+## 3. 제출과 GitHub 이슈화
 
-```sql
-alter table public.inquiries
-  add column if not exists github_issue_number int;   -- null = 미동기화, 값 = 생성된 이슈 번호
+`POST /api/inquiries`는 rate limit 후 사용자 세션을 검증하고 서버가 actor 종류를 결정한다. 이메일을 복제 저장하지 않는다. 고객 직접 제보만 10분 cron에서 다음 공개 이슈로 변환한다.
 
-create index if not exists idx_inquiries_unsynced
-  on public.inquiries(created_at) where github_issue_number is null;
+- title: `고객 피드백 확인 요청`
+- body: 비공개 운영 데이터에서 원문을 확인하라는 고정 문구
+- labels: `source:customer-feedback` 단독
+
+자유 텍스트를 마스킹 후 공개하는 방식은 잔여 PII를 보장할 수 없으므로 폐기한다. 생성 성공 후 `github_issue_number`와 `public_status=checking`을 기록한다. 부분 실패는 다음 실행에서 재시도하며 issue number unique index가 DB 중복 연결을 막는다.
+
+## 4. 답변 reconciliation
+
+GitHub webhook 설치·검증을 전제하지 않는다. 같은 멱등 함수를 다음 두 경계가 호출한다.
+
+1. Cloudflare Worker의 기존 `*/10 * * * *` scheduled trigger.
+2. 운영자가 필요할 때 `POST /api/internal/reconcile-inquiries`에 Worker secret `INQUIRY_RECONCILE_SECRET`을 `X-Reconcile-Secret` 헤더로 전달한다.
+
+운영 설정 절차:
+
+```bash
+npx wrangler secret put INQUIRY_RECONCILE_SECRET
+curl -X POST -H "X-Reconcile-Secret: $INQUIRY_RECONCILE_SECRET" \
+  https://<DEV_WORKER_HOST>/api/internal/reconcile-inquiries
 ```
 
-- `github_issue_number IS NULL` → 미처리 대상. 성공 시 이슈 번호 기록.
-- RLS: 컬럼 업데이트는 service_role(Worker)만 수행 → 기존 `inq_upd`(is_admin) 정책 외, service_role은 RLS 우회이므로 추가 정책 불요.
+실제 host와 secret은 저장소에 기록하지 않는다. Hermes가 stable DEV rollout에서 secret 설정과 수동 trigger 응답을 검증하며 Production은 이 PR 범위 밖이다.
 
-## 4. Worker 로직 (`worker/index.mjs` `scheduled()` 확장)
+자동 답변은 GitHub issue가 동시에 다음을 만족할 때만 기록한다.
 
-### 4.1 크론
+- `state=closed`
+- `state_reason != not_planned`
+- `feedback:notify-ready` 라벨 존재
 
-`wrangler.toml` `[triggers] crons`에 식 추가:
+라벨 없는 close, reopen/open, `not_planned` close는 아무 답변도 기록하지 않는다. 이미 `answered`인 행은 조회 대상에서 제외하여 재실행해도 답변을 덮어쓰지 않는다. 응답과 오류 로그에는 사용자 내용·식별자를 남기지 않는다.
 
-```toml
-crons = ["0 18 * * *", "*/10 * * * *"]   # 기존 일일 아카이브 + 10분 주기 문의 동기화
-```
+## 5. 운영 책임
 
-`scheduled(event, env, ctx)`에서 `event.cron`으로 분기:
-- `"0 18 * * *"` → 기존 일일 아카이브(#239)
-- `"*/10 * * * *"` → 문의 동기화
-
-### 4.2 동기화 절차
-
-1. **조회**: service_role로 `inquiries` 중 `github_issue_number IS NULL` 을 `created_at ASC`, **LIMIT 20**(런당 상한 — 폭주·레이트리밋 방어).
-2. **가드** (건별 skip, 단 처리완료 표시는 하지 않고 다음 런으로 미룸 또는 sentinel 처리 — §4.3):
-   - `char_length(trim(message)) < 5` → 스킵(노이즈)
-   - 동일 message 텍스트가 이번 배치 내 이미 처리됨 → 중복으로 간주, 하나만 이슈화
-3. **PII 마스킹**:
-   - 이슈 본문에 `email`·`user_id` **미포함**
-   - `message` 본문에서 이메일 패턴(`/[\w.+-]+@[\w-]+\.[\w.-]+/g`) → `[이메일 가림]` 치환
-   - 포함 허용: 마스킹된 message, `app_version`, `created_at`, 내부 `inquiry id`(uuid — 식별 불가, 역추적용)
-4. **LLM 정리·분류**(§4.5): 마스킹된 message → `{ title, summary, category }`. 실패/미설정/JSON 깨짐이면 생략(이번 건 원문 폴백).
-5. **이슈 생성**: `POST /repos/GyehyuKim/readinggo/issues`
-   - title: LLM `title`(한 줄, ≤70자) — 없으면 마스킹된 message 앞 ~50자 + `…`
-   - labels: `source:beta-inquiry` + 분류 라벨(**레포 실재 라벨만** — 기능요청 `type:feat` / 버그 `type:bug` / UX `ux` / 문의 `question`, 기타·폴백은 `type:feedback`). 미존재 라벨을 쓰면 GitHub 가 회색 기본 라벨을 새로 만들어 기존 택소노미를 오염시키므로 금지(#1112)
-   - body: 아래 §4.4 템플릿(LLM 성공/폴백 2종)
-6. **기록**: 성공(201) → `update inquiries set github_issue_number = <number> where id = <id>`. 실패 → 컬럼 그대로 두고 다음 런 재시도.
-
-### 4.3 멱등성·실패
-
-- 게이트는 `github_issue_number IS NULL`. 이슈 생성 성공 후에만 컬럼을 채우므로, 생성됐는데 DB 업데이트가 실패하면 **다음 런에서 중복 생성 가능**. 이를 줄이려 생성 직후 즉시 update, update 실패 시 ctx.waitUntil 재시도 1회. 완전한 exactly-once는 비목표(드문 중복은 수동 정리 허용).
-
-### 4.4 이슈 본문 템플릿
-
-**LLM 성공 시** (요약·분류 + 구분선 + 원문 보존):
-
-```markdown
-> 오픈베타 사용자 문의 자동 등록 (LLM 정리·분류 · 원문 보존 · PII 마스킹됨)
-
-**요약·추정 의도**
-<LLM summary>
-
-**분류**: <LLM category(버그/기능요청/UX/문의/기타)>
-
----
-**문의 원문 (마스킹됨)**
-<마스킹된 message>
-
----
-- app_version: `<app_version>`
-- 접수: `<created_at>`
-- inquiry: `<uuid>`
-```
-
-**폴백 시** (LLM 미설정/실패 — 기존 템플릿, 원문만):
-
-```markdown
-> 오픈베타 사용자 문의 자동 등록 (PII 마스킹됨)
-
-**문의 내용**
-<마스킹된 message>
-
----
-- app_version: `<app_version>`
-- 접수: `<created_at>`
-- inquiry: `<uuid>`
-```
-
-### 4.5 LLM 정리·분류 (#1105)
-
-- **재사용**: 독서 파트너(#287)와 같은 텍스트 LLM 프록시 `callLLM`(env `LLM_BASE_URL`·`LLM_MODEL`·`UPSTAGE_API_KEY`). 신규 키·엔드포인트 없음, 키는 서버(Worker) 보관(클라 노출 금지).
-- **입력**: 마스킹된 message(§4.2-3 PII 마스킹 후). **출력**: JSON `{ title, summary, category }` 하나. category 는 고정 enum `버그|기능요청|UX|문의|기타` — enum 밖이면 `기타`로 정규화.
-- **폴백(graceful)**: env 미설정·LLM HTTP 실패·JSON 파싱 실패·핵심 필드 공백 → `null` 반환 → 호출부가 폴백 템플릿(원문만)으로 진행. 문의 손실 없음.
-- **환각 가드**: 시스템 프롬프트가 "원문에 없는 사실 추가 금지, 불명확하면 솔직히 명시"를 지시. 원문은 본문에 항상 그대로 보존되므로 운영자가 LLM 요약과 원문을 대조 가능.
-- **프라이버시**: 마스킹된 message 텍스트가 LLM 프록시로 전송된다(companion·parse-books 과 동일 경로·posture). 추가 방어로 프롬프트가 이름·전화·이메일을 제목·요약에 옮기지 말도록 지시(§6 자유텍스트 PII 한계는 그대로 적용).
-
-## 5. 보안
-
-- `GITHUB_TOKEN`: fine-grained PAT, **단일 레포(`GyehyuKim/readinggo`)·Issues Read/Write**만. `npx wrangler secret put GITHUB_TOKEN`. 클라 노출 절대 금지(Worker 서버 전용).
-- `SUPABASE_SERVICE_ROLE_KEY`: 기존 시크릿 재사용.
-- `UPSTAGE_API_KEY`(LLM 정리·분류, §4.5): 기존 시크릿 재사용. 서버 보관, 클라 노출 금지.
-- 토큰 회전: 만료/유출 시 PAT 재발급 + 시크릿 갱신.
-
-## 6. 프라이버시 한계 (중요)
-
-구조화 필드(email·user_id)는 마스킹하지만, **사용자가 message 자유 텍스트에 직접 적은 PII**(전화번호·이름 등)는 정규식 스크럽으로 100% 못 잡는다. 완화책:
-
-- 문의 폼에 고지 문구 1줄 추가 권장: "문의는 공개 트래커에 익명으로 등록될 수 있어요 — 개인정보는 적지 말아주세요." ([profile.md](./profile.md) 문의 UI PR에서 처리)
-- ⚠️ **현재 마스킹은 이메일 전용**(드리프트 정정 2026-07-09): worker `INQ_EMAIL_RE`만 치환하고 **전화번호 패턴 스크럽은 미구현**. 전화번호 패턴(`\d{2,3}[-.]?\d{3,4}[-.]?\d{4}`) 스크럽 본문 포함은 후속 과제(현재 코드 미반영).
-
-## 7. Admin 대시보드 연동 (옵션·후속)
-
-`AdminDashboardModal` 문의 목록에서 `github_issue_number`가 있으면 `이슈 #N` 배지·링크 노출. 운영자가 앱↔이슈를 오갈 수 있게. 본 스펙의 필수 범위 아님(코드 PR 시 여력되면 포함).
-
-## 8. Open questions
-
-- 스팸 폭주 시 10분 주기·LIMIT 20으로 충분한가 → 베타 초기 물량 보고 cron 주기 조정. 이제 건당 LLM 1콜이 추가돼 런이 길어질 수 있으나, 런이 중간에 끊겨도 미처리 건은 `github_issue_number IS NULL`로 다음 런 재시도(멱등, §4.3) → 안전. 물량 급증 시 LIMIT/주기 재검토.
-- ~~라벨 체계: 자동 분류(bug/feature) 라벨은 Phase 2 LLM 분류로.~~ **해결(#1105, §4.5)** — LLM 분류로 레포 실재 라벨 `type:bug`/`type:feat`/`ux`/`question` 부여(기타·폴백 `type:feedback`). 미존재 라벨(`type:feature`/`type:ux`/`type:question`)을 가리키던 버그는 #1112 에서 정정. 중복 문의 **병합**(같은 버그 묶기)은 여전히 후속.
-- 닫힌(`status=closed`) 문의도 이슈화할 것인가 → 현재는 status 무관 전건 동기화(미동기화면). 필요시 `status != 'closed'` 필터 추가.
+- 구현 PR은 migration과 Worker/UI 계약 및 합성 테스트까지만 제공한다.
+- Hermes가 리뷰·머지 후 stable DEV에 `51_feedback_flywheel.sql` 적용, `GITHUB_TOKEN`의 Issues 권한, 새 reconciliation secret, cron/수동 trigger를 검증한다.
+- Production migration·Worker 배포·label 운영 적용은 별도 승인 게이트이며 이 PR에서 수행하지 않는다.
