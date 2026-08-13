@@ -70,12 +70,13 @@ jobs:
         working-directory: docs/readinggo
         run: npx cap sync android
 
-      # 서명된 release AAB 빌드. build.gradle 이 keystore.properties 를 읽어 release 서명 연결.
-      - name: Gradle bundleRelease
+      # 서명된 release AAB(Play 업로드)와 APK(직접 설치·아카이브)를 같은 소스·키로 빌드한다.
+      # build.gradle 이 keystore.properties 를 읽어 release 서명을 연결한다.
+      - name: Gradle bundleRelease and assembleRelease
         working-directory: docs/readinggo/android
         run: |
           chmod +x ./gradlew
-          ./gradlew bundleRelease --no-daemon --stacktrace
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
 
       # 빌드 끝나면 복원한 키스토어·비번 삭제(아티팩트·로그 유출 방지).
       - name: Clean up keystore
@@ -84,9 +85,17 @@ jobs:
         run: rm -f upload-keystore.jks keystore.properties
 
       - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: readinggo-release-aab
           path: docs/readinggo/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload signed APK artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: readinggo-release-apk
+          path: docs/readinggo/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
