@@ -31,7 +31,6 @@ import './js/companion.js';
 import './js/co-reading.js';
 import './js/social.js';
 import './js/admin-dashboard.js';
-import './js/prompt-lab.js';
 import './js/book-detail-modal.js';
 import './js/nest-theatre.js';
 import './js/follow-list-modal.js';
@@ -51,6 +50,8 @@ async function boot() {
   let devReviewRestored = false;
   if (import.meta.env.VITE_READINGGO_ENV === 'development') {
     try {
+      // Prompt Lab 코드와 endpoint 문자열은 production module graph에 넣지 않는다(#1372).
+      await import('./js/prompt-lab.js');
       const { devReviewPersonas } = await import('./js/dev-review-personas.js');
       window.RG_DEV_REVIEW = devReviewPersonas;
       devReviewRestored = !!(await devReviewPersonas.restore());
