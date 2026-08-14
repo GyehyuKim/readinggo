@@ -225,20 +225,6 @@ export default {
       { const auth = await requireSupabaseUser(request, env); if (auth) return auth; }
       return bookUpsertProxy(request, env);
     }
-    // 문의 작성은 서버가 세션과 현재 admin 여부를 해소해 customer_feedback/admin_note를 결정한다.
-    if (p === '/api/inquiries') {
-      const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
-      { const rl = await rateLimited(request, env, 'inquiries'); if (rl) return rl; }
-      return inquiryProxy(request, env);
-    }
-    // 수동 운영 트리거. webhook에 의존하지 않고 secret을 가진 운영 호출만 reconciliation을 실행한다.
-    if (p === '/api/internal/reconcile-inquiries') {
-      if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-      const supplied = request.headers.get('X-Reconcile-Secret') || '';
-      if (!env.INQUIRY_RECONCILE_SECRET || supplied !== env.INQUIRY_RECONCILE_SECRET) return json({ error: 'unauthorized' }, 401);
-      return json(await reconcileInquiries(env));
-    }
     // 표지 이미지 프록시 (#676) — 알라딘 CDN은 CORS 헤더가 없어 클라가 캔버스로 그리면 tainted canvas.
     // 서버가 대신 받아 동일출처로 돌려주면 공유 카드가 표지를 taint 없이 인라인 가능. 알라딘 호스트만 허용(오픈 프록시 방지).
     if (p === '/api/img') {
@@ -258,7 +244,6 @@ export default {
     // 크론 분기 — */10 은 문의 동기화(빈번), 0 18 은 일일 아카이브+시드 선충전.
     if (event && event.cron === '*/10 * * * *') {
       ctx.waitUntil(syncInquiries(env, ctx));
-      ctx.waitUntil(reconcileInquiries(env));
       return;
     }
     ctx.waitUntil(archive(env));
@@ -267,56 +252,39 @@ export default {
   },
 };
 
-// 고객 직접 문의 → GitHub 이슈 동기화 (#1407) — 크론 */10. GitHub에는 고정 비식별 문구만 전송.
+// 문의 → GitHub 이슈 동기화 (#701, inquiry-sync.md) — 크론 */10. GITHUB_TOKEN 없으면 no-op.
+//   github_issue_number IS NULL 인 문의를 PII 마스킹해 GitHub 이슈로. 성공 시 번호 기록(멱등).
 const GH_REPO = 'GyehyuKim/readinggo';
+const INQ_EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 
-async function inquiryActor(request, env) {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw Object.assign(new Error('not configured'), { status: 503 });
-  const auth = request.headers.get('Authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  if (!token) throw Object.assign(new Error('unauthorized'), { status: 401 });
-  const authResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${token}` },
-  }).catch(() => null);
-  if (!authResponse || !authResponse.ok) throw Object.assign(new Error('invalid session'), { status: 401 });
-  const user = await authResponse.json().catch(() => null);
-  if (!user || !user.id) throw Object.assign(new Error('invalid session'), { status: 401 });
-  const profileResponse = await inquiryDb(env, `users?id=eq.${encodeURIComponent(user.id)}&select=id,is_admin&limit=1`);
-  const profile = profileResponse && profileResponse[0];
-  if (!profile) throw Object.assign(new Error('profile unavailable'), { status: 403 });
-  return { id: user.id, isAdmin: profile.is_admin === true };
-}
+// 문의 LLM 정리·분류 (#1105, inquiry-sync.md §4.5) — 원문을 한 줄 제목·요약·분류로 정돈해
+//   이슈 가독성·트리아지를 높인다(예: #1104 앱 화면 복붙으로 의도 불명). callLLM(텍스트 프록시)
+//   재사용·키 서버보관. 실패/미설정/JSON 깨짐 시 null → 호출부가 원문만으로 폴백(graceful).
+//   환각 가드: 원문에 없는 사실 추가 금지. 원문(masked)은 호출부가 본문에 항상 별도 보존.
+// 라벨은 레포에 실재하는 것만 — GitHub POST /issues 의 미존재 라벨은 기존 택소노미를 오염시킨다(#1112).
+const INQUIRY_CATEGORY_LABELS = { 버그: 'type:bug', 기능요청: 'type:feat', UX: 'ux', 문의: 'question', 기타: 'type:feedback' };
+const INQUIRY_TRIAGE_SYSTEM = '너는 오픈베타 앱의 사용자 문의를 운영자 트리아지용으로 정돈하는 분류기다. 입력은 사용자가 보낸 문의 원문(앱 화면 텍스트가 섞여 불명확할 수 있음)이다. 다음 형태의 JSON 객체 하나만 출력한다: {"title":"한 줄 제목","summary":"핵심 요약과 추정 의도","category":"버그"}. 규칙: (1) title 은 한국어 한 줄, 40자 이내, 무엇에 대한 문의인지 드러나게. 원문이 화면 텍스트 복붙이라 불명확하면 "[불명확]"로 시작. (2) summary 는 1~2문장으로 핵심과 사용자가 무엇을 원하는지(추정 의도)를 적되, 원문에 없는 사실을 지어내지 말 것. 불명확하면 "원문만으로는 의도 불명확"이라고 솔직히 적는다. (3) category 는 정확히 다음 중 하나: 버그, 기능요청, UX, 문의, 기타. (4) 개인정보(이름·전화번호·이메일)는 제목·요약에 옮기지 말 것. (5) 설명·코드펜스 없이 JSON 객체 하나만 출력.';
 
-async function inquiryDb(env, path, init = {}) {
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      ...(init.headers || {}),
-    },
-  });
-  if (!response.ok) throw Object.assign(new Error('inquiry storage failed'), { status: 502 });
-  if (response.status === 204) return null;
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-}
-
-async function inquiryProxy(request, env) {
-  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+async function triageInquiry(masked, env) {
   try {
-    const actor = await inquiryActor(request, env);
-    const payload = await request.json().catch(() => ({}));
-    const message = String(payload && payload.message || '').trim();
-    if (!message || message.length > 2000) return json({ error: 'invalid message' }, 400);
-    const kind = actor.isAdmin ? 'admin_note' : 'customer_feedback';
-    const rows = await inquiryDb(env, 'inquiries?select=id,message,submission_kind,public_status,response,answered_at,created_at', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ user_id: actor.id, message, app_version: String(payload.app_version || '').slice(0, 40) || null, submission_kind: kind, public_status: 'received' }),
+    const out = await callLLM({
+      messages: [
+        { role: 'system', content: INQUIRY_TRIAGE_SYSTEM },
+        { role: 'user', content: '다음 문의를 정돈해 JSON 으로:\n' + masked },
+      ], env, maxTokens: 400, temperature: 0.2,
     });
-    return json(rows && rows[0] ? rows[0] : { ok: true }, 201);
+    let t = String(out || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a < 0 || b <= a) return null;
+    const o = JSON.parse(t.slice(a, b + 1));
+    const title = stripMd(String(o.title || '')).replace(/\s+/g, ' ').trim().slice(0, 70);
+    const summary = stripMd(String(o.summary || '')).trim().slice(0, 600);
+    if (!title || !summary) return null;                 // 핵심 필드 비면 폴백
+    const cat = String(o.category || '').trim();
+    const category = INQUIRY_CATEGORY_LABELS[cat] ? cat : '기타';   // enum 밖이면 기타
+    return { title, summary, category, label: INQUIRY_CATEGORY_LABELS[category] };
   } catch (e) {
-    return json({ error: e && e.status === 401 ? 'unauthorized' : e && e.status === 403 ? 'forbidden' : 'inquiry request failed' }, (e && e.status) || 500);
+    return null;   // env 미설정·HTTP 실패·JSON 파싱 실패 — 전부 원문 폴백
   }
 }
 
@@ -326,103 +294,48 @@ async function syncInquiries(env, ctx) {
     ...init,
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, ...(init && init.headers) },
   });
-  const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   let rows = [];
   try {
-    const r = await sb(`inquiries?select=id,created_at,github_sync_key,github_sync_claimed_at&submission_kind=eq.customer_feedback&github_issue_number=is.null&or=(github_sync_claimed_at.is.null,github_sync_claimed_at.lt.${encodeURIComponent(staleBefore)})&order=created_at.asc&limit=20`);
+    const r = await sb('inquiries?select=id,message,app_version,created_at&github_issue_number=is.null&order=created_at.asc&limit=20');
     if (!r.ok) return;
     rows = await r.json();
   } catch (e) { return; }
   const seen = new Set();
   for (const q of (rows || [])) {
-    const key = String(q.id);
-    if (seen.has(key) || !q.github_sync_key) continue;
+    const raw = String(q.message || '').trim();
+    if (raw.length < 5) continue;                 // 노이즈 스킵(게이트 유지 — 다음 런으로)
+    const masked = raw.replace(INQ_EMAIL_RE, '[이메일 가림]');
+    const key = masked.slice(0, 120);
+    if (seen.has(key)) continue;                  // 배치 내 중복 — 하나만
     seen.add(key);
-    const claimedAt = new Date().toISOString();
-    let claimed = [];
+    // LLM 정리·분류(#1105). 실패/미설정 시 null → 원문만으로 폴백. 원문(masked)은 두 경로 모두 보존.
+    const triage = await triageInquiry(masked, env);
+    const fallbackTitle = (masked.length > 50 ? masked.slice(0, 50) + '…' : masked).replace(/\s+/g, ' ');
+    const title = triage ? triage.title : fallbackTitle;
+    const meta = `- app_version: \`${q.app_version || '-'}\`\n- 접수: \`${q.created_at}\`\n- inquiry: \`${q.id}\``;
+    const body = triage
+      ? `> 오픈베타 사용자 문의 자동 등록 (LLM 정리·분류 · 원문 보존 · PII 마스킹됨)\n\n**요약·추정 의도**\n${triage.summary}\n\n**분류**: ${triage.category}\n\n---\n**문의 원문 (마스킹됨)**\n${masked}\n\n---\n${meta}`
+      : `> 오픈베타 사용자 문의 자동 등록 (PII 마스킹됨)\n\n**문의 내용**\n${masked}\n\n---\n${meta}`;
+    const labels = ['source:beta-inquiry', triage ? triage.label : 'type:feedback'];
     try {
-      const claim = await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&or=(github_sync_claimed_at.is.null,github_sync_claimed_at.lt.${encodeURIComponent(staleBefore)})&select=id,github_sync_key`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify({ github_sync_claimed_at: claimedAt }),
+      const gh = await fetch(`https://api.github.com/repos/${GH_REPO}/issues`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json', 'User-Agent': 'readinggo-worker',
+        },
+        body: JSON.stringify({ title, body, labels }),
       });
-      if (!claim.ok) continue;
-      claimed = await claim.json();
-    } catch (e) { continue; }
-    if (!claimed.length) continue; // 다른 Worker가 먼저 원자적으로 선점
-
-    const marker = `readinggo-feedback:${q.github_sync_key}`;
-    let issueNumber = null;
-    let issueCreated = false;
-    try {
-      // 이전 실행이 GitHub 생성 후 DB 연결 전에 죽었으면 공개 원문 없는 marker로 기존 이슈를 회수한다.
-      const searchQuery = encodeURIComponent(`repo:${GH_REPO} is:issue in:body "${marker}"`);
-      const search = await fetch(`https://api.github.com/search/issues?q=${searchQuery}&per_page=1`, {
-        headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'readinggo-worker' },
-      });
-      if (!search.ok) throw new Error('github issue recovery search failed');
-      const result = await search.json();
-      issueNumber = result && result.items && result.items[0] && result.items[0].number;
-      if (!issueNumber) {
-        const gh = await fetch(`https://api.github.com/repos/${GH_REPO}/issues`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json',
-            'Content-Type': 'application/json', 'User-Agent': 'readinggo-worker',
-          },
-          body: JSON.stringify({
-            title: '고객 피드백 확인 요청',
-            body: `ReadingGo 앱에서 인증된 비관리자 사용자의 피드백이 접수되었습니다.\n\n원문과 제보자 정보는 비공개 운영 데이터에서만 확인하세요.\n\n<!-- ${marker} -->`,
-            labels: ['source:customer-feedback'],
-          }),
-        });
-        if (gh.status !== 201) throw new Error('github issue create failed');
-        const issue = await gh.json();
-        issueNumber = issue.number;
-        issueCreated = true;
-      }
-      const update = await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&github_sync_claimed_at=eq.${encodeURIComponent(claimedAt)}`, {
+      if (gh.status !== 201) continue;            // 실패 → 컬럼 유지, 다음 런 재시도
+      const issue = await gh.json();
+      const upd = () => sb(`inquiries?id=eq.${q.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ github_issue_number: issueNumber, public_status: 'checking', github_sync_claimed_at: null }),
+        body: JSON.stringify({ github_issue_number: issue.number }),
       });
-      if (!update.ok) throw new Error('inquiry issue link failed');
-    } catch (e) {
-      // GitHub에 이미 생성된 경우 claim을 유지해 stale recovery가 marker 검색 후 연결한다.
-      if (!issueCreated) {
-        await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&github_sync_claimed_at=eq.${encodeURIComponent(claimedAt)}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ github_sync_claimed_at: null }),
-        }).catch(() => {});
-      }
-    }
+      const ok = await upd().then((r) => r.ok).catch(() => false);
+      if (!ok && ctx && ctx.waitUntil) ctx.waitUntil(upd().catch(() => {})); // §4.3 재시도 1회
+    } catch (e) { /* 개별 실패 스킵 */ }
   }
-}
-
-async function reconcileInquiries(env) {
-  if (!env.GITHUB_TOKEN || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return { checked: 0, answered: 0 };
-  let rows;
-  try {
-    rows = await inquiryDb(env, 'inquiries?select=id,github_issue_number&submission_kind=eq.customer_feedback&github_issue_number=not.is.null&public_status=neq.answered&order=created_at.asc&limit=50');
-  } catch (e) { return { checked: 0, answered: 0 }; }
-  let checked = 0, answered = 0;
-  for (const row of rows || []) {
-    try {
-      const response = await fetch(`https://api.github.com/repos/${GH_REPO}/issues/${row.github_issue_number}`, {
-        headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'readinggo-worker' },
-      });
-      if (!response.ok) continue;
-      checked += 1;
-      const issue = await response.json();
-      const labels = new Set((issue.labels || []).map((label) => typeof label === 'string' ? label : label.name));
-      const eligible = issue.state === 'closed' && issue.state_reason !== 'not_planned' && labels.has('feedback:notify-ready');
-      if (!eligible) continue;
-      await inquiryDb(env, `inquiries?id=eq.${encodeURIComponent(row.id)}&public_status=neq.answered`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ public_status: 'answered', status: 'answered', response: '보내주신 의견의 확인과 반영이 완료되었어요. 소중한 의견 감사합니다.', answered_at: new Date().toISOString(), response_source: 'github_notify_ready', github_reconciled_at: new Date().toISOString() }),
-      });
-      answered += 1;
-    } catch (e) { /* 안전한 개별 재시도: 사용자 내용이나 오류 본문을 로그하지 않는다. */ }
-  }
-  return { checked, answered };
 }
 
 /* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
