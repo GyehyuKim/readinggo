@@ -134,6 +134,11 @@ export async function crawlYes24(managed, { title, author, isbn }, opts = {}) {
   await managed.warmup();
   const context = managed.context;
   const wantIsbn = onlyDigitsX(isbn);
+  // 시드는 canonical ISBN-13으로만 수집한다. 제목 검색 결과나 ISBN 형식만으로
+  // 다른 판본/책의 발췌를 귀속하지 않는다(#1431).
+  if (!/^97[89]\d{10}$/.test(wantIsbn)) {
+    return { seeds: [], status: 'unverified-book', productUrl: '' };
+  }
   const page = await context.newPage();
   try {
     const searchUrl = SEARCH_BASE + encodeURIComponent(buildQuery(title, author));
@@ -152,8 +157,7 @@ export async function crawlYes24(managed, { title, author, isbn }, opts = {}) {
     const candidates = await collectResultLinks(page);
     if (!candidates.length) { log(`  no results: ${title}`); return { seeds: [], status: 'not-found', productUrl: '' }; }
 
-    let chosen = null;            // ISBN 일치
-    let firstWithExcerpt = null;  // 발췌 있는 첫 상품(폴백)
+    let chosen = null;            // ISBN 정확 일치
 
     for (const productUrl of candidates) {
       await page.goto(productUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -161,15 +165,13 @@ export async function crawlYes24(managed, { title, author, isbn }, opts = {}) {
       const isbnMatch = wantIsbn && isbnOnPage && onlyDigitsX(isbnOnPage) === wantIsbn;
 
       if (isbnMatch) { chosen = { productUrl, excerpts }; break; }
-      if (!firstWithExcerpt && excerpts.length) firstWithExcerpt = { productUrl, excerpts };
-      if (!wantIsbn) { chosen = { productUrl, excerpts }; break; }  // ISBN 없으면 첫 결과로 충분
     }
 
-    const pick = chosen || firstWithExcerpt;
+    const pick = chosen;
     if (!pick || !pick.excerpts.length) {
-      const url = (pick && pick.productUrl) || candidates[0];
-      log(`  matched but no excerpt: ${title}`);
-      return { seeds: [], status: 'no-excerpt', productUrl: url };
+      const url = (pick && pick.productUrl) || '';
+      log(`  exact ISBN match/excerpt 없음: ${title}`);
+      return { seeds: [], status: pick ? 'no-excerpt' : 'isbn-mismatch', productUrl: url };
     }
 
     const seeds = pick.excerpts.map((text) => ({ text, sourceName: '예스24 책속으로', sourceUrl: pick.productUrl }));

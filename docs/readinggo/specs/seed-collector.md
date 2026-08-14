@@ -31,7 +31,7 @@
 │ Node + 헤드리스 브라우저(인바운드 0)     │      │ /api/seed          │◀─조회─ │ 책 열기│
 │  seed_queue 폴링(priority desc)         │─폴링→│  byBook 있으면 []   │        │       │
 │  → 예스24 검색·책속으로 크롤            │ seed │  없으면 seed_queue   │ ─[]→   │ "모으는│
-│  → book_id 해석(auto-upsert)           │_queue│  upsert(high) + []  │        │  중…" │
+│  → canonical book_id 정확매칭           │_queue│  upsert(high) + []  │        │  중…" │
 │  → 여러 NPC 명의 sentences 적재         │◀─────│                     │        │ +폴링 │
 │  → seed_sentences 원장 + status='done' │      └────────────────────┘        └───┬───┘
 │ launchd: poller 상시 + 새벽 prewarm     │           byBook(sentences) 직접 조회 ──┘
@@ -51,11 +51,11 @@
 사용자가 **빈 책을 열면 큐잉하고, 둘러보는 동안 채워 노출한다**(동기 대기·화면 멈춤 없음).
 
 1. 앱 → 워커 `POST /api/seed {title, author, isbn, have}`
-2. 워커: 공개 문장이 이미 있으면(byBook>0) 큐잉 불필요. 없으면 → `seed_queue` upsert(`priority='high'`, book_key 중복 무시) → **빈 배열 반환**("모으는 중").
+2. 워커: `books` canonical 행에서 **ISBN-13 정확 일치 + 정규화 제목 일치**를 확인한다. 미확인·불일치·DB 장애는 `status='skipped'`로 fail-closed하며 큐에 넣지 않는다. 확인된 경우에만 DB의 제목·저자·ISBN으로 `seed_queue` upsert(`priority='high'`, book_key 중복 무시) → **빈 배열 반환**("모으는 중").
 3. collector(맥미니)가 `seed_queue` 폴링(priority desc, 5초 간격) → pending 책 픽업.
-4. collector: 예스24 검색 → "책 속으로" 크롤 → `book_id` 해석(없으면 `books` auto-upsert) → 발췌마다 **서로 다른 NPC 명의**로 `sentences`(kind='quote') 적재 + `seed_sentences` 원장 기록 → `status='done'`.
+4. collector: 예스24 검색 → 상품 페이지의 ISBN-13이 canonical ISBN과 **정확히 같은 결과만** "책 속으로" 크롤 → 기존 canonical `book_id`를 ISBN+제목으로 재확인(없으면 생략; auto-upsert 금지) → 출처 URL이 있는 발췌만 **서로 다른 NPC 명의**로 `sentences`(kind='quote') 적재 + `seed_sentences` 원장 기록 → `status='done'`.
 5. 앱: 시드 0건이면 "🌱 이웃의 문장을 모으는 중…" placeholder + **byBook 짧은 폴링**(예 4초 × ~5회) → 채워지면 "이 책의 한 문장"에 이웃 아바타와 함께 노출.
-6. **실패**: not-found·no-excerpt(예스24 미커버)는 `status='failed'`(재시도 무의미). blocked·timeout은 attempts++ 후 재시도(≤3). 앱은 폴링 종료 시 placeholder 정리.
+6. **실패**: not-found·no-excerpt·unverified-book·isbn-mismatch는 `status='failed'`(재시도 무의미). blocked·timeout은 attempts++ 후 재시도(≤3). 앱은 폴링 종료 시 placeholder 정리.
 
 > **UX 결정**: 동기 대기 폐기 — 큐잉 즉시 반환 + 폴링. 첫 크롤은 ~15~25초(헤드리스 브라우저)라 인기책 prewarm으로 즉시감을 얻고, 나머지는 폴링으로 흡수.
 
@@ -76,10 +76,10 @@
 입력 `{title, author, isbn}` → 출력 `[{text, sourceName, sourceUrl}]`:
 
 1. **검색**: `https://www.yes24.com/Product/Search?domain=BOOK&query={제목 저자}` 를 **브라우저로** 열고 결과(`.gd_name`) 대기(JS 렌더).
-2. **상품 매칭**: 검색 결과 앵커 `.gd_name` 에서 `/product/goods/{id}` 추출. 첫 결과 우선, **ISBN13 대조**(상품페이지 ISBN 일치 확인)로 정확 매칭. 동명이서·다른 판본 방지.
+2. **상품 매칭**: 검색 결과 앵커 `.gd_name` 에서 `/product/goods/{id}` 추출. **canonical ISBN-13과 상품페이지 ISBN이 정확히 일치한 결과만** 선택한다. ISBN 누락·불일치 때 첫 결과나 발췌가 있는 다른 상품으로 폴백하지 않는다.
 3. **발췌 추출**: 상품페이지를 **스크롤(lazy-load)** 한 뒤 `innerText`의 **"책 속으로"** 섹션 파싱. 발췌 구분자는 책마다 다르므로(`* ` 또는 `--- p.NN 「장」 중에서` 인용줄) **줄 단위 + 출처/인용 줄 제거**로 통일.
 4. **정제**: 각 발췌를 시드로. 길이 필터(권장 15~400자), 공백 정규화. 예스24 발췌는 깔끔해 LLM 정제 불필요(블로그와 달리 꼬리표·군더더기 없음).
-5. **적재**: `seed_sentences` insert(service role, `book_key`). `sourceName`='예스24 책속으로'(또는 출판사명), `sourceUrl`=상품 URL.
+5. **적재**: `seed_sentences` insert(service role, `book_key`). `sourceName`='예스24 책속으로', `sourceUrl`은 매칭된 예스24 상품 URL이어야 하며, 출처 없는 텍스트는 저장하지 않는다.
 
 > **검증된 셀렉터·패턴 (2026-06-18, 구현 시 라이브 재확인하여 갱신)**: 검색은 `domain=BOOK` 사용 — 초안의 `domain=ALL` 은 현재 홈(`/Main/default.aspx`)으로 **리다이렉트**되어 못 씀. 검색 결과 링크는 프로모/추천 슬롯과 섞이므로 실제 결과 앵커 셀렉터 **`.gd_name`** 으로 한정(`a[href^="/product/goods/"]` 단독은 광고 슬롯을 잡음). "책 속으로"는 **스크롤 후** 렌더되며 구분자는 책마다 다름(`* ` / `--- … 중에서`). 의심 트래픽은 홈으로 소프트 리다이렉트되므로 **홈 워밍업(세션 쿠키)+봇탐지 완화** 필요. 모순·사피엔스·데미안·불편한편의점 발췌 확인.
 
@@ -90,8 +90,8 @@
 - **직렬화**: 브라우저 1개로 순차 처리(동시 크롤 금지 — 차단·자원). 책 사이 딜레이 2~3초.
 
 > ✅ **정합됨 (2026-07-09)**: `collector/poller.mjs` 기본 `POLL_BATCH=1`(순차)로 낮춤 + 배포본(.env) 도 1로 재시작. 이전 병렬(2~4)에서 관측된 `browserContext.newPage: ...has been closed`(브라우저 컨텍스트 경합) 제거 + spec 동시성-1 안티차단 의도와 일치. (2주 라이브에서 예스24 차단 0건이었으나, 컨텍스트 경합 에러가 있어 순차로 안정화.)
-- **적재**: 발췌 → `book_id` 해석(없으면 `books` auto-upsert) → distinct NPC 명의 `sentences`(kind='quote') + `seed_sentences` 원장. 멱등(그 책 기존 문장 텍스트 제외).
-- **상태전이**: ok→`done`. not-found/no-excerpt→`failed`(영구). blocked/timeout→attempts++ 후 재시도(≤3).
+- **적재**: 출처가 확인된 발췌 → canonical `book_id` 정확 해석(없으면 생략, `books` 쓰기 금지) → distinct NPC 명의 `sentences`(kind='quote') + `seed_sentences` 원장. 멱등(그 책 기존 문장 텍스트 제외).
+- **상태전이**: ok→`done`. not-found/no-excerpt/unverified-book/isbn-mismatch→`failed`(영구). blocked/timeout→attempts++ 후 재시도(≤3).
 
 ## 6. 노출 / 연결 보안 (단순화)
 
