@@ -63,6 +63,7 @@ jobs:
                   headers={
                       'Authorization': f'Bearer {token}',
                       'Content-Type': 'application/json',
+                      'User-Agent': 'readinggo-dev-migration/1.0',
                   },
                   method='POST',
               )
@@ -82,6 +83,8 @@ jobs:
             sha256 text not null,
             applied_at timestamptz not null default now()
           );
+          alter table public.hermes_dev_migrations enable row level security;
+          revoke all on public.hermes_dev_migrations from anon, authenticated;
           '''
           existing = query(ledger + f"select filename, sha256 from public.hermes_dev_migrations where filename = '{safe_filename}';")
           rows = existing if isinstance(existing, list) else []
