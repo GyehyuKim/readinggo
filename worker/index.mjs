@@ -68,6 +68,10 @@ export class PromptExperimentLimiter {
 export default {
   // ── HTTP: CORS 래퍼 (#1230) — 앱 오리진의 교차출처 API 호출에 preflight/ACAO 응답 ──
   async fetch(request, env, ctx) {
+    // #1372: cross-origin OPTIONS를 포함한 모든 PROD Prompt Lab 요청은 어떤 전처리보다 먼저 404.
+    if (new URL(request.url).pathname === '/api/prompt-lab' && env.ENVIRONMENT !== 'development') {
+      return json({ error: 'not found' }, 404);
+    }
     const origin = request.headers.get('Origin');
     const crossApp = !!origin && origin !== new URL(request.url).origin && isAppOrigin(origin);
     if (crossApp && request.method === 'OPTIONS') {
@@ -117,6 +121,9 @@ export default {
     // Prompt Lab (#1304) — 합성 fixture만 쓰는 인증·역할 보호 실험 경로.
     // candidate는 이 명시적 경로에서만 로드하며 일반 /api/companion에는 절대 전달하지 않는다.
     if (p === '/api/prompt-lab') {
+      // #1372: PROD에서는 endpoint 자체가 없는 것처럼 처리한다. origin/rate-limit/auth/DB보다
+      // 먼저 종료해 인증 상태나 요청 형태로 존재 여부·내부 처리 차이가 드러나지 않게 한다.
+      if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'prompt-lab'); if (rl) return rl; }
