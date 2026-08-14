@@ -1,0 +1,107 @@
+name: migrate-dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: "DEV에 적용할 docs/readinggo/supabase SQL 파일명"
+        required: true
+        type: string
+
+concurrency:
+  group: readinggo-dev-migration
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-dev:
+    name: apply one migration to DEV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Apply migration and verify ledger
+        env:
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MIGRATION_FILE: ${{ inputs.migration }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          filename = os.environ['MIGRATION_FILE']
+          if not re.fullmatch(r'[0-9]{2}_[a-z0-9_]+\.sql', filename):
+              raise SystemExit('migration must be a basename such as 52_sentence_visibility_length.sql')
+
+          path = Path('docs/readinggo/supabase') / filename
+          if not path.is_file():
+              raise SystemExit(f'migration not found: {path}')
+
+          sql = path.read_text()
+          if re.search(r'(?im)^\s*(begin|commit|rollback)\s*;', sql):
+              raise SystemExit('migration must not manage its own transaction')
+
+          dev_url = os.environ['DEV_SUPABASE_URL'].rstrip('/')
+          match = re.fullmatch(r'https://([a-z0-9]+)\.supabase\.co', dev_url)
+          if not match:
+              raise SystemExit('DEV_SUPABASE_URL is not a canonical Supabase project URL')
+          project_ref = match.group(1)
+          token = os.environ['SUPABASE_ACCESS_TOKEN']
+          endpoint = f'https://api.supabase.com/v1/projects/{project_ref}/database/query'
+
+          def query(statement):
+              request = urllib.request.Request(
+                  endpoint,
+                  data=json.dumps({'query': statement}).encode(),
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Content-Type': 'application/json',
+                      'User-Agent': 'readinggo-dev-migration/1.0',
+                  },
+                  method='POST',
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  detail = error.read().decode(errors='replace')[:1000]
+                  raise SystemExit(f'Supabase Management API failed ({error.code}): {detail}')
+
+          digest = hashlib.sha256(sql.encode()).hexdigest()
+          safe_filename = filename.replace("'", "''")
+          safe_digest = digest.replace("'", "''")
+          ledger = '''
+          create table if not exists public.hermes_dev_migrations (
+            filename text primary key,
+            sha256 text not null,
+            applied_at timestamptz not null default now()
+          );
+          alter table public.hermes_dev_migrations enable row level security;
+          revoke all on public.hermes_dev_migrations from anon, authenticated;
+          '''
+          existing = query(ledger + f"select filename, sha256 from public.hermes_dev_migrations where filename = '{safe_filename}';")
+          rows = existing if isinstance(existing, list) else []
+          if rows:
+              if rows[0].get('sha256') != digest:
+                  raise SystemExit('migration filename already applied with a different SHA-256')
+              print(json.dumps({'status': 'already_applied', 'migration': filename, 'sha256': digest}))
+              raise SystemExit(0)
+
+          transaction = f'''begin;
+          {sql}
+          insert into public.hermes_dev_migrations(filename, sha256)
+          values ('{safe_filename}', '{safe_digest}');
+          commit;'''
+          query(transaction)
+          verified = query(f"select filename, sha256, applied_at from public.hermes_dev_migrations where filename = '{safe_filename}';")
+          if not isinstance(verified, list) or len(verified) != 1 or verified[0].get('sha256') != digest:
+              raise SystemExit('migration ledger readback failed')
+          print(json.dumps({'status': 'applied', 'migration': filename, 'sha256': digest, 'readback': verified[0]}))
+          PY
