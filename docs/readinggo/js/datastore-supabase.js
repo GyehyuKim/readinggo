@@ -16,6 +16,10 @@
     return c;
   }
   function unwrap(res) { if (res && res.error) throw res.error; return res ? res.data : null; }
+  function validateSentenceText(text, visibility) {
+    if (!window.RG_validateSentenceText) throw new Error('한 문장 검증기 미초기화');
+    return window.RG_validateSentenceText(text, visibility);
+  }
 
   let _uid = null;
   async function uid() {
@@ -366,6 +370,7 @@
           settings = await A.settings.get();
           sentenceVisibility = settings.default_sentence_visibility === 'private' ? 'private' : 'public';
         }
+        const checked = validateSentenceText(text, sentenceVisibility);
         if (sentenceVisibility !== 'private') {
           settings = settings || await A.settings.get();
           if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION)) {
@@ -375,7 +380,7 @@
         }
         return unwrap(await sb().from('sentences').insert({
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
-          page: (typeof page === 'number') ? page : null, text: text || '', my_note: my_note || null,
+          page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
           visibility: sentenceVisibility,
         }).select().single());
@@ -386,7 +391,10 @@
       },
       // 한 문장 본문 편집 (오타 수정, #325) — 본인 행만(RLS)
       async updateText(sentenceId, text) {
-        return unwrap(await sb().from('sentences').update({ text: text || '' }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
+        const id = await uid();
+        const current = unwrap(await sb().from('sentences').select('visibility').eq('id', sentenceId).eq('user_id', id).single());
+        const checked = validateSentenceText(text, current && current.visibility);
+        return unwrap(await sb().from('sentences').update({ text: checked.text }).eq('id', sentenceId).eq('user_id', id).select().single());
       },
       // 한 문장 페이지 번호 편집 (#683) — 본인 행만(RLS). null = 페이지 미상.
       async setPage(sentenceId, page) {
@@ -415,7 +423,12 @@
             throw new Error('ugc_terms_required');
           }
         }
-        return unwrap(await sb().from('sentences').update(patch).eq('id', sentenceId).eq('user_id', await uid()).select().single());
+        const id = await uid();
+        if (patch && patch.visibility) {
+          const current = unwrap(await sb().from('sentences').select('text').eq('id', sentenceId).eq('user_id', id).single());
+          validateSentenceText(current && current.text, patch.visibility);
+        }
+        return unwrap(await sb().from('sentences').update(patch).eq('id', sentenceId).eq('user_id', id).select().single());
       },
       async listByBook(userBookId) {
         return unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)

@@ -86,6 +86,7 @@ jobs:
           node tests/reading-activity-removed.test.mjs
           node tests/related-filter.test.mjs
           node tests/sentence-input-reset.test.mjs
+          node tests/sentence-visibility-limit.test.mjs
           node tests/sentence-book-binding.test.mjs
           node --test tests/shelf-status-options.test.mjs
           node tests/streak-checkin.test.mjs
