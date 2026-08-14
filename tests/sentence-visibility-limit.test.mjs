@@ -31,7 +31,7 @@ assert.match(supabaseSource, /validateSentenceText\(text, sentenceVisibility\)/,
 assert.match(supabaseSource, /select\('visibility'\)[\s\S]+validateSentenceText\(text, current && current\.visibility\)/, 'Supabase 본문 편집 사전 검증');
 assert.match(supabaseSource, /select\('text'\)[\s\S]+validateSentenceText\(current && current\.text, patch\.visibility\)/, 'Supabase visibility 변경 사전 검증');
 
-const migration = fs.readFileSync(path.join(root, 'docs/readinggo/supabase/51_sentence_visibility_length.sql'), 'utf8');
+const migration = fs.readFileSync(path.join(root, 'docs/readinggo/supabase/52_sentence_visibility_length.sql'), 'utf8');
 assert.match(migration, /char_length\(btrim\(text\)\) between 1 and[\s\S]+case when coalesce\(visibility, 'public'\) = 'private' then 1000 else 200 end/i);
 assert.match(migration, /not valid/i, 'forward-only 신규/변경 쓰기 강제 migration');
 
