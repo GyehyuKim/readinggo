@@ -326,39 +326,74 @@ async function syncInquiries(env, ctx) {
     ...init,
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, ...(init && init.headers) },
   });
+  const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   let rows = [];
   try {
-    const r = await sb('inquiries?select=id,created_at&submission_kind=eq.customer_feedback&github_issue_number=is.null&order=created_at.asc&limit=20');
+    const r = await sb(`inquiries?select=id,created_at,github_sync_key,github_sync_claimed_at&submission_kind=eq.customer_feedback&github_issue_number=is.null&or=(github_sync_claimed_at.is.null,github_sync_claimed_at.lt.${encodeURIComponent(staleBefore)})&order=created_at.asc&limit=20`);
     if (!r.ok) return;
     rows = await r.json();
   } catch (e) { return; }
   const seen = new Set();
   for (const q of (rows || [])) {
     const key = String(q.id);
-    if (seen.has(key)) continue;                  // 배치 내 중복 — 하나만
+    if (seen.has(key) || !q.github_sync_key) continue;
     seen.add(key);
-    // 공개 GitHub에는 자유 텍스트·이메일·user_id·내부 UUID를 전혀 전송하지 않는다.
-    const title = '고객 피드백 확인 요청';
-    const body = 'ReadingGo 앱에서 인증된 비관리자 사용자의 피드백이 접수되었습니다.\n\n원문과 제보자 정보는 비공개 운영 데이터에서만 확인하세요.';
-    const labels = ['source:customer-feedback'];
+    const claimedAt = new Date().toISOString();
+    let claimed = [];
     try {
-      const gh = await fetch(`https://api.github.com/repos/${GH_REPO}/issues`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json',
-          'Content-Type': 'application/json', 'User-Agent': 'readinggo-worker',
-        },
-        body: JSON.stringify({ title, body, labels }),
+      const claim = await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&or=(github_sync_claimed_at.is.null,github_sync_claimed_at.lt.${encodeURIComponent(staleBefore)})&select=id,github_sync_key`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ github_sync_claimed_at: claimedAt }),
       });
-      if (gh.status !== 201) continue;            // 실패 → 컬럼 유지, 다음 런 재시도
-      const issue = await gh.json();
-      const upd = () => sb(`inquiries?id=eq.${q.id}`, {
+      if (!claim.ok) continue;
+      claimed = await claim.json();
+    } catch (e) { continue; }
+    if (!claimed.length) continue; // 다른 Worker가 먼저 원자적으로 선점
+
+    const marker = `readinggo-feedback:${q.github_sync_key}`;
+    let issueNumber = null;
+    let issueCreated = false;
+    try {
+      // 이전 실행이 GitHub 생성 후 DB 연결 전에 죽었으면 공개 원문 없는 marker로 기존 이슈를 회수한다.
+      const searchQuery = encodeURIComponent(`repo:${GH_REPO} is:issue in:body "${marker}"`);
+      const search = await fetch(`https://api.github.com/search/issues?q=${searchQuery}&per_page=1`, {
+        headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'readinggo-worker' },
+      });
+      if (!search.ok) throw new Error('github issue recovery search failed');
+      const result = await search.json();
+      issueNumber = result && result.items && result.items[0] && result.items[0].number;
+      if (!issueNumber) {
+        const gh = await fetch(`https://api.github.com/repos/${GH_REPO}/issues`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json',
+            'Content-Type': 'application/json', 'User-Agent': 'readinggo-worker',
+          },
+          body: JSON.stringify({
+            title: '고객 피드백 확인 요청',
+            body: `ReadingGo 앱에서 인증된 비관리자 사용자의 피드백이 접수되었습니다.\n\n원문과 제보자 정보는 비공개 운영 데이터에서만 확인하세요.\n\n<!-- ${marker} -->`,
+            labels: ['source:customer-feedback'],
+          }),
+        });
+        if (gh.status !== 201) throw new Error('github issue create failed');
+        const issue = await gh.json();
+        issueNumber = issue.number;
+        issueCreated = true;
+      }
+      const update = await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&github_sync_claimed_at=eq.${encodeURIComponent(claimedAt)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ github_issue_number: issue.number, public_status: 'checking' }),
+        body: JSON.stringify({ github_issue_number: issueNumber, public_status: 'checking', github_sync_claimed_at: null }),
       });
-      const ok = await upd().then((r) => r.ok).catch(() => false);
-      if (!ok && ctx && ctx.waitUntil) ctx.waitUntil(upd().catch(() => {})); // §4.3 재시도 1회
-    } catch (e) { /* 개별 실패 스킵 */ }
+      if (!update.ok) throw new Error('inquiry issue link failed');
+    } catch (e) {
+      // GitHub에 이미 생성된 경우 claim을 유지해 stale recovery가 marker 검색 후 연결한다.
+      if (!issueCreated) {
+        await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&github_sync_claimed_at=eq.${encodeURIComponent(claimedAt)}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ github_sync_claimed_at: null }),
+        }).catch(() => {});
+      }
+    }
   }
 }
 

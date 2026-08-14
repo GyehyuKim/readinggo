@@ -8,7 +8,11 @@ const originalFetch = globalThis.fetch;
 const writes = [];
 let actorAdmin = false;
 let githubIssue = { state: 'open', state_reason: null, labels: [] };
+let githubSearchItems = [];
+let githubCreateCount = 0;
 let reconcileRows = [];
+let inquiryLinked = false;
+let claimAvailable = true;
 
 const request = (path, body, headers = {}) => new Request(`https://readinggo.example${path}`, {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body || {}),
@@ -23,15 +27,25 @@ globalThis.fetch = async (input, init = {}) => {
     return Response.json([{ id: 'inquiry-row', message: row.message, submission_kind: row.submission_kind, public_status: row.public_status, created_at: '2026-08-13T00:00:00Z' }]);
   }
   if (url.origin === SB && url.pathname === '/rest/v1/inquiries' && !init.method) {
-    if (url.searchParams.get('github_issue_number') === 'is.null') return Response.json([{ id: 'customer-inquiry', created_at: '2026-08-13T00:00:00Z' }]);
+    if (url.searchParams.get('github_issue_number') === 'is.null') {
+      return Response.json(inquiryLinked ? [] : [{ id: 'customer-inquiry', created_at: '2026-08-13T00:00:00Z', github_sync_key: 'public-sync-token', github_sync_claimed_at: null }]);
+    }
     return Response.json(reconcileRows);
   }
   if (url.origin === SB && url.pathname === '/rest/v1/inquiries' && init.method === 'PATCH') {
-    writes.push({ type: 'patch', row: JSON.parse(init.body), query: url.search });
+    const row = JSON.parse(init.body); writes.push({ type: 'patch', row, query: url.search });
+    if (row.github_sync_claimed_at && url.searchParams.get('select')) {
+      if (!claimAvailable) return Response.json([]);
+      claimAvailable = false;
+      return Response.json([{ id: 'customer-inquiry', github_sync_key: 'public-sync-token' }]);
+    }
+    if (row.github_issue_number) inquiryLinked = true;
+    if (row.github_sync_claimed_at === null && !row.github_issue_number) claimAvailable = true;
     return new Response(null, { status: 204 });
   }
+  if (url.hostname === 'api.github.com' && url.pathname === '/search/issues') return Response.json({ items: githubSearchItems });
   if (url.hostname === 'api.github.com' && url.pathname.endsWith('/issues') && init.method === 'POST') {
-    const row = JSON.parse(init.body); writes.push({ type: 'github-create', row });
+    const row = JSON.parse(init.body); writes.push({ type: 'github-create', row }); githubCreateCount += 1;
     return Response.json({ number: 1408 }, { status: 201 });
   }
   if (url.hostname === 'api.github.com' && /\/issues\/\d+$/.test(url.pathname)) return Response.json(githubIssue);
@@ -52,15 +66,36 @@ try {
   assert.equal(response.status, 201);
   assert.equal(writes.at(-1).row.submission_kind, 'admin_note', 'admin은 서버가 내부 메모로 결정');
 
-  const pending = [];
-  await worker.scheduled({ cron: '*/10 * * * *' }, env, { waitUntil(p) { pending.push(p); } });
-  await Promise.all(pending);
+  const runScheduled = async () => {
+    const pending = [];
+    await worker.scheduled({ cron: '*/10 * * * *' }, env, { waitUntil(p) { pending.push(p); } });
+    await Promise.all(pending);
+  };
+
+  await runScheduled();
   const ghCreate = writes.find((entry) => entry.type === 'github-create').row;
   assert.deepEqual(ghCreate.labels, ['source:customer-feedback']);
+  assert.match(ghCreate.body, /readinggo-feedback:public-sync-token/, '비PII recovery marker 포함');
   assert.equal(JSON.stringify(ghCreate).includes('email@example.com'), false);
   assert.equal(JSON.stringify(ghCreate).includes('customer-actor'), false);
   assert.equal(JSON.stringify(ghCreate).includes('customer-inquiry'), false);
   assert.equal(writes.some((entry) => entry.type === 'patch' && entry.row.public_status === 'checking'), true);
+  assert.equal(githubCreateCount, 1);
+
+  // DB 연결 직전 장애 뒤 stale recovery가 기존 marker 이슈를 찾아 새 이슈를 만들지 않는다.
+  inquiryLinked = false;
+  claimAvailable = true;
+  githubSearchItems = [{ number: 1408 }];
+  await runScheduled();
+  assert.equal(githubCreateCount, 1, '기존 marker 이슈 회수 시 중복 생성 금지');
+  assert.equal(inquiryLinked, true, '회수한 이슈 번호를 문의에 다시 연결');
+
+  // 동시에 조회한 다른 Worker가 claim을 잃으면 GitHub 호출을 하지 않는다.
+  inquiryLinked = false;
+  claimAvailable = false;
+  githubSearchItems = [];
+  await runScheduled();
+  assert.equal(githubCreateCount, 1, '원자 claim 패자는 이슈 생성 금지');
 
   reconcileRows = [{ id: 'customer-inquiry', github_issue_number: 1408 }];
   const reconcile = () => worker.fetch(request('/api/internal/reconcile-inquiries', {}, { 'X-Reconcile-Secret': 'reconcile-test' }), env, {});
@@ -84,13 +119,14 @@ try {
 
   const dataStore = readFileSync(new URL('../docs/readinggo/js/datastore-supabase.js', import.meta.url), 'utf8');
   const settings = readFileSync(new URL('../docs/readinggo/js/settings-modal.js', import.meta.url), 'utf8');
-  const migration = readFileSync(new URL('../docs/readinggo/supabase/51_feedback_flywheel.sql', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../docs/readinggo/supabase/53_feedback_flywheel.sql', import.meta.url), 'utf8');
   assert.match(dataStore, /inquiries:[\s\S]*create\([\s\S]*\/api\/inquiries[\s\S]*listMine/);
   assert.match(settings, /내 문의 내역/);
   for (const label of ['접수', '확인중', '답변']) assert.match(settings, new RegExp(label));
   assert.match(migration, /default 'legacy'/, '기존 문의를 소급 자동화하지 않고 보존');
+  assert.match(migration, /github_sync_key[\s\S]+github_sync_claimed_at/, '중복 생성 방지 claim/recovery 컬럼');
 } finally {
   globalThis.fetch = originalFetch;
 }
 
-console.log('OK: feedback actor 분리, PII 비공개, 상태 조회, notify-ready reconciliation');
+console.log('OK: feedback actor 분리, PII 비공개, 원자 claim, marker recovery, notify-ready reconciliation');
