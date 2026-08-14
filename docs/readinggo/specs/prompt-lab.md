@@ -81,7 +81,22 @@ candidate 개선안의 성공 여부는 설명만으로 추정하지 않고 실�
 
 ## 운영 반영과 테스트 단계
 
-candidate의 운영 반영은 promoter만 요청할 수 있고 audit event를 남긴다. 다만 현재 PR의 사용자 테스트는 **candidate 작성·비교·평가 여정**만 대상으로 한다. promotion/rollback의 원자적 DB transaction 보강은 후속 안전 작업으로 분리하며, 그 전에는 운영 prompt를 바꾸는 테스트를 하지 않는다.
+Prompt Lab은 DEV 전용이다. PROD `/api/prompt-lab`은 method·인증 상태와 무관하게 origin 검사,
+rate limit, 인증, DB 처리보다 먼저 `404`로 종료한다. production 앱 번들에는 Lab UI, 합성 fixture,
+access probe, `/api/prompt-lab` 문자열을 포함하지 않는다. DEV 번들만 Judy editor와 Hyu promoter
+화면·API를 유지한다.
+
+DEV에서 검토가 끝난 active 버전은 `prompt_lab_create_handoff`가 감사 가능한 JSON artifact로
+고정한다. artifact는 원본 버전 ID·번호·prompt 본문, 연결된 baseline run과 5개 rubric 점수·코멘트,
+금지 실패 판단 근거, DEV 승인자와 DB server 승인 시각을 보존한다. 기존 성공 기준대로 모든 baseline의
+근거가 있어야 하며 새 자동 합산식이나 숫자 합격선은 추가하지 않는다.
+
+PROD 반영은 Hyu가 artifact를 다시 검토한 뒤 별도 운영 절차에서
+`prompt_lab_activate_handoff`를 직접 호출하는 수동 handoff다. RPC는 요청 시점의 PROD admin과
+active promoter 권한을 재검증하고, 이전 active archive·새 active 생성·artifact 전체와 PROD
+promoter/server 시각 audit 기록을 한 transaction으로 묶는다. 이 절차는 PROD Lab endpoint를
+열지 않으며 일반 `/api/companion`은 계속 PROD의 active 한 건만 읽는다. 코드 머지·배포만으로
+handoff가 실행되지 않고, DEV 승인과 PROD 최종 승격은 서로 다른 명시적 단계다.
 
 ## 데이터 접근
 

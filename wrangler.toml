@@ -39,6 +39,7 @@ simple = { limit = 30, period = 60 }
 
 # 비밀 아님(클라에도 공개). service_role·UPSTAGE 키만 `wrangler secret put` 로.
 [vars]
+ENVIRONMENT = "production"
 SUPABASE_URL = "https://cttllwwkaddghqttyhkg.supabase.co"
 ARCHIVE_DAILY_CAP = "3000"
 # LLM 독서 파트너 (#287) — provider-agnostic. 키(UPSTAGE_API_KEY)는 secret, 아래 둘은 설정값.
