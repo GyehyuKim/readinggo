@@ -1,7 +1,7 @@
 # 운영자 대시보드 스펙 (admin dashboard)
 
 > **신설 (#744, 2026-06-17)**: 운영자 대시보드 고도화 — 모달 → **풀페이지 인앱 뷰** 승격 + 분석 3종(완독/코호트 리텐션·콘텐츠 공명·PostHog 링크아웃). 데이터 전략은 [analytics.md §3.3](./analytics.md) 하이브리드(C)를 구체화.
-> **편집 정책**: 이 영역(운영자 대시보드 구조·지표) 변경은 이 파일 PR로. spec-only PR 준수. 측정 이벤트 카탈로그는 [analytics.md §3.1](./analytics.md), 문의 동기화는 [inquiry-sync.md](./inquiry-sync.md).
+> **편집 정책**: 이 영역(운영자 대시보드 구조·지표) 변경은 이 파일 PR로. spec-only PR 준수. 측정 이벤트 카탈로그는 [analytics.md §3.1](./analytics.md), 문의 직접 대응 정책은 [inquiry-sync.md](./inquiry-sync.md).
 
 ## 1. 목적·범위
 
@@ -26,7 +26,7 @@
 
 기존 RPC(`admin.stats/inquiries/popularBooks/activeUsers`, SECURITY DEFINER + is_admin 가드, `12_admin_insights.sql` — 단 `admin.stats`는 `13_admin_stats.sql`, 드리프트 정정 2026-07-09)를 풀페이지 레이아웃으로 재배치.
 
-- 핵심 수치: 가입자·활성 유저·완독·오늘 체크인·인기책 Top·문의(상태 토글, [inquiry-sync.md](./inquiry-sync.md)).
+- 핵심 수치: 가입자·활성 유저·완독·오늘 체크인·인기책 Top·문의(상태 토글·개별 이메일 답장, [inquiry-sync.md](./inquiry-sync.md)).
 
 ### 3.2 완독률 + 가입 코호트 리텐션 (Supabase, 신규 RPC)
 
