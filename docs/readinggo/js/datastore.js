@@ -17,6 +17,18 @@
 
 const RG_V41_KEY = 'rg_v41';
 
+// 한 문장 저장 계약(#1424): 공백 제거 후 private 1~1,000자, 공개 범위 1~200자.
+// 생성·본문 편집·공개범위 변경이 같은 검증을 써서 로컬 우회를 막는다.
+function _validateSentenceText(text, visibility) {
+  const value = String(text == null ? '' : text).trim();
+  const scope = visibility === 'private' ? 'private' : (visibility === 'followers' ? 'followers' : 'public');
+  const max = scope === 'private' ? 1000 : 200;
+  if (!value) throw new Error('sentence_text_required');
+  if (value.length > max) throw new Error(scope === 'private' ? 'sentence_text_too_long' : 'sentence_public_text_too_long');
+  return { text: value, visibility: scope };
+}
+window.RG_validateSentenceText = _validateSentenceText;
+
 /* ── id / 날짜 헬퍼 ─────────────────────────────── */
 function _dsId(prefix) {
   return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -662,19 +674,21 @@ const DataStore = {
         const ub = userBookId ? _ubById(s, userBookId) : _activeUB(s);
         if (!ub) return null;
         ub.sentences = ub.sentences || [];
+        const requestedVisibility = visibility === 'private' || visibility === 'followers' || visibility === 'public'
+          ? visibility
+          : (s.settings && s.settings.default_sentence_visibility === 'private' ? 'private' : 'public');
+        const checked = _validateSentenceText(text, requestedVisibility);
         const row = {
           id: _dsId('se'),
           user_book_id: ub.id,
           book_id: ub.book_id,
           session_id: sessionId || null,
           page: typeof page === 'number' ? page : (ub.current_page || 0),
-          text: text || '',
+          text: checked.text,
           my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
           // #1261: 호출부의 문장별 명시값이 우선. 없으면 저장된 기본값, 알 수 없는 값은 public.
-          visibility: visibility === 'private' || visibility === 'followers' || visibility === 'public'
-            ? visibility
-            : (s.settings && s.settings.default_sentence_visibility === 'private' ? 'private' : 'public'),
+          visibility: checked.visibility,
           _guest: true,   // 게스트가 직접 남긴 문장(시드 아님) — 로그인 시 backfill 대상 (#370)
           created_at: Date.now(),
         };
@@ -724,7 +738,7 @@ const DataStore = {
     updateText(sentenceId, text) {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
-        if (se) se.text = text || '';
+        if (se) se.text = _validateSentenceText(text, se.visibility).text;
         return se;
       });
     },
@@ -740,7 +754,11 @@ const DataStore = {
     setVisibility(sentenceId, { visibility }) {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
-        if (se) se.visibility = visibility;
+        if (se) {
+          const checked = _validateSentenceText(se.text, visibility);
+          se.text = checked.text;
+          se.visibility = checked.visibility;
+        }
         return se;
       });
     },

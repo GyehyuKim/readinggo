@@ -38,8 +38,10 @@ check('앞뒤 공백 제거', result.sentence === '책의 문장');
 check('빈 페이지는 현재 페이지', result.page === 37 && result.valid);
 check('1자 허용', validate('가', '1', 20, 300).valid);
 check('200자 허용', validate('가'.repeat(200), '300', 20, 300).valid);
+check('201자 허용', validate('가'.repeat(201), '10', 20, 300).valid);
+check('1000자 허용', validate('가'.repeat(1000), '10', 20, 300).valid);
 check('빈 원문 거부', !validate('   ', '10', 20, 300).valid);
-check('201자 거부', !validate('가'.repeat(201), '10', 20, 300).valid);
+check('1001자 거부', !validate('가'.repeat(1001), '10', 20, 300).valid);
 check('0 페이지 거부', !validate('문장', '0', 20, 300).valid);
 check('총 페이지 초과 거부', !validate('문장', '301', 20, 300).valid);
 check('총 페이지 미상은 1 이상 허용', validate('문장', '999', 20, 0).valid);
@@ -48,6 +50,14 @@ check('OCR 성공은 drafts에 삽입하지 않음', /setOcrReview\(/.test(ocrSu
 check('검토 dialog 접근성 계약', /role="dialog" aria-modal="true" aria-labelledby="ocr-review-title"/.test(src));
 check('기존 handleCheckin 단일 호출 경로 사용', /await Promise\.resolve\(handleCheckin\(\{ page: progressPage, sentence: checked\.sentence[^}]+awaitPersistence: true/.test(ocrSaveFlow)
   && (ocrSaveFlow.match(/handleCheckin\(/g) || []).length === 1);
+check('201~1000자는 private, 200자 이하는 기존 기본 공개범위 유지',
+  /checked\.sentence\.length > 200 \? 'private' : undefined/.test(ocrSaveFlow)
+  && /sentence: checked\.sentence, visibility/.test(ocrSaveFlow));
+check('검토 화면은 항상 N/1,000 카운터와 장문 비공개 안내 표시',
+  /ocrReview\.text\.trim\(\)\.length\}\/1,000자/.test(src)
+  && /200자를 넘어 나만 보기로 저장돼요/.test(src));
+check('OCR 응답을 1000자에서 자동 절단하지 않음',
+  !/String\(d\.text\)\.slice\(0,\s*1000\)/.test(fs.readFileSync(path.join(root, 'docs/readinggo/js/data.js'), 'utf8')));
 check('중복 저장 차단', /if \(!ocrReview \|\| ocrSaving\) return;/.test(src) && /disabled=\{ocrSaving\}/.test(src));
 check('실패 시 검토값 보존 안내', /내용을 유지했으니 다시 시도해주세요/.test(src));
 check('공개 UGC 동의 필요 시 원인별 재시도 안내', /code === 'ugc_terms_required'[\s\S]+\uCEE4뮤니티 안내에 동의한 뒤 다시 저장/.test(ocrSaveFlow));
