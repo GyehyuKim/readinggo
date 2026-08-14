@@ -20,7 +20,7 @@
 | **임포트: 유연 도서기록** | [`flexible-import.md`](./flexible-import.md) | 신설 (#1039) — 붙여넣기 텍스트 → LLM 파싱 → shelf-import 매칭·검수·검토함 코어 재사용. 스크린샷(#772)은 폴백 |
 | **시스템 로직** | [`systems.md`](./systems.md) | §6 스트릭·방패·XP·NPC·휴식코스 |
 | **백엔드** | [`backend.md`](./backend.md) | [§7](./backend.md) |
-| **운영: 문의 동기화** | [`inquiry-sync.md`](./inquiry-sync.md) | 신설 (#701) — inquiries → GitHub 이슈 |
+| **운영: 문의 직접 대응** | [`inquiry-sync.md`](./inquiry-sync.md) | Supabase 접수 → 관리자 대시보드 확인·개별 답장 |
 | **운영: 운영자 대시보드** | [`admin-dashboard.md`](./admin-dashboard.md) | 신설 (#744) — 풀페이지 하이브리드 대시보드 |
 | **운영: 배포 안전** | [`ops.md`](./ops.md) | 신설 (#960·#901) — 피처 플래그/킬 스위치 · 카나리(점진 배포) |
 | **법무: 개인정보처리방침** | [`privacy-policy.md`](./privacy-policy.md) | 신설 (#757) — 처리방침 정본·국외이전·게시 |
