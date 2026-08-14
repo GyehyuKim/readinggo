@@ -1193,31 +1193,17 @@
       },
     },
 
-    /* 문의 — 서버가 인증 actor의 admin 여부로 고객 피드백/내부 메모를 구분 (#1407) */
+    /* 문의 — 누구나(로그인) 작성 → admin이 대시보드에서 확인 */
     inquiries: {
-      async create({ message }) {
-        const send = async (refresh) => {
-          const session = refresh ? await sb().auth.refreshSession() : await sb().auth.getSession();
-          if (session.error) throw session.error;
-          const accessToken = session.data && session.data.session && session.data.session.access_token;
-          if (!accessToken) throw new Error('문의는 로그인 세션이 필요합니다.');
-          return fetch(((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || '') + '/api/inquiries', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
-            body: JSON.stringify({ message: message || '', app_version: window.RG_VERSION || null }),
-          });
-        };
-        let response = await send(false);
-        if (response.status === 401) response = await send(true);
-        if (!response.ok) throw new Error('문의 전송 실패: ' + response.status);
-        return response.json();
-      },
-      async listMine() {
+      async create({ message, email }) {
         const id = await uid();
-        if (!id) return [];
-        return unwrap(await sb().from('inquiries')
-          .select('id,message,public_status,response,answered_at,created_at,submission_kind')
-          .eq('user_id', id).order('created_at', { ascending: false }).limit(30)) || [];
+        // 답변 메일 대상 = 가입(인증) 이메일. 닉네임 변경과 무관하게 user_id로 앵커되지만,
+        // admin이 회신할 수 있도록 작성 시점의 auth 이메일을 함께 박아둔다.
+        let authEmail = email || null;
+        if (!authEmail) {
+          try { const { data } = await sb().auth.getSession(); authEmail = (data && data.session && data.session.user && data.session.user.email) || null; } catch (e) {} // #646: getSession(로컬)
+        }
+        return unwrap(await sb().from('inquiries').insert({ user_id: id, message: message || '', email: authEmail }).select().single());
       },
     },
 
