@@ -64,7 +64,7 @@ jobs:
           node tests/dev-review-datastore-sync.test.mjs
           node tests/dev-review-persona-api.test.mjs
           node tests/forest-sentence-date.test.mjs
-          node tests/feedback-flywheel.test.mjs
+          node tests/inquiry-direct-response.test.mjs
           node tests/book-detail-hierarchy.test.mjs
           node tests/barcode-focus.test.mjs
           node tests/book-upsert-auth.test.mjs
@@ -92,6 +92,7 @@ jobs:
           node tests/streak-checkin.test.mjs
           node tests/home-ocr-multi.test.mjs
           node tests/supabase-books.test.mjs
+          node tests/seed-trust-boundary.test.mjs
           node tests/turnstile-execution.test.mjs
           node tests/turnstile-interactive-timeout.test.mjs
           node tests/ugc-moderation.test.mjs

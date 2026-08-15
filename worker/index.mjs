@@ -225,20 +225,6 @@ export default {
       { const auth = await requireSupabaseUser(request, env); if (auth) return auth; }
       return bookUpsertProxy(request, env);
     }
-    // 문의 작성은 서버가 세션과 현재 admin 여부를 해소해 customer_feedback/admin_note를 결정한다.
-    if (p === '/api/inquiries') {
-      const origin = request.headers.get('Origin');
-      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
-      { const rl = await rateLimited(request, env, 'inquiries'); if (rl) return rl; }
-      return inquiryProxy(request, env);
-    }
-    // 수동 운영 트리거. webhook에 의존하지 않고 secret을 가진 운영 호출만 reconciliation을 실행한다.
-    if (p === '/api/internal/reconcile-inquiries') {
-      if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-      const supplied = request.headers.get('X-Reconcile-Secret') || '';
-      if (!env.INQUIRY_RECONCILE_SECRET || supplied !== env.INQUIRY_RECONCILE_SECRET) return json({ error: 'unauthorized' }, 401);
-      return json(await reconcileInquiries(env));
-    }
     // 표지 이미지 프록시 (#676) — 알라딘 CDN은 CORS 헤더가 없어 클라가 캔버스로 그리면 tainted canvas.
     // 서버가 대신 받아 동일출처로 돌려주면 공유 카드가 표지를 taint 없이 인라인 가능. 알라딘 호스트만 허용(오픈 프록시 방지).
     if (p === '/api/img') {
@@ -254,176 +240,12 @@ export default {
   },
 
   // ── Cron: 인기도서 사전 아카이브 (#239) ──────────────────
-  async scheduled(event, env, ctx) {
-    // 크론 분기 — */10 은 문의 동기화(빈번), 0 18 은 일일 아카이브+시드 선충전.
-    if (event && event.cron === '*/10 * * * *') {
-      ctx.waitUntil(syncInquiries(env, ctx));
-      ctx.waitUntil(reconcileInquiries(env));
-      return;
-    }
+  async scheduled(_event, env, ctx) {
     ctx.waitUntil(archive(env));
     ctx.waitUntil(prewarmSeeds(env));   // #774 인기 우선 시드 선충전(sales_point 상위 N권, idempotent)
     ctx.waitUntil(backfillPages(env));  // #1117 쪽수 보강 — 검색(ItemSearch) 업서트는 itemPage 가 없어 null 로 남는다. 일일 ItemLookUp 보강(재발 방지)
   },
 };
-
-// 고객 직접 문의 → GitHub 이슈 동기화 (#1407) — 크론 */10. GitHub에는 고정 비식별 문구만 전송.
-const GH_REPO = 'GyehyuKim/readinggo';
-
-async function inquiryActor(request, env) {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw Object.assign(new Error('not configured'), { status: 503 });
-  const auth = request.headers.get('Authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  if (!token) throw Object.assign(new Error('unauthorized'), { status: 401 });
-  const authResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${token}` },
-  }).catch(() => null);
-  if (!authResponse || !authResponse.ok) throw Object.assign(new Error('invalid session'), { status: 401 });
-  const user = await authResponse.json().catch(() => null);
-  if (!user || !user.id) throw Object.assign(new Error('invalid session'), { status: 401 });
-  const profileResponse = await inquiryDb(env, `users?id=eq.${encodeURIComponent(user.id)}&select=id,is_admin&limit=1`);
-  const profile = profileResponse && profileResponse[0];
-  if (!profile) throw Object.assign(new Error('profile unavailable'), { status: 403 });
-  return { id: user.id, isAdmin: profile.is_admin === true };
-}
-
-async function inquiryDb(env, path, init = {}) {
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      ...(init.headers || {}),
-    },
-  });
-  if (!response.ok) throw Object.assign(new Error('inquiry storage failed'), { status: 502 });
-  if (response.status === 204) return null;
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-}
-
-async function inquiryProxy(request, env) {
-  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-  try {
-    const actor = await inquiryActor(request, env);
-    const payload = await request.json().catch(() => ({}));
-    const message = String(payload && payload.message || '').trim();
-    if (!message || message.length > 2000) return json({ error: 'invalid message' }, 400);
-    const kind = actor.isAdmin ? 'admin_note' : 'customer_feedback';
-    const rows = await inquiryDb(env, 'inquiries?select=id,message,submission_kind,public_status,response,answered_at,created_at', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ user_id: actor.id, message, app_version: String(payload.app_version || '').slice(0, 40) || null, submission_kind: kind, public_status: 'received' }),
-    });
-    return json(rows && rows[0] ? rows[0] : { ok: true }, 201);
-  } catch (e) {
-    return json({ error: e && e.status === 401 ? 'unauthorized' : e && e.status === 403 ? 'forbidden' : 'inquiry request failed' }, (e && e.status) || 500);
-  }
-}
-
-async function syncInquiries(env, ctx) {
-  if (!env.GITHUB_TOKEN || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return; // 미구성 → no-op
-  const sb = (path, init) => fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, ...(init && init.headers) },
-  });
-  const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  let rows = [];
-  try {
-    const r = await sb(`inquiries?select=id,created_at,github_sync_key,github_sync_claimed_at&submission_kind=eq.customer_feedback&github_issue_number=is.null&or=(github_sync_claimed_at.is.null,github_sync_claimed_at.lt.${encodeURIComponent(staleBefore)})&order=created_at.asc&limit=20`);
-    if (!r.ok) return;
-    rows = await r.json();
-  } catch (e) { return; }
-  const seen = new Set();
-  for (const q of (rows || [])) {
-    const key = String(q.id);
-    if (seen.has(key) || !q.github_sync_key) continue;
-    seen.add(key);
-    const claimedAt = new Date().toISOString();
-    let claimed = [];
-    try {
-      const claim = await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&or=(github_sync_claimed_at.is.null,github_sync_claimed_at.lt.${encodeURIComponent(staleBefore)})&select=id,github_sync_key`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify({ github_sync_claimed_at: claimedAt }),
-      });
-      if (!claim.ok) continue;
-      claimed = await claim.json();
-    } catch (e) { continue; }
-    if (!claimed.length) continue; // 다른 Worker가 먼저 원자적으로 선점
-
-    const marker = `readinggo-feedback:${q.github_sync_key}`;
-    let issueNumber = null;
-    let issueCreated = false;
-    try {
-      // 이전 실행이 GitHub 생성 후 DB 연결 전에 죽었으면 공개 원문 없는 marker로 기존 이슈를 회수한다.
-      const searchQuery = encodeURIComponent(`repo:${GH_REPO} is:issue in:body "${marker}"`);
-      const search = await fetch(`https://api.github.com/search/issues?q=${searchQuery}&per_page=1`, {
-        headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'readinggo-worker' },
-      });
-      if (!search.ok) throw new Error('github issue recovery search failed');
-      const result = await search.json();
-      issueNumber = result && result.items && result.items[0] && result.items[0].number;
-      if (!issueNumber) {
-        const gh = await fetch(`https://api.github.com/repos/${GH_REPO}/issues`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json',
-            'Content-Type': 'application/json', 'User-Agent': 'readinggo-worker',
-          },
-          body: JSON.stringify({
-            title: '고객 피드백 확인 요청',
-            body: `ReadingGo 앱에서 인증된 비관리자 사용자의 피드백이 접수되었습니다.\n\n원문과 제보자 정보는 비공개 운영 데이터에서만 확인하세요.\n\n<!-- ${marker} -->`,
-            labels: ['source:customer-feedback'],
-          }),
-        });
-        if (gh.status !== 201) throw new Error('github issue create failed');
-        const issue = await gh.json();
-        issueNumber = issue.number;
-        issueCreated = true;
-      }
-      const update = await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&github_sync_claimed_at=eq.${encodeURIComponent(claimedAt)}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ github_issue_number: issueNumber, public_status: 'checking', github_sync_claimed_at: null }),
-      });
-      if (!update.ok) throw new Error('inquiry issue link failed');
-    } catch (e) {
-      // GitHub에 이미 생성된 경우 claim을 유지해 stale recovery가 marker 검색 후 연결한다.
-      if (!issueCreated) {
-        await sb(`inquiries?id=eq.${encodeURIComponent(q.id)}&github_issue_number=is.null&github_sync_claimed_at=eq.${encodeURIComponent(claimedAt)}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ github_sync_claimed_at: null }),
-        }).catch(() => {});
-      }
-    }
-  }
-}
-
-async function reconcileInquiries(env) {
-  if (!env.GITHUB_TOKEN || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return { checked: 0, answered: 0 };
-  let rows;
-  try {
-    rows = await inquiryDb(env, 'inquiries?select=id,github_issue_number&submission_kind=eq.customer_feedback&github_issue_number=not.is.null&public_status=neq.answered&order=created_at.asc&limit=50');
-  } catch (e) { return { checked: 0, answered: 0 }; }
-  let checked = 0, answered = 0;
-  for (const row of rows || []) {
-    try {
-      const response = await fetch(`https://api.github.com/repos/${GH_REPO}/issues/${row.github_issue_number}`, {
-        headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'readinggo-worker' },
-      });
-      if (!response.ok) continue;
-      checked += 1;
-      const issue = await response.json();
-      const labels = new Set((issue.labels || []).map((label) => typeof label === 'string' ? label : label.name));
-      const eligible = issue.state === 'closed' && issue.state_reason !== 'not_planned' && labels.has('feedback:notify-ready');
-      if (!eligible) continue;
-      await inquiryDb(env, `inquiries?id=eq.${encodeURIComponent(row.id)}&public_status=neq.answered`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ public_status: 'answered', status: 'answered', response: '보내주신 의견의 확인과 반영이 완료되었어요. 소중한 의견 감사합니다.', answered_at: new Date().toISOString(), response_source: 'github_notify_ready', github_reconciled_at: new Date().toISOString() }),
-      });
-      answered += 1;
-    } catch (e) { /* 안전한 개별 재시도: 사용자 내용이나 오류 본문을 로그하지 않는다. */ }
-  }
-  return { checked, answered };
-}
 
 /* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
    provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
@@ -1850,6 +1672,28 @@ async function seedEnqueue(env, { title, author, isbn, priority = 'high' }) {
   } catch (e) { /* best-effort — 큐잉 실패해도 다음 진입 때 재시도 */ }
 }
 
+function seedCanonicalTitle(s) {
+  return String(s || '').toLowerCase().replace(/[\s·,.:;!?'"“”‘’()\[\]<>「」『』、~\-_]/g, '').trim();
+}
+
+// 클라이언트 제목/ISBN은 힌트일 뿐이다. canonical books에서 둘을 함께 확인하고
+// 이후 단계에는 DB 값을 전달한다(#1431).
+async function canonicalSeedBook(env, input) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const isbn13 = String(input && input.isbn || '').replace(/[^0-9]/g, '');
+  const title = String(input && input.title || '').trim();
+  if (!/^97[89]\d{10}$/.test(isbn13) || !seedCanonicalTitle(title)) return null;
+  try {
+    const u = `${env.SUPABASE_URL}/rest/v1/books?select=isbn13,title,author&isbn13=eq.${isbn13}&limit=1`;
+    const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    const book = rows && rows[0];
+    if (!book || seedCanonicalTitle(book.title) !== seedCanonicalTitle(title)) return null;
+    return { title: book.title, author: book.author || '', isbn: book.isbn13 };
+  } catch (e) { return null; }
+}
+
 // /api/seed — 큐 기반 비동기 온디맨드(spec §3.1). 동기 대기 안 함.
 //   빈 책(공개 문장<목표)일 때만 high 우선순위로 큐잉 + 빈 배열 반환.
 //   시드 표시는 클라가 byBook(sentences) 을 직접 조회 — collector 가 NPC 명의로 채우면 폴링으로 노출.
@@ -1859,7 +1703,9 @@ async function seedProxy(request, env) {
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
   const have = parseInt((body && body.have), 10) || 0;
   if (have < SEED_TARGET) {
-    await seedEnqueue(env, { title: body && body.title, author: body && body.author, isbn: body && body.isbn, priority: 'high' });
+    const canonical = await canonicalSeedBook(env, body);
+    if (!canonical) return json({ seeds: [], status: 'skipped', reason: 'unverified-book' }, 200, 0);
+    await seedEnqueue(env, { ...canonical, priority: 'high' });
   }
   return json({ seeds: [], status: 'queued' }, 200, 0);
 }

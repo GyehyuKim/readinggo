@@ -92,12 +92,6 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [inqMsg, setInqMsg] = useState('');
   const [inqBusy, setInqBusy] = useState(false);
   const [inqDone, setInqDone] = useState(false);
-  const [inquiries, setInquiries] = useState([]);
-  const loadInquiries = () => {
-    if (!(DataStore.inquiries && DataStore.inquiries.listMine)) return;
-    Promise.resolve(DataStore.inquiries.listMine()).then((rows) => setInquiries(rows || [])).catch(() => {});
-  };
-  useEffect(loadInquiries, []);
   // 로그인 계정 주소 표기 (#671) — currentUser()는 로컬 세션(무네트워크). 미로그인/로컬모드면 ''.
   const [acctEmail, setAcctEmail] = useState('');
   React.useEffect(() => {
@@ -115,7 +109,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
     if (!(DataStore.inquiries && DataStore.inquiries.create)) { showToast('로그인 후 이용해주세요'); return; }
     setInqBusy(true);
     Promise.resolve(DataStore.inquiries.create({ message: m }))
-      .then(() => { setInqDone(true); setInqMsg(''); loadInquiries(); showToast('문의가 접수됐어요'); })
+      .then(() => { setInqDone(true); setInqMsg(''); showToast('문의가 전송됐어요 — 운영자가 확인합니다'); })
       .catch(() => showToast('전송 실패 — 잠시 후 다시'))
       .finally(() => setInqBusy(false));
   };
@@ -328,20 +322,6 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               </>
             )}
           </div>
-          {inquiries.length > 0 && (
-            <div aria-label="내 문의 내역" style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--ink-2)' }}>내 문의 내역</div>
-              {inquiries.map((item) => {
-                const labels = { received: '접수', checking: '확인중', answered: '답변' };
-                const status = labels[item.public_status] || '접수';
-                return <div key={item.id} style={{ padding: 10, borderRadius: 'var(--r-sm)', background: 'var(--paper)', border: '1px solid var(--line)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, color: 'var(--ink-3)' }}><span>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span><strong style={{ color: 'var(--brand-3)' }}>{status}</strong></div>
-                  <div style={{ marginTop: 5, fontSize: 13, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>{item.message}</div>
-                  {item.public_status === 'answered' && item.response && <div style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid var(--line)', fontSize: 12.5, color: 'var(--ink)' }}>{item.response}</div>}
-                </div>;
-              })}
-            </div>
-          )}
 
           {/* ⑤ 정보 */}
           {groupLabel('정보')}
@@ -417,19 +397,13 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
   const [inqMsg, setInqMsg] = useState('');
   const [inqBusy, setInqBusy] = useState(false);
   const [inqDone, setInqDone] = useState(false);
-  const [inquiries, setInquiries] = useState([]);
-  const loadInquiries = () => {
-    if (!(DataStore.inquiries && DataStore.inquiries.listMine)) return;
-    Promise.resolve(DataStore.inquiries.listMine()).then((rows) => setInquiries(rows || [])).catch(() => {});
-  };
-  useEffect(loadInquiries, []);
   const sendInquiry = () => {
     const m = inqMsg.trim();
     if (!m) { showToast('문의 내용을 적어주세요'); return; }
     if (!(DataStore.inquiries && DataStore.inquiries.create)) { showToast('로그인 후 이용해주세요'); return; }
     setInqBusy(true);
     Promise.resolve(DataStore.inquiries.create({ message: m }))
-      .then(() => { setInqDone(true); setInqMsg(''); loadInquiries(); showToast('문의가 접수됐어요'); })
+      .then(() => { setInqDone(true); setInqMsg(''); showToast('문의가 전송됐어요 — 운영자가 확인합니다'); })
       .catch(() => showToast('전송 실패 — 잠시 후 다시'))
       .finally(() => setInqBusy(false));
   };
@@ -711,20 +685,6 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
           </>
         )}
       </div>
-      {inquiries.length > 0 && (
-        <div aria-label="내 문의 내역" style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--ink-2)' }}>내 문의 내역</div>
-          {inquiries.map((item) => {
-            const labels = { received: '접수', checking: '확인중', answered: '답변' };
-            const status = labels[item.public_status] || '접수';
-            return <div key={item.id} style={{ padding: 10, borderRadius: 'var(--r-sm)', background: 'var(--paper)', border: '1px solid var(--line)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, color: 'var(--ink-3)' }}><span>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span><strong style={{ color: 'var(--brand-3)' }}>{status}</strong></div>
-              <div style={{ marginTop: 5, fontSize: 13, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>{item.message}</div>
-              {item.public_status === 'answered' && item.response && <div style={{ marginTop: 7, paddingTop: 7, borderTop: '1px solid var(--line)', fontSize: 12.5, color: 'var(--ink)' }}>{item.response}</div>}
-            </div>;
-          })}
-        </div>
-      )}
 
       {/* 정보 */}
       {grpLabel('정보')}
