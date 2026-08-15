@@ -380,35 +380,50 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
-  // 스트릭 복구·유예 (#938, A1) — 둥지 진입 시 깨진 스트릭이 복구 가능하면 '하루 만회' 카드를 1회 노출.
-  // 좌절 이탈 방지(코어 감정 '고양감' 보호). 점수·미션 추가 아님 — 기존 스트릭 관용. 주 1회 제한은 datastore SSOT(_streakRepairStatus).
+  // 스트릭 복구·유예 (#938/#1440) — 마운트뿐 아니라 자정·앱 resume·웹 focus 때
+  // 오늘 기록 여부와 복구 상태를 다시 읽는다. lifecycle 정리가 리스너·자정 타이머 누적을 막는다.
   const [repairCard, setRepairCard] = _useState(null); // { lostStreak, brokenDays }
+  const _repairDismissedDateRef = _useRef(null);
+  const _repairShownKeyRef = _useRef(null);
+  const _repairLifecycleRef = _useRef(null);
   _useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        if (!(DataStore.streak && DataStore.streak.repairStatus)) return;
+    if (!(DataStore.streak && DataStore.streak.repairStatus) || !window.RG_createStreakRepairLifecycle) return undefined;
+    const lifecycle = window.RG_createStreakRepairLifecycle({
+      read: async () => {
         const [status, current] = await Promise.all([
           Promise.resolve(DataStore.streak.repairStatus()),
           DataStore.streak.get ? Promise.resolve(DataStore.streak.get()) : Promise.resolve(null),
         ]);
+        return { status, current };
+      },
+      getToday: () => (window._today ? _today() : new Date().toISOString().slice(0, 10)),
+      onState: ({ checkedToday: nextCheckedToday, repairCard: nextRepairCard }) => {
         const today = window._today ? _today() : new Date().toISOString().slice(0, 10);
-        const shouldShow = window.RG_shouldShowStreakRepairCard
-          ? window.RG_shouldShowStreakRepairCard({
-              canRepair: status && status.canRepair,
-              lastCheckInDate: current && current.last_check_in_date,
-              today,
-            })
-          : Boolean(status && status.canRepair && (!current || current.last_check_in_date !== today));
-        if (!alive || !shouldShow) return;
-        setRepairCard({ lostStreak: status.lostStreak, brokenDays: status.brokenDays });
-        rgTrack('streak_repair_shown', { lost: status.lostStreak, broken_days: status.brokenDays });
-      } catch (e) { /* 복구 넛지 실패는 조용히 */ }
-    })();
-    return () => { alive = false; };
+        const visibleCard = _repairDismissedDateRef.current === today ? null : nextRepairCard;
+        setCheckedToday(nextCheckedToday);
+        setRepairCard(visibleCard);
+        if (visibleCard) {
+          const shownKey = `${today}:${visibleCard.lostStreak}:${visibleCard.brokenDays}`;
+          if (_repairShownKeyRef.current !== shownKey) {
+            _repairShownKeyRef.current = shownKey;
+            rgTrack('streak_repair_shown', { lost: visibleCard.lostStreak, broken_days: visibleCard.brokenDays });
+          }
+        }
+      },
+      windowTarget: window,
+      documentTarget: document,
+      capApp: window.CapApp,
+    });
+    _repairLifecycleRef.current = lifecycle;
+    return () => {
+      if (_repairLifecycleRef.current === lifecycle) _repairLifecycleRef.current = null;
+      lifecycle();
+    };
   }, []);
   const doRepairStreak = async () => {
     if (!repairCard) return;
+    const lifecycle = _repairLifecycleRef.current;
+    const finishLifecycleMutation = lifecycle && lifecycle.beginMutation ? lifecycle.beginMutation() : null;
     try {
       const res = await Promise.resolve(DataStore.streak.repair());
       if (res && res.ok) {
@@ -425,10 +440,13 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     } catch (e) {
       showToast('만회에 실패했어요 — 잠시 후 다시 시도해요');
     }
+    if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation();
     setRepairCard(null);
   };
   const dismissRepair = () => {
     if (repairCard) rgTrack('streak_repair_skipped', { lost: repairCard.lostStreak });
+    if (_repairLifecycleRef.current && _repairLifecycleRef.current.invalidate) _repairLifecycleRef.current.invalidate();
+    _repairDismissedDateRef.current = window._today ? _today() : new Date().toISOString().slice(0, 10);
     setRepairCard(null); // 이번 진입 동안만 숨김 — 다음 진입 때 아직 복구 가능하면 다시 권유(주 1회는 datastore가 강제)
   };
 
@@ -448,6 +466,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         throw new Error('ugc_terms_required');
       }
     }
+    const lifecycle = _repairLifecycleRef.current;
+    const finishLifecycleMutation = lifecycle && lifecycle.beginMutation ? lifecycle.beginMutation() : null;
     setModalOpen(false);
     setCheckedToday(true); // 오늘의 짹 완료 — 만회 카드도 즉시 숨김 (#203/#1429)
     const previousNestState = nestState;
@@ -513,7 +533,13 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         };
       });
     }
-    const checkinResult = onCheckin(ns, newLv, xpGain, sentence, kind, quotePage, batch, visibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
+    let checkinResult;
+    try {
+      checkinResult = onCheckin(ns, newLv, xpGain, sentence, kind, quotePage, batch, visibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
+    } catch (error) {
+      if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation();
+      throw error;
+    }
 
     // 성 획득(1,600 주기 완료)은 단계 toast보다 우선 — 경계 통과 시 둥지 단계는 Lv4→Lv1로
     // 리셋되어 nestUp=false 이므로, 성 획득은 별도로 안내한다 (#520/#521).
@@ -533,7 +559,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence, sentenceCount, bookQuoteCount, nestUp, castleGained, castleCount: newCastles, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
-    return completionPromise || checkinResult;
+    const persistenceResult = completionPromise || checkinResult;
+    Promise.resolve(persistenceResult).then(
+      () => { if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation(); },
+      () => { if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation(); },
+    );
+    return persistenceResult;
   };
 
   // 빠른 기록 (#462) — 홈 상시 입력 폼에서 페이지/한 문장을 한 번에 체크인.
@@ -952,9 +983,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)' }}>
               {window.RG_streakContinuationCopy
                 ? window.RG_streakContinuationCopy(repairCard.lostStreak)
-                : (repairCard.lostStreak > 0
-                    ? `오늘 읽으면 ${repairCard.lostStreak + 1}일째로 이어져요`
-                    : '오늘부터 다시 시작해볼까요')}
+                : `하루 만회 후 오늘 읽으면 ${repairCard.lostStreak + 1}일째로 이어져요`}
             </div>
           </div>
           <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55, marginBottom: 12 }}>
