@@ -63,7 +63,7 @@ vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = 
 | Supabase 쿼리·클라이언트 로직 | OS 권한·네이티브 SDK·Capacitor core 업그레이드 |
 
 - **`minNativeVersion` 게이트** = 최우선 안전장치. 각 OTA 번들은 자신이 요구하는 **네이티브 셸 버전**(`minNative`)을 선언한다. 설치된 셸이 그보다 낮으면 그 번들을 **받지 않고** "스토어 업데이트" 배너를 띄운다. → 새 네이티브 API 를 호출하는 웹 번들이 구(舊) 셸에서 **크래시**하는 것을 원천 차단.
-  - 현재 `ota-release.yml` 은 `minNative=1`(현 셸 versionCode) 하드코딩. **네이티브가 바뀐 셸을 낸 직후**부터, 그 새 네이티브 API 를 쓰는 웹 번들을 publish 할 때 이 값을 **새 셸 versionCode 로 상향**해야 한다(§3.3 체크리스트).
+  - `ota-release.yml` 은 Android `build.gradle`의 `versionCode`를 읽어 `minNative`로 발행한다. 별도 숫자를 수동 관리하지 않으므로 네이티브 셸과 OTA 매니페스트가 단일 원천으로 일치한다.
 - **판단 규칙**: "이 변경이 새 APK/IPA 없이 기존 설치 앱에서 동작하나?" → 예면 OTA, 아니오면 스토어 빌드. 애매하면 **스토어 빌드 + `minNative` 상향**(보수적 기본값).
 - **스토어 약관**: 웹/해석형 콘텐츠 업데이트는 Play·App Store 모두 허용. **네이티브 실행코드 다운로드는 금지** — 우리는 웹 번들(`dist`)만 내리므로 적합.
 
@@ -139,8 +139,8 @@ git tag v1.2.0 && git push origin v1.2.0
 | # | 파일 | 키 | 현재값 | 의미 |
 |---|---|---|---|---|
 | 1 | `docs/readinggo/package.json` | `version` | `0.1.0` | 프로젝트 명목 버전(npm). SemVer 의 SoT 로 사용. |
-| 2 | `docs/readinggo/android/app/build.gradle` | `versionName` | `"1.0"` | Android 마케팅 버전(사용자 노출 = SemVer). |
-| 2b | `docs/readinggo/android/app/build.gradle` | `versionCode` | `1` | Android 내부 **정수, 빌드마다 +1 단조 증가**(Play 가 순서 판단). |
+| 2 | `docs/readinggo/android/app/build.gradle` | `versionName` | `"1.0.3"` | Android 마케팅 버전(사용자 노출 = SemVer). |
+| 2b | `docs/readinggo/android/app/build.gradle` | `versionCode` | `4` | Android 내부 **정수, 빌드마다 +1 단조 증가**(Play 가 순서 판단). |
 | 3 | `docs/readinggo/ios/App/App.xcodeproj/project.pbxproj` | `MARKETING_VERSION` | `1.0` | iOS 마케팅 버전(= SemVer). `Info.plist` `CFBundleShortVersionString` 가 이 변수를 참조. |
 | 3b | 〃 | `CURRENT_PROJECT_VERSION` | `1` | iOS 빌드 번호(정수, 빌드마다 +1). `CFBundleVersion` 가 참조. |
 
@@ -152,7 +152,7 @@ git tag v1.2.0 && git push origin v1.2.0
 
 - **마케팅 버전 3곳 일치**: `package.json version` = `versionName` = `MARKETING_VERSION` = `x.y.z`.
 - **빌드 번호 단조 증가**: `versionCode`(Android)·`CURRENT_PROJECT_VERSION`(iOS)는 **스토어 업로드마다 반드시 +1**. 같은 마케팅 버전이라도 재업로드하면 빌드 번호는 올려야 한다(Play/App Store 가 중복 거부). 둘을 같은 정수로 맞춰 두면 추적이 쉽다(예: 둘 다 `5`).
-- **OTA `minNative`**: 네이티브가 바뀐 셸을 새로 냈으면, 그 셸 versionCode 를 `ota-release.yml` 의 `minNative` 에 반영(현재 하드코딩 `1`).
+- **OTA `minNative`**: `ota-release.yml`이 Android `versionCode`를 직접 읽어 매니페스트에 넣는다. 수동 상수는 두지 않으며 계약 테스트가 이 연결을 검증한다.
 
 ### 3.3 동기화 체크리스트 (release 브랜치에서)
 
@@ -163,7 +163,7 @@ git tag v1.2.0 && git push origin v1.2.0
 [ ] build.gradle        versionCode → (직전 +1)
 [ ] project.pbxproj     MARKETING_VERSION → x.y.z   (2곳: Debug/Release 모두)
 [ ] project.pbxproj     CURRENT_PROJECT_VERSION → (직전 +1)  (2곳)
-[ ] (네이티브 변경 동반 시) ota-release.yml  minNative → 새 versionCode
+[ ] ota-release.yml 이 build.gradle versionCode 를 minNative 로 읽는지 계약 테스트 통과
 [ ] 아래 §3.4 스크립트로 정합 확인
 [ ] 빌드·서명·제출 → RELEASE-BUILD.md
 [ ] git tag vx.y.z && push
@@ -220,7 +220,7 @@ PREV=$(npx -y wrangler@4 kv key get --remote --namespace-id "$NS" "ota:android:p
 
 # C) 특정 이전 버전으로 되돌리기 — 그 버전 매니페스트를 prod 키에 다시 쓴다(2세대+ 이전).
 #    이전 양호 번들의 url/checksum 을 알면(Action 로그/R2) 직접 구성해 put.
-GOOD='{"version":"1.0.NN","url":"https://pub-….r2.dev/com.readinggo.app_1.0.NN.zip","checksum":"<sha256>","minNative":1}'
+GOOD='{"version":"1.0.NN","url":"https://pub-….r2.dev/com.readinggo.app_1.0.NN.zip","checksum":"<sha256>","minNative":<required-version-code>}'
 npx -y wrangler@4 kv key put --remote --namespace-id "$NS" "ota:android:production" "$GOOD"
 ```
 

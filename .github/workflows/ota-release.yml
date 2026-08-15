@@ -101,6 +101,21 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "✅ bundled $FILENAME (sha256=$CHECKSUM)"
 
+      # OTA 네이티브 하한의 단일 원천은 실제 Android 셸 versionCode다.
+      # Gradle 값이 없거나 중복되면 publish 전에 실패해 stale 하드코딩을 차단한다(#1441).
+      - name: Read Android native versionCode
+        id: native
+        working-directory: docs/readinggo
+        run: |
+          VERSION_CODE=$(node -e '
+            const source = require("node:fs").readFileSync("android/app/build.gradle", "utf8");
+            const matches = [...source.matchAll(/^\s*versionCode\s+(\d+)\s*$/gm)];
+            if (matches.length !== 1) throw new Error("expected one Android versionCode, found " + matches.length);
+            process.stdout.write(matches[0][1]);
+          ')
+          echo "version-code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "✅ Android native versionCode: $VERSION_CODE"
+
       # R2(public) 업로드 → 공개 URL = <base>/<filename> 로 앱이 다운로드.
       - name: Upload bundle to R2
         working-directory: docs/readinggo
@@ -117,9 +132,8 @@ jobs:
             --remote
 
       # beta 채널 매니페스트 갱신. 워커는 version·url·checksum·minNative 를 사용.
-      # minNative=1: 현재 Capgo 셸의 Android versionCode. 향후 네이티브 릴리스가 versionCode 를 올리고
-      #   그 새 네이티브 API 를 쓰는 번들을 낼 때, 이 값을 그 셸 버전으로 상향한다 → 구 셸은 해당 번들을
-      #   스킵하고 "스토어 업데이트" 배너를 띄운다(spec §1·§5, 크래시 원천 차단). 지금은 셸 변경 없으니 1.
+      # minNative 는 위에서 Android build.gradle versionCode 를 읽어 자동 설정한다. 새 네이티브 API를
+      # 쓰는 번들은 구 셸에서 스킵된다(spec §1·§5, 크래시 원천 차단).
       # sha/date: 운영 추적용 메타데이터(워커 무시). semver 가 git sha 를 못 담으므로 여기 별도 기록.
       - name: Publish beta manifest to KV
         working-directory: docs/readinggo
@@ -130,6 +144,7 @@ jobs:
           FILENAME: ${{ steps.bundle.outputs.filename }}
           CHECKSUM: ${{ steps.bundle.outputs.checksum }}
           GIT_SHA: ${{ github.sha }}
+          MIN_NATIVE: ${{ steps.native.outputs.version-code }}
         run: |
           DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           URL="https://pub-6a6b161169dd4882a91d87901685fa58.r2.dev/${FILENAME}"
@@ -139,7 +154,7 @@ jobs:
               version: process.env.VERSION,
               url: process.env.URL,
               checksum: process.env.CHECKSUM,
-              minNative: 1,
+              minNative: Number(process.env.MIN_NATIVE),
               sha: process.env.GIT_SHA,
               date: process.env.DATE,
             };
@@ -155,5 +170,6 @@ jobs:
             echo "- version: \`$VERSION\`"
             echo "- url: $URL"
             echo "- checksum: \`$CHECKSUM\`"
+            echo "- minNative: \`$MIN_NATIVE\`"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "✅ beta 매니페스트 갱신: $VERSION → $URL"

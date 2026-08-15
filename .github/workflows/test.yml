@@ -68,6 +68,7 @@ jobs:
           node tests/book-detail-hierarchy.test.mjs
           node tests/barcode-focus.test.mjs
           node tests/book-upsert-auth.test.mjs
+          node tests/ota-native-gate.test.mjs
           node tests/workflow-pins.test.mjs
           node tests/ceremony-sentence-action.test.mjs
           node tests/companion-turn-limit.test.mjs
