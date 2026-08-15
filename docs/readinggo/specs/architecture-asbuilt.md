@@ -170,7 +170,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `/api/book-upsert` | 책 캐노니컬 upsert — 검색 raw id → books id(#1191) | Supabase(service_role) |
 | `/api/ota` | OTA 번들 매니페스트 체크(#876) | — (OTA_KV) |
 | **cron** `0 18 * * *`(UTC)=KST 03:00 | 일일 인기도서 아카이브(#239) | 알라딘·Supabase |
-| **cron** `*/10 * * * *` | 문의 → GitHub 이슈 동기화(#701) | GitHub API |
+| 문의 접수 | 인증된 Supabase DataStore 저장 → 관리자 대시보드에서 개별 직접 대응 | Supabase |
 
 도서 검색/메타는 **다중 소스**: 알라딘(주) + 구글북스(`books/v1/volumes`) + 오픈라이브러리(`api/books`, 표지 폴백 `covers.openlibrary.org`) + 네이버 블로그검색(보강). 정확한 폴백 순서는 `worker/index.mjs` 참조.
 
@@ -213,9 +213,9 @@ setup-globals → config → supabase-client → datastore-supabase →
 - `[assets] directory = docs/readinggo/dist` → 워커가 Vite 산출물 정적 서빙.
 - `[[kv_namespaces]] binding = OTA_KV` → OTA 번들 매니페스트(#876).
 - `[vars]`: `SUPABASE_URL`·`ARCHIVE_DAILY_CAP`·`LLM_BASE_URL`(upstage)·`LLM_MODEL`(solar-pro3)·`VISION_BASE_URL`(gemini)·`VISION_MODEL`(gemini-2.5-flash).
-- `[triggers] crons = ["0 18 * * *", "*/10 * * * *"]` (인기도서 아카이브 + 문의→GitHub 동기화).
+- `[triggers] crons = ["0 18 * * *"]` (인기도서 아카이브·선충전·쪽수 보강). 문의는 자동 동기화하지 않고 관리자 대시보드에서 개별 직접 대응한다([inquiry-sync.md](./inquiry-sync.md)).
 - **자동 배포**: `main` 푸시 시 Cloudflare Workers Build. (수동 폴백 `npx wrangler deploy`)
-- **시크릿**(`wrangler secret`): `ALADIN_TTB_KEY`·`SUPABASE_SERVICE_ROLE_KEY`·`UPSTAGE_API_KEY`·`GEMINI_API_KEY`·`NAVER_CLIENT_ID/SECRET`·`GOOGLE_BOOKS_API_KEY`·`KAKAO_REST_KEY`·`NLK_CERT_KEY`·`GITHUB_TOKEN`.
+- **시크릿**(`wrangler secret`): `ALADIN_TTB_KEY`·`SUPABASE_SERVICE_ROLE_KEY`·`UPSTAGE_API_KEY`·`GEMINI_API_KEY`·`NAVER_CLIENT_ID/SECRET`·`GOOGLE_BOOKS_API_KEY`·`KAKAO_REST_KEY`·`NLK_CERT_KEY`. 문의 자동화용 GitHub token은 사용하지 않는다.
 
 ---
 
