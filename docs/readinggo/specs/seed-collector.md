@@ -76,7 +76,7 @@
 입력 `{title, author, isbn}` → 출력 `[{text, sourceName, sourceUrl}]`:
 
 1. **검색**: `https://www.yes24.com/Product/Search?domain=BOOK&query={제목 저자}` 를 **브라우저로** 열고 결과(`.gd_name`) 대기(JS 렌더).
-2. **상품 매칭**: 검색 결과 앵커 `.gd_name` 에서 `/product/goods/{id}` 추출. **canonical ISBN-13과 상품페이지 ISBN이 정확히 일치한 결과만** 선택한다. ISBN 누락·불일치 때 첫 결과나 발췌가 있는 다른 상품으로 폴백하지 않는다.
+2. **상품 매칭**: 검색 결과 앵커 `.gd_name` 에서 `/product/goods/{id}` 추출. **canonical ISBN-13과 상품 전용 메타데이터(JSON-LD의 Book/Product 본체, ISBN meta, 상품 영역 itemprop)의 ISBN이 정확히 일치한 결과만** 선택한다. 페이지 전체 본문이나 관련상품에서 먼저 발견한 ISBN은 사용하지 않는다. 전용 메타데이터에 ISBN이 없거나 서로 충돌하거나 canonical과 불일치하면 `isbn-mismatch`로 거부하며, 첫 결과나 발췌가 있는 다른 상품으로 폴백하지 않는다.
 3. **발췌 추출**: 상품페이지를 **스크롤(lazy-load)** 한 뒤 `innerText`의 **"책 속으로"** 섹션 파싱. 발췌 구분자는 책마다 다르므로(`* ` 또는 `--- p.NN 「장」 중에서` 인용줄) **줄 단위 + 출처/인용 줄 제거**로 통일.
 4. **정제**: 각 발췌를 시드로. 길이 필터(권장 15~400자), 공백 정규화. 예스24 발췌는 깔끔해 LLM 정제 불필요(블로그와 달리 꼬리표·군더더기 없음).
 5. **적재**: `seed_sentences` insert(service role, `book_key`). `sourceName`='예스24 책속으로', `sourceUrl`은 매칭된 예스24 상품 URL이어야 하며, 출처 없는 텍스트는 저장하지 않는다.
@@ -91,7 +91,7 @@
 
 > ✅ **정합됨 (2026-07-09)**: `collector/poller.mjs` 기본 `POLL_BATCH=1`(순차)로 낮춤 + 배포본(.env) 도 1로 재시작. 이전 병렬(2~4)에서 관측된 `browserContext.newPage: ...has been closed`(브라우저 컨텍스트 경합) 제거 + spec 동시성-1 안티차단 의도와 일치. (2주 라이브에서 예스24 차단 0건이었으나, 컨텍스트 경합 에러가 있어 순차로 안정화.)
 - **적재**: 출처가 확인된 발췌 → canonical `book_id` 정확 해석(없으면 생략, `books` 쓰기 금지) → distinct NPC 명의 `sentences`(kind='quote') + `seed_sentences` 원장. 멱등(그 책 기존 문장 텍스트 제외).
-- **상태전이**: ok→`done`. not-found/no-excerpt/unverified-book/isbn-mismatch→`failed`(영구). blocked/timeout→attempts++ 후 재시도(≤3).
+- **상태전이**: ok이고 실제 신규 문장을 저장했거나 모든 문장이 이미 존재함→`done`. canonical/출처 영구 검증 거부와 not-found/no-excerpt/unverified-book/isbn-mismatch→`failed`(영구). DB 조회·NPC 풀·user_book/문장/원장 쓰기 장애로 실제 저장 계약을 완료하지 못한 0건(부분 실패 포함), blocked/timeout→attempts++ 후 재시도(≤3).
 
 ## 6. 노출 / 연결 보안 (단순화)
 
