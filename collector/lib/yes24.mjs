@@ -95,10 +95,92 @@ async function scrollToLoad(page) {
   }
 }
 
+// 페이지 전체 텍스트의 첫 ISBN은 관련상품일 수 있으므로 쓰지 않는다. 상품 전용
+// meta·JSON-LD mainEntity·직접 product itemprop 근거를 모두 합의시키고, 충돌하면 fail-closed 한다.
+export function productIsbnFromMetadata({ meta = [], jsonLd = [], itemprop = [] } = {}) {
+  const valid = (value) => {
+    const isbn = onlyDigitsX(value);
+    return /^97[89]\d{10}$/.test(isbn) ? isbn : '';
+  };
+  const candidates = [];
+  const addValues = (...values) => candidates.push(...values.flat(Infinity).map(valid).filter(Boolean));
+  addValues(meta);
+
+  const isProductEntity = (entity) => {
+    const types = [].concat((entity && entity['@type']) || []).map((x) => String(x).toLowerCase());
+    return types.some((x) => x === 'book' || x === 'product');
+  };
+  const entityIsbn = (entity) => {
+    if (isProductEntity(entity)) addValues(entity.isbn, entity.isbn13, entity.gtin13);
+  };
+  for (const raw of jsonLd) {
+    try {
+      const parsed = JSON.parse(raw);
+      for (const root of [].concat(parsed || [])) {
+        if (!root || typeof root !== 'object') continue;
+        const graph = [].concat(root['@graph'] || []).filter((x) => x && typeof x === 'object');
+        const byId = new Map(graph.filter((x) => x['@id']).map((x) => [String(x['@id']), x]));
+        const resolve = (value) => {
+          if (!value || typeof value !== 'object') return null;
+          if (value['@id'] && byId.has(String(value['@id']))) return byId.get(String(value['@id']));
+          return value;
+        };
+        const mains = [];
+        const addMain = (value) => {
+          for (const candidate of [].concat(value || [])) {
+            const resolved = resolve(candidate);
+            if (isProductEntity(resolved)) mains.push(resolved);
+          }
+        };
+
+        if (isProductEntity(root)) addMain(root);
+        addMain(root.mainEntity);
+        for (const entity of graph) addMain(entity.mainEntity); // WebPage.mainEntity object 또는 @id
+
+        // mainEntity 지정이 없는 단순 @graph는 상품 노드가 정확히 하나일 때만 본체로 인정한다.
+        if (!mains.length) {
+          const graphProducts = graph.filter(isProductEntity);
+          if (graphProducts.length === 1) mains.push(graphProducts[0]);
+        }
+        for (const entity of new Set(mains)) entityIsbn(entity);
+      }
+    } catch { /* malformed JSON-LD is not evidence */ }
+  }
+
+  addValues(itemprop);
+  const unique = [...new Set(candidates)];
+  return unique.length === 1 ? unique[0] : '';
+}
+
+// 현재 상품 wrapper 자체가 Book/Product scope인 경우의 직접 ISBN만 읽는다.
+// wrapper 아래 itemscope를 탐색하면 관련상품 하나만 있는 페이지에서 그 ISBN을 본체로 오인할 수 있다.
+export function productItempropFromDocument(documentRoot = globalThis.document) {
+  const value = (el) => el && (el.getAttribute('content') || el.getAttribute('value') || el.textContent || '');
+  const productScopes = [
+    ...documentRoot.querySelectorAll('#yDetailTopWrap[itemscope],#infoset_specific[itemscope],main[itemscope]'),
+  ].filter((scope) => /\/(?:Book|Product)$/i.test(scope.getAttribute('itemtype') || ''));
+  const itemprop = [];
+  for (const scope of productScopes) {
+    for (const el of scope.querySelectorAll('[itemprop="isbn"],[itemprop="isbn13"],[itemprop="gtin13"]')) {
+      if (el.closest('[itemscope]') === scope) itemprop.push(value(el));
+    }
+  }
+  return itemprop;
+}
+
 async function extractFromProduct(page) {
   await scrollToLoad(page);
   const bodyText = await page.evaluate(() => document.body.innerText || '');
-  const isbnOnPage = (bodyText.match(/\b(97[89]\d{10})\b/) || [])[1] || '';
+  const itemprop = await page.evaluate(productItempropFromDocument);
+  const metadata = await page.evaluate(() => {
+    const value = (el) => el && (el.getAttribute('content') || el.getAttribute('value') || el.textContent || '');
+    return {
+      meta: [...document.querySelectorAll('meta[name="isbn"],meta[name="isbn13"],meta[property="books:isbn"],meta[property="product:isbn"],meta[property="product:gtin13"]')].map(value),
+      jsonLd: [...document.querySelectorAll('script[type="application/ld+json"]')].map((el) => el.textContent || ''),
+    };
+  });
+  metadata.itemprop = itemprop;
+  const isbnOnPage = productIsbnFromMetadata(metadata);
   return { excerpts: parseExcerpts(bodyText), isbnOnPage };
 }
 

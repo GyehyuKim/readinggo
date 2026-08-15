@@ -58,8 +58,9 @@ function fakeManaged(productIsbn) {
     async waitForSelector() {},
     url() { return current; },
     async $$eval() { return ['/product/goods/123']; },
-    async evaluate(_fn, position) {
+    async evaluate(fn, position) {
       if (position !== undefined) return true;
+      if (String(fn).includes('querySelectorAll')) return { meta: [productIsbn], jsonLd: [], itemprop: [] };
       return `ISBN ${productIsbn}\n책 속으로\n검증할 수 있는 충분히 긴 원문 발췌 문장입니다.\n출판사 리뷰`;
     },
     async waitForTimeout() {},
@@ -103,6 +104,7 @@ function fakeManaged(productIsbn) {
     [{ text: '모델이 지어낸 문장', sourceName: 'AI', sourceUrl: '' }],
   );
   assert.equal(result.written, 0);
+  assert.equal(result.outcome, 'rejected');
   assert.equal(calls.length, 0, 'unverified quote must not reach Supabase');
 
   result = await writeSeedsAsNpc(
@@ -110,6 +112,7 @@ function fakeManaged(productIsbn) {
     [{ text: '출처 표시는 있지만 canonical 책이 없다', sourceName: '예스24 책속으로', sourceUrl: 'https://www.yes24.com/product/goods/999' }],
   );
   assert.equal(result.written, 0);
+  assert.equal(result.outcome, 'rejected');
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url.pathname, '/rest/v1/books');
   assert.equal(calls[0].init.method, undefined, 'canonical lookup must be read-only');
@@ -133,7 +136,35 @@ function fakeManaged(productIsbn) {
     [{ text: '검증된 책에 연결된 출처 있는 문장', sourceName: '예스24 책속으로', sourceUrl: 'https://www.yes24.com/product/goods/123' }],
   );
   assert.equal(result.written, 1, 'verified canonical seed should retain the legitimate Supabase path');
+  assert.equal(result.outcome, 'written');
   assert.equal(calls.some(({ url, init }) => url.pathname === '/rest/v1/books' && init.method), false, 'seed path must never write books');
+
+  calls = [];
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(input);
+    calls.push({ url, init });
+    if (url.pathname === '/rest/v1/books') return Response.json([{ id: 'canonical-book-id', title: '데미안' }]);
+    if (url.pathname === '/rest/v1/sentences') return Response.json([{ text: '검증된 책에 연결된 출처 있는 문장' }]);
+    if (url.pathname === '/rest/v1/seed_sentences') return new Response(null, { status: 201 });
+    throw new Error(`unexpected already-existing fetch ${url}`);
+  };
+  result = await writeSeedsAsNpc(
+    { title: '데미안', author: '헤르만 헤세', isbn: '9788937460449' },
+    [{ text: '검증된 책에 연결된 출처 있는 문장', sourceName: '예스24 책속으로', sourceUrl: 'https://www.yes24.com/product/goods/123' }],
+  );
+  assert.equal(result.outcome, 'already-exists', 'existing sentence with a persisted ledger is a legitimate done outcome');
+
+  globalThis.fetch = async (input) => {
+    const url = new URL(input);
+    if (url.pathname === '/rest/v1/books') return new Response(null, { status: 503 });
+    throw new Error(`unexpected transient fetch ${url}`);
+  };
+  result = await writeSeedsAsNpc(
+    { title: '데미안', author: '헤르만 헤세', isbn: '9788937460449' },
+    [{ text: '검증된 문장이지만 DB가 일시 장애', sourceName: '예스24 책속으로', sourceUrl: 'https://www.yes24.com/product/goods/123' }],
+  );
+  assert.equal(result.outcome, 'retryable');
+  assert.match(result.reason, /book-lookup-http-503/);
 }
 
 globalThis.fetch = originalFetch;

@@ -17,20 +17,33 @@ export async function fetchPending(limit = 3) {
 }
 
 export async function markDone(id) {
-  await fetch(`${SB()}/rest/v1/seed_queue?id=eq.${id}`, {
-    method: 'PATCH', headers: H({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ status: 'done' }),
-  }).catch(() => {});
+  let r;
+  try {
+    r = await fetch(`${SB()}/rest/v1/seed_queue?id=eq.${id}`, {
+      method: 'PATCH', headers: H({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ status: 'done' }),
+    });
+  } catch (error) {
+    throw new Error(`queue-done-network: ${error.message}`);
+  }
+  if (!r.ok) throw new Error(`queue-done-http-${r.status}`);
+  return 'done';
 }
 
 // 실패 — attempts++. MAX 초과면 status='failed', 아니면 pending 유지(다음 폴에서 재시도).
 export async function markFailed(id, attempts, errMsg) {
   const next = (attempts || 0) + 1;
   const status = next >= MAX_ATTEMPTS ? 'failed' : 'pending';
-  await fetch(`${SB()}/rest/v1/seed_queue?id=eq.${id}`, {
-    method: 'PATCH', headers: H({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ status, attempts: next, last_error: String(errMsg || '').slice(0, 500) }),
-  }).catch(() => {});
+  let r;
+  try {
+    r = await fetch(`${SB()}/rest/v1/seed_queue?id=eq.${id}`, {
+      method: 'PATCH', headers: H({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ status, attempts: next, last_error: String(errMsg || '').slice(0, 500) }),
+    });
+  } catch (error) {
+    throw new Error(`queue-failed-network: ${error.message}`);
+  }
+  if (!r.ok) throw new Error(`queue-failed-http-${r.status}`);
   return status;
 }
 
