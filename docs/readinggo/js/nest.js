@@ -388,10 +388,21 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     (async () => {
       try {
         if (!(DataStore.streak && DataStore.streak.repairStatus)) return;
-        const st = await Promise.resolve(DataStore.streak.repairStatus());
-        if (!alive || !st || !st.canRepair) return;
-        setRepairCard({ lostStreak: st.lostStreak, brokenDays: st.brokenDays });
-        rgTrack('streak_repair_shown', { lost: st.lostStreak, broken_days: st.brokenDays });
+        const [status, current] = await Promise.all([
+          Promise.resolve(DataStore.streak.repairStatus()),
+          DataStore.streak.get ? Promise.resolve(DataStore.streak.get()) : Promise.resolve(null),
+        ]);
+        const today = window._today ? _today() : new Date().toISOString().slice(0, 10);
+        const shouldShow = window.RG_shouldShowStreakRepairCard
+          ? window.RG_shouldShowStreakRepairCard({
+              canRepair: status && status.canRepair,
+              lastCheckInDate: current && current.last_check_in_date,
+              today,
+            })
+          : Boolean(status && status.canRepair && (!current || current.last_check_in_date !== today));
+        if (!alive || !shouldShow) return;
+        setRepairCard({ lostStreak: status.lostStreak, brokenDays: status.brokenDays });
+        rgTrack('streak_repair_shown', { lost: status.lostStreak, broken_days: status.brokenDays });
       } catch (e) { /* 복구 넛지 실패는 조용히 */ }
     })();
     return () => { alive = false; };
@@ -438,7 +449,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       }
     }
     setModalOpen(false);
-    setCheckedToday(true); // 오늘의 짹 완료 (#203)
+    setCheckedToday(true); // 오늘의 짹 완료 — 만회 카드도 즉시 숨김 (#203/#1429)
     const previousNestState = nestState;
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
@@ -934,12 +945,16 @@ function NestView({ state, onCheckin, onOpenSearch }) {
 
       {/* 스트릭 복구·유예 — '하루 만회' (#938, A1). 깨진 스트릭이 복구 가능할 때만. 좌절 이탈 방지(고양감 보호).
           버튼 위계(DESIGN.md): 1차 솔리드(만회) 1개 + 3차 텍스트(괜찮아요). 점수·미션 아님 — 기존 스트릭 관용. */}
-      {repairCard && (
+      {repairCard && !checkedToday && (
         <div style={{ marginTop: 10, background: 'var(--brand-tint)', border: '1.5px solid var(--brand-soft)', borderRadius: 'var(--r-md)', padding: '16px 16px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <span style={{ fontSize: 22, lineHeight: 1 }}>🔥</span>
             <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)' }}>
-              {repairCard.lostStreak}일 연속이 끊길 뻔했어요
+              {window.RG_streakContinuationCopy
+                ? window.RG_streakContinuationCopy(repairCard.lostStreak)
+                : (repairCard.lostStreak > 0
+                    ? `오늘 읽으면 ${repairCard.lostStreak + 1}일째로 이어져요`
+                    : '오늘부터 다시 시작해볼까요')}
             </div>
           </div>
           <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55, marginBottom: 12 }}>

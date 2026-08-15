@@ -11,6 +11,7 @@ import './js/turnstile.js';   // #1158/#1159 Turnstile 봇 검증 — RG_apiFetc
 // 3) 데모/컴포넌트 — 기존 loadBabel 순서 그대로(주석은 index.html 의존성 메모).
 import './js/data.js';
 import './js/datastore.js';
+import './js/streak-repair-copy.js'; // #1429 스트릭 만회 카드 카피·오늘 기록 경계
 import './js/icons.js';
 import './js/components.js';
 import './js/moderation.js'; // #1392 UGC 약관·신고·차단 공용 UI
