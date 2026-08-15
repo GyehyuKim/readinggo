@@ -1135,12 +1135,12 @@ function App() {
               <span>Reading<span className="go">Go</span></span>
             </div>
             <div className="topbar-stats">
-              {/* 상단바 XP 수치 표시 (#493) — Lv 왼쪽에 현재 보유 XP. appState.xp 라 변경 시 즉시 반영. */}
+              {/* #1415: XP는 유지하고 사용자 Lv 대신 1,600 XP 주기 완료 수를 표시한다. */}
               <span className="stat xp" title="현재 XP (systems.md §6.3)">
                 <span>XP {(appState.xp || 0).toLocaleString()}</span>
               </span>
-              <span className="stat lv" title="레벨 (systems.md §6.3)">
-                <span>Lv.{calcLevel(appState.xp)}</span>
+              <span className="stat nest-count" title="완성한 둥지 수 (1,600 XP당 1개)">
+                <span>· 🪺 둥지 {nestCastleCount(appState.xp)}개</span>
               </span>
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               {/* #790: 돋보기 아이콘만으론 '책 추가' 동선 발견성이 낮음 → '도서 찾기' 라벨 + 틴트 배경칩으로 강조. */}
