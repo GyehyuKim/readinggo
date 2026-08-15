@@ -22,7 +22,7 @@ let stopping = false;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 영구 실패(yes24 미커버) vs 일시 실패(차단·타임아웃) 구분.
-const PERMANENT = new Set(['not-found', 'no-excerpt']);
+const PERMANENT = new Set(['not-found', 'no-excerpt', 'unverified-book', 'isbn-mismatch']);
 const MAX_FORCE = 99; // markFailed 에 큰 attempts 를 넘겨 즉시 failed 처리(재시도 무의미한 영구 실패용).
 
 async function processOne(job) {

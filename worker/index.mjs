@@ -1672,6 +1672,28 @@ async function seedEnqueue(env, { title, author, isbn, priority = 'high' }) {
   } catch (e) { /* best-effort — 큐잉 실패해도 다음 진입 때 재시도 */ }
 }
 
+function seedCanonicalTitle(s) {
+  return String(s || '').toLowerCase().replace(/[\s·,.:;!?'"“”‘’()\[\]<>「」『』、~\-_]/g, '').trim();
+}
+
+// 클라이언트 제목/ISBN은 힌트일 뿐이다. canonical books에서 둘을 함께 확인하고
+// 이후 단계에는 DB 값을 전달한다(#1431).
+async function canonicalSeedBook(env, input) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const isbn13 = String(input && input.isbn || '').replace(/[^0-9]/g, '');
+  const title = String(input && input.title || '').trim();
+  if (!/^97[89]\d{10}$/.test(isbn13) || !seedCanonicalTitle(title)) return null;
+  try {
+    const u = `${env.SUPABASE_URL}/rest/v1/books?select=isbn13,title,author&isbn13=eq.${isbn13}&limit=1`;
+    const r = await fetch(u, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    const book = rows && rows[0];
+    if (!book || seedCanonicalTitle(book.title) !== seedCanonicalTitle(title)) return null;
+    return { title: book.title, author: book.author || '', isbn: book.isbn13 };
+  } catch (e) { return null; }
+}
+
 // /api/seed — 큐 기반 비동기 온디맨드(spec §3.1). 동기 대기 안 함.
 //   빈 책(공개 문장<목표)일 때만 high 우선순위로 큐잉 + 빈 배열 반환.
 //   시드 표시는 클라가 byBook(sentences) 을 직접 조회 — collector 가 NPC 명의로 채우면 폴링으로 노출.
@@ -1681,7 +1703,9 @@ async function seedProxy(request, env) {
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
   const have = parseInt((body && body.have), 10) || 0;
   if (have < SEED_TARGET) {
-    await seedEnqueue(env, { title: body && body.title, author: body && body.author, isbn: body && body.isbn, priority: 'high' });
+    const canonical = await canonicalSeedBook(env, body);
+    if (!canonical) return json({ seeds: [], status: 'skipped', reason: 'unverified-book' }, 200, 0);
+    await seedEnqueue(env, { ...canonical, priority: 'high' });
   }
   return json({ seeds: [], status: 'queued' }, 200, 0);
 }
