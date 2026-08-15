@@ -92,7 +92,7 @@ function getEvolutionCopy(fromLv, toLv){
 
 /* ── XP 보상 — systems.md §6.3 SSOT (v7.1 행동 가중치) ──
    1) 위계: 핵심 기여(읽고 한 줄) > 반응(주는 짹) > 단순 방문. 방문도 0 아님.
-   2) 레벨 곡선: 초반 쉽게, 후반 더디게(루트). 3) v7: XP 차감 없음. */
+   2) 완성 둥지 수 = floor(totalXp / 1600), 현재 주기 단계는 별도 파생. 3) v7: XP 차감 없음. */
 const XP_RULES = {
   dailyMission:     20,
   reaction:          5,
@@ -102,7 +102,6 @@ const XP_RULES = {
   streak7:         100,
   streak30:        500,
 };
-function calcLevel(xp){ return Math.floor(Math.sqrt(Math.max(0, xp || 0) / 100)) + 1; }
 function computeCheckinXp({ isNewDay, isComplete, newStreak }){
   const parts = [];
   if (isNewDay) parts.push({ key:'daily', label:'읽고 한 줄', xp: XP_RULES.dailyMission, ico:'📖' });
@@ -511,7 +510,7 @@ window.getNestStageByXp=getNestStageByXp; window.nestXpProgress=nestXpProgress;
 window.nestCycleXp=nestCycleXp; window.nestCastleCount=nestCastleCount;
 window.nestStageProgress=nestStageProgress;
 window.NEST_STAGE_TRANSITIONS=NEST_STAGE_TRANSITIONS; window.getEvolutionCopy=getEvolutionCopy;
-window.XP_RULES=XP_RULES; window.calcLevel=calcLevel; window.computeCheckinXp=computeCheckinXp;
+window.XP_RULES=XP_RULES; window.computeCheckinXp=computeCheckinXp;
 window.reactionXpFor=reactionXpFor; window.grantXp=grantXp;
 window.INITIAL_STATE=INITIAL_STATE;
 window.INITIAL_BOOKSHELF=INITIAL_BOOKSHELF; window.WISHLIST=WISHLIST;
