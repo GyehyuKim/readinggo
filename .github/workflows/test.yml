@@ -94,6 +94,7 @@ jobs:
           node tests/home-ocr-multi.test.mjs
           node tests/supabase-books.test.mjs
           node tests/seed-trust-boundary.test.mjs
+          node tests/seed-collector-followup.test.mjs
           node tests/turnstile-execution.test.mjs
           node tests/turnstile-interactive-timeout.test.mjs
           node tests/ugc-moderation.test.mjs

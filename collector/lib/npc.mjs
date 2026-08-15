@@ -17,7 +17,8 @@ let _npcCache = null;
 async function npcPool() {
   if (_npcCache) return _npcCache;
   const r = await fetch(`${SB()}/rest/v1/users?select=id&is_npc=is.true`, { headers: H() });
-  _npcCache = r.ok ? (await r.json()).map((u) => u.id) : [];
+  if (!r.ok) throw new Error(`npc-pool-http-${r.status}`);
+  _npcCache = (await r.json()).map((u) => u.id);
   return _npcCache;
 }
 
@@ -26,14 +27,14 @@ const normTitle = (s) => String(s || '').toLowerCase().replace(/[\s·,.:;!?'"“
 // 검증된 ISBN-13 + 제목이 canonical books 행과 모두 일치해야 한다(#1431).
 async function resolveBookId({ title, author, isbn }) {
   const isbn13 = onlyDigitsX(isbn);
-  if (!/^97[89]\d{10}$/.test(isbn13) || !normTitle(title)) return null;
+  if (!/^97[89]\d{10}$/.test(isbn13) || !normTitle(title)) return { status: 'rejected', bookId: null, reason: 'unverified-book' };
   const u = `${SB()}/rest/v1/books?select=id,isbn13,title,author&isbn13=eq.${isbn13}&limit=1`;
   const r = await fetch(u, { headers: H() });
-  if (!r.ok) return null;
+  if (!r.ok) return { status: 'retryable', bookId: null, reason: `book-lookup-http-${r.status}` };
   const rows = await r.json();
   const book = rows && rows[0];
-  if (book && normTitle(book.title) === normTitle(title)) return book.id;
-  return null;
+  if (book && normTitle(book.title) === normTitle(title)) return { status: 'ok', bookId: book.id };
+  return { status: 'rejected', bookId: null, reason: 'unverified-book' };
 }
 
 // NPC 의 user_book 확보(merge upsert) → user_book_id.
@@ -52,7 +53,7 @@ async function ensureUserBook(npcId, bookId) {
 async function existingSentenceTexts(bookId) {
   const u = `${SB()}/rest/v1/sentences?select=text,user_book:user_books!inner(book_id)&user_book.book_id=eq.${bookId}&limit=200`;
   const r = await fetch(u, { headers: H() });
-  if (!r.ok) return new Set();
+  if (!r.ok) throw new Error(`sentence-read-http-${r.status}`);
   const rows = await r.json();
   return new Set((rows || []).map((x) => String(x.text || '').replace(/\s+/g, '').trim()));
 }
@@ -76,7 +77,8 @@ function pickDistinct(pool, n) {
 //   반환 { written, skipped, bookId } — written=신규 sentences 수.
 export async function writeSeedsAsNpc({ title, author, isbn }, seeds, opts = {}) {
   const log = opts.log || (() => {});
-  if (!dbConfigured() || !seeds.length) return { written: 0, skipped: 0, bookId: null };
+  if (!dbConfigured()) return { written: 0, skipped: 0, bookId: null, outcome: 'retryable', reason: 'db-unconfigured' };
+  if (!seeds.length) return { written: 0, skipped: 0, bookId: null, outcome: 'rejected', reason: 'no-seeds' };
   // 표시 가능한 시드는 collector가 확인한 예스24 "책 속으로" 상품 URL과 본문만 허용한다.
   // 출처가 없거나 다른 경로에서 주입된 텍스트는 문장으로 저장하지 않는다(#1431).
   const verifiedSeeds = seeds.filter((s) =>
@@ -84,35 +86,55 @@ export async function writeSeedsAsNpc({ title, author, isbn }, seeds, opts = {})
     && s.sourceName === '예스24 책속으로'
     && /^https:\/\/(?:www\.)?yes24\.com\/product\/goods\/\d+(?:[?#].*)?$/i.test(String(s.sourceUrl || ''))
   );
-  if (!verifiedSeeds.length) return { written: 0, skipped: seeds.length, bookId: null };
+  if (!verifiedSeeds.length) return { written: 0, skipped: seeds.length, bookId: null, outcome: 'rejected', reason: 'unverified-source' };
   const bookKey = seedBookKey(title, isbn);
   const norm = (s) => String(s || '').replace(/\s+/g, '').trim();
 
   // 1) canonical book_id 해석(미확인 책은 fail-closed).
-  const bookId = await resolveBookId({ title, author, isbn });
-  if (!bookId) { log(`  book_id 해석 실패: ${title}`); return { written: 0, skipped: seeds.length, bookId: null }; }
+  let resolved;
+  try { resolved = await resolveBookId({ title, author, isbn }); }
+  catch (e) { return { written: 0, skipped: seeds.length, bookId: null, outcome: 'retryable', reason: e.message }; }
+  const bookId = resolved.bookId;
+  if (!bookId) {
+    log(`  book_id 해석 실패: ${title}`);
+    return { written: 0, skipped: seeds.length, bookId: null, outcome: resolved.status, reason: resolved.reason };
+  }
 
   // 2) 중복 판정 — 이 책에 이미 있는 sentences 텍스트 제외(멱등). 원장이 아니라 실제 문장 기준
   //    → 원장만 있고 NPC 문장 없던 책도 이번에 채워짐.
-  const seenTexts = await existingSentenceTexts(bookId);
+  let seenTexts;
+  try { seenTexts = await existingSentenceTexts(bookId); }
+  catch (e) { return { written: 0, skipped: seeds.length, bookId, outcome: 'retryable', reason: e.message }; }
   const fresh = verifiedSeeds.filter((s) => !seenTexts.has(norm(s.text)));
-  if (!fresh.length) { log(`  already has sentences (0 new): ${title}`); return { written: 0, skipped: seeds.length, bookId }; }
+  if (!fresh.length) {
+    const ledgerWritten = await seedWrite(bookKey, verifiedSeeds);
+    if (ledgerWritten === 0) return { written: 0, skipped: seeds.length, bookId, outcome: 'retryable', reason: 'ledger-write-failed' };
+    log(`  already has sentences (0 new): ${title}`);
+    return { written: 0, skipped: seeds.length, bookId, outcome: 'already-exists' };
+  }
 
   // 3) 발췌마다 distinct NPC 배정 → sentences insert.
-  const pool = await npcPool();
-  if (!pool.length) { log('  NPC 풀 비어있음'); return { written: 0, skipped: fresh.length, bookId }; }
+  let pool;
+  try { pool = await npcPool(); }
+  catch (e) { return { written: 0, skipped: fresh.length, bookId, outcome: 'retryable', reason: e.message }; }
+  if (!pool.length) { log('  NPC 풀 비어있음'); return { written: 0, skipped: fresh.length, bookId, outcome: 'retryable', reason: 'npc-pool-empty' }; }
   const npcs = pickDistinct(pool, fresh.length);
   let written = 0;
+  let failed = 0;
   for (let i = 0; i < fresh.length; i++) {
     const npcId = npcs[i % npcs.length];
     const ubId = await ensureUserBook(npcId, bookId);
-    if (!ubId) continue;
+    if (!ubId) { failed++; continue; }
     if (await insertSentence(npcId, ubId, fresh[i].text)) written++;
+    else failed++;
   }
 
   // 4) 원장 기록(출처·중복판정·takedown). db.seedWrite 가 행별 프래그먼트로 중복 회피.
-  await seedWrite(bookKey, fresh);
+  const ledgerWritten = await seedWrite(bookKey, fresh);
 
   log(`  ✓ NPC 적재 ${written}/${fresh.length}: ${title}`);
-  return { written, skipped: seeds.length - fresh.length, bookId };
+  if (failed || written === 0 || ledgerWritten === 0) {
+    return { written, skipped: seeds.length - fresh.length, bookId, outcome: 'retryable', reason: failed ? 'sentence-write-failed' : 'ledger-write-failed' };
+  }
+  return { written, skipped: seeds.length - fresh.length, bookId, outcome: 'written' };
 }
