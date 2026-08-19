@@ -1914,7 +1914,8 @@ async function imgProxy(searchParams) {
 async function aladinProxy(q, env, ctx) {
   const isbn = (q.get('isbn') || '').trim();
   const query = (q.get('query') || q.get('q') || '').trim().slice(0, 100);
-  const max = Math.min(parseInt(q.get('max'), 10) || 10, 20);
+  const requestedMax = parseInt(q.get('max'), 10);
+  const max = Number.isFinite(requestedMax) && requestedMax > 0 ? Math.min(requestedMax, 20) : 10;
   if (isbn && !/^\d{10,13}$/.test(isbn)) return json({ error: 'isbn 형식 오류' }, 400);
   if (!isbn && !query) return json({ error: 'query 또는 isbn 필요' }, 400);
   if (isbn && nlkReady(env)) return nlkIsbnLookup(isbn, env, ctx);
@@ -1980,18 +1981,22 @@ function normalizeNLK(doc, isbn) {
 async function kakaoSearchProxy(query, max, env, ctx) {
   try {
     let items = await kakaoBookSearch(query, max, env);
-    // 외서 균형 보강(#302 유지): 국내(카카오) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
+    // 외서 균형 보강(#302 유지): 기본 국내(카카오) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
+    // 요청 max가 10보다 작으면 provider 보강 뒤에도 그 상한을 지킨다(#1458).
     // Google 결과는 실시간 응답만 — 영구 upsert 없음(ToS §5.e).
-    items = items.slice(0, 5);
-    try {
-      const gb = await googleBooksSearch(query, 10 - items.length, env);
-      const seen = new Set(items.map((it) => it.isbn13 || it.title));
-      for (const g of gb) {
-        if (items.length >= 10) break;
-        const k = g.isbn13 || g.title;
-        if (k && !seen.has(k)) { seen.add(k); items.push(g); }
-      }
-    } catch (e) { /* 보강 실패 무시 */ }
+    const responseMax = Math.min(max, 10);
+    items = items.slice(0, Math.min(5, responseMax));
+    if (items.length < responseMax) {
+      try {
+        const gb = await googleBooksSearch(query, responseMax - items.length, env);
+        const seen = new Set(items.map((it) => it.isbn13 || it.title));
+        for (const g of gb) {
+          if (items.length >= responseMax) break;
+          const k = g.isbn13 || g.title;
+          if (k && !seen.has(k)) { seen.add(k); items.push(g); }
+        }
+      } catch (e) { /* 보강 실패 무시 */ }
+    }
     // 검색 도서 자동 저장(#489 계승): 카카오 발견 ISBN → 국중도 재조회 후 canonical 적재.
     if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && nlkReady(env)) {
       const isbns = items.filter((b) => b.source === 'kakao' && b.isbn13).map((b) => b.isbn13);
@@ -2007,7 +2012,7 @@ async function kakaoSearchProxy(query, max, env, ctx) {
     return json({ items }, 200, 86400);
   } catch (e) {
     // 카카오 자체 실패 → Google 실시간 폴백(저장 없음) — 레거시 경로와 동일 무중단 규약.
-    try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb }, 200, 3600); } catch (e2) {}
+    try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb.slice(0, max) }, 200, 3600); } catch (e2) {}
     return json({ error: '카카오 호출 실패', detail: String((e && e.message) || e) }, 502);
   }
 }
@@ -2077,20 +2082,24 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
       const toPersist = persistItems || items;
       ctx.waitUntil(Promise.all(toPersist.filter((b) => b.isbn13).map((b) => upsertBook(SB, SRK, b).catch(() => {}))));
     }
-    // 외서 균형 보강 (#302) — 검색이면 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
-    // 결과 홍수 방지: 알라딘 5칸으로 자르고, 외서 5칸을 항상 채워 균형. ISBN 단건 조회엔 미적용.
-    // 빈자리 이월(#350): 알라딘이 5칸을 못 채우면(외서 등) 남은 자리를 Google로 채워 총 10건 보장.
+    // 외서 균형 보강 (#302) — 검색이면 기본 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
+    // 요청 max가 10보다 작으면 provider 보강 뒤에도 그 상한을 지킨다(#1458).
+    // ISBN 단건 조회엔 미적용한다.
     if (query) {
-      items = items.slice(0, 5);
-      try {
-        const gb = await googleBooksSearch(query, 10 - items.length, env);
-        const seen = new Set(items.map((it) => it.isbn13 || it.title));
-        for (const g of gb) {
-          if (items.length >= 10) break;
-          const k = g.isbn13 || g.title;
-          if (k && !seen.has(k)) { seen.add(k); items.push(g); }
-        }
-      } catch (e) { /* 폴백 실패 무시 */ }
+      const responseMax = Math.min(max, 10);
+      items = items.slice(0, Math.min(5, responseMax));
+      if (items.length < responseMax) {
+        try {
+          const gb = await googleBooksSearch(query, responseMax - items.length, env);
+          const seen = new Set(items.map((it) => it.isbn13 || it.title));
+          for (const g of gb) {
+            if (items.length >= responseMax) break;
+            const k = g.isbn13 || g.title;
+            if (k && !seen.has(k)) { seen.add(k); items.push(g); }
+          }
+        } catch (e) { /* 폴백 실패 무시 */ }
+      }
+      items = items.slice(0, responseMax);
       // (#1044) 구 #529 의 Google 결과 upsert 는 제거 — Google ToS §5.e 가 영구 DB 캐시를
       // 금지하므로 Google 은 실시간 응답 표시만. 외서 영구 저장 폴백은 OpenLibrary(ISBN 등록 경로).
     }
@@ -2098,7 +2107,7 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
   } catch (e) {
     // 알라딘 자체 실패 시 검색은 Google Books로 한 번 더 (외서 가용성↑).
     if (query) {
-      try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb }, 200, 3600); } catch (e2) {}
+      try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb.slice(0, max) }, 200, 3600); } catch (e2) {}
     }
     return json({ error: '알라딘 호출 실패', detail: String((e && e.message) || e) }, 502);
   }

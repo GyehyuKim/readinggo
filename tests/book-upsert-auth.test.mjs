@@ -98,3 +98,64 @@ assert.equal(clientFetches[1].headers.Authorization, 'Bearer fresh-token');
 assert.deepEqual(JSON.parse(clientFetches[1].body), { isbn13: '9781234567897' });
 
 console.log('OK: book-upsert 인증·인증 전 rate-limit·서버 정본·세션 갱신 경계');
+
+// /aladin 검색 응답은 Kakao + Google 보강 뒤에도 요청 max를 넘지 않아야 한다 (#1458).
+const kakaoDocuments = Array.from({ length: 10 }, (_, i) => ({
+  isbn: `123456789012${i}`,
+  title: `카카오 책 ${i}`,
+  authors: ['저자'],
+}));
+const googleItems = Array.from({ length: 10 }, (_, i) => ({
+  volumeInfo: {
+    title: `Google Book ${i}`,
+    industryIdentifiers: [{ type: 'ISBN_13', identifier: `223456789012${i}` }],
+  },
+}));
+const aladinItems = Array.from({ length: 10 }, (_, i) => ({
+  isbn13: `323456789012${i}`,
+  title: `알라딘 책 ${i}`,
+  author: '저자',
+}));
+
+async function searchItems(max, { kakaoFails = false, legacy = false } = {}) {
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = new URL(input);
+    if (url.hostname === 'dapi.kakao.com') {
+      return kakaoFails
+        ? Response.json({ error: 'upstream failure' }, { status: 502 })
+        : Response.json({ documents: kakaoDocuments });
+    }
+    if (url.hostname === 'www.googleapis.com') return Response.json({ items: googleItems });
+    if (url.hostname === 'www.aladin.co.kr') return Response.json({ item: aladinItems });
+    throw new Error(`unexpected search upstream ${url}`);
+  };
+  try {
+    const suffix = max == null ? '' : `&max=${encodeURIComponent(max)}`;
+    const searchEnv = legacy
+      ? { ALADIN_TTB_KEY: 'test-key', BOOKS_PROVIDER: 'aladin' }
+      : { KAKAO_REST_KEY: 'test-key' };
+    const response = await worker.fetch(
+      new Request(`https://readinggo.example/aladin?query=test${suffix}`),
+      searchEnv,
+      {},
+    );
+    assert.equal(response.status, 200);
+    return (await response.json()).items;
+  } finally {
+    globalThis.fetch = savedFetch;
+  }
+}
+
+for (const max of [1, 2, 5, 10, 20]) {
+  const items = await searchItems(max);
+  assert.ok(items.length <= max, `Kakao+Google 결과 ${items.length}개가 max=${max}를 넘지 않아야 한다`);
+}
+assert.equal((await searchItems()).length, 10, 'max 미지정은 기존 기본 10개를 유지해야 한다');
+assert.equal((await searchItems('invalid')).length, 10, '잘못된 max는 기존 기본 10개를 유지해야 한다');
+assert.equal((await searchItems(0)).length, 10, 'max=0은 기존 기본 10개를 유지해야 한다');
+assert.equal((await searchItems(-1)).length, 10, '음수 max는 기존 기본 10개를 유지해야 한다');
+assert.equal((await searchItems(2, { kakaoFails: true })).length, 2, 'Kakao 실패→Google fallback도 max를 지켜야 한다');
+assert.equal((await searchItems(2, { legacy: true })).length, 2, '레거시 Aladin+Google 보강도 max를 지켜야 한다');
+
+console.log('OK: book search max boundary across Kakao, Google fallback and legacy Aladin');
