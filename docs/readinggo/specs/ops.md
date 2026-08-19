@@ -62,7 +62,7 @@
 
 - **정의처**: [`js/config.js`](../js/config.js) `RG_CONFIG.FLAGS = { <name>: <boolean>, ... }`. 클라 공개 안전(민감정보 아님 — 키·시크릿 금지).
 - **조회**: `window.RG_flag(name)` — 단순·안전 조회. **미정의/오타/`FLAGS` 부재 → `false`**(기능 미노출이 안전 기본값). 피처 코드는 이 헬퍼만 쓴다(`RG_CONFIG.FLAGS` 직접 접근 금지 — 안전 폴백 우회 방지).
-- **토글 방법(Phase 0)**: `config.js` 값을 바꿔 **작은 배포**(`npx wrangler deploy` 또는 main 머지→Workers Build). 코드 한 줄·작은 diff라 카나리·롤백 위험이 거의 없다.
+- **토글 방법(Phase 0)**: `config.js` 변경도 일반 PR·CI를 거쳐 `main`에 머지하고 stable DEV에서 검증한다. Production 반영은 검증된 동일 SHA를 `promote-production.yml`로 수동 승격한다. 작은 config diff도 로컬 직접 배포나 Production gate 우회 사유가 아니다.
 
 ### 1.2 off = 미노출 원칙 (graceful-skip)
 
@@ -102,45 +102,26 @@ DEV 빌드는 `VITE_SUPABASE_URL`·`VITE_SUPABASE_PUBLISHABLE_KEY`·`VITE_API_OR
 승격 workflow는 (1) 승인 SHA가 `origin/main` HEAD인지, (2) stable dev `/api/release` receipt의 SHA와 같은지
 검증한 뒤에만 동일 checkout을 prod에 배포한다. 자세한 실행·rollback은 [RUNBOOK-DEPLOY](../RUNBOOK-DEPLOY.md).
 
-### 2.1 prod 카나리 — 보조 안전망 (#901)
+### 2.1 prod 카나리 — 비활성 제안 (#901)
 
-> **이 절차의 롤아웃 단계는 Cloudflare 계정 액션(대시보드/`wrangler`)이라 코드/PR로 자동화되지 않는다 — 계휴(계정 보유자)가 수동 실행한다.** 본 스펙은 *방법*을 문서화할 뿐, 실제 트래픽 분할은 LLM이 실행할 수 없다.
+[Cloudflare Workers gradual deployment](https://developers.cloudflare.com/workers/configuration/versions-and-deployments/gradual-deployments/)은 일부 트래픽에 새 버전을 먼저 보내는 보조 안전망 후보다. 현재 저장소에는 승인 SHA·stable DEV receipt·GitHub `production` environment를 유지하면서 비율 배포하는 audited workflow가 없으므로 **활성 운영 절차가 아니다**. 대시보드나 로컬 `wrangler` 명령으로 ad-hoc Production 업로드·분할·100% 승격을 수행하지 않는다.
 
-### 2.1.1 개념
+### 2.2 활성화 선행조건
 
-[Cloudflare Workers gradual deployment](https://developers.cloudflare.com/workers/configuration/versions-and-deployments/gradual-deployments/) 로 **새 버전을 일부 트래픽에만 먼저** 보낸 뒤(예: 10%) 모니터하고, 이상 없으면 100%로 올린다. "터져도 일부만" — 영향 범위를 시간축으로 쪼갠다. 현재 배포(main 머지 → Workers Build가 Vite 빌드→`dist` 즉시 100% 서빙)의 빈틈(① 한 번에 100% ② 자동 롤백이 "렌더되나"만 봄)을 메우는 *사전* 장치.
-
-### 2.2 절차 (수동 — 계정 액션)
-
-1. **새 버전 업로드(배포 아님)** — 트래픽을 받지 않는 버전만 올린다.
-   ```bash
-   npx wrangler versions upload
-   ```
-   출력의 **Version ID**(예: `e6b2…`)를 기록한다. 이 단계는 라이브 트래픽에 영향 없음.
-2. **카나리 시작 — 새 버전 10% / 직전 버전 90%**:
-   ```bash
-   npx wrangler versions deploy <NEW_VERSION_ID>@10 <PREV_VERSION_ID>@90
-   ```
-   (대시보드: Workers & Pages → `readinggo` → Deployments → *Deploy version* → 두 버전 비율 지정.)
-3. **모니터**(권장 10~30분 또는 트래픽 한 사이클). 보는 것: Workers 대시보드 **Errors/Invocations**, `deploy-verify` live smoke(렌더), 그리고 **카나리가 못 보는 데이터·플로우 회귀**는 수동 확인(핵심 플로우 1~2개 직접). 이상 징후면 §2.3 즉시 롤백.
-4. **승격 — 100%**:
-   ```bash
-   npx wrangler versions deploy <NEW_VERSION_ID>@100
-   ```
-   또는 안정 확인 후 일반 `npx wrangler deploy`(최신 빌드 100%).
+1. `promote-production.yml`과 같은 SHA·stable DEV·`production` 승인 게이트를 보존하는 별도 workflow를 PR로 추가한다.
+2. version ID와 source SHA의 대응, 트래픽 비율, 관측 시간, E2E, rollback SHA를 감사 가능한 receipt로 남긴다.
+3. DEV·Production credential 및 Worker 이름 분리를 정적·실행 테스트로 검증한다.
+4. 위 workflow와 runbook이 승인·머지되기 전에는 현재의 동일 SHA 수동 100% 승격 계약을 사용한다.
 
 ### 2.3 롤백
 
-- **카나리 중**: 직전 버전 100%로 되돌린다.
-  ```bash
-  npx wrangler versions deploy <PREV_VERSION_ID>@100
-  ```
-- **기능 단위**: 회귀가 특정 기능이면 §1 플래그를 off로(작은 config 배포) — 전체 롤백보다 좁게 차단.
-- 기존 `deploy-verify`(live smoke ×3 → 3연속 실패 시 자동 롤백)는 그대로 안전망으로 둔다(렌더 회귀 한정).
+- Production 회귀는 승인된 직전 정상 SHA를 `promote-production.yml`로 재승격한다. 로컬 checkout이나 dashboard 수동 배포로 되돌리지 않는다.
+- 기능 플래그 off도 일반 PR·CI→stable DEV 검증→동일 SHA Production 승격 순서를 따른다.
+- 친구 공개 5-A의 보안 rollback은 broad base RLS 복원이 아니라 신규 클라이언트 pause·제한 API 유지·원인 수정이다.
 
-### 2.4 버전 affinity (선택, #901)
+### 2.4 version affinity — 향후 검토 (#901)
 
-비율 분할 중 한 세션이 매 요청 다른 버전에 붙으면 상태가 튄다. 세션 고정이 필요하면 gradual deployment의 **version affinity**(쿠키 기반 세션 고정)를 켠다 — Phase 0 정적+클라 상태(localStorage) 특성상 필수는 아니나, Phase 1 Supabase 세션·서버 상태가 늘면 검토.
+비율 배포 workflow를 실제 도입할 때 한 세션이 요청마다 다른 버전에 붙지 않도록 version affinity 필요성을 검토한다. 현재 운영 계약에는 포함하지 않는다.
 
 ## 3. 격리 불변조건
 

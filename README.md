@@ -47,7 +47,7 @@
   ```bash
   npx serve docs/readinggo
   ```
-- **재배포**: `npx wrangler deploy` (Cloudflare Workers — Netlify에서 이전 완료)
+- **재배포**: PR 검증 후 `main` 머지로 stable DEV를 자동 배포하고, 검증된 동일 SHA만 `promote-production.yml`에서 수동 Production 승격한다. 로컬 `npx wrangler deploy`는 정상 배포 경로가 아니다.
 - **도서 데이터**: canonical = Supabase `books` (#490). 구 정적 `books.tsv`는 제거됨(#972) — 폴백은 인라인 `RG_BOOKS`(12). 코드에 책 정보 하드코딩 금지
 
 ---

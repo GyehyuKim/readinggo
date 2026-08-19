@@ -160,7 +160,7 @@ PR 생성 또는 머지 요청 전 반드시 아래 순서를 따른다.
 - Worker 이름: `readinggo`
 - Demo URL: `https://readinggo.hyuniverse.workers.dev`
 - Demo entrypoint: `docs/readinggo/index.html` (`wrangler.toml` `[assets]` 로 서빙)
-- 재배포: `npx wrangler deploy`
+- 재배포: PR 검증 후 `main` 머지로 stable DEV 자동 배포 → 검증된 동일 SHA를 `promote-production.yml`에서 수동 Production 승격. 로컬 `npx wrangler deploy` 직접 배포 금지.
 
 ## Design System
 

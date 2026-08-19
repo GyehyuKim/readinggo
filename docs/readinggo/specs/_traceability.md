@@ -23,7 +23,7 @@
 | `python3 tests/spec-align/design_lint.py` | ✅ 0건 | 이모지·raw hex·ghost·radius·font 규칙 위반 없음 |
 | `python3 tests/spec-align/migrations_applied.py` | 🚩 환경 의존 | 기본 Python 3.9.6은 `str \| None`에서 실패. `uv` Python 3.11에서는 시작되나 worktree에 `SUPABASE_ACCESS_TOKEN`이 없어 원격 검증 보류 |
 | `npm run build` (`docs/readinggo`) | ✅ | production·합성 DEV build 모두 성공. 폰트 runtime resolution·대형 chunk 경고는 기존 상태 |
-| Node 테스트 54개 파일 | ✅ 70/70 | 정적·Worker 67, Playwright 2, DEV isolation 1을 각 전제(build·Chromium·합성 DEV env)로 실행. 현행 OCR 테스트가 `201~1000자→private`를 요구하므로 v17 1,000자 공개 계약의 구현 완료 증거는 아님 |
+| Node·Worker·Playwright 회귀 묶음 | ✅ | `.github/workflows/test.yml`의 계약·회귀·Production build/boot·합성 DEV isolation·Playwright render smoke를 실행. 파일 수나 assertion 수를 고정 계약으로 삼지 않는다. 현행 OCR 테스트가 `201~1000자→private`를 요구하므로 v17 1,000자 공개 계약의 구현 완료 증거는 아님 |
 
 ## 1. 33개 스펙 파일 전수 상태
 
@@ -84,6 +84,6 @@
 - 정적 grep 검증은 코드 존재를 확인할 뿐 실제 UX·RLS·Production 적용을 보증하지 않는다.
 - `docs/readinggo/supabase/*.sql` 존재와 Production 적용 여부는 다르다. `migrations_applied.py`도 table 33개·column 40개 존재만 확인하고 policy·view·RPC body·grant·trigger·RLS·backfill을 보증하지 않는다. 원격 ledger와 역할별 직접 API 검증 없이 적용 완료로 단정하지 않는다.
 - 정적 감사에서 `user_books` 인증 사용자 read 범위를 확인했으나 Production의 실제 적용 정책·데이터 영향 건수는 아직 검증하지 않았다.
-- Node 70/70은 현행 v16/레거시 계약의 회귀 통과다. XP 제거·책나무·새 공개범위·1,000자 공개 저장을 검증하는 v17 invariant는 아직 없다.
+- 현재 Node·Worker·Playwright 회귀 통과는 현행 v16/레거시 계약의 증거다. XP 제거·책나무·새 공개범위·1,000자 공개 저장을 검증하는 v17 invariant는 아직 없다.
 - 이번 spec-only 작업에서는 코드·DB·DEV·Production·Play Store를 변경하지 않는다.
 - 최신 제품 결정은 구현 사실과 분리해 각 기능 스펙에 `목표 계약 / 현재 갭 / 전환 게이트`로 기록한다.
