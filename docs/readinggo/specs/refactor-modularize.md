@@ -91,17 +91,18 @@ index.html 로드 순서: 의존 글로벌이 사용보다 **먼저**. 아래는
 
 ## 4. prod-안전 배포 플로우 (필수)
 
-main 머지 = Cloudflare Workers Build 자동배포(prod 직행)라 검증 완충이 없다 → 추출 PR마다:
+`main` 머지는 stable DEV까지 자동이며 Production은 검증된 동일 SHA의 수동 승격이다. 추출 PR마다:
 
-1. **프리뷰 검증**: `preview-smoke.yml`이 비프로모션 Worker를 올리고 edge URL에서 Vite 번들 부팅·전 탭 렌더를 검증.
+1. **프리뷰 검증**: PR event의 `preview-smoke.yml`은 localhost에서 Vite 번들 부팅·전 탭 렌더를 검증한다. 비프로모션 DEV Worker 업로드와 edge 검증은 `workflow_dispatch`로 명시 실행할 때만 수행한다.
 2. **CI 게이트**: Vite `boot-smoke` + render-smoke + spec-align.
-3. **머지** → Workers Build 자동배포 → `deploy-verify`가 Vite content-hash 자산 반영·production live smoke 검증.
-4. **롤백**: 깨지면 `wrangler rollback`(또는 PR revert + 재배포). tiny PR이라 비용 최소.
-5. **캐시버스트**: Vite content-hash 파일명이 자동 담당. 수동 `_RG_V` bump는 폐기됨.
+3. **머지**: `deploy-dev.yml`이 main SHA를 stable DEV에 배포하고 `/api/release`·환경 격리·render smoke를 확인한다.
+4. **Production 승격**: 승인 SHA가 `origin/main`과 stable DEV receipt에 모두 일치할 때만 `promote-production.yml`을 GitHub `production` environment에서 수동 실행한다.
+5. **롤백**: DEV 회귀는 DEV에서만 복구한다. Production 회귀는 revert PR을 필수 CI 후 `main`에 머지해 만든 새 HEAD를 stable DEV에서 검증하고, 그 동일 SHA를 production workflow로 승격한다. 현재 workflow로 과거 SHA를 직접 재승격하지 않는다. DEV credential이나 main 자동 연결로 prod를 조작하지 않는다.
+6. **캐시버스트**: Vite content-hash 파일명이 자동 담당. 수동 `_RG_V` bump는 폐기됨.
 
 ## 5. 검증 체크리스트 (추출 PR마다)
 
 - [ ] 순수 이동(로직 diff 0), `window.X` shim 유지
 - [ ] `main.js` ES import 추가 + 로드 순서(의존 먼저), `window.X` shim 유지
-- [ ] PR `preview-smoke` edge URL에서 부팅·렌더 확인
+- [ ] PR `preview-smoke` localhost 부팅·렌더 통과. edge URL 검증이 필요한 PR은 수동 `workflow_dispatch` run과 URL 증거를 추가
 - [ ] Vite boot-smoke·render-smoke·spec-align 통과

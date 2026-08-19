@@ -3,7 +3,7 @@
 > **신설 (2026-06-24)**: 설치된 네이티브 앱에 웹 레이어(JS/HTML/CSS)를 스토어 우회로 갱신.
 > iOS-PLAN [§10.5 업데이트 전략](../iOS-PLAN.md)의 OTA 골격을 구체화한 **피처 스펙**.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec PR 먼저 → 코드 PR 나중.
-> **현행 정합 (2026-07-21, #1297)**: 초기 설계는 구현 완료됐다. `@capgo/capacitor-updater`, Worker `/api/ota`, R2 `readinggo-ota`, KV `ota:android:<channel>`, `ota-release.yml`·`ota-promote.yml`이 현재 `main`의 실행 계약이다.
+> **현행 정합 (2026-08-19, `origin/main@39248ef`)**: `@capgo/capacitor-updater`, Worker `/api/ota`, R2 `readinggo-ota`, KV `ota:android:<channel>`이 구현돼 있다. 현재 `ota-release.yml`과 `ota-promote.yml`은 모두 `workflow_dispatch`이며 stable DEV receipt·`origin/main`·입력 SHA 일치와 GitHub `production` environment 승인을 요구한다.
 
 ## 0. 목적
 
@@ -18,7 +18,7 @@
 | **OTA로 내리는 것** | `dist` 웹 번들 — JS / HTML / CSS / assets |
 | **OTA로 못 내리는 것** | 네이티브 — Capacitor 플러그인 추가·제거, `AndroidManifest`(딥링크 등), 네이티브 코드, 앱 아이콘·스플래시, OS 권한 → **스토어 빌드 필수** |
 
-- **`minNativeVersion` 게이트 (최우선 안전장치)**: 각 OTA 번들은 자신이 요구하는 **네이티브 셸 버전**을 선언한다. 설치된 셸이 그보다 낮으면 그 번들을 **받지 않는다**. → 새 네이티브 API를 호출하는 웹 번들이 구(舊) 셸에 적용돼 **크래시하는 것**을 원천 차단. (예: 이번 OAuth 딥링크처럼 네이티브 플러그인이 추가된 변경은 OTA로 내리면 안 되고, 새 셸 빌드 + `minNative` 상향이 필요.)
+- **`minNativeVersion` 게이트**: 각 OTA 번들은 자신이 요구하는 **네이티브 셸 버전**을 선언한다. 설치된 셸이 그보다 낮으면 그 번들을 받지 않아 새 네이티브 API 호출로 인한 크래시를 차단한다. 단, 이 값은 DB migration·RLS/RPC 권한·공개범위 enum·legacy API 의미 호환을 보증하지 않는다. 해당 전환은 app version별 호출 관측, 최소 지원 버전, fail-closed 정책, 직접 API QA를 별도 통과해야 한다.
 - **스토어 약관**: 웹/해석형 콘텐츠 업데이트는 Google Play·App Store 모두 허용 범위. **네이티브 실행코드 다운로드는 금지** — 우리는 웹 번들만 내리므로 적합.
 
 ## 2. 아키텍처 — 자가호스팅 (Cloudflare)
@@ -55,8 +55,8 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 
 ### ③ 릴리스 전략 ⭐ (핵심 결정)
 - **채널 2개**: `beta` · `production`.
-- **트리거**: **main 머지 → 자동으로 `beta` 채널 publish**. **`beta` → `production` 은 수동 승격**(GitHub Action `workflow_dispatch`). = **앱판 카나리** — 운영자/베타테스터가 먼저 받아 확인 후 prod로 올린다.
-- **근거**: 배포안전 에픽(#897)의 카나리 철학을 앱 레이어에 적용. 웹은 main=즉시 100%지만, **앱은 수동 게이트로 한 겹 더 보수적**으로(설치 사용자에게 잘못된 번들이 바로 가지 않게).
+- **트리거**: `ota-release.yml`을 `workflow_dispatch`로 실행해 stable DEV에서 검증된 `origin/main` SHA의 번들을 `beta`에 발행한다. beta 기기 QA 뒤 `ota-promote.yml`을 별도 수동 실행해 같은 SHA의 manifest를 재빌드 없이 `production`으로 승격한다. 두 workflow 모두 GitHub `production` environment 승인 대상이다.
+- **근거**: main push가 설치 사용자 채널을 자동 변경하지 않게 하고, DEV 검증 artifact와 beta·production OTA의 SHA·checksum을 단일 receipt로 추적한다.
 - **대안(기각)**: iOS-PLAN §10.5 원안 = `main → production` 자동 + staged %. 더 빠르나 prod 자동 노출. → 출시 초기엔 **수동 승격**을 채택, staged % 점진배포는 Phase 2로.
 
 ### ④ MVP 범위
@@ -65,10 +65,11 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 
 ## 4. 릴리스 흐름
 
-1. **main 머지** → GitHub Action: `vite build` → `dist` zip → SHA-256 → R2 `bundles/<version>.zip` 업로드 → KV `channel:beta = {version,url,checksum,minNative}`.
-2. **베타 앱**(채널=beta) 다음 시작 시 수신 → 검증 → 적용. 운영자가 확인.
-3. 정상 → **수동 승격**(`workflow_dispatch`): KV `channel:production = 그 version`. prod 앱이 순차 수신.
-4. 이상 → 승격 안 함(prod 무영향) + beta는 자동 롤백.
+1. main SHA가 stable DEV `/api/release`와 일치하고 DEV QA가 승인된 뒤 `ota-release.yml`을 수동 실행한다.
+2. workflow가 같은 SHA를 checkout해 `dist` zip·SHA-256을 만들고 R2에 업로드한 뒤 `ota:android:beta` manifest에 version·URL·checksum·`minNative`·SHA를 기록한다.
+3. **베타 앱**이 다음 시작 시 수신·검증·적용한다. 운영자가 실제 기기와 대상 역할을 확인한다.
+4. 정상일 때만 `ota-promote.yml`을 같은 SHA로 수동 실행해 beta manifest를 검증하고 `ota:android:production`으로 그대로 복사한다.
+5. 이상이면 production 승격을 하지 않는다. beta의 부팅 실패 자동 rollback과 production `:prev` 복원은 별도 증거를 남긴다.
 
 ## 5. minNativeVersion 운영
 
@@ -90,7 +91,7 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 1. ✅ `capacitor.config.json`: `updateUrl`, `autoUpdate:true`, `directUpdate:false`, `resetWhenUpdate:true`.
 2. ✅ `main.js`: 네이티브 부팅 성공 후 `notifyAppReady()`.
 3. ✅ Worker/KV: `POST /api/ota` + `minNative` 게이트.
-4. ✅ `ota-release.yml`: `main` 푸시 시 build → zip/checksum → R2 → beta.
-5. ✅ `ota-promote.yml`: 수동 beta→production 승격 + `:prev` 백업.
+4. ✅ `ota-release.yml`: 실제 trigger는 `workflow_dispatch`이며 승인 SHA 입력 → stable DEV/main gate → build → zip/checksum → R2 → beta다. 파일 상단의 과거 "main 머지 자동" 설명은 실행 trigger가 아닌 stale 주석으로 #1464에서 정정한다.
+5. ✅ `ota-promote.yml`: `workflow_dispatch` + 같은 SHA gate → beta manifest 검증 → production verbatim 승격 + `:prev` 백업.
 
 > 실제 R2/KV 객체와 설치 기기의 수신 성공은 워크플로우 실행·기기 QA 근거로 별도 판정한다.

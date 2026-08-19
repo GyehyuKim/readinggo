@@ -1,36 +1,48 @@
 # ReadingGo 스펙 — 인덱스
 
-> **기준**: **v7 (2026-06-01) — web-first 재정의 + v6 롤백.** 용어는 §0.5, Phase·스택은 §3, 데이터·DataStore 계약은 [backend.md](./backend.md). 분할 기반은 v6 (2026-05-28, #107 머지본)
-> **분할일**: 2026-05-28
-> **원본**: `docs/2. specifications/_archive/readinggo-spec.md` (1,651줄 단일 파일)을 강의 Week 11 *thin spec* 처방 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week11-spec-honest-synthesis))에 따라 피처별로 분할.
-> **편집 정책**: 변경은 *해당 피처 파일* PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
+> **기준**: 이 디렉터리는 ReadingGo의 살아있는 SSOT다. 충돌 시 `meta/decisions.md`의 가장 최신 활성 결정 → 해당 기능 스펙 → 현재 구현·검증 증거 순으로 정합하며, 과거 v5~v16 설명은 감사 이력이지 현재 계약이 아니다.
+> **구현 사실 기준**: 현재 런타임은 [architecture-asbuilt.md](./architecture-asbuilt.md), 기능별 구현 상태와 갭은 [_traceability.md](./_traceability.md)를 따른다.
+> **원본**: `docs/2. specifications/_archive/readinggo-spec.md` 단일 문서를 2026-05-28 피처별로 분할했다. 아카이브는 현재 계약으로 사용하지 않는다.
+> **편집 정책**: 변경은 해당 피처 파일의 spec-only PR로 먼저 승인·머지한다. 코드·DEV·Production·스토어 작업은 승인된 스펙 이후에만 진행한다.
 
 ---
 
 ## 파일 지도
 
-| 영역 | 파일 | 다룬 절 (원 v6 spec) |
+| 분류 | 파일 | 현재 역할 |
 |---|---|---|
-| **온보딩** | [`onboarding.md`](./onboarding.md) | [§4](./onboarding.md) 가입 여정 A~H |
-| **둥지 탭** | [`nest.md`](./nest.md) | §5.1-5.4 둥지 진화·활성책·일일미션·성 컬렉션 |
-| **소셜 탭** | [`feed.md`](./feed.md) | [§5.7](./feed.md) |
-| **같이읽기(방)** | [`co-reading.md`](./co-reading.md) | 신설 (#987, 부모 #925) — 피드→'함께' 재편 + 방 코어 |
-| **내서재(프로필)** | [`profile.md`](./profile.md) | [§5.8](./profile.md)-5.9 (v6: AI 도서 추천 포함) |
-| **바코드 스캔 등록** | [`barcode-scan.md`](./barcode-scan.md) | 신설 (#943) — 뒤표지 ISBN 스캔 → 정확 매칭. 무의존 `BarcodeDetector`(Phase 0) |
-| **임포트: 유연 도서기록** | [`flexible-import.md`](./flexible-import.md) | 신설 (#1039) — 붙여넣기 텍스트 → LLM 파싱 → shelf-import 매칭·검수·검토함 코어 재사용. 스크린샷(#772)은 폴백 |
-| **시스템 로직** | [`systems.md`](./systems.md) | §6 스트릭·방패·XP·NPC·휴식코스 |
-| **백엔드** | [`backend.md`](./backend.md) | [§7](./backend.md) |
-| **운영: 문의 직접 대응** | [`inquiry-sync.md`](./inquiry-sync.md) | Supabase 접수 → 관리자 대시보드 확인·개별 답장 |
-| **운영: 운영자 대시보드** | [`admin-dashboard.md`](./admin-dashboard.md) | 신설 (#744) — 풀페이지 하이브리드 대시보드 |
-| **운영: 배포 안전** | [`ops.md`](./ops.md) | 신설 (#960·#901) — 피처 플래그/킬 스위치 · 카나리(점진 배포) |
-| **법무: 개인정보처리방침** | [`privacy-policy.md`](./privacy-policy.md) | 신설 (#757) — 처리방침 정본·국외이전·게시 |
-| **리팩토링: 모듈화** | [`refactor-modularize.md`](./refactor-modularize.md) | 신설 (#761) — monolith 분할 맵·prod-안전 플로우 |
-| **운영: OTA 업데이트** | [`ota.md`](./ota.md) | 신설 (#876) — 웹 번들 무선 업데이트(Capgo 자가호스팅 R2/KV), beta→prod 수동 승격(앱판 카나리) |
-| **디자인** | [`design.md`](./design.md) | [§11](./design.md) + [§12](./design.md) |
-| **메타: 여정** | [`meta/journey.md`](./meta/journey.md) | [§0.5](./meta/journey.md) |
-| **메타: 결정 이력** | [`meta/decisions.md`](./meta/decisions.md) | [§8](./meta/decisions.md) 미결 → 확정 |
-| **메타: 미해결** | [`meta/open-issues.md`](./meta/open-issues.md) | [§13](./meta/open-issues.md) |
-| **메타: 기각** | [`meta/rejected.md`](./meta/rejected.md) | [§14](./meta/rejected.md) |
+| **제품 코어** | [`onboarding.md`](./onboarding.md) | 첫 진입·책 등록·세계관 구체화·가입 여정 |
+|  | [`nest.md`](./nest.md) | 홈·읽기·기존 둥지/목표 책나무 화면 계약. 경로는 호환을 위해 유지 |
+|  | [`profile.md`](./profile.md) | 프로필·내 서재·책 상태·문장 탐색 |
+|  | [`feed.md`](./feed.md) | 피드·친구 책나무·공개 문장·UGC 안전 |
+|  | [`co-reading.md`](./co-reading.md) | 같이읽기 기능과 읽기방 |
+|  | [`companion.md`](./companion.md) | AI 독서 동반자 대화·완독 회고 |
+|  | [`systems.md`](./systems.md) | 성장일·레거시 스트릭·XP 전환·NPC 시스템 |
+| **기록·탐색** | [`resurface.md`](./resurface.md) | 저장 문장 되감기 |
+|  | [`share.md`](./share.md) | 문장 외부 공유 카드 |
+|  | [`barcode-scan.md`](./barcode-scan.md) | ISBN 스캔 책 등록 |
+|  | [`integrated-shelf.md`](./integrated-shelf.md) | 서가 복원·검토함·시드 문장 |
+|  | [`flexible-import.md`](./flexible-import.md) | 텍스트·파일 도서 기록 임포트 |
+|  | [`referral.md`](./referral.md) | 서비스 공유·referral 초안 |
+| **데이터·AI** | [`backend.md`](./backend.md) | 플랫폼·인증·DataStore·스키마·RLS |
+|  | [`architecture-asbuilt.md`](./architecture-asbuilt.md) | 코드에서 역생성한 현재 런타임 사실 |
+|  | [`analytics.md`](./analytics.md) | 이벤트·지표·동의·주간 리포트 |
+|  | [`prompt-lab.md`](./prompt-lab.md) | DEV 전용 프롬프트 실험·승격 계약 |
+|  | [`seed-collector.md`](./seed-collector.md) | 시드 문장 수집기 |
+| **운영·출시** | [`ops.md`](./ops.md) | 스펙→코드→DEV→Production 전달 게이트 |
+|  | [`ota.md`](./ota.md) | 웹 번들 OTA와 네이티브 버전 경계 |
+|  | [`admin-dashboard.md`](./admin-dashboard.md) | 운영자 지표·검토 표면 |
+|  | [`inquiry-sync.md`](./inquiry-sync.md) | 문의 직접 대응 정책 |
+|  | [`SYNC-POLICY.md`](./SYNC-POLICY.md) | 스펙·코드 드리프트 방지 정책 |
+| **디자인·법무** | [`design.md`](./design.md) | 토큰·컴포넌트·접근성·마이크로카피 |
+|  | [`privacy-policy.md`](./privacy-policy.md) | 개인정보처리방침 정본·게시 |
+|  | [`legal-copyright.md`](./legal-copyright.md) | 문장 인용·공개·시드 저작권 경계 |
+| **내부 구조** | [`refactor-modularize.md`](./refactor-modularize.md) | 모듈화 구조와 안전한 리팩터링 |
+|  | [`_traceability.md`](./_traceability.md) | 스펙별 구현 증거·결정 갭 매트릭스 |
+| **메타** | [`meta/decisions.md`](./meta/decisions.md) | 시간순 제품 결정과 supersede 관계 |
+|  | [`meta/open-issues.md`](./meta/open-issues.md) | 실제 미결정·미구현 안건 |
+|  | [`meta/rejected.md`](./meta/rejected.md) | 의도적으로 기각한 방향 |
+|  | [`meta/journey.md`](./meta/journey.md) | v5/v6까지의 역사적 여정 |
 
 ---
 
@@ -39,13 +51,13 @@
 ### 어디를 고치나
 | 변경 종류 | 대상 파일 |
 |---|---|
-| 화면 스펙 (홈·소셜·내서재) | 해당 피처 `.md` (`nest.md`, `feed.md`, `profile.md`) |
-| 가입 여정 | `onboarding.md` |
-| 시스템 로직 (스트릭·방패·XP·NPC·휴식코스) | `systems.md` |
-| 데이터 모델·플랫폼 | `backend.md` |
-| 디자인 토큰·마이크로카피 | `design.md` |
-| 한 줄·약속·핵심 루프·Phase·데모·태스크 | 이 `README.md` |
-| 새 결정 등록 | `meta/decisions.md` 표 갱신 |
+| 화면 스펙 (홈·책나무·피드·프로필) | 해당 피처 `.md` (`nest.md`, `feed.md`, `profile.md`) |
+| 가입·세계관 여정 | `onboarding.md` |
+| 성장일·레거시 XP/스트릭 전환 | `systems.md` |
+| 데이터 모델·플랫폼·RLS | `backend.md` |
+| 디자인 토큰·아이콘·마이크로카피 | `design.md` |
+| 한 줄·제품 약속·핵심 루프·런타임 | 이 `README.md` |
+| 새 결정 등록 | `meta/decisions.md`에 append하고 대체 관계를 명시 |
 | 미해결 안건 추가 | `meta/open-issues.md` |
 | 의도적 기각 보존 | `meta/rejected.md` |
 
@@ -65,15 +77,15 @@
 ### 살아있는 spec 의무
 구현 중 ① 가정이 틀림 ② 예상보다 어려움 ③ 예측 못 한 사용자 행동 발견 → **spec commit 먼저, 코드 commit 나중**. 근거: [LF: Living Document](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week9-living-document).
 
-### 파일 소유권 (v7 분배)
+### 파일 소유권
 
 | 피처 파일 | owner | 비고 |
 |---|---|---|
-| `nest.md` · `systems.md` · `design.md` | **seungwon** | 둥지·XP 보상체계·디자인 |
-| `feed.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 소셜·내서재·백엔드·로그인 |
+| `nest.md` · `systems.md` · `design.md` | **seungwon** | 책나무 화면·성장 리듬·디자인 |
+| `feed.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 공개범위·서재·백엔드·가입 |
 | `meta/*` · `README.md` | **gyehyu** | 결정 기록·통합 (머지 담당) |
 
-> **SSOT 규칙**: XP 수치 = `systems.md`, 둥지 단계표 = `nest.md`, 스포일러 블라인드 = `feed.md §5.7.1`. 타 파일은 복붙 말고 링크 참조.
+> **SSOT 규칙**: 책나무 화면=`nest.md`, 성장일·XP 전환=`systems.md`, 데이터·RLS=`backend.md`, 문장 공개=`feed.md`, 결정 우선순위=`meta/decisions.md`. 과거 XP·둥지 수치표는 레거시 호환 근거일 뿐 새 제품 계약이 아니다.
 
 ---
 
@@ -85,23 +97,24 @@
 
 ---
 
-## 0.5 용어 사전 (v7 — 정본)
+## 0.5 용어 사전 (v17 — 정본)
 
-전 spec 파일이 이 표를 따른다. 변경 시 이 표를 먼저 갱신.
+전 spec 파일이 이 표를 따른다. 일반 기능어에서 세계관 용어로 전환하는 시점은 `onboarding.md`를 따른다.
 
-| 개념 | 정식 명칭 | 폐기어 / 비고 |
+| 개념 | 정식 명칭 | 내부·레거시 비고 |
 |---|---|---|
-| 일일 기록 콘텐츠 | **한 문장** (오늘 작성분 = "오늘의 문장") | ❌ "모이". DB 테이블 `sentences` 유지 |
-| 좋아요 리액션 | **짹** (한 문장에 +1 토글) | ❌ "박수 / 👏🥹🔖 3종" |
-| 독려 넛지 (미기록 친구) | **콕찌르기** (🪱) | ❌ "모이 보내기". DB `pokes` |
-| 둥지 진행 시각화 | **둥지가 자란다** (누적 XP 5단계, [nest.md §5.2](./nest.md)) | ❌ "The Path / 세션 노드" |
-| 누적 성취 | **성(🏰) 컬렉션** (= 완독 권수, 파생) | v7 신설 |
-| 하단 탭 | **홈 / 함께 / 둥지 / 프로필 / 설정** 5개 목적지 | PR #1366. 내부 키 `nest`/`social`/`nest-grow`/`profile`/`settings`. 마을 탭은 폐기 상태 유지 |
+| 저장 기록 | 온보딩 전 **문장**, 관계 설명 후 **나뭇잎 한 장** | DB `sentences` 유지 |
+| 사용자 책 컬렉션 | **책나무 한 그루** | 사용자당 하나. 별도 tree row는 필수 아님 |
+| 등록해 읽기 시작한 책 | 책나무의 **가지 하나** | `user_books`가 권위. 검색·서재·책 상세에서는 `책` 유지 |
+| 중단한 책 | **쉬어가는 가지** | 저장 status `aborted`는 호환 기간 유지 |
+| 찜한 책 | **새 가지 후보** | `wish_books`는 호환 기간 유지. 실제 가지 수에 포함하지 않음 |
+| 문장 반응 | **좋아요** | 내부 like/reaction 식별자 유지. 과거 UI 용어 `짹`은 폐기 |
+| 독려 넛지 | **콕찌르기** | DB `pokes`; 죄책감·상실 예고 금지 |
+| 같이 읽는 기능/공간 | **같이읽기 / 읽기방** | 내부 `social`, `rooms.*` 유지 가능. `숲`은 사용자 노출에서 폐기 |
+| AI 동반자 이름 | **TBD** | 결정 전 런타임 `Jacky / 재키` 유지 |
+| 하단 탭 | **홈 / 같이읽기 / 책나무 / 프로필 / 설정** | 내부 키 `nest`/`social`/`nest-grow`/`profile`/`settings`는 전환기 유지 가능 |
 
-> v7(2026-06-01) 롤백·신설. **운영자 짹 · 둥지 가속 · 주간 리그 · 결정 마찰 카피**는 폐지 ([meta/rejected.md](./meta/rejected.md)).
-> v8(2026-06-14) 갱신: **마을 탭 삭제**(#440) · **하단탭 '둥지'→'홈'**(#447) · **둥지 캐릭터(NestTheatre)를 프로필로 이동**(#428) · **홈=읽기 세션 인라인**(#432·#436) · **성 컬렉션을 서재 '읽은 책' 탭으로 이동**(#429) · **상단바 칩 정리**(#425, ⚡XP·Lv만) · **체크인 세리머니 스트릭 제거 + 둥지 진척도 bar**(#426).
-> v8.4(2026-06-23, #877) 정합: 하단 탭 라벨 **소셜→피드**(#639) · **프로필→책장**. 설정은 목적지 탭이 아니라 바텀시트 액션(#567).
-> v9(2026-07-30, PR #1366): 하단 탭을 **홈/함께/둥지/프로필/설정**으로 재편. v8.4의 책장 라벨과 설정 액션 계약을 대체한다.
+> v8~v16의 XP 기반 둥지·성·완성 둥지 계약은 [v17 결정](./meta/decisions.md)이 대체한다. 과거 문구는 감사 이력으로만 읽는다.
 
 ---
 
@@ -109,9 +122,9 @@
 
 | 사용자가 얻는 것 | 제품이 책임지는 것 |
 |---|---|
-| 하루 1페이지 이상 읽는 습관 형성 | 듀오링고 수준의 지속성 엔진 (스트릭·방패·복귀) |
-| 읽은 책의 핵심을 손에 남긴다 | "오늘의 문장" 누적 → 책 한 권의 엑기스 → Markdown export |
-| 혼자가 아니라 같이 읽는다 | 단방향 팔로우 + 소셜 피드(같은 책 둥지 시각화) + 짹 + NPC 동행 |
+| 부담 없이 다시 책을 펼칠 수 있다 | 단절·실패를 벌주지 않고 최근 14일 리듬과 누적 성장일을 사실대로 보여줌 |
+| 읽은 책과 마음에 남은 문장을 한눈에 되찾는다 | 한 그루 책나무 아래 책=가지·문장=나뭇잎 관계를 정확한 목록·검색과 함께 제공 |
+| 혼자가 아니라 같이 읽는다 | 친구 책 상태와 공개 문장을 안전하게 발견하고 읽기방에서 함께 읽는 경험 제공 |
 
 타겟: **읽고 싶은데 이어나가지 못하는 사람**. 안 읽는 사람을 끌어오는 제품 아님.
 
@@ -131,31 +144,30 @@ UI 상 진입 화면 헤더·로그인 화면·온보딩 카피에서 일관되�
 ## 2. 핵심 루프
 
 ```
-[책 등록] (여러 권 가능, 1권을 "활성 책"으로 지정)
+[책 등록·읽기 시작] → 책나무에 가지 하나 생성
    ↓
 [앱 밖에서 읽기 — 하루 1페이지 이상이면 충분]
    ↓
-[일일 미션: 활성 책의 현재 페이지 입력 + 한 문장 입력(둘 다 강제)]
+[현재 페이지와 마음에 남은 문장 저장]
    ↓
-[스트릭 갱신 → XP 보상 → 둥지가 자람(누적 XP 5단계) / 완독 시 🏰 1개]
+[같은 가지에 나뭇잎 한 장 추가 + 최근 독서 리듬·누적 성장일 갱신]
    ↓
-[소셜 피드에 친구 둥지 불빛 ON, 한 문장 노출 → 짹]
+[책나무에서 가지·나뭇잎 탐색 / 공개 문장은 친구와 공유]
    ↓
-[리마인드 알림(Phase 2 PWA 이후). 미참여 시 스트릭만 위기 — 둥지·XP는 존속]
+[원할 때 같은 자리부터 다시 펼치기]
 ```
 
-**목표 페이지 설정 없음.** 부담을 없애는 게 핵심 — 1페이지만 읽어도 오늘은 성공.
+**목표 페이지 설정 없음.** 한 번 쉬었다 돌아와도 기존 가지와 나뭇잎은 사라지거나 손상되지 않는다.
 
-### 2.1 핵심 체크인 트리거
+### 2.1 핵심 기록 트리거
 
-**"한 문장" 입력 (강제, 200자 이내).** *(오늘 읽은 책에서 마음에 든 한 문장을 그대로 옮겨 적은 짧은 인용구. 오늘 작성분은 "오늘의 문장". DB 테이블명은 `sentences` 유지.)*
-
-페이지 입력만으로는 읽음을 검증할 수 없다. 한 문장을 직접 적는 행위가 (a) 읽음의 증명이며 (b) 사용자에게 누적되는 자산이 된다.
+**v17 목표 — 책에서 마음에 남은 문장 저장.** 문장 원문은 공개범위와 무관하게 최대 1,000자이며 글자 수 때문에 공개범위를 강제 변경하지 않는다. 현행 공개 저장은 200자 경계와 길이 기반 `private` 강제가 남아 있고 #1457 구현 후속이다. 누적 저작권 위험의 현재 수용·추후 검토와 출처표기·삭제요청·seed provenance 의무는 `legal-copyright.md`를 따른다. 페이지 진도와 문장은 `user_book_id`에 연결하고, 문장 한 건은 책나무의 나뭇잎 한 장으로 투영한다.
 
 ### 2.2 이탈 방어선
 
-- **스트릭 lock-in** — 끊기지 않은 연속일이 머무를 이유
-- **누적 문장 export** — 떠나도 가져갈 수 있다는 신뢰가 lock-in의 윤리적 부담 상쇄
+- **사라지지 않는 기록 자산** — 가지·나뭇잎·누적 성장일은 휴식이나 스트릭 단절로 감소하지 않음
+- **정확한 탐색과 export** — 목록·검색·Markdown 내보내기로 기록의 소유권을 보장
+- **부담 없는 복귀** — `0일`, 실패, 복구 압박 대신 최근 리듬과 `다시 펼치기`를 제공
 
 ---
 

@@ -1,12 +1,14 @@
 # GTM 전략 — Play 스토어 출시
 
+> **문서 상태:** 2026-07 당시의 출시 가설·일정·카피를 보존한 이력 문서다. XP·둥지·스트릭 기반 포지셔닝과 아래 날짜는 v17 출시 계약이나 현재 운영 상태의 증거가 아니다. 활성 제품 계약은 [`../readinggo/specs/README.md`](../readinggo/specs/README.md), 실제 릴리스 상태는 검증된 배포 receipt와 Play Console을 따른다.
+
 > 작성 2026-07-02. Refs #1124. Google Play Console 승인 완료 시점.
 > 소스: [pitch.md](./pitch.md) 포지셔닝, [onboarding.md](../readinggo/specs/onboarding.md) 여정,
 > [DESIGN.md](../readinggo/DESIGN.md) 브랜드, 코드 실측(app.js·nest.js).
 >
 > **Launch v1 확정(2026-07-30, #1307)**: Google Play를 우선해 **2026-08-01에
 > 출시**한다. iOS는 이번 런칭에서 App Store 앱을 내지 않고 웹으로만 안내한다.
-> 유료 집행은 [analytics.md §3.1.2](../readinggo/specs/analytics.md#312-wau리텐션주간-리포트)의
+> 유료 집행은 [analytics.md §3.1.2](../readinggo/specs/analytics.md)의
 > W1 리텐션 기준을 확인할 때까지 보류한다. 실행 캘린더는 §9가 정본이다.
 
 ## 0. 한 줄 전략
@@ -174,7 +176,7 @@ analytics.md 이벤트 위에서. 북극성: **주간 문장 수**(WSS — 진�
   `&referrer=utm_source%3Dinstagram%26utm_medium%3Dorganic_social%26utm_campaign%3Dlaunch_20260801%26utm_content%3Dd0`.
 - 한 링크를 여러 채널에 복사하지 않는다. 채널별 URL을 §9.4 기록표에 그대로 남긴다.
 - 제품 분석 이벤트에는 전체 URL query/hash를 보내지 않는다는
-  [개인정보 최소화 계약](../readinggo/specs/analytics.md#311-런칭-측정-계약)을 유지한다.
+  [개인정보 최소화 계약](../readinggo/specs/analytics.md)을 유지한다.
   유입은 Play Console·각 SNS의 집계치와 UTM별 집계로 보고, 개인 단위로 제품 행동과
   결합하지 않는다.
 
@@ -235,7 +237,7 @@ Jerome은 게시·발송 직후 아래 표를 채운다. 숫자가 없으면 `0`
 | **D+14, 8/15** | 최근 **성숙** W1 코호트, 2주 누적 오가닉 다운로드, 콘텐츠별 클릭·제품 행동 | 유료 `계속 보류` 또는 `별도 유료 실험안 검토 가능` 기록 |
 
 회고는 KST 주 경계와 production 데이터만 사용하는
-[analytics.md §3.1.2](../readinggo/specs/analytics.md#312-wau리텐션주간-리포트)를
+[analytics.md §3.1.2](../readinggo/specs/analytics.md)를
 따른다. 각 회고에서 다음을 한 줄씩 남긴다.
 
 1. **실행**: 예정 콘텐츠가 채널별로 게시됐는가. 미실행 사유는 무엇인가.

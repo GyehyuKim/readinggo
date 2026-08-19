@@ -5,7 +5,7 @@
 
 ## 1. 정상 흐름
 
-1. PR: `preview-smoke`가 `wrangler.dev.toml`로 `readinggo-dev` version preview를 만들고 edge smoke를 수행한다.
+1. PR: `preview-smoke`가 localhost에서 Vite build·render smoke를 수행한다. 비프로모션 `readinggo-dev` version 업로드와 edge smoke는 `workflow_dispatch`로 명시 실행할 때만 수행한다.
 2. merge: `deploy-dev`가 그 `main` SHA를 stable DEV에 배포하고 `/api/release`의 environment·SHA·Supabase host를 검증한다.
 3. Hermes: 이슈·diff·CI·stable DEV smoke·미해결 대화를 검토한다.
 4. prod: `promote-production`을 승인 SHA로 수동 실행한다. GitHub `production` environment 승인 뒤,
@@ -33,12 +33,13 @@ curl -fsS https://readinggo-dev.hyuniverse.workers.dev/api/release
 
 - DEV 회귀: Cloudflare `readinggo-dev`의 직전 정상 version을 100% 재배포한다. prod는 건드리지 않는다.
 - prod 승격 전 실패: **중단·보고**한다. stable DEV receipt를 새로 만들기 전 prod workflow를 재실행하지 않는다.
-- prod 승격 후 회귀: GitHub `production` environment에서 직전 정상 prod SHA를 `promote-production`으로 재승격한다.
+- prod 승격 후 회귀: 직전 정상 변경을 되돌리는 revert PR을 만들고 필수 CI를 통과시켜 `main`에 머지한다. 새 `main` HEAD의 stable DEV receipt와 E2E를 확인한 뒤 GitHub `production` environment에서 그 동일 SHA를 `promote-production`으로 승격한다. 과거 SHA 직접 재승격은 현재 workflow가 거부한다. 긴급 과거 SHA rollback이 필요하면 별도 승인·receipt 검증형 workflow를 먼저 구현한다.
   자동 rollback이나 DEV credential로 prod를 조작하지 않는다.
 - Cloudflare Workers Builds에 남은 `main → readinggo` 자동 연결은 제거돼야 한다. 이 계정 설정이 확인되기 전에는
   #1303을 완료 처리하거나 `Closes #1303`을 쓰지 않는다.
 
 ## 5. 감사 증거
 
-PR URL/commit SHA, DEV project region/status, DEV Worker URL/version, DEV KV ID, migration 개수,
-schema/RLS 검사 결과, preview/stable smoke run URL, production environment 승인 기록을 한 release receipt로 보존한다.
+PR URL/commit SHA, DEV project region/status, DEV Worker URL/version, DEV KV ID, migration 목록·hash·원격 ledger,
+schema/RLS/RPC 역할별 검사 결과, preview/stable smoke run URL, production environment 승인 기록, Production Worker·OTA manifest·Play artifact·실기기 QA를
+[ops.md §0.3](./specs/ops.md)의 단일 release receipt로 보존한다. 각 항목은 `PASS | FAIL | BLOCKED | NOT_RUN`으로 남기며 credential은 기록하지 않는다.

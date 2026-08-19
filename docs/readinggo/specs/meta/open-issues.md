@@ -1,7 +1,7 @@
 # 미해결 안건 (학기 후 또는 별도 세션)
 
 > **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §13. 변경 이력은 git log 참조.
-> **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
+> **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 13. 미해결 안건 (학기 후 또는 별도 세션)
 
@@ -12,9 +12,9 @@
 **현재 상태**: 최소 구현(둥지 진입 시 과거 한 문장 회상 카드)만 존재. 본격 확장(질문·되감기 흐름)은 **보류**. 스펙은 [resurface.md](../resurface.md) 보존.
 **다음에**: Phase later 재개 시 resurface.md 기준으로 시작. 현 단계 spec-align invariant 미부여.
 
-### 13.1 XP destination — 모은 XP를 무엇에 쓰는가 (✅ 해소 #1086)
+### 13.1 XP destination — 과거 해소 후 v17 폐기
 
-**해소 (2026-06-30, #1086; 2026-08-16 최종 노출 결정 #1415)**: XP의 쓸모 = **둥지를 키우는 연료**. XP가 둥지를 키우고 → 1,600 주기마다 완성 둥지가 되고 → 완성 둥지·완독이 내 서재에 남는다(*책 행동을 더 풍부하게 하는 곳*에 쓴다 — 위 시작 질문 중 그쪽, *영속 누적되는 신분* 채택). **별도 화폐·상점 없음**(짹=화폐→상점 발상 폐기). #1176의 홈 XP·Lv 계약은 #1415가 대체하며, 홈 TopBar는 **`XP {n} · 🪺 둥지 {floor(totalXp/1600)}개`**를 표시한다. SSOT = [systems.md §6.3](../systems.md).
+**역사**: #1086·#1415에서는 XP를 1,600 XP 둥지 성장의 연료로 정했다. **v17(2026-08-19, #1452)이 이 제품 계약을 supersede**했다. XP의 새 용도를 다시 찾지 않으며 별도 화폐·상점·보상으로 이전하지 않는다. 신규 적립을 동결하고 구 APK 호환층을 거쳐 단계 삭제한다. 삭제 게이트는 [systems.md §6.0](../systems.md)이다.
 
 ### 13.2 T2 mini — 같은 책 자동 패널
 
@@ -83,5 +83,30 @@
 - ReadingGo의 *어떤 가치* 를 유료로 묶을지 (OCR 무제한? 통계 확장? 광고 제거?)
 
 **학기 끝나야 의사결정 가능 변수가 드러남**.
+
+### 13.7 책나무 구현·출시 게이트 (v17)
+
+아래는 방향 재논의가 아니라 확정된 결정과 **구현·migration·출시에 필요한 남은 증거**다. 아이콘·캐릭터 이름만 팀 논의 후 별도 확정하며, 두 항목은 핵심 데이터·권한 구현을 막지 않는다.
+
+| 항목 | 현재 확정 | 남은 결정·증거 | 차단 범위 |
+|---|---|---|---|
+| 책나무 탭 아이콘 (#1453) | Lucide `book-open`·`sprout`·`tree-deciduous` 시안 팀 공유, 최종 선택 보류 | 20px·24px, 활성/비활성·light/dark·Android 팀 의견과 최종 1개 승인 | 최종 자산·스토어 스크린샷. IA·데이터 구현은 가능 |
+| 캐릭터 이름 (#1455) | 이름 결정 보류, `Jacky / 재키` 유지 | Judy·Jerome 논의, 후보 의도·권리/혼동 조사, 동일 조건 비교 | 새 이름 반영만 차단. 다른 v17 구현은 가능 |
+| 기존 사용자 공개범위 (#1456) | **4-B** 사전 고지 후 상호 팔로우 친구 책나무 자동 활성화, 전체 opt-out 제공 | 고지 문구·효력일·설정 위치·철회 전파·캐시 무효화·`wishlist_public` 처리·rollback 증거 | 친구 책나무 Production 활성화 |
+| 문장 공개범위 구버전 호환 | `followers`/알 수 없는 값의 `public` 확대 금지. **5-A** 최소 지원 버전 강제 | `friends` alias 정규화 위치, fail-closed 방식, 구 APK 왕복·업데이트 차단 테스트 | 친구 공개 기본값과 새 문장 저장 출시 |
+| 문장 1,000자 정렬 (#1457) | OCR·직접입력·배치/import, `public\|followers\|private` 모두 1~1,000자. 200자 제외·절단·`private` 강제 없음 | Worker·DataStore·DB CHECK·모든 입력 경로·카피·경계 테스트의 구현 diff, 기존 행 보존, rollback, DEV 역할별 API·웹·Android 저장/재조회 증거 | 1,000자 계약 출시. 저작권 재검토와는 별개 |
+| 권리자 takedown 운영 (#1463) | 공개 접수·책임자·임시 숨김·삭제·이의·기록 SOP는 필수 P0 가드 | 실제 이메일/폼과 개인정보처리방침·푸터 링크, 상태 전이·접근권한·보존정책, 피드·책 상세·검색·캐시 비노출 E2E | 공개 1,000자와 크롤 seed의 Production 활성화 |
+| 레거시 배포 workflow 드리프트 (#1464) | 정상 경로는 stable DEV→동일 SHA 수동 Production 승격. `deploy-verify`는 수동 전용이지만 직접 rollback 계약이 충돌하고 OTA 상단 주석도 실제 trigger와 다름 | workflow 제거·재설계, 자동 rollback 제거, test/OTA 주석 정렬, rollback receipt 검증 | 레거시 workflow 수동 실행과 OTA 운영. 이 spec-only PR 머지는 비차단 |
+| base RLS·구 APK 컷오버 | **5-A** 제한 view/RPC·신규 앱 선배포→최소 버전 미만 차단→broad `ub_sel` 소유자 전용 축소. 보안 rollback으로 broad 정책 복원 금지 | 버전별 직접 조회 인벤토리, OTA/스토어 수신·호출 증거, 정확한 최소 버전, 구버전 실패·rollback 테스트 | base RLS 축소와 친구 책나무 Production 활성화 |
+| XP 물리 삭제 (#1452) | **6-A** 신규 쓰기·참조 제거→최소 버전 강제→legacy 호출 0→rollback 기간 후 물리 삭제 | 실제 최소 버전, 지원 버전 전체 호출 0 telemetry, 운영·분석 참조 0, 백업·migration·rollback 증거 | 컬럼·RPC·legacy adapter 삭제 |
+| 재독 회차 스키마 | **3-A** 책당 `user_book`·가지 하나 + `reading_rounds` 명시 회차. 기존 문장 `reading_round_id=NULL` 무손실 보존 | 정확한 컬럼·FK·상태 전이, 신규 문장 귀속, 구 앱 호환, migration·rollback 테스트 | 회차별 UI·DB migration |
+
+### 13.8 공개 문장 누적 저작권 위험 — 수용·추후 검토
+
+**현재 결정**: 공개범위와 무관하게 한 문장 원문은 최대 1,000자다. 글자 수 때문에 `private`로 강제하지 않으며, 누적·pagination을 통한 원문 재구성 위험은 인지하고 수용한다. **이 절의 누적 위험 재검토만** 이번 v17 spec·구현의 차단 조건이 아니다. 1,000자 저장 계약은 #1457의 필수 구현·검증 범위이고, 기본 takedown 운영 가드 #1463은 공개 1,000자와 크롤 seed의 Production 활성화 blocker다.
+
+**다음에**: 실제 이용량·권리자 문의·원문 재구성 사례가 생기거나 수익모델이 바뀔 때 법무·제품 검토를 다시 연다. 그 전에도 출처표기·seed provenance를 유지하고 #1463의 삭제요청 경로를 구축한다.
+
+구현 계획에서 위 항목을 임의 수치·스키마로 채우지 않는다. 확정 시 [decisions.md](./decisions.md)에 결정과 근거를 남기고 이 표를 해소 상태로 갱신한다.
 
 ---

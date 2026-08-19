@@ -1,137 +1,91 @@
-# 스펙 ↔ 구현 추적 매트릭스 (spec-align 리뷰)
+# 스펙 ↔ 구현 추적 매트릭스
 
-> `loop/spec-align-full/PROMPT.md` 산출. **상태**: ✅구현 · 🔧이번정합 · ❌누락(이슈) · 🚩스펙드리프트(수정필요) · ⏳Phase미도래.
-> nest/social/profile/village/onboarding/backend는 grep 실측 검증, systems/design은 owner(승원) 영역이라 갭만 표시. 클로즈베타까지의 QA1~7로 대부분 동기화됨.
+> **감사 기준**: `origin/main@39248ef` (2026-08-19)
+> **목적**: 현재 구현 사실과 스펙의 정합 여부를 파일별로 검토한다. 제품의 미래 목표 계약은 `meta/decisions.md`와 각 기능 스펙에서 관리하며, 아직 구현되지 않은 결정은 구현 완료로 표시하지 않는다.
 
-## nest.md (둥지) — owner 승원
-| 조항 | 상태 | 근거/갭 |
+## 상태
+
+- ✅ **정합**: 현재 구현·검증 증거와 스펙이 일치
+- 🔧 **이번 정합**: 구현은 존재하지만 인덱스·추적 문서가 뒤처져 이번 spec PR에서 보정
+- 📝 **목표 정합**: 현행 구현과 최신 목표 계약을 분리해 스펙에 반영했으며 구현은 아직 안 됨
+- ⚠️ **레거시 현행**: 현재 구현돼 있으나 최신 제품 결정에 따라 후속 교체 예정
+- ⏳ **의도된 미구현**: 스펙에 후속 범위로 명시됐고 현재 구현되지 않음
+- 🚩 **출시 차단 갭**: 보안·개인정보·영속·검증 문제로 구현 또는 운영 증거 없이는 출시할 수 없음
+
+## 검증 기준선
+
+> 2026-08-19 로컬 실행 보고다. 아래 full build·Node·Playwright는 반대감사 전 head에서 통과했고 이후 변경은 Markdown뿐이며, 정적 스펙·markdownlint·diff check는 최종 문서 수정 뒤 다시 실행했다. 영속 receipt는 이 branch의 PR CI run URL로 확정하며, 로컬 PASS를 DEV·Production 적용 증거로 사용하지 않는다.
+
+| 검증 | 결과 | 해석 |
 |---|---|---|
-| §5.1 상단바·진화배너·둥지자람·캐러셀 | ✅ | app.js topbar · nest.js NestTheatre/twigs/switchBook |
-| §5.2 **둥지=1,600 XP 주기(v8.1)** · 경계 성 획득·리셋 | ✅ | nest.js `_cycleXp(xp)=xp%1600`·`nestCastleCount=floor(totalXp/1600)`·1600경계 성획득+리셋(#520/#521). 2026-06 정합(구 🚩는 오표기 — 구현 완료) |
-| §5.1 CTA·§5.4 일일미션 = 읽기모드 대체 | ✅ | #252 — nest.md §5.5 반영(읽기모드가 체크인 대체). CheckinModal 폐기 |
-| §5.4 별점0.5·완독세리머니(읽기모드 위임) · §5.5 읽기모드(나가기✕) | ✅ | #300 finish→handleCheckin · ReadingMode |
-| §5.6.1 OCR 전체화면 검토·편집 | 🔧 | 선행 spec PR #1279 · nest.js `_validateOcrReview`·`runOcrQuick`·`saveOcrReview` · app.js `handleCheckin` completion · `tests/ocr-review-flow.test.mjs` |
+| `python3 tests/spec-align/align_v7.py` | `PASS` (99/99) | 과거 v7~v16 기능의 존재·부재 검사. 최신 제품 결정을 검증하지는 않음 |
+| `python3 tests/spec-align/nest.py` | `PASS` (9/9) | 현재 XP·둥지 구현이 존재함을 확인하는 레거시 기준선 |
+| `python3 tests/spec-align/architecture_current.py` | `PASS` (3/3) | Vite·Capacitor·Cloudflare·DataStore 현재 계약 확인 |
+| `python3 tests/spec-align/drift.py` | `PASS` | spec-drift workflow 구조 확인 |
+| `python3 tests/spec-align/design_lint.py` | `PASS` (0건) | 이모지·raw hex·ghost·radius·font 규칙 위반 없음 |
+| `python3 tests/spec-align/migrations_applied.py` | `BLOCKED` | 기본 Python 3.9.6은 `str \| None`에서 실패. `uv` Python 3.11에서는 시작되나 worktree에 `SUPABASE_ACCESS_TOKEN`이 없어 원격 검증 보류 |
+| `npm run build` (`docs/readinggo`) | `PASS` (로컬) | production·합성 DEV build 모두 성공. 폰트 runtime resolution·대형 chunk 경고는 기존 상태 |
+| Node·Worker·Playwright 회귀 묶음 | `PASS` (로컬) | `.github/workflows/test.yml`의 계약·회귀·Production build/boot·합성 DEV isolation·Playwright render smoke를 실행. 파일 수나 assertion 수를 고정 계약으로 삼지 않는다. 현행 OCR 테스트가 `201~1000자→private`를 요구하므로 v17 1,000자 공개 계약의 구현 완료 증거는 아님 |
 
-## companion.md (LLM 독서 파트너 — v7.4 신설) — owner 계휴
-| 조항 | 상태 | 근거/갭 |
+## 1. 33개 스펙 파일 전수 상태
+
+| 파일 | 현재 구현 증거 | 상태 | 감사 메모 |
+|---|---|---|---|
+| `README.md` | `architecture_current.py`; 현재 Vite·Capacitor·Cloudflare 설명 | 🔧 | 실제 33개 중 다수 파일이 지도에서 누락됐고 v7을 최상위 기준으로 오해하게 하던 문구를 이번 PR에서 보정 |
+| `SYNC-POLICY.md` | `.github/workflows/spec-drift.yml`, `tests/spec-align/drift.py` | ✅ | 정책과 CI 구조가 존재. 모든 조항의 의미 검증까지 자동화되지는 않음 |
+| `_traceability.md` | 본 문서 | 🔧 | 부분 기능·과거 이슈 연대기 중심 문서를 33개 전수표로 교체 |
+| `admin-dashboard.md` | `js/admin-dashboard.js`, `DataStore.admin.*`, admin RPC migrations | ✅ | 현행 운영 표면과 지표 계약 존재 |
+| `analytics.md` | `rgTrack`, PostHog 동의 게이트, 주간 리포트 workflow | 📝 | 책나무·성장 리듬 이벤트와 legacy XP/스트릭 격리를 추가. 신규 이벤트는 구현 전 |
+| `architecture-asbuilt.md` | `main.js`, `worker/index.mjs`, `wrangler.toml`, workflows, migrations | 🔧 | main→stable DEV 자동, Worker Production·OTA beta·OTA Production 수동 동일 SHA 승격이라는 현재 workflow trigger를 보정 |
+| `backend.md` | `datastore.js`, `datastore-supabase.js`, `schema.sql`, migrations | 🚩 | 목표 투영·RLS·XP 호환 계약을 추가. 현행 `ub_sel`이 차단 외 인증 사용자에게 타인 `user_books` 전체 컬럼 read를 허용해 권한 수정 전 친구 책나무 활성화 금지 |
+| `barcode-scan.md` | `barcode-scan.js`, Android native scanner bridge | ✅ | 웹 폴백과 Android 경계가 문서화됨 |
+| `co-reading.md` | `co-reading.js`, `rooms.*`, villages/room migrations | 📝 | 현행 `함께/숲`을 이력으로 보존하고 목표 `같이읽기/읽기방`, 무랭킹·무XP·공개범위 계약 반영 |
+| `companion.md` | `companion.js`, `/api/companion`, `companion_sessions` | 📝 | 대화 계약은 현행과 일치. 캐릭터 최종 이름 TBD·진화 없는 2D 참새·기존 재키 임시 유지 반영 |
+| `design.md` | `index.html` tokens, `RG_ICONS`, `design_lint.py` | 📝 | 현행 토큰 린트 0건. 대규모 책나무 IA·저모션·상태 표현·20/24px 아이콘 결정 게이트 추가 |
+| `feed.md` | `social.js`, `SentenceCard`, moderation migrations/tests | 📝 | 현행 인기 Top5는 레거시. 목표 같이읽기 내 피드·무랭킹·무XP·친구 책나무 공개 계약 반영 |
+| `flexible-import.md` | `data-import.js`, `/api/parse-books`, shelf-import core | ✅ | 구현·검수 경로 존재 |
+| `inquiry-sync.md` | 직접 대응 정책, 자동화 제거 커밋 | ✅ | 현재 자동 issue 동기화가 아니라 관리자 확인·개별 회신 |
+| `integrated-shelf.md` | `shelf-import.js`, `import_staging`, `/api/seed` | ✅ | 스크린샷 복원·검토함·시드 경로 구현 |
+| `legal-copyright.md` | 문장 길이·공개범위 제약, seed provenance 검증 | 📝 | 활성 결정은 모든 공개범위·OCR·직접입력·배치/import 최대 1,000자, 글자 수에 따른 제외·절단·private 강제 없음, 누적 저작권 위험 수용/추후 검토. 현행 Worker·DataStore·DB CHECK·OCR·batch/import·테스트에 200자 경계가 남아 후속 구현 필요 |
+| `meta/decisions.md` | v12~v16과 현재 코드 이력 | 📝 | v17 책나무·XP 폐기·리듬·책 상태·공개범위·명칭·미결정·전달 게이트 추가. v14~v16은 감사 이력으로 보존 |
+| `meta/journey.md` | 역사 문서 | ✅ | v5/v6 여정으로만 사용. 현재 계약으로 사용하지 않음 |
+| `meta/open-issues.md` | GitHub #1452~#1457과 수동 대조 | 📝 | 아이콘·이름·공개 migration·구 APK·XP 삭제·재독 스키마와 문장 1,000자 구현 #1457을 추적. 누적 저작권 재검토만 비차단 후속으로 분리 |
+| `meta/rejected.md` | 역사 문서 | 📝 | XP 재상품화·다중 나무·손실형 스트릭·시듦·랭킹·대형 세리머니·별도 숲과 **사전 고지·opt-out 없는** 공개확대를 v17 기각안으로 추가 |
+| `nest.md` | `nest.js`, `nest-grow.js`, `nest-theatre.js`, `ceremony.js` | 📝 | v17 한 그루·책=가지·문장=잎·검색 목록·상태·세리머니 수용기준을 추가. XP 둥지는 레거시 as-built |
+| `onboarding.md` | `onboarding.js`, `nest.js` empty state, local notifications | 📝 | 첫 책=가지·첫 문장=잎·비손실 리듬·축소 세리머니 목표 여정 추가. 기존 카피는 현행 이력 |
+| `ops.md` | dev/prod workflows, `wrangler.toml`, release scripts | 📝 | spec 승인→구현→DEV QA→동일 SHA PROD→Production QA→Play, 권한·XP 단계 증거와 rollback 계약 추가 |
+| `ota.md` | Capacitor updater, Worker `/api/ota`, OTA KV, release workflows | 🔧 | 실제 `ota-release`·`ota-promote`는 모두 `workflow_dispatch`+production environment. stable DEV/main 동일 SHA로 beta 수동 발행 후 같은 manifest를 prod에 수동 승격 |
+| `privacy-policy.md` | 공개 privacy URL, consent UI, account deletion | 📝 | 현행 처리 사실을 유지하면서 4-B 사전 고지 후 자동 활성화+전체 opt-out, 5-A 제한 API 선배포→구버전 관측→base RLS owner-only 축소 게이트를 분리 |
+| `profile.md` | `library.js`, `settings-view.js`, `user-profile-modal.js` | 🚩 | 목표 무XP 프로필·친구 책나무·3단계 문장 기본값 round-trip 반영. 현행 `followers` 기본값 저장/복원 불일치는 출시 차단 구현 갭 |
+| `prompt-lab.md` | DEV-only API/UI, promotion transaction | 📝 | 실험·승격 경계는 유지하고 최종 캐릭터 이름 TBD, 재키/jacky는 호환 식별자로 정리 |
+| `refactor-modularize.md` | `main.js` import map, 분리된 `js/*.js` | ✅ | 현재 모듈 구조와 부팅 순서가 as-built에 기록됨 |
+| `referral.md` | `shareService`, 외부 공유 동선 | ⏳ | 보상·귀속·랜딩은 초안/미구현으로 명시됨 |
+| `resurface.md` | `resurfaceCandidate`, `markResurfaced`, UI 카드 | ✅ | 코어 되감기 구현, 확장 범위는 의도된 후속 |
+| `seed-collector.md` | `collector/`, `seed_queue`, Worker seed endpoint | ✅ | fail-closed provenance와 재시도 경계 문서화 |
+| `share.md` | `share-card.js`, `navigator.share`·clipboard fallback | ✅ | 1:1 카드 구현, 9:16은 의도된 후속 |
+| `systems.md` | `DataStore.streak`, `DataStore.xp`, `increment_xp`, shield schema | 📝 | 최근 14일·누적 성장일과 XP 제품폐기→쓰기동결→참조격리→물리삭제 계약 추가. 기존 수치표는 레거시 |
+
+## 2. 현재 구현의 핵심 증거
+
+| 영역 | 구현 위치 | 현재 사실 |
 |---|---|---|
-| §4 LLM 연결(solar-pro3, provider-agnostic) | ✅ | #287 worker callLLM(env) · /api/companion · genCompanionQuestion |
-| §2 멀티턴 대화(답→후속, 최대 3턴) | ✅ | #327 genCompanionFollowup · exchanges · 문장 하단 스레드 |
-| §3 한 문장 탭→대화 모달 + 본문 편집 | ✅ | #326 CompanionModal/RG_openCompanion · #325 sentences.updateText |
-| 책·작가 맥락 프롬프트 · reasoning 토글 | ✅ | COMPANION_SYSTEM · LLM_REASONING_EFFORT |
-| DEMO 폴백(키없음/실패) | ✅ | companionMock(서버)·pickCompanionQ(클라) |
-| 대화 아카이브 companion_sessions | ✅ | #295 18_*.sql + companionSessions.add. **실증: 동의+로그인 답변 3건 적재 확인(2026-06-11)** |
-| §4.1 완독 회고 + 영속화 | ✅ | #345 mode:recap · #352 user_books.companion_recap(19_*.sql)·saveRecap·다시받기 |
-| §2 인용 vs 내 생각 구분 수신 + 맥락 불명 되묻기 | ✅ | #359 COMPANION_SYSTEM 역할분리 · #360 kind(quote/thought, 20_*.sql)·읽기모드 토글·💭 표기 |
-| §5 시간차 되감기(둥지 카드·대화 재개) | ✅ | #346 코드=#364 머지(last_resurfaced_at 21_*.sql·resurfaceCandidate·1일게이트). spec PR은 윤지(#346 OPEN) |
-| 질문 품질(반복방지·책맥락·난이도) · 평가👍👎 · 재생성🔄 · 방향성 프리셋 | ✅ | 반복방지(#373 — worker `avoid` 직전질문 회피, index.mjs:327)·책맥락(#373 — `getBookBrief` 브리프 프롬프트 주입, index.mjs:314-318)·평가👍👎(#371)·재생성🔄(#372)·프리셋(#375, 작가시선 #936). **#373은 PR #378로 완료**(클라 아닌 worker 프롬프트 구현 — 감사 1차 오판 정정) |
+| 홈 상단 | `js/app.js` `topbar-stats` | `XP {n} · 🪺 둥지 {floor(xp/1600)}개` 노출 |
+| 전용 둥지 탭 | `js/app.js`, `js/nest-grow.js`, `js/nest-theatre.js` | 내부키 `nest-grow`, 라벨 `둥지`, 1,600 XP 주기·완성 이력 |
+| XP 쓰기 | `js/datastore.js`, `js/datastore-supabase.js`, `39_increment_xp_rpc.sql` | 체크인·방문·반응 등에서 XP 적립, 로그인은 원자 RPC 사용 |
+| 스트릭 | `js/datastore.js`, `43_checkin_atomic.sql`, `js/nest.js` | 연속일·하루 만회·마일스톤 회고 구현 |
+| 책 상태 | `user_books.status`, `wish_books`, `myBooks.abort/resume/complete` | reading/completed/aborted와 wish가 별도 구조로 존재 |
+| 공개 문장 | `sentences.visibility`, `sentences_public`, moderation policies | public/followers/private와 신고·차단 필터 구현 |
+| 타인 서재 UI | `users.publicShelf`, `users.publicWishlist`, `user-profile-modal.js` | 읽는 중·완독만 렌더하고 위시리스트는 `wishlist_public` 토글에 의존 |
+| 타인 책 base 권한 | `49_ugc_moderation.sql` `ub_sel` | 차단되지 않은 인증 사용자에게 `user_books` 전체 행 read 허용. UI 필터는 권한 경계가 아님 |
+| 문장 기본 공개 설정 | `settings-view.js`, adapters | UI의 `친구 공개(followers)`와 영속 허용/복원 값이 불일치하는 드리프트 존재 |
+| 같이읽기 | `js/co-reading.js`, `rooms.*` | 표면 용어 `함께`, 개별 공간 `숲`/방이 혼재 |
+| AI 동반자 | `js/companion.js`, Worker companion route | 사용자 표시명은 Jacky/재키, 이름 교체 미결정 |
 
-## feed.md (소셜)
-| 조항 | 상태 | 근거/갭 |
-|---|---|---|
-| §5.7 피드 3탭·짹·책갈피·본인비활성 | ✅ | social.js:27-29,60 · claps.toggle/isMine |
-| §5.7.1 페이지 블라인드·visibility 3단계 | ✅ | components.js isSpoiler · library.js cycleVis |
-| §5.7 "이번 주 신규 시작러 Top3" | ✅ | #286 social_newcomers_weekly RPC · social.js 상단 스트립 |
-| **§5.7.1 친구 찾기 패널(NPC_SEARCH)** | ✅ | social.js `findOpen` 패널(#250) + users.search(양 어댑터). 2026-06 정합(구 ❌는 오표기 — 구현 완료) |
-| §5.7.1 전역 스포일러 토글 🔓 | 🔧 | #3 토글 설정(⚙️) 이전 완료 · #177 검토완료(spec 문구 후속) |
+## 3. 감사 한계
 
-## profile.md (프로필) — owner 계휴
-| 조항 | 상태 | 근거/갭 |
-|---|---|---|
-| §5.8 성컬렉션·bio·내문장10+더보기·별점4.0·헤더정리 | ✅ | QA5/6 (#205·#226·#228) |
-| §5.8.9 대시보드(인기책·활성·차트·문의) · §5.8.10 히트맵(채도·월) | ✅ | #190·#206·#208·#195·#207 |
-| §5.8.4 쪽수 폴백·책갈피·회상 · export 상세화(v7.4) | ✅ | #204 · bookmarks/random · #315 export(메타·완독·날짜) · #316 책 소개(알라딘 description) |
-| §5.8.1.1 성 컬렉션 책장 상세(최근10+그리드/검색/정렬/필터, v7.4) | ✅ | #312 ArchiveShelfModal |
-| 공용 BookCover + 표지 placeholder(v7.4) | ✅ | #316 components.js BookCover · 외서 5+5(#302/#343, 알라딘5+Google5) · export 책소개(#316/#344) |
-| §5.8.6 AI 카드 — 참새의 완독 회고(v7.4) | ✅ | #259/#345 회고 + #352 영속화. 다음책 추천/추출(`ai.recommendBooks`·`extractBook`)은 **Phase 0 하드코딩 시뮬 구현 ✅**(#946 — data.js `recommendNextBooks`·`extractBookSummary` + 양 어댑터 위임 + BookDetailModal 완독 카드). 실 Gemini 호출은 Phase 1+(§7.9) |
-| 한 문장 삭제 (책상세·둥지 상세) | ✅ | #358 sentences.remove(양 어댑터)·책상세 🗑 · CompanionModal 🗑(rg:sentence-removed 이벤트) |
-| 한 문장 책 제목 오표시(getBook 폴백) 수정 | ✅ | PR #374 — onArchive bookTitle 전달 + 둥지 카드 폴백 가드 |
-
-
-## systems.md (스트릭·XP·휴식) — owner 승원
-| 조항 | 상태 | 근거/갭 |
-|---|---|---|
-| §6.3 XP 행동가중치·Lv · 스트릭·방패 | ✅ | #210/#212 · streak.bumpOnCheckIn · shield_log |
-| 둥지=누적 XP(v7.4) | ✅ | #313 systems.md §6.3 갱신 — 둥지·XP 같은 누적축 |
-| **휴식코스(Pause·동결)** | ⏳보류 | 이번 컨셉 정렬 X → parking-lot.md §1 (#126/#251 닫음, 재개조건 명시) |
-
-## onboarding.md — owner 계휴
-| §4 가입 A→C1→C2→D3·매직링크·닉네임규칙 | ✅ | onboarding.js · signInWithEmail · RG_VALIDATE/04_constraints |
-| §4 E 게스트 우선(로그인 벽 제거·저장 시점 로그인, v7.3) | ✅ | #298 app.js showLogin·syncPendingToSupabase · 데모 시드 누수 수정 #332 |
-
-## analytics.md (행동데이터·동의 — v7.x) — owner 계휴
-| 조항 | 상태 | 근거/갭 |
-|---|---|---|
-| §3 PostHog 자동수집 + 커스텀 이벤트·identify | ✅ | #296 index.html · #293 rgTrack(book_opened/highlight_selected/answer_saved/reading_session_end) |
-| §5 데이터 활용 동의 — 진입 배너(필수/전체/상세) + 설정 토글 | ✅ | #294 DataStore.consent · #331 ConsentBanner |
-| §4 companion_sessions 아카이브 | ✅ | #295 18_*.sql 실행 완료 · 실유저 답변 3건 적재 실증(2026-06-11) |
-| 행동데이터 분석(Supabase first-party + PostHog) | ✅ | 2026-06-11 분석: 퍼널 가입8→등록7→문장6→완독3 · 아카이브 동의타이밍 규명(#370) |
-
-## resilience — owner 계휴
-| 전역 ErrorBoundary(컴포넌트 크래시 격리) | ✅ | #310 app.js ErrorBoundary key={activeTab} |
-
-## backend.md — owner 계휴
-| 조항 | 상태 | 근거/갭 |
-|---|---|---|
-| §7.2 DataStore 계약 전반 | ✅ | datastore-supabase.js 메서드 표면 일치 |
-| RLS 17테이블·SECURITY DEFINER(search_path+is_admin) | ✅ | /cso 검증 |
-| §7 알라딘(검색≠쪽수, ISBN 보강) | ✅현행 | aladin.js·worker (#233). **#1044 로 소스 이전 예정**(§7.2.1) — 알라딘 OpenAPI ToS(영리·캐싱 금지) 회피 |
-| ai.recommendBooks·extractBook (다음책 추천/추출) | ✅ | Phase 0 하드코딩 시뮬(#946) — data.js `recommendNextBooks`/`extractBookSummary`(L482-555) + 양 어댑터 위임 + book-detail-modal.js L139-149 UI 연결. 실 Gemini는 Phase 1+(§7.9). 구 "⏳ stub"는 #946 머지로 해소 |
-| inquiries 자동 응답(LLM) | ⏳보류 | parking-lot §3(#208) — 컬럼만. 코어 아님, 재개조건 미충족 |
-| §7.2.1 책 데이터 소스 이전(알라딘 ToS 회피, #1044) | ⏳스펙선행/코드후속 | 방향 확정(국중도 ISBN 서지=쪽수·표지 + 카카오 책검색=검색·표지, 외서 Google 실시간만). worker 재배선(`aladinProxy`·`normalize`·`imgProxy`·`googleBooksSearch` upsert·`archive` 인기시드)·출시 전 실계정 ToS 확인 게이트 4건은 §7.2.1. 코드는 후속 PR(#1044) |
-
-## design.md — owner 승원
-| 디자인 토큰·컴포넌트 | ⏳ 미심층 | owner 승원 — 토큰(index.html `:root`) vs design.md 대조는 승원이 |
-
-## 신규 스펙 7종 (main 적재, 매트릭스 누락 → 본 PR 추가·실측) — owner 계휴(승원: nest 영역)
-> v8.5 이후 main 에 머지됐으나 매트릭스에 미등록이던 스펙. js/** + worker/index.mjs grep 실측.
-| 스펙 | 상태 | 근거/갭 |
-|---|---|---|
-| **share.md** (한 문장 외부 카드, #651) | ✅ | share-card.js `renderSentenceCardBlob`(htmlToImage)·`shareSentence`(navigator.share→클립보드 폴백)·sentence-card.js 진입. 구현 #670, QA #674/#677 머지 |
-| **barcode-scan.md** (ISBN 스캔 등록, #943) | ✅ | barcode-scan.js `BarcodeScanModal`·`barcodeScanSupported`(BarcodeDetector)·`resolveBookByIsbn`(normalizeIsbn13→books/알라딘 정확매칭)·미지원 폴백(수동검색). search.js 연동 |
-| **integrated-shelf.md** (빈 서가 박멸, #772·#774) | ✅ | ① 능동복원: shelf-import.js→`/api/shelf-import`(worker L559 비전OCR)·library.js 상시 진입점(#832). ② 수동시드: book-info-modal.js L64-96 마중물 큐→`/api/seed`(worker L817)+cron `prewarmSeeds`(L797). align_v7 invariant 락(L156) |
-| **ota.md** (웹 번들 OTA, #876) | ✅ 구현·운영 경로 적재 | `main.js`의 `@capgo/capacitor-updater`, `capacitor.config.json`, Worker `/api/ota`의 `otaCheck`, `wrangler.toml`의 `OTA_KV`가 존재한다. #876 및 #979는 2026-06-24 CLOSED로 확인. 이후 번들 발행·매니페스트 운영 변경은 새 이슈로 추적한다. |
-| **referral.md** (서비스 외부 공유·referral, #650-B) | ⏳부분 | 보상없는 코드만 동선 ✅(#727 — share-card.js `shareService`, library.js L560). **referral 코드·`?ref=` 귀속·랜딩(§5)·보상(§4.2)은 미구현 — CEO 보상 검토 의존(정상 보류, 신규 이슈 생성 안 함)** |
-| **co-reading.md** (같이읽기 방, #987) | ✅ 구현 | `co-reading.js`의 `RoomsView`·추천 랭킹·`BookCoReadRow`, 양 DataStore 어댑터의 `byBook` 정렬, `book-detail-modal.js` 진입점이 존재한다. #987/#988은 2026-06-24 CLOSED. 후속 기능은 별도 이슈로만 추적한다. |
-| **resurface.md** (시간차 되감기, #639) | ✅코어/🅿️확장 | 코어 되감기 ✅(#346/#364 — datastore-supabase.js `resurfaceCandidate` L334·`markResurfaced` L364·1일 게이트 L456). resurface.md 자체는 🅿️보류(확장은 Phase later, 정상) |
-
-## meta/decisions.md
-결정 이력(§8.0~8.8) — 매칭 기준 컨텍스트. 자체 구현 대상 아님.
-
----
-**v7.4 갱신 (2026-06-10)**: companion(LLM solar-pro3·멀티턴·문장대화·동의·아카이브) ✅, 둥지 책분리 ✅(#313), 성컬렉션 그리드 ✅(#312), BookCover ✅(#316), export 상세화 ✅(#315), 게스트 우선 ✅(#298), ErrorBoundary ✅(#310), PostHog 이벤트 ✅, 동의 배너 ✅(#331). 해소: nest CTA·미션(#252)·Top3(#286)·스포일러토글(#3). 보류: 휴식코스(parking-lot), 문의 LLM(#208).
-
-**v7.4.1 갱신 (2026-06-10, post-merge)**: 외서 검색 5+5 ✅(#302/#343), export 책 소개 ✅(#316/#344), 공개전환 체크리스트 ✅(#178/#344), 참새 완독 회고 ✅(#259/#345). spec-align: nest.py v7.2 현실로 갱신(getNestStage·NestView=function 선언형, ActiveBookSheet→캐러셀 #185, MissionModal→CheckinModal) → 10/10. backend.md Netlify→Cloudflare Worker 잔재 정정.
-
-**남은 이슈 후보 (2026-06 감사 #877, 갱신)**: ~~**inquiry-sync.md(#701)** — #890 구현(worker 크론 */10 + 32_*.sql, GITHUB_TOKEN 필요)~~ **2026-08-14 운영 결정으로 폐기** — 문의는 관리자 대시보드에서 개별 직접 대응하며 자동 GitHub 이슈화·LLM 분류·문의 cron을 사용하지 않음 · ❌ **companion-reading-end(#347)** — 읽기 종료 자동 진입 미출시(읽기모드 #505 폐기), **도입 안 함·스펙 삭제(2026-07-09)** · ✅ **seed-collector** — `collector/` poller + 멀티NPC(#841 등) · ⏳ AI 다음책 추천·추출(stub, Phase1) · ⏳ companion 질문품질(#371-375) · ✅ onboarding.js 데드코드 삭제(#888).
-> 해소됨: companion_sessions 실행·실증 ✅ · spec-drift CI ✅(#351, drift.py PASS) · 스포일러 spec 문구(#177).
-
----
-**v7.4.2 갱신 (2026-06-11, post-merge 2)**: 외서 빈자리 보충 ✅(#350), 회고 영속화 ✅(#352), 한 문장 삭제 ✅(#358·둥지/책상세), 즉시 관리 id 전달 ✅(#358), 인용/내 생각 구분 ✅(#359·#360), 시간차 되감기 ✅(#346/#364), 게스트 데모 정합 ✅(#366·#367), spec-drift CI ✅(#351), 행동데이터 분석 ✅. SQL: 18~21(companion_sessions·companion_recap·sentence.kind·last_resurfaced_at) 전부 실행. 게이트 8종 green(align34·nest10·village·drift·contract·worker·biome·mdlint).
-
-**신규 백로그 (실사용·분석 발견, 2026-06-11)**: #370 해자 데이터 누수(게스트 대화 미보존) · #371 질문 평가👍👎 · #372 질문 재생성🔄 · #373 질문 품질(반복·책맥락·난이도) · #375 질문 방향성 프리셋 · #374 책 오표시(OPEN PR).
-
-**과거 윤지 제안 이력**: #346 되감기(코드 #364 머지) · #347 읽기 종료 시 참새(✅ 구현 — nest.js handleCheckin→companion #438).
-
----
-**v8.4 갱신 (2026-06-23, #877 감사 + 출시 정합)**:
-- **출시 반영** ✅: 작가 시선 preset(#936) · 스트릭 복구 + 마일스톤 회고(#940 A1/A2) · 콜드스타트 OCR 제거(#944 — 본문 사진→책 식별 불가, 사진→책은 바코드 #943로 대체 검토).
-- **nav 라벨 드리프트 정합** 🔧: 실제 하단 탭 = **홈(`nest`) / 피드(`social`) / 책장(`profile`)** + 설정(`settings`, 바텀시트 액션 #567). 구 '소셜'→'피드'(#639, feed.md 기존 문서화) · '프로필'→'책장'(미문서 → 본 PR 정합). onboarding.md·README.md·feed.md §5.7·profile.md 동기화.
-- **#877 감사 결과**: 둥지 1,600 XP(#520/#521) ✅ · 친구찾기 NPC_SEARCH(#250) ✅ · companion 평가👍👎/재생성🔄/프리셋 ✅, **질문 품질필터(#373 반복방지·책맥락) ✅ PR #378**(worker `avoid`+`getBookBrief` — 감사 subagent가 클라만 보고 worker 놓친 오판, 본 노트로 정정) · **AI 다음책 추천/추출 ⏳빈 stub**(datastore-supabase.js:1001, UI 미연결 — #946) · parking-lot 3건(#126/#191/#208) 재개조건 미충족(정상 보류).
-
----
-**v8.5 갱신 (2026-06-23, spec 드리프트 catch-up #951/#953 + spec-first 신규)**:
-- **계기**: 요며칠 ship 모드로 코드 42 커밋 중 spec 동반 ~1/3 — spec-first 마찰(2-PR)·CI 미강제·폴리시/기능 경계 모호로 드리프트. 키워드 grep은 커버리지 과대평가, 실제는 *stale spec*(코드와 모순)이 핵심.
-- **#951 정정** 🔧: `nest.md §5.1`·`feed.md`가 책 상세 진입 = `BookInfoModal` 단정하던 걸 **소유 라우팅**(보유→`BookDetailModal`/미보유→`BookInfoModal`)으로 정정. 코드는 이미 ship됨, spec이 stale했음.
-- **#953 문서화** ✅: 한 문장 카드 렌더 = 공용 `QuoteCard` SSOT(nest.md §5.1, 책장과 단일 컴포넌트).
-- **신규 spec-first**: '이 책의 다른 한 문장'(콜드스타트 사회적 증거, 내 문장 <3일 때 타인 좋아요순 ~6–8) — nest.md §5.1에 코드 전 spec 기재(미구현).
-- **남은 델타-audit 후보**(키워드 spec은 있으나 as-shipped 일치 미검증): 배치OCR #844·일괄입력 #848·계정삭제 #875·export #929·시드UI #828·인기랭킹 #835 — #877식 심층 대조는 별도. (본 PR은 *확인된* stale/zero만 처리.)
-
----
-**v8.6 갱신 (2026-06-24, #877 심층 재감사 — 신규 스펙 7종 등록 + 델타 후보 전수 검증)**:
-- **계기**: open 이슈가 적어 진행 가시성 낮음(#877 본문). 매트릭스가 v8.5 이후 main 적재 스펙 7종(share·barcode-scan·integrated-shelf·ota·referral·co-reading·resurface)을 **통째로 누락** → 본 PR로 섹션 추가하고 `js/**`+`worker/index.mjs` grep 실측으로 상태 확정(위 "신규 스펙 7종" 표).
-- **#877 본문 알려진 갭 = 전부 구현 확인** ✅: 둥지 1,600 XP 주기(#520/#521, nest.js L23-37·265-282) · 친구찾기 NPC_SEARCH(#250, social.js L20-71·179) · companion 질문품질/평가👍👎/재생성🔄/프리셋(#371/#372/#373/#375 — companion.js + worker `avoid`/`getBookBrief`/`PRESET_TONE` L304-331) · AI 다음책 추천·추출(#946 — Phase 0 시뮬, data.js L482-555 + UI 연결). **이 갭들엔 신규 이슈 불필요(이미 구현)**.
-- **v8.5 델타-audit 후보 6종 전수 검증 = 전부 ✅ shipped**(closed 이슈 + 코드/worker 엔드포인트 대조): 배치OCR #844(`/api/extract-highlights`+book-detail-modal.js L86) · 일괄입력 #848(batch-quote-import.js) · 계정삭제 #875(`/api/delete-account` worker L35) · export #423/#929(profile export) · 시드UI #828(book-info-modal.js+collector) · 인기랭킹 #835(social 랭킹). → 델타 후보 줄 **해소**.
-- **v8.4 stale 정정** 🔧: 구 "AI 다음책 추천/추출 ⏳빈 stub(datastore-supabase.js:1001, UI 미연결 #946)"는 **#946 머지로 해소** — 이제 ✅(시뮬 구현 + book-detail-modal.js UI 연결). backend.md 표의 "ai.* ⏳ stub" 행도 ✅로 분리·정정.
-- **역드리프트 발견(코드가 트래커보다 앞섬)** ⚠️: **OTA(#876)** 가 ota.md 헤더·#876/#979 이슈에선 "코드 후속/미구현"으로 표기되나 **이미 동작 코드 적재**(main.js capgo 플러그인 + worker `otaCheck` + `OTA_KV` 바인딩). 남은 건 R2 번들 호스팅(#979 OPEN). 스펙 헤더 정합은 owner(계휴) 후속.
-- **신규 갭 이슈 = 0건(의도)**: 묻힌 *미추적* 진짜 갭이 없음 — 미구현분은 전부 활성 OPEN 이슈가 이미 추적(#876/#979 OTA · #987/#988 co-reading · #897 배포안전 epic) 하거나 의도적 보류(resurface 확장 #639 · referral 보상 CEO검토 · parking-lot 3건 #126/#191/#208 재개조건 미충족). 추측으로 이슈를 만들지 않음(#877 지침 "확실한 것만").
+- 정적 grep 검증은 코드 존재를 확인할 뿐 실제 UX·RLS·Production 적용을 보증하지 않는다.
+- `docs/readinggo/supabase/*.sql` 존재와 Production 적용 여부는 다르다. `migrations_applied.py`도 table 33개·column 40개 존재만 확인하고 policy·view·RPC body·grant·trigger·RLS·backfill을 보증하지 않는다. 원격 ledger와 역할별 직접 API 검증 없이 적용 완료로 단정하지 않는다.
+- 정적 감사에서 `user_books` 인증 사용자 read 범위를 확인했으나 Production의 실제 적용 정책·데이터 영향 건수는 아직 검증하지 않았다.
+- 현재 Node·Worker·Playwright 회귀 통과는 현행 v16/레거시 계약의 증거다. XP 제거·책나무·새 공개범위·1,000자 공개 저장을 검증하는 v17 invariant는 아직 없다.
+- 이번 spec-only 작업에서는 코드·DB·DEV·Production·Play Store를 변경하지 않는다.
+- 최신 제품 결정은 구현 사실과 분리해 각 기능 스펙에 `목표 계약 / 현재 갭 / 전환 게이트`로 기록한다.

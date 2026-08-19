@@ -2,6 +2,8 @@
 
 이 디렉토리(`docs/readinggo/`)가 ReadingGo Phase 0 데모의 루트다.
 
+> **제품 계약 경계:** 아래 파일 구조와 코드 설명은 현행/구 APK의 레거시 as-built다. 활성 v17 목표는 [`specs/README.md`](./specs/README.md)를 먼저 따른다. v17은 사용자당 책나무 1그루·책당 가지 1개·저장 문장당 잎 1장을 사용하며 XP·둥지 진화·스트릭 상실 UX를 신규 제품 계약에서 폐기한다. 코드의 `nest`·`social`·XP·스트릭 식별자는 구현 전환 중 호환 이름일 수 있다.
+
 ## 도서 데이터 — Supabase `books` (canonical)
 
 도서 데이터의 단일 진실원천은 **Supabase `books` 테이블**이다(#490). 게스트도 publishable key + anon RLS read 로 같은 카탈로그를 읽는다. **책 정보를 코드에 하드코딩하지 말 것.** 구 정적 `books.tsv`(542권)는 과도기 잔재이자 stale 드리프트 원인이라 **제거됨(#972)** — Supabase 미설정/장애 시 폴백은 `data.js`의 인라인 `RG_BOOKS`(12권, 데모 무중단용)뿐이다.
@@ -39,9 +41,9 @@ docs/readinggo/
 │   └── assets/         # sparrow 등 (도서 데이터는 Supabase — §도서 데이터)
 ├── js/
 │   ├── data.js         # 상태·시드 데이터·loadBooks·fuzzySearch
-│   ├── components.js   # 공용 UI (AppHeader, BookCover, StreakCalendar 등)
-│   ├── nest.js         # 홈 탭 (독서 기록, 스트릭)
-│   ├── social.js       # 소셜 탭 (리그, 피드)
+│   ├── components.js   # 공용 UI (AppHeader, BookCover, 레거시 StreakCalendar 등)
+│   ├── nest.js         # 현행 홈 탭 (독서 기록, 레거시 스트릭)
+│   ├── social.js       # 현행 함께 탭 (레거시 리그·피드 포함)
 │   ├── library.js      # 서재 탭 (책 목록, 상세, 설정)
 │   └── app.js          # 최상위 App + ReactDOM.createRoot
 └── capacitor.config.json  # 앱 셸(#872) webDir=dist
