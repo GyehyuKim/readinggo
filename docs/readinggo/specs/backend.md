@@ -230,6 +230,14 @@ ai.extractBook(book, quotes)               → 추출 책 요약        // 드�
 
 **흐름**: 국내서 검색 = 카카오 → 등록(ISBN 확정) 시 국중도로 쪽수(+표지) 보강. 외서 = Google Books **실시간만**(upsert 안 함). canonical `books` 에는 **국중도·카카오 출처 행만** 영구 적재한다.
 
+**검색 결과 상한 계약 (`GET /aladin`, #1458):**
+
+- `max`는 반환 개수의 최소 보장이 아니라 **최종 응답 상한**이다. 양의 정수는 최대 20까지 해석하되, 기존 제품 총 상한 10을 유지하므로 검색 응답의 effective limit은 `min(max, 10)`이다.
+- `max` 미지정·비숫자·`0`·음수는 기존 기본값 10을 사용한다. ISBN 단건 조회에는 이 검색 병합 상한을 적용하지 않는다.
+- 카카오 또는 레거시 알라딘 검색 결과에 Google Books를 보강할 때 provider 병합·중복 제거 후에도 effective limit을 넘지 않는다. Kakao/Aladin 실패 후 Google fallback에도 같은 상한을 적용한다.
+- 국내 결과가 effective limit을 이미 채웠으면 Google을 호출하지 않는다. 성공 검색의 기존 24시간 캐시와 실패 fallback의 1시간 캐시는 유지한다.
+- 회귀 검증은 `max=1·2·5·10·20·20초과`, 기본/invalid/0/음수, 카카오·알라딘 성공/실패, Google 중복 제거·불필요 호출 방지, ISBN 단건 비영향을 포함한다.
+
 **worker 이전 지점 (`worker/index.mjs`):**
 
 | 현행 함수 | 현재(알라딘) | 이전 후 | 비고 |
