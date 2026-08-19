@@ -233,9 +233,9 @@ ai.extractBook(book, quotes)               → 추출 책 요약        // 드�
 **검색 결과 상한 계약 (`GET /aladin`, #1458):**
 
 - `max`는 반환 개수의 최소 보장이 아니라 **최종 응답 상한**이다. 양의 정수는 최대 20까지 해석하되, 기존 제품 총 상한 10을 유지하므로 검색 응답의 effective limit은 `min(max, 10)`이다.
-- `max` 미지정·비숫자·`0`·음수는 기존 기본값 10을 사용한다. ISBN 단건 조회에는 이 검색 병합 상한을 적용하지 않는다.
-- 카카오 또는 레거시 알라딘 검색 결과에 Google Books를 보강할 때 provider 병합·중복 제거 후에도 effective limit을 넘지 않는다. Kakao/Aladin 실패 후 Google fallback에도 같은 상한을 적용한다.
-- 국내 결과가 effective limit을 이미 채웠으면 Google을 호출하지 않는다. 성공 검색의 기존 24시간 캐시와 실패 fallback의 1시간 캐시는 유지한다.
+- `max` 미지정·비숫자·`0`은 기존대로 기본값 10을 사용한다. 음수도 10으로 정규화해 현행 worker의 음수 전달 결함을 함께 교정한다. ISBN 단건 조회에는 이 검색 병합 상한을 적용하지 않는다.
+- primary provider가 성공하면 카카오 또는 레거시 알라딘 결과를 `min(5, effective limit)`개까지 우선 배치하고, 남은 슬롯을 Google Books로 보강한다. provider 병합·중복 제거 후에도 effective limit을 넘지 않는다. primary provider 실패 후 Google fallback에도 같은 상한을 적용한다.
+- primary provider 할당 결과가 effective limit을 이미 채워 남은 슬롯이 없으면 Google 보강을 호출하지 않는다. 카카오/알라딘 primary 성공 응답은 24시간, provider 실패 후 Google fallback 성공 응답은 1시간 캐시한다.
 - 회귀 검증은 `max=1·2·5·10·20·20초과`, 기본/invalid/0/음수, 카카오·알라딘 성공/실패, Google 중복 제거·불필요 호출 방지, ISBN 단건 비영향을 포함한다.
 
 **worker 이전 지점 (`worker/index.mjs`):**
