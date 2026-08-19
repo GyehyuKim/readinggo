@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a course project folder for **BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습** (KAIST IMMS, Spring 2026, instructor: 이지수).
 
-The project is **ReadingGo** — 독서 + 게이미피케이션(스트릭, XP, 소셜)으로 매일 읽게 만드는 독서 습관 형성 앱. 소스 문서는 `docs/` (MANIFESTO, whytree, pitch). 데모 엔트리포인트: `docs/readinggo/index.html` (예정).
+The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가고, 책과 문장이 쌓인 모습을 한 그루 책나무로 보여주는 독서 습관 앱. v17 목표는 사용자당 나무 1그루·책당 가지 1개·저장 문장당 잎 1장이며, XP·둥지 진화·스트릭 상실 UX는 신규 제품 계약에서 폐기한다. 코드와 구 APK의 XP·둥지·스트릭은 호환·삭제 계획이 필요한 레거시 as-built다. 활성 정본은 `docs/readinggo/specs/README.md`, 데모 엔트리포인트는 `docs/readinggo/index.html`이다.
 
 ## Governance — MANDATORY
 

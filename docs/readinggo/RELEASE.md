@@ -8,7 +8,7 @@
 > **`RELEASE-BUILD.md`**(#1024)가 담당한다. 둘이 겹치면 빌드 명령은 RELEASE-BUILD, 의사결정·순서·게이트는 RELEASE 가 source of truth.
 >
 > **연관 문서**: [`DEPLOY.md`](./DEPLOY.md)·[`RUNBOOK-DEPLOY.md`](./RUNBOOK-DEPLOY.md)는 **웹(Cloudflare Worker)** 배포 런북이다.
-> 이 문서는 **설치된 앱**(iOS/Android 셸 + OTA 웹 번들)의 릴리스를 다룬다. 웹 즉시배포는 그대로 유지된다.
+> 이 문서는 **설치된 앱**(iOS/Android 셸 + OTA 웹 번들)의 릴리스를 다룬다. 웹 Worker production도 main 자동배포가 아니라 stable DEV에서 검증한 동일 SHA를 승인 후 수동 승격한다.
 
 ---
 
@@ -35,11 +35,11 @@ OTA 매니페스트는 Workers KV 에 **채널별**로 저장된다: `ota:androi
 > KV 키·`ota-promote.yml`·`capacitor.config.json` 채널명은 전부 `beta`/`production` 이다(코드가 source of truth). "staging" 은 개념어로만 쓴다.
 
 ```
-[main 머지]
-   │  ota-release.yml (push: main)
+[main 머지 → stable DEV 자동 배포·QA]
+   │  승인 SHA로 ota-release.yml (workflow_dispatch + production environment)
    ▼
-vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = {version,url,checksum,minNative}
-   │  = beta 채널 자동 publish
+vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = {version,url,checksum,minNative,sha}
+   │  = beta 채널 수동 publish
    ▼
 [베타 앱(채널=beta)]  다음 시작 시 수신 → checksum 검증 → 적용. 운영자/베타테스터가 확인.
    │
@@ -50,7 +50,7 @@ vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = 
    └─ 이상 ──▶  승격 안 함(prod 무영향). beta 는 Capgo 자동 롤백(§4).
 ```
 
-- **왜 수동 승격인가**: 배포안전 에픽(#897)의 카나리 철학을 앱 레이어에 적용. 웹은 `main`=즉시 100% 지만, **앱은 한 겹 더 보수적**으로 — 운영자가 beta 에서 먼저 확인한 *그 바이너리·체크섬을 그대로* prod 로 올린다(재빌드하면 카나리가 무의미). (`specs/ota.md` §3③)
+- **왜 수동 발행·승격인가**: main push는 stable DEV까지만 자동이다. 승인 SHA로 beta를 발행하고 운영자가 확인한 *같은 manifest·바이너리·체크섬*만 production으로 복사한다. 웹 Worker production도 같은 stable DEV SHA gate를 사용한다. (`specs/ota.md` §3③)
 - **앱이 채널을 어떻게 아는가**: Capgo `defaultChannel` / 런타임 `setChannel`. 베타테스터 빌드 = `beta`, 스토어 배포 빌드 = `production`. (현재 `capacitor.config.json` 의 `updateUrl` 은 `…/api/ota`; 워커가 `?channel=` 로 분기.)
 
 ### 1.2 무엇이 OTA 로 가고 무엇이 네이티브 빌드인가 (★ 안전의 핵심)
@@ -62,7 +62,7 @@ vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = 
 | `public/` 정적 자산(폰트·이미지) | 앱 아이콘·스플래시 |
 | Supabase 쿼리·클라이언트 로직 | OS 권한·네이티브 SDK·Capacitor core 업그레이드 |
 
-- **`minNativeVersion` 게이트** = 최우선 안전장치. 각 OTA 번들은 자신이 요구하는 **네이티브 셸 버전**(`minNative`)을 선언한다. 설치된 셸이 그보다 낮으면 그 번들을 **받지 않고** "스토어 업데이트" 배너를 띄운다. → 새 네이티브 API 를 호출하는 웹 번들이 구(舊) 셸에서 **크래시**하는 것을 원천 차단.
+- **`minNativeVersion` 게이트**는 네이티브 셸 API 호환 장치다. 설치된 셸이 요구 버전보다 낮으면 번들을 받지 않아 크래시를 차단한다. DB migration·RLS/RPC·공개범위 enum·legacy API 의미 호환은 보증하지 않으며 별도 fail-closed 전환과 역할별 QA가 필요하다.
   - `ota-release.yml` 은 Android `build.gradle`의 `versionCode`를 읽어 `minNative`로 발행한다. 별도 숫자를 수동 관리하지 않으므로 네이티브 셸과 OTA 매니페스트가 단일 원천으로 일치한다.
 - **판단 규칙**: "이 변경이 새 APK/IPA 없이 기존 설치 앱에서 동작하나?" → 예면 OTA, 아니오면 스토어 빌드. 애매하면 **스토어 빌드 + `minNative` 상향**(보수적 기본값).
 - **스토어 약관**: 웹/해석형 콘텐츠 업데이트는 Play·App Store 모두 허용. **네이티브 실행코드 다운로드는 금지** — 우리는 웹 번들(`dist`)만 내리므로 적합.
@@ -73,13 +73,13 @@ vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = 
 
 ### 2.1 main 과 release 브랜치의 관계
 
-- **`main` = 연속 통합 + OTA 소스.** 피처 브랜치 → PR → `main` 머지 시:
-  1. 웹: Cloudflare Worker 자동 배포(기존 그대로).
-  2. 앱: `ota-release.yml` 이 `beta` 채널 OTA 자동 publish.
-- **`release/x.y.z` = 스토어 바이너리 컷 지점.** 네이티브 변경을 스토어에 내보낼 때만 `main` 에서 브랜치를 컷한다. 일상 OTA 업데이트는 release 브랜치가 **필요 없다**(main → beta → prod 로 충분).
+- **`main` = 연속 통합 + stable DEV 소스.** 피처 브랜치 → PR → `main` 머지 시 DEV Worker만 자동 배포·smoke한다.
+- **웹 production**: `promote-production.yml`을 승인 SHA로 수동 실행해 stable DEV receipt·`origin/main` 일치 뒤 같은 checkout을 배포한다.
+- **앱 OTA**: `ota-release.yml`을 승인 SHA로 수동 실행해 beta를 발행하고, 기기 QA 뒤 `ota-promote.yml`로 같은 manifest를 production에 수동 승격한다.
+- **`release/x.y.z` = 스토어 바이너리 컷 지점.** 네이티브 변경을 스토어에 내보낼 때만 `main` 에서 브랜치를 컷한다. 일상 OTA 업데이트는 release 브랜치가 필요 없지만 beta·production 승인 gate는 생략하지 않는다.
 
 ```
-main  ──●──●──●──────●──────●──●──▶   (연속, 매 머지 = beta OTA)
+main  ──●──●──●──────●──────●──●──▶   (연속, 매 머지 = stable DEV; OTA는 승인 SHA로 별도 실행)
             │ cut          │ cut
             ▼              ▼
    release/1.1.0    release/1.2.0      ← 네이티브 변경 시에만 컷
@@ -262,9 +262,9 @@ OTA 롤백이 *실제로* 동작하는지 검증한다(설계만 믿지 않는�
 
 | 항목 | 결정 |
 |---|---|
-| OTA 채널 | `beta`(=staging 개념) → `production`. main 머지=beta 자동, prod=수동 승격(앱판 카나리). |
+| OTA 채널 | `beta`(=staging 개념) → `production`. stable DEV 승인 SHA로 beta 수동 발행, 같은 manifest를 production에 수동 승격. |
 | OTA 범위 | 현재 **Android 만**. `dist` 웹 번들. iOS OTA·서명·staged% 는 후속. |
-| OTA/네이티브 경계 | `dist` 안=OTA, `dist` 밖(셸)=스토어 빌드. `minNativeVersion` 게이트가 강제. |
+| OTA/네이티브 경계 | `dist` 안=OTA, `dist` 밖(셸)=스토어 빌드. `minNativeVersion`은 셸 API만 보호하며 DB/RLS/API 의미 호환은 별도 gate. |
 | release 브랜치 | `release/x.y.z` 는 **스토어 빌드 컷 지점만**. 일상 OTA 는 불필요. |
 | SemVer | patch·웹=OTA, minor↑(네이티브)=스토어. OTA 번들 버전(`1.0.<run#>`)과 스토어 SemVer 는 독립. |
 | 버전 동기화 | 마케팅 3곳 일치(package.json·versionName·MARKETING_VERSION), 빌드번호 단조+1(versionCode·CURRENT_PROJECT_VERSION). |

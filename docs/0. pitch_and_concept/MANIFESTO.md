@@ -1,5 +1,7 @@
 # MANIFESTO
 
+> **문서 상태:** v17 이전 제품 가설과 문제 서사를 보존한 이력 문서다. `스트릭·방패·XP·둥지 진화·성·전체 공개 피드`는 현재 제품 계약이 아니다. 활성 목표는 [`../readinggo/specs/README.md`](../readinggo/specs/README.md)와 [`../readinggo/PHILOSOPHY.md`](../readinggo/PHILOSOPHY.md)를 따른다.
+
 > **하루 한 페이지, 한 문장에서 시작해요.**
 
 ---

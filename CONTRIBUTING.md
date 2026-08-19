@@ -119,7 +119,7 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 |---|---|---|
 | `CLAUDE.md` · `AGENTS.md` · `CONTRIBUTING.md` | **gyehyu** | governance·머지 담당. 타인은 조율 후 |
 | `specs/backend.md` · `social.md` · `profile.md` · `onboarding.md` · `meta/*` · `specs/README.md` | **gyehyu** | 백엔드·소셜·내서재·온보딩 |
-| `specs/nest.md` · `systems.md` · `design.md` | **seungwon** | 둥지·XP·디자인 |
+| `specs/nest.md` · `systems.md` · `design.md` | **seungwon** | 책나무·성장 리듬·디자인과 레거시 XP 경계 |
 | 데모 코드 `docs/readinggo/js/*` · `index.html` | 해당 피처 오너 | 공용 `data.js`·`components.js`·`app.js` 변경 시 조율 |
 
 > 피처 spec 상세는 [`specs/README.md` 파일 소유권](./docs/readinggo/specs/README.md). 이 표는 *governance·공용 파일* 까지 포함한 상위 기준.
@@ -166,7 +166,7 @@ claude --resume <name>        # 이름으로 재개 (다른 worktree 에서도)
 
 **강제 (CI 게이트)** — 두 층:
 
-1. **`spec-align`** (`tests/spec-align/align_v7.py`·`nest.py`·`drift.py`) — **기능별 invariant**(존재/부재 grep)를 검사. 단 *그 invariant가 있는 기능만* 잡는다 → 새 기능이 invariant 없이 들어오면 **못 잡는다**(2026-06 드리프트의 빈틈: 코드 42커밋 중 spec 동반 ~1/3인데 이 게이트는 통과했음).
+1. **`spec-align`** (`tests/spec-align/align_v7.py`·`nest.py`·`drift.py`) — **기능별 invariant**(존재/부재 grep)를 검사한다. 현재 검사는 v7~v16과 레거시 XP·둥지 구현의 기준선이며 **v17 책나무 완료를 보증하지 않는다**. 새 목표는 해당 invariant와 role-based 권한 검사를 추가하기 전까지 green을 구현 완료 증거로 사용하지 않는다. 단 *그 invariant가 있는 기능만* 잡는다 → 새 기능이 invariant 없이 들어오면 **못 잡는다**(2026-06 드리프트의 빈틈: 코드 42커밋 중 spec 동반 ~1/3인데 이 게이트는 통과했음).
 2. **`spec-coverage`** (`.github/workflows/test.yml`, #spec-coverage) — **일반 케이스를 막는 바닥선**: PR이 `docs/readinggo/js/**` 를 바꿨으면 **`docs/readinggo/specs/**` 변경이 같은 PR에 있거나**, PR 본문에 **`no-spec: <사유>`** 가 있어야 통과. 둘 다 없으면 빨간불(머지 차단). honor-system 을 끝내 — spec 스킵을 *의식적·가시적* 행위로 만든다.
 
 > **경계 (spec 필요 vs `no-spec:`)**: **동작·계약·플로우·새 화면 = spec 필수**(해당 `.md` 갱신). **순수 시각·카피·CI·동작불변 리팩터·스펙대로 복구하는 버그픽스 = `no-spec: <사유>`** 로 면제. 애매하면 spec 쪽. — spec-coverage 가 강제하는 건 *spec 존재*(같은 PR 허용 = 바닥선)이고, **위 spec-only PR 먼저(2-PR)는 큰 기능의 *이상*으로 유지**(CI 강제 아님). 새 기능은 `align_v7.py` invariant도 같이 추가해 락. PR 본문 상단 **스펙 동기화 체크리스트**(pull_request_template.md)도 확인.

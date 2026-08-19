@@ -5,7 +5,7 @@
 
 ## 1. 정상 흐름
 
-1. PR: `preview-smoke`가 `wrangler.dev.toml`로 `readinggo-dev` version preview를 만들고 edge smoke를 수행한다.
+1. PR: `preview-smoke`가 localhost에서 Vite build·render smoke를 수행한다. 비프로모션 `readinggo-dev` version 업로드와 edge smoke는 `workflow_dispatch`로 명시 실행할 때만 수행한다.
 2. merge: `deploy-dev`가 그 `main` SHA를 stable DEV에 배포하고 `/api/release`의 environment·SHA·Supabase host를 검증한다.
 3. Hermes: 이슈·diff·CI·stable DEV smoke·미해결 대화를 검토한다.
 4. prod: `promote-production`을 승인 SHA로 수동 실행한다. GitHub `production` environment 승인 뒤,
@@ -40,5 +40,6 @@ curl -fsS https://readinggo-dev.hyuniverse.workers.dev/api/release
 
 ## 5. 감사 증거
 
-PR URL/commit SHA, DEV project region/status, DEV Worker URL/version, DEV KV ID, migration 개수,
-schema/RLS 검사 결과, preview/stable smoke run URL, production environment 승인 기록을 한 release receipt로 보존한다.
+PR URL/commit SHA, DEV project region/status, DEV Worker URL/version, DEV KV ID, migration 목록·hash·원격 ledger,
+schema/RLS/RPC 역할별 검사 결과, preview/stable smoke run URL, production environment 승인 기록, Production Worker·OTA manifest·Play artifact·실기기 QA를
+[ops.md §0.3](./specs/ops.md)의 단일 release receipt로 보존한다. 각 항목은 `PASS | FAIL | BLOCKED | NOT_RUN`으로 남기며 credential은 기록하지 않는다.

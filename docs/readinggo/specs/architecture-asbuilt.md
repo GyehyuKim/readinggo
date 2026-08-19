@@ -11,14 +11,14 @@
 
 | 층 | 무엇 | 핵심 |
 |---|---|---|
-| **프론트엔드** | React 18 + **Vite**(빌드타임 JSX, #871) | esbuild가 `.js`의 JSX를 classic 변환. `main.js` 진입. `js/` 모듈 ~33개 |
+| **프론트엔드** | React 18 + **Vite**(빌드타임 JSX, #871) | esbuild가 `.js`의 JSX를 classic 변환. `main.js` 진입. `js/` 모듈은 §2 부팅 순서와 저장소 실측을 따른다 |
 | **모듈 로드·공유** | `main.js` ES import + `window.X` shim | import 순서가 계약. 파일 간 공개 API는 아직 `window.X` |
 | **상태/데이터** | DataStore 계약 | 미로그인=localStorage / 로그인=Supabase (부팅 스왑) |
 | **백엔드** | Cloudflare Worker (`worker/index.mjs`) | 정적 서빙 + 12개 API/프록시 라우트 + cron 2종 |
-| **DB/인증** | Supabase (Postgres·Auth·RLS·pg_cron) | 테이블 약 22개, 마이그레이션 ~39개 |
+| **DB/인증** | Supabase (Postgres·Auth·RLS·pg_cron) | 스키마·마이그레이션은 `docs/readinggo/supabase/`와 원격 ledger를 대조한다. 파일 개수는 적용 증거가 아니다 |
 | **외부 연동** | 알라딘·구글북스·오픈라이브러리·네이버·Upstage·**Gemini(vision)**·PostHog | 키는 워커(서버)에만 |
-| **배포** | Cloudflare Workers Build | `main` 머지 시 자동. Vite content-hash 자산으로 반영 확인 |
-| **CI·릴리스** | GitHub Actions | test · spec-drift · preview-smoke · deploy-verify · OTA release/promote |
+| **배포** | GitHub Actions + Cloudflare Workers | `main` 머지는 stable DEV 자동 배포. Production Worker는 stable DEV에서 검증한 동일 SHA를 `promote-production`으로 수동 승격 |
+| **CI·릴리스** | GitHub Actions | test · spec-drift · preview-smoke · deploy-dev · Production/OTA 수동 승격 |
 
 ---
 
@@ -214,7 +214,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 - `[[kv_namespaces]] binding = OTA_KV` → OTA 번들 매니페스트(#876).
 - `[vars]`: `SUPABASE_URL`·`ARCHIVE_DAILY_CAP`·`LLM_BASE_URL`(upstage)·`LLM_MODEL`(solar-pro3)·`VISION_BASE_URL`(gemini)·`VISION_MODEL`(gemini-2.5-flash).
 - `[triggers] crons = ["0 18 * * *"]` (인기도서 아카이브·선충전·쪽수 보강). 문의는 자동 동기화하지 않고 관리자 대시보드에서 개별 직접 대응한다([inquiry-sync.md](./inquiry-sync.md)).
-- **자동 배포**: `main` 푸시 시 Cloudflare Workers Build. (수동 폴백 `npx wrangler deploy`)
+- **배포**: `main` push는 `deploy-dev.yml`로 stable DEV에 자동 배포된다. Production Worker는 승인 SHA를 `promote-production.yml` (`workflow_dispatch`, GitHub `production` environment)로 수동 승격한다. 저장소 workflow 기준으로 main→Production 자동 trigger는 없다. Cloudflare 계정의 외부 Workers Builds 연결 여부는 저장소만으로 검증되지 않았다.
 - **시크릿**(`wrangler secret`): `ALADIN_TTB_KEY`·`SUPABASE_SERVICE_ROLE_KEY`·`UPSTAGE_API_KEY`·`GEMINI_API_KEY`·`NAVER_CLIENT_ID/SECRET`·`GOOGLE_BOOKS_API_KEY`·`KAKAO_REST_KEY`·`NLK_CERT_KEY`. 문의 자동화용 GitHub token은 사용하지 않는다.
 
 ---
@@ -225,9 +225,10 @@ setup-globals → config → supabase-client → datastore-supabase →
 |---|---|
 | `test.yml` | validate-books · align_v7 · datastore-contract · **boot-smoke**(Vite 부팅 회귀) · render-smoke · biome lint · migrations_applied |
 | `spec-drift.yml` | align_v7+nest+drift · datastore-contract · related-filter · nest-cycle · supabase-books · sentence-book-binding · biome lint |
-| `preview-smoke.yml` | PR Worker 비프로모션 버전 업로드 + edge render-smoke |
-| `deploy-verify.yml` | Vite content-hash 자산 반영 폴링 + production live smoke 3회 + 실패 시 자동 롤백 |
-| `ota-release.yml` / `ota-promote.yml` | `main`→Android beta R2/KV 자동 발행 / beta→production 수동 승격·`:prev` 백업 |
+| `preview-smoke.yml` | PR event는 localhost build/render smoke만 수행한다. 수동 `workflow_dispatch`만 `main`을 checkout해 비프로모션 Worker version을 업로드하고 edge render-smoke를 수행한다 |
+| `deploy-dev.yml` / `promote-production.yml` | `main` push의 stable DEV 자동 배포·release 격리 검증 / 검증된 동일 SHA의 Production 수동 승격 |
+| `deploy-verify.yml` | 레거시 Production content-hash 폴링·live smoke·rollback 경로. 현재 정상 승격 SSOT는 `deploy-dev`와 `promote-production`이다 |
+| `ota-release.yml` / `ota-promote.yml` | 둘 다 `workflow_dispatch` + `production` environment. 승인 SHA의 stable DEV/main 일치 후 Android beta R2/KV 수동 발행 / 같은 beta manifest를 production에 수동 승격·`:prev` 백업 |
 
 ---
 
@@ -254,7 +255,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 5. **`onboarding.js` 미로드**: `window.OnboardingFlow` 정의돼 있으나 index.html 부팅·`app.js`에서 참조 없음 → **사용 안 되는 코드로 추정**(별도 확인·정리 후보).
 6. **Phase 표현**: README §3은 Phase 0/1을 미래형으로 적었으나, 실제 런타임은 **로그인=Supabase / 미로그인=localStorage 공존**.
 7. **네이티브 로컬 알림**: `@capacitor/local-notifications` + `streak-reminder.js`가 기본 OFF 21:00 스트릭 리마인더를 스케줄한다. 웹/PWA·서버 푸시는 미구현.
-8. **OTA 구현**: Capgo updater·`/api/ota`·R2·KV·beta 자동 발행·production 수동 승격이 정책 코드에 존재한다. 설치 기기의 실제 수신 성공은 코드 스캔만으로 단정하지 않는다.
+8. **OTA 구현**: Capgo updater·`/api/ota`·R2·KV가 존재한다. 저장소 workflow 기준 beta 발행과 production 승격은 모두 `workflow_dispatch`+`production` environment의 수동 단계이며, 승인 SHA의 stable DEV/main 일치와 같은 beta manifest 승격을 검사한다. 설치 기기의 실제 수신 성공은 코드 스캔만으로 단정하지 않는다.
 
 ---
 

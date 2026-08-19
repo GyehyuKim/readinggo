@@ -15,7 +15,7 @@
 1. **[`CONTRIBUTING.md`](./CONTRIBUTING.md)** — 브랜치 네이밍, PR 규칙, 커밋 메시지, 금지 사항,
    LLM 행동 규칙(§9). **이것이 단일 진실 소스.**
 2. **[`CLAUDE.md`](./CLAUDE.md)** — Claude Code 전용 보조 지침 + Stack Lock + Pages. 다른 에이전트도 참고.
-3. **[`docs/readinggo/specs/README.md`](./docs/readinggo/specs/README.md)** — ReadingGo 스펙 인덱스 (v7). 용어 사전(§0.5)·Phase(§3)·파일 소유권.
+3. **[`docs/readinggo/specs/README.md`](./docs/readinggo/specs/README.md)** — ReadingGo 스펙 인덱스 (v17). 용어 사전(§0.5)·Phase(§3)·파일 소유권.
 
 우선순위 (모순이 있을 때): `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > `specs/README.md` > `DESIGN.md` > `ROADMAP.md` > 기타 문서.
 
@@ -24,11 +24,12 @@
 ## 프로젝트 개요 (1분 요약)
 
 - **코스**: KAIST IMMS BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습 (2026 Spring, 이지수 교수)
-- **프로젝트**: **ReadingGo** — 독서 습관 앱. "하루 한 페이지, 한 문장"을 게이미피케이션(스트릭·XP·둥지 진화·성 컬렉션)과
-  소셜(함께읽기·전체 공개 피드·짹·NPC)로 매일 읽게 만든다. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
+- **프로젝트**: **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가고, 책과 문장이 쌓인 모습을 한 그루 **책나무**로 보여주는 독서 습관 앱. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
+- **v17 목표**: 사용자당 나무 1그루, 책당 가지 1개, 저장 문장당 잎 1장. XP·둥지 진화·스트릭 상실 UX는 신규 노출·적립에서 폐기하고, 최근 14일 독서 리듬과 누적 성장일을 사용한다. 친구 공개는 상호 팔로우 친구에게 제한하며, 4-B 결정에 따라 기존 사용자에게 사전 고지 후 자동 활성화하되 언제든 전체 opt-out할 수 있어야 한다.
+- **현행 구현 경계**: 코드와 구 APK에는 XP·둥지·스트릭·전체 공개 경로가 남아 있다. 이는 목표 제품 규범이 아니라 호환·삭제 계획이 필요한 레거시 as-built다.
 - **형태**: **Capacitor 채택**(런칭 결정, 2026-06) — 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드 = **Vite 전환 완료**(#871). Phase 0 데모(현행) → Phase 1 Supabase. *이전 web-first·Capacitor Phase 3 보류는 해제* (`CLAUDE.md` Stack Lock · `iOS-PLAN.md`).
-- **팀 (dev 3인)**: 김계휴(`gyehyu`, 구현·감독 머지), 이승원(둥지·XP·디자인 제안), 정윤지(`jyj23-jeong`, 승인 contributor). 정윤지는 계휴와 사전에 합의된 이슈를 `yunji/*` 브랜치에서 구현·PR하고 자신의 PR을 직접 머지하지 않는다.
-- **주요 산출물**: `docs/readinggo/` (Phase 0 데모), `docs/readinggo/specs/` (피처별 spec, v7).
+- **팀 (dev 3인)**: 김계휴(`gyehyu`, 구현·감독 머지), 이승원(성장 시각화·디자인 제안), 정윤지(`jyj23-jeong`, 승인 contributor). 정윤지는 계휴와 사전에 합의된 이슈를 `yunji/*` 브랜치에서 구현·PR하고 자신의 PR을 직접 머지하지 않는다.
+- **주요 산출물**: `docs/readinggo/` (현행 데모), `docs/readinggo/specs/` (피처별 spec, v17 목표와 레거시 as-built 분리).
 - **언어**: 모든 커뮤니케이션과 문서는 **한국어**가 기본. 코드 식별자만 영어.
 
 ---
@@ -39,7 +40,7 @@
 |---|---|
 | 스펙 전체 지도 | `docs/readinggo/specs/README.md` |
 | 데이터 모델 · DataStore 계약 | `docs/readinggo/specs/backend.md` |
-| 둥지·XP·스트릭 규칙 | `docs/readinggo/specs/nest.md`, `systems.md` |
+| 책나무·성장 리듬과 레거시 XP·스트릭 경계 | `docs/readinggo/specs/nest.md`, `systems.md` |
 | 같이읽기 | `docs/readinggo/specs/co-reading.md` |
 | 소셜·내서재 | `docs/readinggo/specs/social.md`, `profile.md` |
 | 데모 코드 | `docs/readinggo/index.html` + `docs/readinggo/js/*` |
@@ -99,7 +100,7 @@ gh pr create --title "..." --body "..."
 
 - **과분할 금지**: 관련된 변경을 과도하게 쪼개 PR 여러 개를 만들지 말 것. 1 PR = 1 논리 단위.
 - **단정하지 말 것**: 프로젝트 맥락이 불충분하면 사용자에게 묻는다. 특히 제품 의사결정,
-  게임 메카닉(XP·둥지·성), 페르소나, 숫자 추산은 임의로 채우지 않는다.
+  책나무 시각화·레거시 삭제 순서·페르소나·숫자 추산은 임의로 채우지 않는다.
 - **SLC > MVP**: 새 기능은 *Simple·Lovable·Complete* 기준. "다듬은 한 기능 > 반쯤 만든 다섯 개."
 - **한국어 응답**: 사용자가 영어로 쓰지 않는 한 한국어로 답한다.
 

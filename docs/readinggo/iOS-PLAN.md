@@ -180,7 +180,7 @@
 | 네이티브(플러그인·권한·SDK·아이콘) | **스토어 바이너리 릴리스** | 있음 | 주기적(예: 월 1회) |
 
 **브랜치/릴리스 규칙** (요약 — 운영 절차 전문은 [`RELEASE.md`](./RELEASE.md))
-- `main` = 연속 통합. 머지되면 (1) 웹 CF 배포 (2) 앱 OTA `beta` 채널 자동 갱신 → 확인 후 `production` 수동 승격(앱판 카나리).
+- `main` = 연속 통합 + stable DEV 소스. 머지되면 DEV Worker에 자동 배포·smoke하고, 승인된 동일 SHA로 웹 Production과 앱 OTA `beta`를 각각 수동 workflow로 승격한다. beta 기기 확인 후 같은 manifest를 `production`으로 수동 승격한다.
 - **스토어 바이너리** = `main`에서 `release/x.y.z` 태그/브랜치 컷 → 버전 범프 → iOS(App Store Connect)·Android(Play) 제출. 네이티브 버전은 *네이티브 변경 시에만* 올림.
 - **SemVer**: `major.minor.patch`. patch·웹 핫픽스는 OTA, 네이티브 추가는 minor 바이너리 릴리스.
 - **단계적 출시**(Play staged rollout 10%→50%→100%, App Store phased release)로 회귀 방어. OTA도 채널(`beta`→`production`)로 단계 배포(staging=beta).

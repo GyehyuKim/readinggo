@@ -131,20 +131,30 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - 주간 자동 리포트는 production만 조회하고 WAU, 핵심 이벤트 사용자·건수, 4단계 퍼널, W1 리텐션, 누락 환경/SHA 데이터 품질 경고를 GitHub Actions summary와 artifact로 남긴다.
 - PostHog Personal API key는 읽기 전용 GitHub Secret으로만 보관한다. 미설정이면 workflow는 명시적으로 실패하되 앱 배포를 막지 않는다.
 
-### 3.1.3 둥지 성장 설명 관찰 계약 (#1308, 구현 후속)
+### 3.1.3 책나무·성장 리듬 측정 계약 (v17, 구현 후속)
 
-전용 둥지 탭의 설명 UX가 현재 단계·다음 성장·완성 누적을 찾게 하는지 출시 후 관찰한다. 아래 이벤트는 코드 PR에서 구현하며, 이 spec-only PR에서는 발화된 것으로 간주하지 않는다.
+이 계약은 v17 코드 전환 뒤에만 활성화한다. `origin/main@39248ef`에서 발화 중인 XP·스트릭·둥지 이벤트는 구현 사실로 보존하되 신규 KPI에 섞지 않는다. 아래 이벤트명·property명·bucket명·대시보드명은 구현 논의를 위한 **후보**이며 제품·개인정보 승인 전 활성 계약이 아니다. 정본은 이름이 아니라 아래 결과를 재현 가능하게 측정하는 것이다.
 
-| 이벤트 | 발화 시점 | 필수 속성 |
-|---|---|---|
-| `nest_tab_viewed` | 사용자가 `nest-grow` 목적지에 진입할 때 1회 | `cycle_stage`(1–4), `completed_nest_count` |
-| `nest_growth_guide_opened` | `둥지가 자라는 법` 안내를 열 때마다 | `cycle_stage`, `completed_nest_count` |
-| `nest_completion_viewed` | `둥지 완성` 서브탭으로 전환할 때마다 | `cycle_stage`, `completed_nest_count` |
+| 후보 이벤트 | 후보 발화 시점 | 후보 속성 | 금지 속성 |
+|---|---|---|---|
+| `book_tree_viewed` | 책나무 목적지 진입 후 데이터 렌더 성공 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point` | 정확한 문장 수, 책 제목, 문장 원문 |
+| `book_tree_branch_opened` | 가지 목록에서 책 상세를 열 때 | `book_id`, `book_status`, `leaf_count_bucket` | 문장 원문, 개인 메모 |
+| `book_tree_filter_used` | 검색·상태 필터 결과가 적용될 때 | `filter_type`, `result_count_bucket` | 검색어 원문 |
+| `reading_rhythm_viewed` | 최근 14일 리듬이 렌더될 때 | `active_day_count`, `cumulative_growth_days_bucket` | 날짜별 원문 기록 |
+| `book_candidate_added` | 관심 책 저장 성공 뒤 | `book_id`, `source` | 책 검색어 원문 |
+| `book_paused` | 사용자가 명시적으로 중단 상태로 전환한 뒤 | `book_id`, `previous_status` | 미독서 기간을 실패값으로 해석한 속성 |
 
-- `totalXp`, 한 문장 원문, 책 정보는 이벤트에 넣지 않는다. 공통 `environment`·`release_sha`·`schema_version`·`platform`은 §3.1.1 계약을 따른다.
-- **단계별 안내 열람률** = 주간 `nest_growth_guide_opened` 고유 활성 ID / 같은 `cycle_stage`의 `nest_tab_viewed` 고유 활성 ID.
-- **완성 이력 확인률** = 주간 `nest_completion_viewed` 고유 활성 ID / `nest_tab_viewed` 고유 활성 ID. `completed_nest_count=0`과 1 이상을 나눠 본다.
-- 시간대·주 경계와 고유 ID 해석은 §3.1.2를 재사용한다. 출시 전 목표치·합격선은 정하지 않으며, 단계별 차이를 다음 설명 개선의 근거로 기록한다.
+- 정확한 가지·잎 수는 제품 화면의 사용자 소유 데이터이며, PostHog에는 구간값만 보낸다. Admin 운영 집계가 필요하면 Supabase의 권한 제한 집계를 사용한다.
+- `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`는 컷오버 전 `legacy_*` 이벤트군으로 분리한다. 새 버전에서 발화하지 않고 WAU·리텐션·책나무 퍼널의 분자·분모에 포함하지 않는다.
+- 기존 데이터 이름을 소급 변경하지 않는다. 분석 쿼리에서 `release_sha`·`schema_version`·컷오버 시각으로 legacy를 분리하고, 과거 리포트 재현성을 유지한다.
+- XP 물리 삭제 게이트는 지원 중인 app version·release SHA별 XP mutation, legacy RPC 호출, 직접 `users.xp` 수정 시도, OTA 수신·스토어 버전 분포를 관측할 수 있어야 한다. 현재 이 관측면은 없어 삭제 승인 불가다.
+- 정확한 이벤트명이 바뀌어도 "신규 버전의 XP 값 변화 0"과 "지원 중 버전의 legacy 호출 소멸"을 객관적으로 판정하는 결과 계약은 유지한다. 관측 기간과 삭제 임계값은 운영 승인 전 미결정이다.
+- `reading_session_end`와 `sentence_added`는 현행 실제 독서·기록 성공 이벤트로 보존한다. 성장일은 이벤트 합계가 아니라 권위 DB의 distinct local date를 사용한다.
+- 친구 책나무 분석에는 비공개 문장의 존재·개수나 공개범위 판정 이유를 보내지 않는다.
+
+### 3.1.4 과거 둥지 측정 이력 (#1308, superseded)
+
+`nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`와 XP 기반 단계 속성은 v17이 대체한다. 아직 구현되지 않은 과거 제안이므로 신규 구현하지 않는다. 기존 코드나 저장된 분석 데이터가 발견되면 legacy로만 보존한다.
 
 **⏳ 후속 (해당 기능 도입 시):**
 
@@ -207,21 +217,23 @@ WHERE consented = true;
 
 ---
 
-## 5. 사용자 동의 설계 (2단 모델, #752)
+## 5. 사용자 동의 설계 — 현행 모델과 v17 보강 게이트
 
-> **2단 동의 (PIPA·오픈베타, #1409 정정)**: 서비스 필수 추론과 비필수 보관·2차 활용을 분리한다.
+> **상태:** 아래 2단 동의·`RG_consent`·정확한 카피·PostHog 호출은 현행/이전 구현이다. 이를 법적 적정성이나 Production 동작 완료로 간주하지 않는다. v17에서는 동의 버전·시각·효력일·철회·기기 복원과 철회 후 외부 데이터 처리를 검증한 뒤 재승인한다.
+> **현행 2단 동의 (#752·#1409)**: 서비스 필수 추론과 비필수 보관·2차 활용을 분리한다.
 >
 > - **서비스 필수 처리(고지)**: 인증·내 기록 저장·보안·오류, 익명 행동 통계와 사용자가 요청한 재키 질문 생성을 위한 최소 현재 문장·책·해당 대화 history 처리. 질문 입력은 선택 동의와 무관하며 선택적 아카이브·분석·학습에 전용하지 않는다.
 > - **선택 (opt-in, `RG_consent='yes'`)**: **세션 리플레이** + 로그인 유저 **식별 분석** + **대화 서버 아카이브·개인화·제품 분석/학습 활용**(`companion_sessions`). 거부해도 10턴 재키 대화를 포함한 핵심 서비스는 동일하다.
 >
-> 근거: 익명 통계는 필수/고지로 방어 가능, 민감한 리플레이·식별은 명시 동의자만 → 수집 최대화 + 법적 안전. 거부권 필수(PIPA).
+> 과거 근거는 익명 통계를 필수/고지로 처리할 수 있다고 보았으나, PostHog `distinct_id`·autocapture·보존 설정을 확인하지 않은 채 일률적으로 익명이라고 단정하지 않는다. 필수/선택 구분과 카피는 개인정보 검토 대상이다.
 
 ### 5.1 동의 시점
 
 **구현(#331/#1409)**: 진입 시 **비차단 하단 동의 배너** — 필수 처리 고지 + 선택(세션 리플레이·식별·대화 보관/2차 활용) opt-in. "필수만"은 질문 생성에 필요한 최소 추론은 허용하되 리플레이·식별·대화 아카이브·개인화·분석/학습을 제외한다.
 
-### 5.2 동의 문구
+### 5.2 레거시 동의 문구 — 재사용 금지
 
+> 아래는 현행/이전 카피이며 새 동의 UI에 복사하지 않는다. 정확한 문구는 실제 수집·보존·삭제 처리와 맞춰 별도 승인한다.
 > **ReadingGo가 더 좋아질 수 있도록**
 >
 > **필수(고지)**: 서비스 운영과 **익명 사용 통계**(어떤 화면을 쓰는지, 식별 정보 없음)를 위해 쿠키를 사용해요.
@@ -229,9 +241,9 @@ WHERE consented = true;
 >
 > ✅ 전체 동의 (선택까지)  ·  ☐ 필수만 (익명 통계만)
 
-- 동의는 언제든 설정에서 변경 가능. 철회 시 리플레이·식별 즉시 중단.
-- "필수만"이어도 익명 행동 분석과 요청한 재키 추론은 유지한다. 리플레이·식별·대화 아카이브·개인화·분석/학습은 제외한다.
-- `consented` 플래그를 `companion_sessions`에 함께 저장. 쿠키는 first-party 분석용(PostHog).
+- 목표 계약상 동의는 설정에서 철회 가능해야 한다. 철회 시 향후 리플레이·식별 전송 중단, PostHog identity reset, 기존 데이터 삭제 또는 비식별 여부를 처리·검증한다. 현재 end-to-end 범위는 미검증이다.
+- "필수만"의 행동 분석 범위와 식별 가능성은 실제 SDK 구성·법무 검토 전까지 확정하지 않는다. 요청한 AI 추론과 선택 아카이브·개인화·분석/학습을 분리한다.
+- 동의 상태는 버전·동의 시각·효력일·철회 시각·기기 간 복원을 판정할 수 있어야 한다. `consented` 같은 정확한 컬럼·키는 후보일 뿐 승인된 저장 스키마가 아니다.
 
 ### 5.3 동의 상태 저장
 
@@ -239,16 +251,15 @@ WHERE consented = true;
 // Phase 0 구현(#294): localStorage 'rg_data_consent' = 'yes' | 'no' | null(미질문)
 window.RG_consent.get() / .set('yes'|'no')   // components.js
 
-// Phase 1: Supabase users 테이블
-ALTER TABLE profiles ADD COLUMN data_consent boolean;
-ALTER TABLE profiles ADD COLUMN data_consent_at timestamptz;
+// 과거 Phase 1 후보 — 실행 계약 아님
+// 실제 스키마는 version·accepted_at·effective_at·revoked_at·device restore를 표현해야 하며 별도 승인
 ```
 
 ### 5.4 PostHog 게이팅·리플레이·쿠키 (#752)
 
 - **init(index.html)**: `disable_session_recording: true`(리플레이 **기본 off**) + `session_recording: { maskAllInputs: true }`. 익명 이벤트·퍼널은 상시(고지). `person_profiles: 'identified_only'` 유지(비로그인 익명).
 - **선택 동의 'yes'** → `posthog.startSessionRecording()` + (로그인 시) `posthog.identify(...)`.
-- **'no'/철회** → `posthog.stopSessionRecording()`, `identify` 안 함(또는 `reset`), LLM backfill 스킵(현행 `app.js`).
+- **'no'/철회 현행** → `posthog.stopSessionRecording()`, `identify` 생략 또는 `reset`, LLM backfill 스킵. `reset`의 일관 실행, 기존 이벤트 처리, 다른 기기 복원은 미검증이며 v17 출시 게이트다.
 - **리플레이 PII 마스킹**: 입력값 `maskAllInputs`, 민감 표시 요소(이메일 등)에 `.ph-no-capture` 클래스. admin 대시보드(타 유저 이메일·문장 노출)는 운영자 리플레이에서도 마스킹 권장.
 - **쿠키**: first-party 분석 쿠키(distinct_id). 배너 고지로 충족(별도 동의 차단 쿠키 없음).
 

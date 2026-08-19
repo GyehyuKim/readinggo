@@ -10,10 +10,79 @@
 > **v11 갱신 (2026-06-29, #1044)**: **책 데이터 소스 이전(알라딘 OpenAPI ToS 회피)** — §7.2.1 신설. 알라딘 OpenAPI 약관(영리·법인 이용 불가 + 취득정보 **저장·캐시 금지**)이 우리 canonical 캐시(`books` upsert, #489)와 정면 충돌 → 상업 출시 블로커. canonical 소스를 **국립중앙도서관 ISBN 서지정보 API**(쪽수·표지, 이용허락 제한 없음)와 **카카오 책검색**(검색·표지, 캐시 조건부 허용) 페어로, 외서는 **Google Books 실시간만**(영구 upsert 중단), 네이버 비권장. worker 이전 지점·출시 전 실계정 ToS 확인 게이트·Phasing 은 §7.2.1. **본 PR 은 spec-only — 코드 재배선은 후속 PR(#1044).**
 > **v12 갱신 (2026-07-03, #1044 코드 PR)**: §7.2.1 P1 **구현** — worker 에 provider 스위치(`KAKAO_REST_KEY`/`NLK_CERT_KEY` 자동 감지, 미설치 시 알라딘 폴백 = 무중단). 검색→카카오(영구 적재는 ISBN 국중도 재조회분만)·ISBN→국중도(+OpenLibrary 외서 폴백)·Google 영구 경로 2건 제거(검색 upsert·backfillPages PATCH)·imgProxy 화이트리스트 확장·archive 시드 게이트 격리(재설계 P2). 상세 §7.2.1 구현 상태.
 > **v13 갱신 (2026-07-28, #1350)**: DEV 소셜 로그인 provider에 의존하지 않는 합성 검수 환경 신설(§7.1.1). 브라우저 local-first 상태와 DEV 전용 Supabase 저장소를 분리하고, Production·실사용자 Auth/DataStore 경로는 fail-closed 한다.
-> **v14 갱신 (2026-08-01, #1392)**: 공개 UGC 신고·사용자 차단·운영자 검토 데이터 모델과 DataStore 계약을 신설. 상세 UX·정책 동의·출시 게이트는 [feed.md §5.7.4](./feed.md#574-공개-ugc-안전--동의신고차단검토-1392-p0)가 SSOT다.
-> **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
+> **v14 갱신 (2026-08-01, #1392)**: 공개 UGC 신고·사용자 차단·운영자 검토 데이터 모델과 DataStore 계약을 신설. 상세 UX·정책 동의·출시 게이트는 [feed.md §5.7.4](./feed.md)가 SSOT다.
+> **v17 목표 결정 (2026-08-19, #1452·#1454·#1456)**: 책나무는 기존 `user_books`·`wish_books`·`sentences`의 읽기 모델이며, XP와 별도다. 친구 책나무 공개는 UI 필터가 아니라 서버 권한에서 강제한다. 아래 §7.0이 목표 계약이고, 기존 DataStore·스키마 설명은 `origin/main@39248ef`의 현행 구현이다.
+> **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
+
+### 7.0 책나무·성장·공개범위 목표 계약 (v17)
+
+#### 7.0.1 권위 데이터와 투영
+
+| 제품 개념 | 권위 데이터 | 규칙 |
+|---|---|---|
+| 사용자 한 그루 | `users.id` | 사용자별 별도 `book_trees` 행을 만들지 않는다. 책나무는 사용자 독서 데이터의 투영이다 |
+| 가지 | `user_books` | `reading`·`completed`·`aborted` 책 1권당 가지 하나. 같은 `(user_id, book_id)`를 중복 가지로 만들지 않는다 |
+| 새 가지 후보 | `wish_books` | 아직 `user_books`가 아닌 관심 책. 읽기 시작하면 후보를 제거하고 `user_books` 가지로 전환한다 |
+| 나뭇잎 | `sentences` | 저장 성공한 문장 1행당 잎 한 장. XP·좋아요·방문·스트릭으로 추가 잎을 만들지 않는다 |
+| 성장일 | `reading_sessions.session_date` | 사용자 로컬 날짜의 distinct 일수. 최근 14일과 전체 누적을 동일 원천에서 계산한다 |
+
+책나무 전용 캐시·집계 컬럼은 성능 증거 없이 추가하지 않는다. 도입 시 원본과의 재계산 가능성·무효화·백필·드리프트 검사를 별도 스펙으로 승인한다.
+
+#### 7.0.2 목표 DataStore 경계
+
+> 아래 호출명은 응답 책임을 설명하기 위한 **후보 표기**이며 승인된 API·RPC 이름이 아니다. 실제 이름·전송 형식·캐시·페이지네이션은 구현 계획에서 승인한다.
+
+```text
+[내 책나무 읽기 후보]          → { branches, candidates, branchCount, leafCount }
+[가지 상세 읽기 후보]          → { userBook, rounds?, leaves }
+[14일 리듬 읽기 후보]          → { activeDates, activeDayCount, cumulativeGrowthDays }
+[친구 책나무 제한 읽기 후보]   → { branches, candidates, visibleLeafCount }
+```
+
+- 내 책나무의 `leafCount`는 본인 소유 모든 문장을 센다.
+- 친구 책나무 제한 경로는 기존 **상호 팔로우** 관계를 친구로 사용하고, 차단·정지·운영자 숨김을 우선 적용한다.
+- 친구 응답은 책 메타데이터와 `reading|completed|aborted|wish` 상태만 보장한다. `current_page`, 별점, 후기, 개인 메모, AI 대화는 이 결정만으로 공개하지 않는다.
+- 친구의 잎 본문과 개수는 해당 viewer가 `sentences_public`을 통해 실제로 읽을 수 있는 문장만 포함한다. `private` 문장의 존재·개수·본문과 `my_note`는 어떤 집계·빈 상태·차이 계산으로도 누출하지 않는다.
+- 내부 테이블 직접 조회를 피처 계약으로 삼지 않는다. 친구 책나무는 필드가 제한된 view 또는 `SECURITY INVOKER/DEFINER` RPC와 테스트 가능한 RLS 경계를 사용한다.
+
+**문장 저장 목표 (#1457)**: OCR·직접입력·배치/import와 `public|followers|private` 모두 공백 제거 후 1~1,000자를 저장한다. 200자 초과를 제외·절단하거나 `private`로 강제하지 않고 사용자가 선택한 공개범위를 보존한다. 1,001자 이상은 모든 클라이언트·Worker·직접 API/DB 쓰기에서 거부하되 검토 원문·초안은 보존한다. 아래 §7.2·§7.3의 200/1,000 조건부 경계는 `origin/main@39248ef`의 현행 as-built이며 #1457 구현 전까지 목표 완료로 해석하지 않는다.
+
+#### 7.0.3 현재 보안 갭과 전환 게이트
+
+`origin/main@39248ef`의 저장소 SQL·클라이언트를 정적으로 감사한 결과, 현재 권한 갭은 `user_books.ub_sel` 하나에 한정되지 않는다. 확인된 저장소 기준 위험은 다음과 같다.
+
+- `users`, `user_books`, `reading_sessions`, `streak`, `claps` base table 또는 연관 정책이 비소유자에게 필요한 범위보다 넓은 행·필드를 줄 가능성이 있다.
+- `user_books.ub_sel`은 `moderation_user_visible(user_id)`만 검사해 차단되지 않은 **모든 인증 사용자**가 타인의 전체 컬럼을 직접 읽을 수 있다. `publicShelf()`의 UI 필터는 권한 경계가 아니다.
+- private 문장 UUID를 아는 사용자가 clap 삽입·count·외래키 오류와 report 오류 차이로 문장 존재를 추론할 수 있는 side channel이 있다.
+- 클라이언트 adapter는 지원하지 않는 `friends|followers` 또는 알 수 없는 공개범위를 `public`으로 정규화할 수 있어 구 APK 왕복 뒤 공개가 확대되는 fail-open 위험이 있다.
+
+이는 **저장소 정적 증거**이며 실제 Production policy·function body·grant·데이터 영향은 인증·관측 증거가 없어 **미검증**이다. 반대로 Production이 안전하다고 추정하지도 않는다. base select를 즉시 소유자 전용으로 좁히면 지원 중 구 APK의 직접 조회가 깨질 수 있으므로, broad policy를 방치하거나 RLS만 선행 변경하지 않고 다음 컷오버를 모두 만족하기 전에는 친구 책나무를 Production에 활성화하지 않는다.
+
+1. 지원 중인 web·OTA 가능 Capacitor 셸·스토어 APK 버전별 `user_books`/`wish_books` 직접 조회 경로와 필드 의존성을 인벤토리한다.
+2. 친구용 제한 필드 view/RPC와 상호 팔로우 검사를 먼저 배포하고, 신규 클라이언트가 base table 대신 그 경로를 사용하도록 DEV와 Production에서 수신·호출 증거를 남긴다.
+3. **5-A 결정**에 따라 OTA로 교체 가능한 셸과 스토어 업데이트가 필요한 APK를 구분하고 최소 지원 버전 미만을 업데이트 안내 후 친구 책나무·구 직접 조회 경로에서 차단한다. 정확한 버전 번호는 구현·배포 release contract에서 확정하며, 전환 증거 전 broad base policy 제거를 완료로 간주하지 않는다.
+4. 승인된 최소 버전의 수신·호출 전환 증거를 확인한 뒤 `user_books` base select를 소유자 전용으로 축소한다. 보안 rollback에서 broad base policy를 복원하지 않으며, UI 또는 친구용 제한 경로만 비활성화한다.
+5. `wish_books`도 같은 친구 경계를 사용하며 구 `wishlist_public` 토글과 기존 사용자 데이터 전환을 #1456의 별도 migration으로 승인한다.
+6. 친구 응답의 문장 join·count는 `sentences_public`의 viewer별 결과만 사용한다.
+7. RLS/RPC 테스트에서 본인·친구·비친구·차단·정지·`private|followers|public` 조합, 구버전 실패 경로, 직접 PostgREST 호출을 검증한다.
+8. **4-B 결정**에 따라 기존 사용자는 사전 고지와 효력일 뒤 상호 팔로우 친구 책나무를 자동 활성화하며 전체 opt-out을 제공한다. 신규 사용자도 같은 기본값과 명확한 고지·해제 경로를 사용하고, 철회·차단은 캐시·검색·직접 URL까지 즉시 전파한다.
+9. `friends|followers`와 알 수 없는 값을 이해하지 못하는 클라이언트는 더 넓은 `public`으로 정규화하지 않는다. 신규 제한 경로는 `private` fail-closed를 사용하며 **5-A 최소 지원 버전 강제**로 구 APK를 컷오버한다.
+10. private 문장은 본문뿐 아니라 개수·존재·clap/report 성공·오류 차이도 비공개여야 한다. 보안 테스트는 유효 UUID·무효 UUID·타인 private UUID가 외부에서 구분되지 않는지 검증한다.
+
+#### 7.0.4 재독 회차 계약 — 3-A 확정
+
+책당 가지와 `user_book`은 하나를 유지하고, 재독은 별도 `reading_rounds`로 1회차·2회차를 명시 저장한다. 신규 문장·독서 이력은 해당 회차 식별자에 연결한다. 전환 전 기존 문장의 `reading_round_id=NULL`은 **레거시 기록·회차 미상**으로 보존하며 근거 없이 1회차로 강제 백필하지 않는다. 실제 migration 전 다음을 구현 계획에서 승인한다.
+
+- 현재 `user_books` UNIQUE 제약을 유지하는 정확한 FK·컬럼 구조
+- 재독 시작·종료·취소·재완독 상태 전이와 신규 문장·세션 귀속
+- 구 앱이 회차 컬럼을 모르는 동안의 읽기·쓰기 호환
+- 기존 행 무손실·nullable 의미·백업·rollback 검증
+
+#### 7.0.5 XP 호환 경계
+
+`users.xp`, `reading_sessions.xp_earned`, `increment_xp(int)`와 기존 XP DataStore 표면은 구 APK 호환을 위해 즉시 삭제하지 않는다. **6-A 결정**에 따라 신규 XP 쓰기 제거→운영·분석 참조 제거→최소 지원 버전 강제→지원 버전 전체 legacy 호출 0 증거→release cadence에 따른 rollback 기간 순으로 확인한 뒤 RPC→세션 XP→사용자 XP를 물리 삭제한다. 임의 날짜를 두거나 UI에서만 숨긴 채 영구 유지하지 않는다. 자세한 단계와 수용기준은 [systems.md §6.0](./systems.md)을 따른다.
 
 ### 7.1 플랫폼
 
@@ -126,8 +195,8 @@ sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?, kind?, visibility?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
 //   ↳ #1261 visibility는 신규 문장별 명시값(public|followers|private). 호출부는 제출 시 개별 선택값을 우선하고,
 //      없으면 settings.default_sentence_visibility(public|private), 설정도 없거나 무효면 'public'을 전달한다.
-//   ↳ #1424 text는 private일 때 1~1,000자, public|followers일 때 1~200자. 200자 초과 OCR 단발 저장은
-//      호출부가 visibility:'private'를 명시하며, DB CHECK도 같은 조건을 강제해 클라이언트 우회를 차단한다.
+//   ↳ 현행(#1424): private 1~1,000자, public|followers 1~200자. 단발 OCR 201~1,000자는 private 강제,
+//      Worker·배치/import 일부 경로는 200자 초과를 제외한다. v17 목표 #1457은 §7.0.2를 따른다.
 //      어댑터는 허용값만 저장하고 무효값은 'public'으로 정규화한다. DB DEFAULT 'public'은 방어선으로 유지한다.
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
 sentences.listByBook(userBookId)           → Sentence[]      // 내 책(user_book) 한 문장
@@ -158,7 +227,7 @@ wishBooks.add(bookId) / wishBooks.list() / wishBooks.remove(bookId)
 // 스샷 서가 복원 검토함 (#1048, integrated-shelf.md §4.7) — 로그인 전용 임포트 스테이징(import_staging §7.3).
 // shelf-import 검수 "등록"이 책장 직행 대신 여기로 적재 → 서재 "검토함" 뷰가 항목별/일괄 이동·제외.
 // local 어댑터(datastore.js)는 게이트라 **no-op**(게스트 도달 안 함) — 계약 표면 패리티만 유지.
-importStaging.add(items)                   → StagingRow[]       // items=[{book, status, rating?}](addBatch 표면) → 행 평탄화 적재(매칭 메타·별점 보존)
+importStaging.add(items)                   → StagingRow[]       // `items=[{book, status, rating?}]`(addBatch 표면) → 행 평탄화 적재(매칭 메타·별점 보존)
 importStaging.list()                       → StagingRow[]       // 본인 검토함(최신순). local=[] → 서재 검토함 섹션 미노출
 importStaging.remove(id)                   → StagingRow[]       // 제외(영구 삭제), 갱신된 목록 반환
 importStaging.commit(id, status?)          → UserBook           // 책장 이동: status(없으면 suggested_status)로 myBooks.addBatch 라우팅(별점 보존) 후 staging row 삭제
@@ -367,7 +436,7 @@ sentences                                   -- "한 문장" (DB 테이블명 유
   user_book_id  uuid FK user_books.id
   session_id    uuid FK reading_sessions.id NULL
   page          int                  -- 스포일러 블라인드 판정 기준 (§social)
-  text          text                 -- 원문 인용. private 1~1,000자 / public·followers 1~200자 (조건부 CHECK + 클라, #1424)
+  text          text                 -- 현행: private 1~1,000자 / public·followers 1~200자 (52_sentence_visibility_length.sql). 목표 #1457은 전 공개범위 1~1,000자
   my_note       text NULL            -- 내 감상·코멘트 (선택, 사후 추가·편집). ≤1000자 (CHECK)
   visibility    text default 'public' -- v7.2: 'public'|'followers'|'private' 3단계. RLS 강제 (§social 5.7.1, 06_privacy_v2.sql). is_private(boolean) 대체
   is_private    boolean default false -- DEPRECATED (v7.1→v7.2 visibility 마이그레이션 후 미사용. 마이그레이션 호환 위해 컬럼 보존)
