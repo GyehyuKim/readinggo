@@ -1,36 +1,48 @@
 # ReadingGo 스펙 — 인덱스
 
-> **기준**: **v7 (2026-06-01) — web-first 재정의 + v6 롤백.** 용어는 §0.5, Phase·스택은 §3, 데이터·DataStore 계약은 [backend.md](./backend.md). 분할 기반은 v6 (2026-05-28, #107 머지본)
-> **분할일**: 2026-05-28
-> **원본**: `docs/2. specifications/_archive/readinggo-spec.md` (1,651줄 단일 파일)을 강의 Week 11 *thin spec* 처방 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week11-spec-honest-synthesis))에 따라 피처별로 분할.
-> **편집 정책**: 변경은 *해당 피처 파일* PR로. spec-only PR 룰 ([LF](../../1. research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
+> **기준**: 이 디렉터리는 ReadingGo의 살아있는 SSOT다. 충돌 시 `meta/decisions.md`의 가장 최신 활성 결정 → 해당 기능 스펙 → 현재 구현·검증 증거 순으로 정합하며, 과거 v5~v16 설명은 감사 이력이지 현재 계약이 아니다.
+> **구현 사실 기준**: 현재 런타임은 [architecture-asbuilt.md](./architecture-asbuilt.md), 기능별 구현 상태와 갭은 [_traceability.md](./_traceability.md)를 따른다.
+> **원본**: `docs/2. specifications/_archive/readinggo-spec.md` 단일 문서를 2026-05-28 피처별로 분할했다. 아카이브는 현재 계약으로 사용하지 않는다.
+> **편집 정책**: 변경은 해당 피처 파일의 spec-only PR로 먼저 승인·머지한다. 코드·DEV·Production·스토어 작업은 승인된 스펙 이후에만 진행한다.
 
 ---
 
 ## 파일 지도
 
-| 영역 | 파일 | 다룬 절 (원 v6 spec) |
+| 분류 | 파일 | 현재 역할 |
 |---|---|---|
-| **온보딩** | [`onboarding.md`](./onboarding.md) | [§4](./onboarding.md) 가입 여정 A~H |
-| **둥지 탭** | [`nest.md`](./nest.md) | §5.1-5.4 둥지 진화·활성책·일일미션·성 컬렉션 |
-| **소셜 탭** | [`feed.md`](./feed.md) | [§5.7](./feed.md) |
-| **같이읽기(방)** | [`co-reading.md`](./co-reading.md) | 신설 (#987, 부모 #925) — 피드→'함께' 재편 + 방 코어 |
-| **내서재(프로필)** | [`profile.md`](./profile.md) | [§5.8](./profile.md)-5.9 (v6: AI 도서 추천 포함) |
-| **바코드 스캔 등록** | [`barcode-scan.md`](./barcode-scan.md) | 신설 (#943) — 뒤표지 ISBN 스캔 → 정확 매칭. 무의존 `BarcodeDetector`(Phase 0) |
-| **임포트: 유연 도서기록** | [`flexible-import.md`](./flexible-import.md) | 신설 (#1039) — 붙여넣기 텍스트 → LLM 파싱 → shelf-import 매칭·검수·검토함 코어 재사용. 스크린샷(#772)은 폴백 |
-| **시스템 로직** | [`systems.md`](./systems.md) | §6 스트릭·방패·XP·NPC·휴식코스 |
-| **백엔드** | [`backend.md`](./backend.md) | [§7](./backend.md) |
-| **운영: 문의 직접 대응** | [`inquiry-sync.md`](./inquiry-sync.md) | Supabase 접수 → 관리자 대시보드 확인·개별 답장 |
-| **운영: 운영자 대시보드** | [`admin-dashboard.md`](./admin-dashboard.md) | 신설 (#744) — 풀페이지 하이브리드 대시보드 |
-| **운영: 배포 안전** | [`ops.md`](./ops.md) | 신설 (#960·#901) — 피처 플래그/킬 스위치 · 카나리(점진 배포) |
-| **법무: 개인정보처리방침** | [`privacy-policy.md`](./privacy-policy.md) | 신설 (#757) — 처리방침 정본·국외이전·게시 |
-| **리팩토링: 모듈화** | [`refactor-modularize.md`](./refactor-modularize.md) | 신설 (#761) — monolith 분할 맵·prod-안전 플로우 |
-| **운영: OTA 업데이트** | [`ota.md`](./ota.md) | 신설 (#876) — 웹 번들 무선 업데이트(Capgo 자가호스팅 R2/KV), beta→prod 수동 승격(앱판 카나리) |
-| **디자인** | [`design.md`](./design.md) | [§11](./design.md) + [§12](./design.md) |
-| **메타: 여정** | [`meta/journey.md`](./meta/journey.md) | [§0.5](./meta/journey.md) |
-| **메타: 결정 이력** | [`meta/decisions.md`](./meta/decisions.md) | [§8](./meta/decisions.md) 미결 → 확정 |
-| **메타: 미해결** | [`meta/open-issues.md`](./meta/open-issues.md) | [§13](./meta/open-issues.md) |
-| **메타: 기각** | [`meta/rejected.md`](./meta/rejected.md) | [§14](./meta/rejected.md) |
+| **제품 코어** | [`onboarding.md`](./onboarding.md) | 첫 진입·책 등록·세계관 구체화·가입 여정 |
+|  | [`nest.md`](./nest.md) | 홈·읽기·기존 둥지/목표 책나무 화면 계약. 경로는 호환을 위해 유지 |
+|  | [`profile.md`](./profile.md) | 프로필·내 서재·책 상태·문장 탐색 |
+|  | [`feed.md`](./feed.md) | 피드·친구 책나무·공개 문장·UGC 안전 |
+|  | [`co-reading.md`](./co-reading.md) | 같이읽기 기능과 읽기방 |
+|  | [`companion.md`](./companion.md) | AI 독서 동반자 대화·완독 회고 |
+|  | [`systems.md`](./systems.md) | 성장일·레거시 스트릭·XP 전환·NPC 시스템 |
+| **기록·탐색** | [`resurface.md`](./resurface.md) | 저장 문장 되감기 |
+|  | [`share.md`](./share.md) | 문장 외부 공유 카드 |
+|  | [`barcode-scan.md`](./barcode-scan.md) | ISBN 스캔 책 등록 |
+|  | [`integrated-shelf.md`](./integrated-shelf.md) | 서가 복원·검토함·시드 문장 |
+|  | [`flexible-import.md`](./flexible-import.md) | 텍스트·파일 도서 기록 임포트 |
+|  | [`referral.md`](./referral.md) | 서비스 공유·referral 초안 |
+| **데이터·AI** | [`backend.md`](./backend.md) | 플랫폼·인증·DataStore·스키마·RLS |
+|  | [`architecture-asbuilt.md`](./architecture-asbuilt.md) | 코드에서 역생성한 현재 런타임 사실 |
+|  | [`analytics.md`](./analytics.md) | 이벤트·지표·동의·주간 리포트 |
+|  | [`prompt-lab.md`](./prompt-lab.md) | DEV 전용 프롬프트 실험·승격 계약 |
+|  | [`seed-collector.md`](./seed-collector.md) | 시드 문장 수집기 |
+| **운영·출시** | [`ops.md`](./ops.md) | 스펙→코드→DEV→Production 전달 게이트 |
+|  | [`ota.md`](./ota.md) | 웹 번들 OTA와 네이티브 버전 경계 |
+|  | [`admin-dashboard.md`](./admin-dashboard.md) | 운영자 지표·검토 표면 |
+|  | [`inquiry-sync.md`](./inquiry-sync.md) | 문의 직접 대응 정책 |
+|  | [`SYNC-POLICY.md`](./SYNC-POLICY.md) | 스펙·코드 드리프트 방지 정책 |
+| **디자인·법무** | [`design.md`](./design.md) | 토큰·컴포넌트·접근성·마이크로카피 |
+|  | [`privacy-policy.md`](./privacy-policy.md) | 개인정보처리방침 정본·게시 |
+|  | [`legal-copyright.md`](./legal-copyright.md) | 문장 인용·공개·시드 저작권 경계 |
+| **내부 구조** | [`refactor-modularize.md`](./refactor-modularize.md) | 모듈화 구조와 안전한 리팩터링 |
+|  | [`_traceability.md`](./_traceability.md) | 스펙별 구현 증거·결정 갭 매트릭스 |
+| **메타** | [`meta/decisions.md`](./meta/decisions.md) | 시간순 제품 결정과 supersede 관계 |
+|  | [`meta/open-issues.md`](./meta/open-issues.md) | 실제 미결정·미구현 안건 |
+|  | [`meta/rejected.md`](./meta/rejected.md) | 의도적으로 기각한 방향 |
+|  | [`meta/journey.md`](./meta/journey.md) | v5/v6까지의 역사적 여정 |
 
 ---
 
