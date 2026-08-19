@@ -2012,7 +2012,8 @@ async function kakaoSearchProxy(query, max, env, ctx) {
     return json({ items }, 200, 86400);
   } catch (e) {
     // 카카오 자체 실패 → Google 실시간 폴백(저장 없음) — 레거시 경로와 동일 무중단 규약.
-    try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb.slice(0, max) }, 200, 3600); } catch (e2) {}
+    const fallbackMax = Math.min(max, 10);
+    try { const gb = await googleBooksSearch(query, fallbackMax, env); if (gb.length) return json({ items: gb.slice(0, fallbackMax) }, 200, 3600); } catch (e2) {}
     return json({ error: '카카오 호출 실패', detail: String((e && e.message) || e) }, 502);
   }
 }
@@ -2107,7 +2108,8 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
   } catch (e) {
     // 알라딘 자체 실패 시 검색은 Google Books로 한 번 더 (외서 가용성↑).
     if (query) {
-      try { const gb = await googleBooksSearch(query, max, env); if (gb.length) return json({ items: gb.slice(0, max) }, 200, 3600); } catch (e2) {}
+      const fallbackMax = Math.min(max, 10);
+      try { const gb = await googleBooksSearch(query, fallbackMax, env); if (gb.length) return json({ items: gb.slice(0, fallbackMax) }, 200, 3600); } catch (e2) {}
     }
     return json({ error: '알라딘 호출 실패', detail: String((e && e.message) || e) }, 502);
   }
