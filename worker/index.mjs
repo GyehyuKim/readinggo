@@ -1227,7 +1227,8 @@ async function ocrProxy(request, env) {
 // 한 엔드포인트로 두 종류의 이미지 처리(#844 책 페이지 강조 + #1150 타사앱 저장 밑줄 목록 스크린샷).
 const HIGHLIGHT_SYSTEM = '너는 사용자가 강조·저장한 문장을 이미지에서 원문 그대로 뽑아내는 추출기다. 두 종류의 이미지를 처리한다: (A) 책 페이지 사진 — 밑줄·형광펜·괄호·별표로 강조 표시된 문장만. (B) 독서앱(교보·밀리 등)의 "저장한 밑줄·메모" 목록 스크린샷 — 각 행이 한 문장이므로 그 문장 텍스트를 모두. 강조/저장된 문장을 원문 그대로 JSON 문자열 배열로 출력한다. 형식: ["문장1","문장2"]. 규칙: (1) (A)는 강조 표시된 문장만 — 강조 안 된 본문·머리말·쪽번호·각주 제외. (B)는 목록의 각 문장만 — UI 텍스트(진행률 %·날짜·시간·페이지 번호·버튼·앱 이름·메뉴·별점)는 모두 제외. (2) 원문 그대로 — 단어 변경·교정·요약·번역·합치기·새 문장 생성 절대 금지. (3) 강조·저장된 문장이 전혀 없으면 빈 배열 []. (4) 설명·코드펜스 없이 JSON 배열만 출력.';
 
-// JSON 문자열 배열 견고 파싱 — 코드펜스·잡텍스트 제거, 공백·중복 제거, 200자 초과·상한 40 컷.
+// JSON 문자열 배열 견고 파싱 — 코드펜스·잡텍스트 제거, 공백·중복 제거, 상한 40개.
+// 길이 초과 원문도 검토 초안까지 전달하고 저장 계층에서 1,000자를 강제한다(#1457).
 function parseHighlights(s) {
   if (!s) return [];
   let t = String(s).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
@@ -1239,7 +1240,7 @@ function parseHighlights(s) {
   const seen = new Set(), out = [];
   for (const it of arr) {
     const text = String(typeof it === 'string' ? it : (it && it.text) || '').trim();
-    if (!text || text.length > 200) continue;
+    if (!text) continue;
     const key = text.replace(/\s+/g, '').toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

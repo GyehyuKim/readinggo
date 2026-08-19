@@ -94,9 +94,10 @@ create table if not exists public.sentences (             -- "한 문장" (테�
   user_book_id  uuid not null references public.user_books(id) on delete cascade,
   session_id    uuid references public.reading_sessions(id) on delete set null,
   page          int,                                -- 스포일러 블라인드 판정 기준
-  text          text not null,                      -- 인용 ≤200자
+  text          text not null,
   my_note       text,                               -- 사후 감상(선택, 사후 추가·편집)
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  constraint sentences_text_len check (char_length(btrim(text)) between 1 and 1000)
 );
 
 create table if not exists public.streak (

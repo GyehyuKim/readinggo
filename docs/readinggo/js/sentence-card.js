@@ -175,6 +175,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     stop(e);
     const text = (dText || '').trim();
     if (!text) { showToast('문장 내용을 입력해 주세요'); return; }
+    if (Array.from(text).length > 1000) { showToast('한 문장은 1,000자 이내로 남겨주세요. 입력 내용은 그대로 두었어요.'); return; }
     const pageRaw = (dPage || '').trim();
     const page = pageRaw === '' ? null : parseInt(pageRaw, 10);
     if (pageRaw !== '' && (!isFinite(page) || page < 0)) { showToast('페이지 번호를 확인해 주세요'); return; }
@@ -217,7 +218,9 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   if (mine && editing) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }} onClick={stop}>
-        <textarea value={dText} onChange={(e) => setDText(e.target.value)} rows={3} placeholder="문장 내용" style={{ ...inputBase, resize: 'vertical', lineHeight: 1.5 }} />
+        <textarea value={dText} onChange={(e) => setDText(e.target.value)} rows={3} placeholder="문장 내용"
+          aria-invalid={Array.from(dText.trim()).length > 1000} style={{ ...inputBase, resize: 'vertical', lineHeight: 1.5 }} />
+        <div style={{ textAlign: 'right', fontSize: 11, color: Array.from(dText.trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(dText.trim()).length}/1,000자{Array.from(dText.trim()).length > 1000 ? ' — 줄여주세요' : ''}</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>페이지</label>
           <input type="number" min="0" inputMode="numeric" value={dPage} onChange={(e) => setDPage(e.target.value)} placeholder="미상" style={{ ...inputBase, width: 110 }} />

@@ -66,7 +66,7 @@ function _validateOcrReview(text, page, currentPage, totalPages) {
   const rawPage = String(page == null ? '' : page).trim();
   const fallbackPage = Math.max(1, parseInt(currentPage, 10) || 1);
   const parsedPage = rawPage === '' ? fallbackPage : Number(rawPage);
-  const textError = !sentence ? '한 문장을 입력해주세요.' : (sentence.length > 1000 ? '한 문장은 1,000자 이내로 남겨주세요.' : '');
+  const textError = !sentence ? '한 문장을 입력해주세요.' : (Array.from(sentence).length > 1000 ? '한 문장은 1,000자 이내로 남겨주세요.' : '');
   const pageError = (!Number.isInteger(parsedPage) || parsedPage < 1 || (totalPages > 0 && parsedPage > totalPages))
     ? `페이지는 1${totalPages > 0 ? `~${totalPages}` : ' 이상'} 범위로 입력해주세요.` : '';
   return { sentence, page: parsedPage, textError, pageError, valid: !textError && !pageError };
@@ -99,7 +99,7 @@ function _mergeOcrDrafts(existing, texts, visibility) {
   const additions = [];
   (texts || []).forEach((value) => {
     const text = String(value || '').trim();
-    if (!text || text.length > 200 || seen.has(text)) return;
+    if (!text || seen.has(text)) return;
     seen.add(text);
     additions.push({ text, visibility });
   });
@@ -111,6 +111,17 @@ function _mergeOcrDrafts(existing, texts, visibility) {
   return drafts;
 }
 window._mergeOcrDrafts = _mergeOcrDrafts;
+
+function _retainUnsavedDrafts(drafts, savedIndices) {
+  const saved = new Set(Array.isArray(savedIndices) ? savedIndices : []);
+  let readyIndex = -1;
+  return drafts.filter((draft) => {
+    if (!(draft.text || '').trim()) return true;
+    readyIndex += 1;
+    return !saved.has(readyIndex);
+  });
+}
+window._retainUnsavedDrafts = _retainUnsavedDrafts;
 
 /* ── NestView ─────────────────────────────────────────── */
 
@@ -626,7 +637,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         if (i < files.length - 1) await new Promise((resolve) => setTimeout(resolve, 1200));
       }
 
-      const validCount = new Set(extracted.map((text) => String(text || '').trim()).filter((text) => text && text.length <= 200)).size;
+      const validCount = new Set(extracted.map((text) => String(text || '').trim()).filter(Boolean)).size;
       if (validCount > 0) {
         const visibility = await window.readDefaultSentenceVisibility();
         setDrafts((current) => _mergeOcrDrafts(current, extracted, visibility));
@@ -656,8 +667,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     _ocrSavingRef.current = true; setOcrSaving(true); setOcrErrors({ text: '', page: '', status: '저장 중입니다.' });
     try {
       const progressPage = Math.max(nestState.book.cur || 0, checked.page);
-      const visibility = checked.sentence.length > 200 ? 'private' : undefined;
-      await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, visibility, kind: 'quote', sentPage: checked.page, awaitPersistence: true }));
+      await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, kind: 'quote', sentPage: checked.page, awaitPersistence: true }));
       setOcrErrors({ text: '', page: '', status: '저장했습니다.' });
       if (_ocrHistoryRef.current) window.history.back(); else closeOcrReview();
     } catch (e) {
@@ -693,6 +703,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const submitSentence = async () => {
     const ready = drafts.map((x) => ({ text: (x.text || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
     if (!ready.length) { showToast('한 문장을 입력해주세요'); return; }
+    if (ready.some((x) => Array.from(x.text).length > 1000)) { showToast('한 문장은 1,000자 이내로 남겨주세요. 입력 내용은 그대로 두었어요.'); return; }
     // #589/#1202: 한 문장 전용/공유 페이지(quickSentPage = 덮을 때의 쪽). 비우면 현재 진도.
     // 입력한 쪽 그대로 문장에 저장 — 현재 쪽보다 낮아도(앞부분 발췌·재독) 1..total 로만 클램프.
     const cur = nestState.book.cur || 0, total = nestState.book.total || 0;
@@ -715,7 +726,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       setDrafts([{ text: '', visibility }]);
       setQuickSentPage('');
     } catch (e) {
-      // app.js 가 저장 오류를 안내하고 낙관 상태를 롤백한다. 초안·문장 페이지는 재시도를 위해 보존.
+      // 부분 성공은 저장된 행만 제거하고 실패 초안·문장 페이지를 재시도할 수 있게 보존한다.
+      const saved = Array.isArray(e && e.savedBatchIndices) ? e.savedBatchIndices : [];
+      if (saved.length) setDrafts((prev) => _retainUnsavedDrafts(prev, saved));
     } finally {
       _sentenceSubmittingRef.current = false;
       setSentenceSubmitting(false);
@@ -1035,17 +1048,21 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         {/* 초안 행들(#1198) — drafts[0]=기존 입력창(OCR·포커스), drafts[1..]=(+)로 추가·× 삭제. 임시저장 상태. */}
         {drafts.map((draft, i) => (
           i === 0 ? (
-            <div key="d0"><textarea ref={_quickSentRef} value={draft.text} onChange={(e) => { if (e.target.value.length > 1000) return; setDraft(0, { text: e.target.value }); }}
+            <div key="d0"><textarea ref={_quickSentRef} value={draft.text} onChange={(e) => setDraft(0, { text: e.target.value })}
+              aria-invalid={Array.from(String(draft.text || '').trim()).length > 1000}
               placeholder="오늘 읽은 문장을 남겨요…" rows={4}
               style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', resize: 'none', padding: 0, fontFamily: 'inherit' }} />
               <SentenceVisibilitySelect value={draft.visibility} onChange={(visibility) => setDraft(0, { visibility })} />
+              <div style={{ textAlign: 'right', fontSize: 11, color: Array.from(String(draft.text || '').trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(String(draft.text || '').trim()).length}/1,000자{Array.from(String(draft.text || '').trim()).length > 1000 ? ' — 줄여주세요' : ''}</div>
             </div>
           ) : (
             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 6, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-              <div style={{ flex: 1 }}><textarea value={draft.text} onChange={(e) => { if (e.target.value.length > 1000) return; setDraft(i, { text: e.target.value }); }}
+              <div style={{ flex: 1 }}><textarea value={draft.text} onChange={(e) => setDraft(i, { text: e.target.value })}
+                aria-invalid={Array.from(String(draft.text || '').trim()).length > 1000}
                 placeholder="또 다른 문장…" rows={2} autoFocus
                 style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', resize: 'none', padding: 0, fontFamily: 'inherit' }} />
                 <SentenceVisibilitySelect value={draft.visibility} onChange={(visibility) => setDraft(i, { visibility })} label={`${i + 1}번 문장 공개 범위`} />
+                <div style={{ textAlign: 'right', fontSize: 11, color: Array.from(String(draft.text || '').trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(String(draft.text || '').trim()).length}/1,000자{Array.from(String(draft.text || '').trim()).length > 1000 ? ' — 줄여주세요' : ''}</div>
               </div>
               <button onClick={() => removeDraft(i)} aria-label="이 문장 삭제"
                 style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 12, border: 'none', background: 'var(--paper-2)', color: 'var(--ink-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
@@ -1135,10 +1152,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
                 aria-invalid={!!ocrErrors.text} aria-describedby="ocr-review-count ocr-review-text-error" />
               <div className="ocr-review-meta">
                 <span id="ocr-review-text-error" className="ocr-review-error">{ocrErrors.text}</span>
-                <span id="ocr-review-count" className={ocrReview.text.trim().length > 1000 ? 'is-over' : ''}>{ocrReview.text.trim().length}/1,000자</span>
+                <span id="ocr-review-count" className={Array.from(ocrReview.text.trim()).length > 1000 ? 'is-over' : ''}>{Array.from(ocrReview.text.trim()).length}/1,000자</span>
               </div>
-              {ocrReview.text.trim().length > 200 && ocrReview.text.trim().length <= 1000 &&
-                <div className="ocr-review-help">200자를 넘어 나만 보기로 저장돼요.</div>}
             </div>
             <div className="ocr-review-field">
               <label htmlFor="ocr-review-page">페이지</label>

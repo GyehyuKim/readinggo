@@ -31,6 +31,18 @@ function check(name, condition) {
   console.log(`OK   ${name}`);
 }
 
+const workerSource = readFileSync(join(root, 'worker', 'index.mjs'), 'utf8');
+const parseStart = workerSource.indexOf('function parseHighlights');
+const parseEnd = workerSource.indexOf('\n// ArrayBuffer', parseStart);
+if (parseStart < 0 || parseEnd < 0) throw new Error('parseHighlights helper not found');
+const highlightSandbox = {};
+vm.runInNewContext(`${workerSource.slice(parseStart, parseEnd)}\nthis.parseHighlights = parseHighlights;`, highlightSandbox);
+const highlightValues = ['가'.repeat(200), '나'.repeat(201), `  ${'다'.repeat(1000)}  `, '라'.repeat(1001)];
+const parsedHighlights = highlightSandbox.parseHighlights(JSON.stringify(highlightValues));
+check('강조 추출은 200·201·1,000·1,001자를 검토 초안까지 원문 보존한다',
+  JSON.stringify(Array.from(parsedHighlights, (text) => text.length)) === JSON.stringify([200, 201, 1000, 1001])
+    && parsedHighlights[2] === '다'.repeat(1000) && parsedHighlights[3] === highlightValues[3]);
+
 let result = await clientWindow.ocrExtractSentence({ size: 9 * 1024 * 1024 });
 check('클라이언트 8MB 초과는 Worker와 같은 code/stage를 쓴다',
   result.error === 'ocr_image_too_large' && result.stage === 'request' && result.status === 413);

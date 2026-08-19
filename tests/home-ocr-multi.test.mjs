@@ -24,12 +24,12 @@ function check(name, cond) {
 
 let result = merge(
   [{ text: '직접 쓴 초안', visibility: 'private' }, { text: '', visibility: 'public' }],
-  ['첫 추출', '둘째 추출', '첫 추출', '', '가'.repeat(201)],
+  ['첫 추출', '둘째 추출', '첫 추출', '', '가'.repeat(1000), '나'.repeat(1001)],
   'public',
 );
 check('기존 사용자 초안과 공개범위를 보존', result[0].text === '직접 쓴 초안' && result[0].visibility === 'private');
 check('기존 빈 행부터 채우고 선택 순서대로 누적', result[1].text === '첫 추출' && result[2].text === '둘째 추출');
-check('중복·빈 값·200자 초과 제외', result.length === 3);
+check('중복·빈 값만 제외하고 1000·1001자 모두 검토 초안에 보존', result.length === 5 && result[3].text.length === 1000 && result[4].text.length === 1001);
 
 result = merge([{ text: '', visibility: null }], [], 'private');
 check('추출 결과가 없으면 기존 초안을 그대로 유지', result.length === 1 && result[0].text === '' && result[0].visibility === null);

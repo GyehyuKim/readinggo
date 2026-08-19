@@ -906,12 +906,17 @@ function App() {
           is_complete: !!isComplete,
         });
         if (batch && batch.length) {
-          // 배치: N개 문장을 개별 add(공유 페이지). 진도·세션·XP·스트릭은 위/아래에서 1회만(#1198).
-          for (const s of batch) {
-            try {
-              await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote', visibility: s.visibility }));
-              if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
-            } catch (e) { console.warn('[ReadingGo] 배치 문장 저장 실패(1건 스킵):', (e && e.message) || e); }
+          // 배치: 공용 실행기가 부분 실패 인덱스를 반환해 실패 초안만 보존한다.
+          const result = await window.RG_saveSentenceBatch(batch, async (s) => {
+            const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote', visibility: s.visibility }));
+            if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
+            return row;
+          });
+          if (result.failedIndices.length) {
+            const error = new Error('sentence_batch_partial_failure');
+            error.savedBatchIndices = result.savedIndices;
+            error.failedBatchIndices = result.failedIndices;
+            throw error;
           }
         } else if (sentence) {
           await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));

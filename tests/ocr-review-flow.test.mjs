@@ -40,8 +40,10 @@ check('1자 허용', validate('가', '1', 20, 300).valid);
 check('200자 허용', validate('가'.repeat(200), '300', 20, 300).valid);
 check('201자 허용', validate('가'.repeat(201), '10', 20, 300).valid);
 check('1000자 허용', validate('가'.repeat(1000), '10', 20, 300).valid);
+check('이모지 1000자 허용', validate('😀'.repeat(1000), '10', 20, 300).valid);
 check('빈 원문 거부', !validate('   ', '10', 20, 300).valid);
 check('1001자 거부', !validate('가'.repeat(1001), '10', 20, 300).valid);
+check('이모지 1001자 거부', !validate('😀'.repeat(1001), '10', 20, 300).valid);
 check('0 페이지 거부', !validate('문장', '0', 20, 300).valid);
 check('총 페이지 초과 거부', !validate('문장', '301', 20, 300).valid);
 check('총 페이지 미상은 1 이상 허용', validate('문장', '999', 20, 0).valid);
@@ -50,12 +52,12 @@ check('OCR 성공은 drafts에 삽입하지 않음', /setOcrReview\(/.test(ocrSu
 check('검토 dialog 접근성 계약', /role="dialog" aria-modal="true" aria-labelledby="ocr-review-title"/.test(src));
 check('기존 handleCheckin 단일 호출 경로 사용', /await Promise\.resolve\(handleCheckin\(\{ page: progressPage, sentence: checked\.sentence[^}]+awaitPersistence: true/.test(ocrSaveFlow)
   && (ocrSaveFlow.match(/handleCheckin\(/g) || []).length === 1);
-check('201~1000자는 private, 200자 이하는 기존 기본 공개범위 유지',
-  /checked\.sentence\.length > 200 \? 'private' : undefined/.test(ocrSaveFlow)
-  && /sentence: checked\.sentence, visibility/.test(ocrSaveFlow));
-check('검토 화면은 항상 N/1,000 카운터와 장문 비공개 안내 표시',
-  /ocrReview\.text\.trim\(\)\.length\}\/1,000자/.test(src)
-  && /200자를 넘어 나만 보기로 저장돼요/.test(src));
+check('201~1000자도 길이 기반 private 강제 없이 기존 기본 공개범위 유지',
+  !/checked\.sentence\.length > 200/.test(ocrSaveFlow)
+  && /sentence: checked\.sentence, kind: 'quote'/.test(ocrSaveFlow));
+check('검토 화면은 N/1,000 카운터를 표시하고 장문 비공개 안내를 제거',
+  /Array\.from\(ocrReview\.text\.trim\(\)\)\.length\}\/1,000자/.test(src)
+  && !/200자를 넘어 나만 보기로 저장돼요/.test(src));
 check('OCR 응답을 1000자에서 자동 절단하지 않음',
   !/String\(d\.text\)\.slice\(0,\s*1000\)/.test(fs.readFileSync(path.join(root, 'docs/readinggo/js/data.js'), 'utf8')));
 check('중복 저장 차단', /if \(!ocrReview \|\| ocrSaving\) return;/.test(src) && /disabled=\{ocrSaving\}/.test(src));
