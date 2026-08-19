@@ -227,8 +227,8 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `spec-drift.yml` | align_v7+nest+drift · datastore-contract · related-filter · nest-cycle · supabase-books · sentence-book-binding · biome lint |
 | `preview-smoke.yml` | PR event는 localhost build/render smoke만 수행한다. 수동 `workflow_dispatch`만 `main`을 checkout해 비프로모션 Worker version을 업로드하고 edge render-smoke를 수행한다 |
 | `deploy-dev.yml` / `promote-production.yml` | `main` push의 stable DEV 자동 배포·release 격리 검증 / 검증된 동일 SHA의 Production 수동 승격 |
-| `deploy-verify.yml` | 레거시 Production content-hash 폴링·live smoke·rollback 경로. 현재 정상 승격 SSOT는 `deploy-dev`와 `promote-production`이다 |
-| `ota-release.yml` / `ota-promote.yml` | 둘 다 `workflow_dispatch` + `production` environment. 승인 SHA의 stable DEV/main 일치 후 Android beta R2/KV 수동 발행 / 같은 beta manifest를 production에 수동 승격·`:prev` 백업 |
+| `deploy-verify.yml` | 레거시 Production content-hash 폴링·live smoke·직접 rollback 경로. `workflow_dispatch` 전용이라 main 머지로 자동 실행되지는 않지만 현재 정상 승격 계약과 충돌해 #1464에서 제거·재설계한다. 현재 SSOT는 `deploy-dev`와 `promote-production`이다 |
+| `ota-release.yml` / `ota-promote.yml` | 둘 다 실제 trigger는 `workflow_dispatch` + `production` environment다. 승인 SHA의 stable DEV/main 일치 후 Android beta R2/KV 수동 발행 / 같은 beta manifest를 production에 수동 승격·`:prev` 백업하며, 상단의 과거 자동발행 주석은 #1464에서 정정한다 |
 
 ---
 

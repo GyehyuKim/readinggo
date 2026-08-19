@@ -33,7 +33,7 @@ curl -fsS https://readinggo-dev.hyuniverse.workers.dev/api/release
 
 - DEV 회귀: Cloudflare `readinggo-dev`의 직전 정상 version을 100% 재배포한다. prod는 건드리지 않는다.
 - prod 승격 전 실패: **중단·보고**한다. stable DEV receipt를 새로 만들기 전 prod workflow를 재실행하지 않는다.
-- prod 승격 후 회귀: GitHub `production` environment에서 직전 정상 prod SHA를 `promote-production`으로 재승격한다.
+- prod 승격 후 회귀: 직전 정상 변경을 되돌리는 revert PR을 만들고 필수 CI를 통과시켜 `main`에 머지한다. 새 `main` HEAD의 stable DEV receipt와 E2E를 확인한 뒤 GitHub `production` environment에서 그 동일 SHA를 `promote-production`으로 승격한다. 과거 SHA 직접 재승격은 현재 workflow가 거부한다. 긴급 과거 SHA rollback이 필요하면 별도 승인·receipt 검증형 workflow를 먼저 구현한다.
   자동 rollback이나 DEV credential로 prod를 조작하지 않는다.
 - Cloudflare Workers Builds에 남은 `main → readinggo` 자동 연결은 제거돼야 한다. 이 계정 설정이 확인되기 전에는
   #1303을 완료 처리하거나 `Closes #1303`을 쓰지 않는다.

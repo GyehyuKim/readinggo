@@ -14,16 +14,18 @@
 
 ## 검증 기준선
 
+> 2026-08-19 로컬 실행 보고다. 아래 full build·Node·Playwright는 반대감사 전 head에서 통과했고 이후 변경은 Markdown뿐이며, 정적 스펙·markdownlint·diff check는 최종 문서 수정 뒤 다시 실행했다. 영속 receipt는 이 branch의 PR CI run URL로 확정하며, 로컬 PASS를 DEV·Production 적용 증거로 사용하지 않는다.
+
 | 검증 | 결과 | 해석 |
 |---|---|---|
-| `python3 tests/spec-align/align_v7.py` | ✅ 99/99 | 과거 v7~v16 기능의 존재·부재 검사. 최신 제품 결정을 검증하지는 않음 |
-| `python3 tests/spec-align/nest.py` | ✅ 9/9 | 현재 XP·둥지 구현이 존재함을 확인하는 레거시 기준선 |
-| `python3 tests/spec-align/architecture_current.py` | ✅ 3/3 | Vite·Capacitor·Cloudflare·DataStore 현재 계약 확인 |
-| `python3 tests/spec-align/drift.py` | ✅ | spec-drift workflow 구조 확인 |
-| `python3 tests/spec-align/design_lint.py` | ✅ 0건 | 이모지·raw hex·ghost·radius·font 규칙 위반 없음 |
-| `python3 tests/spec-align/migrations_applied.py` | 🚩 환경 의존 | 기본 Python 3.9.6은 `str \| None`에서 실패. `uv` Python 3.11에서는 시작되나 worktree에 `SUPABASE_ACCESS_TOKEN`이 없어 원격 검증 보류 |
-| `npm run build` (`docs/readinggo`) | ✅ | production·합성 DEV build 모두 성공. 폰트 runtime resolution·대형 chunk 경고는 기존 상태 |
-| Node·Worker·Playwright 회귀 묶음 | ✅ | `.github/workflows/test.yml`의 계약·회귀·Production build/boot·합성 DEV isolation·Playwright render smoke를 실행. 파일 수나 assertion 수를 고정 계약으로 삼지 않는다. 현행 OCR 테스트가 `201~1000자→private`를 요구하므로 v17 1,000자 공개 계약의 구현 완료 증거는 아님 |
+| `python3 tests/spec-align/align_v7.py` | `PASS` (99/99) | 과거 v7~v16 기능의 존재·부재 검사. 최신 제품 결정을 검증하지는 않음 |
+| `python3 tests/spec-align/nest.py` | `PASS` (9/9) | 현재 XP·둥지 구현이 존재함을 확인하는 레거시 기준선 |
+| `python3 tests/spec-align/architecture_current.py` | `PASS` (3/3) | Vite·Capacitor·Cloudflare·DataStore 현재 계약 확인 |
+| `python3 tests/spec-align/drift.py` | `PASS` | spec-drift workflow 구조 확인 |
+| `python3 tests/spec-align/design_lint.py` | `PASS` (0건) | 이모지·raw hex·ghost·radius·font 규칙 위반 없음 |
+| `python3 tests/spec-align/migrations_applied.py` | `BLOCKED` | 기본 Python 3.9.6은 `str \| None`에서 실패. `uv` Python 3.11에서는 시작되나 worktree에 `SUPABASE_ACCESS_TOKEN`이 없어 원격 검증 보류 |
+| `npm run build` (`docs/readinggo`) | `PASS` (로컬) | production·합성 DEV build 모두 성공. 폰트 runtime resolution·대형 chunk 경고는 기존 상태 |
+| Node·Worker·Playwright 회귀 묶음 | `PASS` (로컬) | `.github/workflows/test.yml`의 계약·회귀·Production build/boot·합성 DEV isolation·Playwright render smoke를 실행. 파일 수나 assertion 수를 고정 계약으로 삼지 않는다. 현행 OCR 테스트가 `201~1000자→private`를 요구하므로 v17 1,000자 공개 계약의 구현 완료 증거는 아님 |
 
 ## 1. 33개 스펙 파일 전수 상태
 

@@ -96,6 +96,7 @@
 | 문장 공개범위 구버전 호환 | `followers`/알 수 없는 값의 `public` 확대 금지. **5-A** 최소 지원 버전 강제 | `friends` alias 정규화 위치, fail-closed 방식, 구 APK 왕복·업데이트 차단 테스트 | 친구 공개 기본값과 새 문장 저장 출시 |
 | 문장 1,000자 정렬 (#1457) | OCR·직접입력·배치/import, `public\|followers\|private` 모두 1~1,000자. 200자 제외·절단·`private` 강제 없음 | Worker·DataStore·DB CHECK·모든 입력 경로·카피·경계 테스트의 구현 diff, 기존 행 보존, rollback, DEV 역할별 API·웹·Android 저장/재조회 증거 | 1,000자 계약 출시. 저작권 재검토와는 별개 |
 | 권리자 takedown 운영 (#1463) | 공개 접수·책임자·임시 숨김·삭제·이의·기록 SOP는 필수 P0 가드 | 실제 이메일/폼과 개인정보처리방침·푸터 링크, 상태 전이·접근권한·보존정책, 피드·책 상세·검색·캐시 비노출 E2E | 공개 1,000자와 크롤 seed의 Production 활성화 |
+| 레거시 배포 workflow 드리프트 (#1464) | 정상 경로는 stable DEV→동일 SHA 수동 Production 승격. `deploy-verify`는 수동 전용이지만 직접 rollback 계약이 충돌하고 OTA 상단 주석도 실제 trigger와 다름 | workflow 제거·재설계, 자동 rollback 제거, test/OTA 주석 정렬, rollback receipt 검증 | 레거시 workflow 수동 실행과 OTA 운영. 이 spec-only PR 머지는 비차단 |
 | base RLS·구 APK 컷오버 | **5-A** 제한 view/RPC·신규 앱 선배포→최소 버전 미만 차단→broad `ub_sel` 소유자 전용 축소. 보안 rollback으로 broad 정책 복원 금지 | 버전별 직접 조회 인벤토리, OTA/스토어 수신·호출 증거, 정확한 최소 버전, 구버전 실패·rollback 테스트 | base RLS 축소와 친구 책나무 Production 활성화 |
 | XP 물리 삭제 (#1452) | **6-A** 신규 쓰기·참조 제거→최소 버전 강제→legacy 호출 0→rollback 기간 후 물리 삭제 | 실제 최소 버전, 지원 버전 전체 호출 0 telemetry, 운영·분석 참조 0, 백업·migration·rollback 증거 | 컬럼·RPC·legacy adapter 삭제 |
 | 재독 회차 스키마 | **3-A** 책당 `user_book`·가지 하나 + `reading_rounds` 명시 회차. 기존 문장 `reading_round_id=NULL` 무손실 보존 | 정확한 컬럼·FK·상태 전이, 신규 문장 귀속, 구 앱 호환, migration·rollback 테스트 | 회차별 UI·DB migration |

@@ -91,7 +91,7 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 1. ✅ `capacitor.config.json`: `updateUrl`, `autoUpdate:true`, `directUpdate:false`, `resetWhenUpdate:true`.
 2. ✅ `main.js`: 네이티브 부팅 성공 후 `notifyAppReady()`.
 3. ✅ Worker/KV: `POST /api/ota` + `minNative` 게이트.
-4. ✅ `ota-release.yml`: `workflow_dispatch` + 승인 SHA 입력 → stable DEV/main gate → build → zip/checksum → R2 → beta. 파일 상단의 과거 "main 머지 자동" 주석은 실행 trigger가 아니며 stale 주석이다.
+4. ✅ `ota-release.yml`: 실제 trigger는 `workflow_dispatch`이며 승인 SHA 입력 → stable DEV/main gate → build → zip/checksum → R2 → beta다. 파일 상단의 과거 "main 머지 자동" 설명은 실행 trigger가 아닌 stale 주석으로 #1464에서 정정한다.
 5. ✅ `ota-promote.yml`: `workflow_dispatch` + 같은 SHA gate → beta manifest 검증 → production verbatim 승격 + `:prev` 백업.
 
 > 실제 R2/KV 객체와 설치 기기의 수신 성공은 워크플로우 실행·기기 QA 근거로 별도 판정한다.

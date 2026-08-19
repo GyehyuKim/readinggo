@@ -48,6 +48,7 @@
 - DB migration 파일명·SHA-256·적용 순서·대상 환경·원격 ledger read-back·영향 건수·rollback 쿼리
 - Play versionCode·AAB checksum·서명/출처·내부/Production 트랙·설치 기기 QA
 - owner·friend·nonfriend·blocked·anonymous 직접 API와 UI 허용·거부 결과
+- 공개 1,000자·크롤 seed Production 활성화 단위는 #1463의 실제 takedown 접수 링크, 책임자, 임시 숨김→삭제→이의·기록 SOP, 피드·책 상세·검색·캐시 비노출 E2E를 포함한다. 하나라도 미확인이면 `BLOCKED`다.
 - XP 신규 획득 경로의 DB 값 변화 0, app version별 legacy 호출량, 분석 격리
 
 모든 검증 항목은 `PASS | FAIL | BLOCKED | NOT_RUN` 중 하나다. skip·unknown·secret 부재·"workflow success"만으로 PASS를 만들지 않는다.
@@ -115,7 +116,7 @@ DEV 빌드는 `VITE_SUPABASE_URL`·`VITE_SUPABASE_PUBLISHABLE_KEY`·`VITE_API_OR
 
 ### 2.3 롤백
 
-- Production 회귀는 승인된 직전 정상 SHA를 `promote-production.yml`로 재승격한다. 로컬 checkout이나 dashboard 수동 배포로 되돌리지 않는다.
+- Production 회귀는 직전 정상 변경을 되돌리는 revert PR을 CI 후 `main`에 머지하고, 새 HEAD의 stable DEV receipt·E2E를 확인한 뒤 그 동일 SHA를 `promote-production.yml`로 승격한다. 현재 workflow는 과거 SHA 직접 재승격을 거부한다. 로컬 checkout이나 dashboard 수동 배포로 되돌리지 않는다.
 - 기능 플래그 off도 일반 PR·CI→stable DEV 검증→동일 SHA Production 승격 순서를 따른다.
 - 친구 공개 5-A의 보안 rollback은 broad base RLS 복원이 아니라 신규 클라이언트 pause·제한 API 유지·원인 수정이다.
 
