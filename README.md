@@ -81,12 +81,12 @@ CONTRIBUTING.md              ★ 협업 규칙 (SSOT) · CLAUDE.md · AGENTS.md
 
 | 이름 | 역할 | 작업 방식 |
 |---|---|---|
-| **계휴** (`gyehyu`) | contributor · 최종 merge | 제품·아키텍처·통합, 모든 PR의 최종 merge |
+| **계휴** (`gyehyu`) | maintainer · 최종 merge | 제품·아키텍처·통합, 모든 PR의 최종 merge |
 | **승원** (`seungwon`) | contributor | 사전 합의된 이슈 범위의 제안·검토·구현·PR |
 | **윤지** (`jyj23-jeong`, `yunji`) | contributor | 사전 합의된 이슈 범위의 제안·검토·구현·PR |
 
 - 파일·기능별 고정 담당은 두지 않는다.
-- 브랜치: `gyehyu/<topic-slug>` · `seungwon/<topic-slug>` · `yunji/<topic-slug>`. **spec PR과 코드 PR은 분리.** contributor는 self-merge하지 않으며 최종 merge는 계휴만 수행한다.
+- 브랜치: `gyehyu/<topic-slug>` · `seungwon/<topic-slug>` · `yunji/<topic-slug>`. **spec PR과 코드 PR은 분리.** 승원·윤지는 self-merge하지 않으며 최종 merge는 계휴만 수행한다.
 - 오픈 태스크는 GitHub Issues로 일원화 (README에 중복 관리 안 함).
 
 ---

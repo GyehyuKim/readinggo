@@ -83,7 +83,7 @@
 
 - 동일 파일을 수정하는 open PR이 있으면 먼저 충돌 가능성과 수용 기준 중복을 확인한다.
 - 동작·계약 변경은 해당 피처의 spec-only PR을 먼저 승인·머지한 뒤 코드 PR로 진행한다.
-- contributor는 self-merge하지 않으며 최종 merge는 김계휴만 수행한다.
+- 승원·윤지는 self-merge하지 않으며 최종 merge는 김계휴만 수행한다.
 - **SSOT 규칙**: 책나무 화면=`nest.md`, 성장일·XP 전환=`systems.md`, 데이터·RLS=`backend.md`, 문장 공개=`feed.md`, 결정 우선순위=`meta/decisions.md`. 과거 XP·둥지 수치표는 레거시 호환 근거일 뿐 새 제품 계약이 아니다.
 
 ---

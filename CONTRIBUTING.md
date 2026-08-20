@@ -12,21 +12,21 @@
 ## 0. 운영 권한 — 승인된 기여, 감독 머지
 
 - **이슈**: 공개 저장소의 Issues는 누구나 열고, 버그·아이디어·질문·우선순위 제안을 남길 수 있다. 이슈 작성은 구현 권한이나 작업 배정을 뜻하지 않는다.
-- **구현**: 코드·스펙·운영 문서 변경은 **김계휴/Hermes와 승인 contributor 이승원·정윤지**가 사전에 합의된 이슈 범위에서 수행한다. 파일·기능별 고정 담당은 두지 않는다. Hermes는 김계휴가 지시한 범위에서 구현 작업을 보조하고 PR을 연다. 그 밖의 제안은 이슈·코멘트·수용 기준으로 반영한다.
-- **PR과 머지**: 모든 변경은 `main`에 직접 push하지 않고 PR로만 반영한다. 필수 CI가 모두 green이고 base가 최신인 뒤에도, Hermes가 관련 이슈·diff·변경 범위·테스트 증거·미해결 대화를 확인한 **감독 게이트**를 통과해야 한다. **contributor는 자신의 PR을 직접 머지하지 않으며, 최종 merge는 김계휴(`GyehyuKim`)만 수행한다.**
+- **구현**: 코드·스펙·운영 문서 변경은 **김계휴(Hyu, maintainer)와 승인 contributor 이승원·정윤지**가 사전에 합의된 이슈 범위에서 수행한다. 파일·기능별 고정 담당은 두지 않는다. Hermes는 김계휴가 지시한 범위에서 구현 작업을 보조하고 PR을 연다. 그 밖의 제안은 이슈·코멘트·수용 기준으로 반영한다.
+- **PR과 머지**: 모든 변경은 `main`에 직접 push하지 않고 PR로만 반영한다. 필수 CI가 모두 green이고 base가 최신인 뒤에도, Hermes가 관련 이슈·diff·변경 범위·테스트 증거·미해결 대화를 확인한 **감독 게이트**를 통과해야 한다. **승원·윤지는 자신의 PR을 직접 머지하지 않으며, 최종 merge는 김계휴(`GyehyuKim`)만 수행한다.**
 - **중요**: CI green은 필요조건이지 자동 머지 승인이 아니다. Hermes의 확인에서 범위 이탈·회귀 위험·근거 부족이 발견되면 수정 요청 또는 보류한다.
 
-GitHub 개인 저장소는 Write collaborator별 merge 권한 제한을 제공하지 않는다. 승인 contributor의 Write 협업은 유지하되 합의된 이슈·자기 contributor slug 브랜치·감독 게이트를 따르고 self-merge하지 않는다. 최종 merge는 김계휴만 수행한다. 이 규칙을 플랫폼에서 엄격히 강제해야 하면 조직 저장소 또는 triage+fork 모델을 별도로 결정한다. 이슈는 공개 상태로 열어 둔다.
+GitHub 개인 저장소는 Write collaborator별 merge 권한 제한을 제공하지 않는다. 승인 contributor 이승원·정윤지의 Write 협업은 유지하되 합의된 이슈·자기 actor slug 브랜치·감독 게이트를 따르고 self-merge하지 않는다. 최종 merge는 김계휴만 수행한다. 이 규칙을 플랫폼에서 엄격히 강제해야 하면 조직 저장소 또는 triage+fork 모델을 별도로 결정한다. 이슈는 공개 상태로 열어 둔다.
 
 ---
 
 ## 1. 브랜치 네이밍 (필수)
 
-형식: **`<contributor>/<topic-slug>`**
+형식: **`<actor>/<topic-slug>`**
 
 정규식: `^(gyehyu|seungwon|yunji)/[a-z0-9]+(-[a-z0-9]+)*$`
 
-- `contributor`는 작업 주체의 고정 slug를 쓴다: 김계휴/Hermes=`gyehyu`, 이승원=`seungwon`, 정윤지=`yunji`. 이 slug는 파일·기능의 전용 권한을 뜻하지 않는다.
+- `actor`는 작업 주체의 고정 slug를 쓴다: 김계휴/Hermes=`gyehyu`, 이승원=`seungwon`, 정윤지=`yunji`. 이 slug는 파일·기능의 전용 권한을 뜻하지 않는다.
 - `topic-slug` — kebab-case, 3~40자, 무슨 일인지 한눈에 보이게.
 
 **좋은 예**
@@ -36,9 +36,9 @@ GitHub 개인 저장소는 Write collaborator별 merge 권한 제한을 제공�
 
 **나쁜 예 (금지)**
 - `patch-1`, `jerome3354-patch-9`, `update` — 의미 없음
-- `fix/whytree` — contributor slug 없음
+- `fix/whytree` — actor slug 없음
 - `gyehyu/WhyTree_Update` — PascalCase/underscore 금지
-- `feat/biz-plan-restructure` — contributor slug 없음, type-prefix는 사용 안 함
+- `feat/biz-plan-restructure` — actor slug 없음, type-prefix는 사용 안 함
 
 > GitHub 웹 에디터의 "Edit" → "Commit directly to a new branch"는 기본값이
 > `<username>-patch-N`으로 나온다. **반드시 "branch name" 필드를 위 규칙대로 수정**한 뒤 커밋한다.
@@ -76,7 +76,7 @@ git **충돌**은 *같은 줄을 양쪽이 고쳤을 때만* 잡힌다. **다른
 ```bash
 git checkout main
 git pull origin main           # §3.0-2: 세션 시작 시 항상
-git checkout -b <contributor>/<topic-slug>
+git checkout -b <actor>/<topic-slug>
 ```
 
 ### 3.2 작업 중 main이 움직였다면 (PR 열기 전)
@@ -111,7 +111,7 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 
 ### 3.5 파일 변경 조율
 
-파일·기능별 고정 담당은 두지 않는다. 변경 권한과 검토 범위는 **사전에 합의된 이슈**가 정하며, contributor slug나 과거 작성자는 현재 담당 근거가 아니다.
+파일·기능별 고정 담당은 두지 않는다. 변경 권한과 검토 범위는 **사전에 합의된 이슈**가 정하며, actor slug나 과거 작성자는 현재 담당 근거가 아니다.
 
 - 같은 파일을 수정하는 open PR이 있으면 먼저 범위와 충돌 가능성을 확인한다.
 - `CLAUDE.md`·`AGENTS.md`·`CONTRIBUTING.md` 같은 governance 파일과 `data.js`·`components.js`·`app.js` 같은 공용 런타임은 영향이 넓으므로 이슈 수용 기준과 전체 diff를 특별히 검토한다.
@@ -187,7 +187,7 @@ claude --resume <name>        # 이름으로 재개 (다른 worktree 에서도)
 |---|---|
 | **무엇/왜** | 한두 줄. 배경·근거(스펙·분석 문서 링크) |
 | **범위** | IN(이 이슈가 다루는 것) / OUT(안 다루는 것·다른 이슈) |
-| **협업자 / Phase** | contributor slug(gyehyu/seungwon/yunji) 또는 GitHub assignee · Phase(0/1/2) · 우선순위(P0/P1/P2, §5.5) |
+| **협업자 / Phase** | actor slug(gyehyu/seungwon/yunji) 또는 GitHub assignee · Phase(0/1/2) · 우선순위(P0/P1/P2, §5.5) |
 | **수용 기준** | `- [ ]` 체크박스. *검증 가능하게* (모호한 "구현 완료" 금지) |
 | **링크** | 관련 스펙 절·PR·분석 문서 |
 
@@ -206,7 +206,7 @@ feat(profile): 무작위 한 문장 회상 카드
 
 ## 범위
 - IN: 프로필 회상 카드 + DataStore.sentences.random
-- OUT: 홈(둥지=승원), 위젯(Phase 2)
+- OUT: 홈(둥지 영역), 위젯(Phase 2)
 
 ## 담당 / Phase
 gyehyu · Phase 1 · P1
@@ -313,7 +313,7 @@ TODOS.md 항목, 스펙 문서(`docs/spec-*.md`), PR 설명에 아래 레이블�
 - [x] force push와 branch deletion 금지
 - [x] Write collaborator는 김계휴가 승인한 contributor로 제한. 이슈는 public repo에서 누구나 생성 가능.
 
-> GitHub 개인 저장소는 Write collaborator별 merge 제한을 지원하지 않는다. 따라서 최소 Write collaborator + PR 보호 + 합의 이슈 + contributor self-merge 금지 + 김계휴 단독 최종 merge를 함께 적용한다. 엄격한 시스템 강제는 조직 저장소 또는 triage+fork 모델이 필요하다.
+> GitHub 개인 저장소는 Write collaborator별 merge 제한을 지원하지 않는다. 따라서 최소 Write collaborator + PR 보호 + 합의 이슈 + 승원·윤지 self-merge 금지 + 김계휴 단독 최종 merge를 함께 적용한다. 엄격한 시스템 강제는 조직 저장소 또는 triage+fork 모델이 필요하다.
 
 ---
 
@@ -352,7 +352,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
 이 섹션은 AI 도구가 이 프로젝트에서 코드/문서 작업을 대신 수행할 때 **예외 없이** 따라야 하는
 규칙이다. 사용자가 위 섹션을 읽히지 않았더라도 LLM은 여기 적힌 내용을 자동 강제한다.
 
-1. **브랜치 생성 시 반드시 §1 네이밍 규칙을 따른다.** contributor slug를 모르면 사용자에게 묻고 진행.
+1. **브랜치 생성 시 반드시 §1 네이밍 규칙을 따른다.** actor slug를 모르면 사용자에게 묻고 진행.
    임의로 `feat/`, `fix/` 등 type prefix를 쓰지 않는다.
 2. **`main`에 직접 커밋/푸시하지 않는다.** 항상 feature 브랜치 → PR 경유.
 3. **브랜치를 생성하기 전에 `git pull origin main`으로 최신화**한다.
@@ -375,7 +375,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
 16. **Spec/코드 PR 분리 (§4.1).** spec 파일과 구현 코드를 같은 PR에 묶지 않는다. spec PR이 먼저, 코드 PR이 나중. 묶어야 할 사유가 있으면 PR 설명에 명시.
 17. **Stack Lock 준수.** `CLAUDE.md` Stack Lock 절에 명시된 결정 (web-first, Capacitor 보류, React CDN 유지, 백엔드 Supabase, **책 데이터 canonical = Phase 1 Supabase `books` / Phase 0 현재는 TSV·#490** 등) 외 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 근거: [LF: Lock Stack](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-lock-stack).
 18. **이슈 먼저, 그다음 PR(§4.2).** 의미 있는 작업은 **PR 생성 전에** `gh issue create`로 이슈를 먼저 열고(§4.3 형식) `Closes/Refs #N`로 연결한다. `gh issue list`로 기존 이슈도 점검한다. `no-issue:`는 오타·포맷 등 진짜 사소한 변경에만(상시 사용 금지). 이슈 없이 PR을 만들지 않는다.
-19. **구현·머지 권한(§0).** 이슈 제안자는 자동으로 구현자가 되지 않는다. 코드 변경은 김계휴/Hermes와 승인 contributor가 사전 합의된 이슈·자기 contributor slug 브랜치에서 수행한다. 필수 CI가 모두 green이라고 자동 머지하거나 contributor가 self-merge하지 말고, Hermes가 PR의 이슈 연결·diff·테스트 근거·대화 해결을 확인한 뒤 김계휴만 최종 merge한다.
+19. **구현·머지 권한(§0).** 이슈 제안자는 자동으로 구현자가 되지 않는다. 코드 변경은 김계휴/Hermes와 승인 contributor가 사전 합의된 이슈·자기 actor slug 브랜치에서 수행한다. 필수 CI가 모두 green이라고 자동 머지하지 않는다. 승원·윤지는 self-merge하지 않고, Hermes가 PR의 이슈 연결·diff·테스트 근거·대화 해결을 확인한 뒤 김계휴만 최종 merge한다.
 
 모순이 생기면 **이 `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타**의 우선순위를 따른다.
 
@@ -385,7 +385,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
 
 제출자 스스로 체크:
 
-- [ ] 브랜치 이름이 `<contributor>/<topic-slug>` 형식인가?
+- [ ] 브랜치 이름이 `<actor>/<topic-slug>` 형식인가?
 - [ ] `main`과 rebase/merge로 최신 상태인가?
 - [ ] 변경이 논리적으로 하나의 단위인가?
 - [ ] 커밋 메시지가 Conventional Commits 형식인가?

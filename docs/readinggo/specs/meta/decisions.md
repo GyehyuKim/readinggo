@@ -79,7 +79,7 @@
 
 **현재 협업 해석**
 
-이 절 이후의 `담당` 열과 과거 구현 표기는 당시 작업 이력일 뿐 현재 권한·라우팅 근거가 아니다. 파일·기능별 고정 담당은 두지 않으며, 김계휴/Hermes와 승인 contributor 이승원·정윤지는 [CONTRIBUTING.md](../../../../CONTRIBUTING.md) §0의 사전 합의된 이슈 범위에서 협업한다. contributor는 self-merge하지 않고 최종 merge는 김계휴만 수행한다.
+이 절 이후의 `담당` 열과 과거 구현 표기는 당시 작업 이력일 뿐 현재 권한·라우팅 근거가 아니다. 파일·기능별 고정 담당은 두지 않으며, maintainer 김계휴/Hermes와 승인 contributor 이승원·정윤지는 [CONTRIBUTING.md](../../../../CONTRIBUTING.md) §0의 사전 합의된 이슈 범위에서 협업한다. 승원·윤지는 self-merge하지 않고 최종 merge는 김계휴만 수행한다.
 
 ---
 
@@ -132,7 +132,7 @@
 | **이메일 템플릿 브랜딩** | 확인·매직링크 메일에 **ReadingGo 브랜딩 + 문의처(`readinggo.admin@gmail.com`)** 삽입 — 사용자가 발신 출처를 신뢰하고 클릭하도록. `admin-cli.mjs email-template set` | backend(운영) | 신규(#1 맥락) |
 | **#154 마을 Supabase 연동** | `village.js` 데모 하드코딩 → `DataStore.villages.listMine/listPublic/create/join` 실연동 | 폐기 #440 | 사용자 지시로 계휴 작업 |
 | **#170 본인 마을 제외** | 추천 공개 마을 목록에서 내가 생성/가입한 마을 `filter` 제외 | 폐기 #440 | — |
-| **#153 반별점 0.5** | 별 좌측 절반 탭=0.5점. nest.md §5.4 SSOT 반영 | nest | 스펙 반영(구현 이력) |
+| **#153 반별점 0.5** | 별 좌측 절반 탭=0.5점. nest.md §5.4 SSOT 반영 | nest | 스펙 반영(역사적 기여: 승원 구현) |
 | **#157 스포일러 토글 위치** | social.js 헤더 우측 `🔓` — 현재 미배선, 배선 대상으로 명시 | social | 스펙 현행화 |
 
 ---
@@ -154,7 +154,7 @@
 | **마을 공유/나가기/알림** | 가짜 rgo.app 링크→실 공유 URL+Web Share(#8), `villages.leave` 실동작(#9), 알림 체크박스 라벨 명확화(#10) | 폐기 #440 | 당시 구현 이력 |
 | **로그인 redirect** | `site_url`·`uri_allow_list`를 Netlify URL로(서버 적용됨) — OAuth 후 localhost 폴백 해소 | backend(운영) | — |
 
-**(해소됨)** #184 읽기모드·#185 캐러셀·1000자·페이지 명시 → **nest.md §5.3/§5.4/§5.5 반영 완료**(코드=PR #187, 스펙=spec-nest-readingmode PR). #153 반별점은 nest.md §5.4 스펙에 반영됐고 당시 코드는 구현 진행 중이었다.
+**(해소됨)** #184 읽기모드·#185 캐러셀·1000자·페이지 명시 → **nest.md §5.3/§5.4/§5.5 반영 완료**(코드=PR #187, 스펙=spec-nest-readingmode PR). #153 반별점은 nest.md §5.4 스펙에 반영됐고 당시 승원이 구현 진행 중이었다.
 
 ---
 
@@ -187,7 +187,7 @@
 | **#195 활동 히트맵** | ~~프로필에 GitHub식 잔디 제공~~ → 팀 결정으로 기능 삭제(#1363). 일일 읽기 기록 자체는 유지 | profile/backend | superseded 2026-07-30 |
 | **#190 대시보드 A+B** | **A**: 실사용자(NPC 제외) 카드. **B**: 최근 7일 추세 막대(체크인)+가입(+N). `admin.stats`에 realUsers·trend 추가. C(리텐션 코호트·인기책)는 Phase 2 유지 | profile/backend | §5.8.9 확장 |
 | **#191 멀티 디바이스** | **refetch-on-focus**만(탭 포커스 시 Supabase 상태 재로드 → 다른 기기 변경 반영). 기기별 목록 관리자는 보류(#191 유지) | backend/profile | 합의 범위 |
-| **#153 반별점** | 좌측 절반 탭=0.5 (Ceremony·BookDetailModal). 코드=PR #199 | nest | 계휴 구현(기존 작업 미반영) |
+| **#153 반별점** | 좌측 절반 탭=0.5 (Ceremony·BookDetailModal). 코드=PR #199 | nest | 계휴 구현(역사적 기여: 승원 작업 미push) |
 | **로컬 dev 서버** | 라이브(Netlify)만 사용 → 로컬 8888 python 서버 종료. CI/CD(#198)로 main 머지=자동 배포 | ops | — |
 
 **후속 기록**: 당시 ActivityHeatmap invariant 추가를 검토했으나 기능은 이후 #1363에서 폐기했다.
@@ -210,7 +210,7 @@
 | 이메일 SMTP | 공개 전 autoconfirm OFF용 커스텀 SMTP(Resend 추천) | #178 | ops |
 | 로컬 dev 서버 | 종료(라이브만). CI/CD 자동배포(#198) | — | ops |
 
-**XP 결정 (2026-06-05 확정, 구현 #215)**: #210/#212에서 XP/Lv를 재설계·도입 → **XP 개념 유지**. #205는 **프로필 중간의 중복 스탯카드만 제거**(상단 Lv/XP는 유지). XP 폐지 아님.
+**XP 결정 (2026-06-05 확정, 구현 #215)**: 승원이 #210/#212에서 XP/Lv를 재설계·도입 → **XP 개념 유지**. #205는 **프로필 중간의 중복 스탯카드만 제거**(상단 Lv/XP는 유지). XP 폐지 아님.
 
 **구현 vs 스펙 (#215)**: 코드는 PR #215, 결정은 이 §8.7. SSOT 세부는 [profile.md §5.8.4/§5.8.9/§5.8.10](../profile.md)·[backend.md §7.2](../backend.md)에 반영(spec-only PR).
 
