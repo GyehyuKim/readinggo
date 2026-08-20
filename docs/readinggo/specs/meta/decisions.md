@@ -79,7 +79,7 @@
 
 **현재 협업 해석**
 
-이 절 이후의 `담당` 열과 과거 구현 표기는 당시 작업 이력일 뿐 현재 권한·라우팅 근거가 아니다. 파일·기능별 고정 담당은 두지 않으며, maintainer 김계휴/Hermes와 승인 contributor 이승원·정윤지는 [CONTRIBUTING.md](../../../../CONTRIBUTING.md) §0의 사전 합의된 이슈 범위에서 협업한다. 승원·윤지는 self-merge하지 않고 최종 merge는 김계휴만 수행한다.
+이 절 이후의 `담당` 열과 과거 구현 표기는 당시 작업 이력일 뿐 현재 권한·라우팅 근거가 아니다. 파일·기능별 고정 담당은 두지 않으며, maintainer 김계휴와 이를 보조하는 Hermes, 승인 contributor 이승원·정윤지는 [CONTRIBUTING.md](../../../../CONTRIBUTING.md) §0의 사전 합의된 이슈 범위에서 협업한다. 승원·윤지는 self-merge하지 않고 최종 merge는 김계휴만 수행한다.
 
 ---
 
