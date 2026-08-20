@@ -27,6 +27,6 @@
 - [ ] `.env`·API 키·개인정보 없음 (§6)
 
 ## Hermes 감독 머지 게이트
-<!-- CI green은 자동 머지 승인이 아님. contributor는 self-merge하지 않고 계휴/Hermes의 감독 머지를 기다린다. -->
+<!-- CI green은 자동 머지 승인이 아님. 승원·윤지는 self-merge하지 않고 Hermes 감독 게이트 확인 뒤 김계휴의 최종 merge를 기다린다. -->
 - [ ] 필수 CI 전체 green 및 `main` 최신화
 - [ ] Hermes가 관련 이슈, diff 범위, 테스트 증거, 미해결 대화를 확인
