@@ -282,7 +282,7 @@ ai.extractBook(book, quotes)               → 추출 책 요약        // 드�
 
 **추가 메서드(계약 표면에 미열거, 코드 실재 — 드리프트 정정 2026-07-09)**: 위 목록 외에도 어댑터에 `sentences.updateText`/`setPage`/`setKind`/`remove`/`resurfaceCandidate`/`markResurfaced`, `books.saveRecap`, `admin.popularBooks`/`activeUsers`/`completionStats`/`cohortRetention`/`contentResonance` 가 존재한다(상세 문서화는 생략 — 표면만 명시).
 
-> 휴식코스(Pause) 관련 메서드(`pause.start(days)` 등)는 **상세 미정** — `systems.md`(승원)에서 기간·빈도·스트릭 동결 규칙 확정 후 본 계약에 추가.
+> 휴식코스(Pause) 관련 메서드(`pause.start(days)` 등)는 **상세 미정** — `systems.md`의 기간·빈도·스트릭 동결 규칙이 합의된 후속 이슈에서 확정된 뒤 본 계약에 추가.
 
 ### 7.2.1 책 데이터 소스 — 알라딘에서 국중도·카카오로 이전 (#1044, 출시 블로커)
 
@@ -592,7 +592,7 @@ inquiries                                   -- v7.2 신설 (09_inquiries.sql) �
 -- v7 제거: operator_replies 테이블 전체 (운영자 짹 폐기)
 ```
 
-> **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md`(승원) 확정 후 `pause_log` 류 테이블을 본 절에 추가.
+> **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md` 계약이 합의된 후속 이슈에서 확정된 뒤 `pause_log` 류 테이블을 본 절에 추가.
 
 JSONB 사용:
 - `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public"}`. 공개 범위 키는 `public|private`만 허용하며 키 없음·무효값은 `public`으로 해석한다. 설정 변경은 신규 `sentences.add` 초기값에만 적용하고 기존 문장을 갱신하지 않는다(#1261). 알림은 Phase 2 PWA 이후 실동작.

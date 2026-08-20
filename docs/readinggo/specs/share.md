@@ -199,6 +199,6 @@ https://readinggo.hyuniverse.workers.dev
 
 - 부모 에픽: #650 (외부 공유 기능 신설), 본 이슈: #651.
 - companion.md §2 — 인용 vs 감상(`kind`) 정의(#359/#360).
-- design.md §11 — 토큰·타이포 원천(seungwon 소유).
+- design.md §11 — 토큰·타이포 원천.
 - `meta/decisions.md` v5.1 — 이미지 카드 공유 = 바이럴 루프 채택.
 - `specs/README.md` 파일 지도 등재는 **후속 인덱스 PR**에서 처리.
