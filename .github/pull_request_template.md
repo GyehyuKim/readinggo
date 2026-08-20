@@ -17,7 +17,8 @@
 - [ ] `spec-align` CI 통과 (새 기능은 `tests/spec-align/align_v7.py`에 invariant 추가)
 
 ## 체크리스트
-- [ ] 브랜치 `<owner>/<topic-slug>` 형식 (`gyehyu/*` 또는 승인 contributor의 `yunji/*`, §1)
+- [ ] 브랜치 `<contributor>/<topic-slug>` 형식 (`gyehyu/*`, `seungwon/*`, `yunji/*`; 파일·기능 소유권 아님, §1)
+- [ ] contributor self-merge 금지 · 최종 merge는 김계휴만 수행 (§0)
 - [ ] `main` 기준 최신 (rebase 또는 `Update branch`) (§3.0)
 - [ ] 1 PR = 1 논리 단위 · **spec/코드 분리** (§4·§4.1)
 - [ ] **관련 이슈 연결(`Closes`/`Refs`) 또는 새 이슈 생성** (§4.2)

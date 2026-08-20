@@ -12,7 +12,7 @@ The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 �
 
 Before making any git/PR operation, read and follow **[`CONTRIBUTING.md`](./CONTRIBUTING.md)**. It is the single source of truth for:
 
-- Branch naming (`<owner>/<topic-slug>`, owner ∈ {gyehyu, seungwon, yunji})
+- Branch naming (`<contributor>/<topic-slug>`, contributor slug ∈ {gyehyu, seungwon, yunji}; 파일·기능 소유권 아님)
 - PR size and lifetime rules
 - Conventional Commits message format
 - Forbidden operations (direct push to main, --force, --no-verify, committing secrets)

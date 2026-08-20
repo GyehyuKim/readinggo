@@ -12,8 +12,8 @@ labels: ["type:feat"]
 - IN:
 - OUT:
 
-## 담당 / Phase
-<!-- owner(gyehyu/seungwon/yunji) · Phase(0/1/2) · 우선순위(P0/P1/P2, §5.5) -->
+## 협업자 / Phase
+<!-- contributor slug(gyehyu/seungwon/yunji) 또는 GitHub assignee · Phase(0/1/2) · 우선순위(P0/P1/P2, §5.5) -->
 
 ## 수용 기준
 <!-- 검증 가능하게. 모호한 "구현 완료" 금지 -->

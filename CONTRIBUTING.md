@@ -12,35 +12,33 @@
 ## 0. 운영 권한 — 승인된 기여, 감독 머지
 
 - **이슈**: 공개 저장소의 Issues는 누구나 열고, 버그·아이디어·질문·우선순위 제안을 남길 수 있다. 이슈 작성은 구현 권한이나 작업 배정을 뜻하지 않는다.
-- **구현**: 코드·스펙·운영 문서 변경은 **김계휴(`gyehyu`)와 승인 contributor 정윤지(`jyj23-jeong`, branch slug `yunji`)**가 수행한다. 정윤지는 김계휴와 사전에 합의된 이슈 범위에서만 구현·PR하고, Hermes는 김계휴가 지시한 범위에서 구현 작업을 보조하고 PR을 연다. 그 밖의 제안은 이슈·코멘트·수용 기준으로 반영한다.
-- **PR과 머지**: 모든 변경은 `main`에 직접 push하지 않고 PR로만 반영한다. 필수 CI가 모두 green이고 base가 최신인 뒤에도, Hermes가 관련 이슈·diff·변경 범위·테스트 증거·미해결 대화를 확인한 **감독 게이트**를 통과해야 한다. **contributor는 자신의 PR을 직접 머지하지 않으며**, 최종 반영은 김계휴 또는 그가 지시한 Hermes가 수행한다.
+- **구현**: 코드·스펙·운영 문서 변경은 **김계휴/Hermes와 승인 contributor 이승원·정윤지**가 사전에 합의된 이슈 범위에서 수행한다. 파일·기능별 고정 담당은 두지 않는다. Hermes는 김계휴가 지시한 범위에서 구현 작업을 보조하고 PR을 연다. 그 밖의 제안은 이슈·코멘트·수용 기준으로 반영한다.
+- **PR과 머지**: 모든 변경은 `main`에 직접 push하지 않고 PR로만 반영한다. 필수 CI가 모두 green이고 base가 최신인 뒤에도, Hermes가 관련 이슈·diff·변경 범위·테스트 증거·미해결 대화를 확인한 **감독 게이트**를 통과해야 한다. **contributor는 자신의 PR을 직접 머지하지 않으며, 최종 merge는 김계휴(`GyehyuKim`)만 수행한다.**
 - **중요**: CI green은 필요조건이지 자동 머지 승인이 아니다. Hermes의 확인에서 범위 이탈·회귀 위험·근거 부족이 발견되면 수정 요청 또는 보류한다.
 
-GitHub 개인 저장소는 경로·브랜치 prefix별 Write 제한을 제공하지 않는다. 따라서 Write collaborator는 `GyehyuKim`과 승인된 `jyj23-jeong`으로 제한하고, 정윤지는 합의된 이슈·`yunji/*` 브랜치·감독 머지 규칙을 준수한다. 이슈는 공개 상태로 열어 둔다.
-
-> 이 §0은 이 문서 안의 파일 오너십 예시보다 우선한다. 오너십은 기본 검토 창구이며, 정윤지의 구현 가능 범위는 파일명이 아니라 사전에 합의된 이슈로 정한다.
+GitHub 개인 저장소는 Write collaborator별 merge 권한 제한을 제공하지 않는다. 승인 contributor의 Write 협업은 유지하되 합의된 이슈·자기 contributor slug 브랜치·감독 게이트를 따르고 self-merge하지 않는다. 최종 merge는 김계휴만 수행한다. 이 규칙을 플랫폼에서 엄격히 강제해야 하면 조직 저장소 또는 triage+fork 모델을 별도로 결정한다. 이슈는 공개 상태로 열어 둔다.
 
 ---
 
 ## 1. 브랜치 네이밍 (필수)
 
-형식: **`<owner>/<topic-slug>`**
+형식: **`<contributor>/<topic-slug>`**
 
-정규식: `^(gyehyu|yunji)/[a-z0-9]+(-[a-z0-9]+)*$`
+정규식: `^(gyehyu|seungwon|yunji)/[a-z0-9]+(-[a-z0-9]+)*$`
 
-- `owner`는 구현 주체의 고정 slug를 쓴다: 김계휴/Hermes=`gyehyu`, 정윤지=`yunji`.
+- `contributor`는 작업 주체의 고정 slug를 쓴다: 김계휴/Hermes=`gyehyu`, 이승원=`seungwon`, 정윤지=`yunji`. 이 slug는 파일·기능의 전용 권한을 뜻하지 않는다.
 - `topic-slug` — kebab-case, 3~40자, 무슨 일인지 한눈에 보이게.
 
 **좋은 예**
 - `gyehyu/backend-datastore-contract`
+- `seungwon/nest-castle-collection`
 - `yunji/feed-empty-state`
 
 **나쁜 예 (금지)**
 - `patch-1`, `jerome3354-patch-9`, `update` — 의미 없음
-- `fix/whytree` — owner 없음
-- `seungwon/nest-castle-collection` — 승인 contributor slug가 아님
+- `fix/whytree` — contributor slug 없음
 - `gyehyu/WhyTree_Update` — PascalCase/underscore 금지
-- `feat/biz-plan-restructure` — owner 없음, type-prefix는 사용 안 함
+- `feat/biz-plan-restructure` — contributor slug 없음, type-prefix는 사용 안 함
 
 > GitHub 웹 에디터의 "Edit" → "Commit directly to a new branch"는 기본값이
 > `<username>-patch-N`으로 나온다. **반드시 "branch name" 필드를 위 규칙대로 수정**한 뒤 커밋한다.
@@ -62,7 +60,7 @@ GitHub 개인 저장소는 경로·브랜치 prefix별 Write 제한을 제공하
 
 ## 3. 동시 작업과 충돌 방지 (핵심)
 
-충돌·무음 덮어쓰기를 막는 3중 방어: **(1) 동기화 규칙(§3.0)** · **(2) 주요 파일 오너십(§3.5)** · **(3) 머지 전 diff 리뷰(§3.3·§7)**. 오너 없는 일반 파일은 *base 최신화(rebase)* 로 충돌을 차단한다.
+충돌·무음 덮어쓰기를 막는 3중 방어: **(1) 동기화 규칙(§3.0)** · **(2) 파일 변경 조율(§3.5)** · **(3) 머지 전 diff 리뷰(§3.3·§7)**. 파일별 고정 담당 대신 합의된 이슈 범위와 *base 최신화(rebase)* 로 충돌을 차단한다.
 
 ### 3.0 동기화 규칙 (필수)
 
@@ -78,7 +76,7 @@ git **충돌**은 *같은 줄을 양쪽이 고쳤을 때만* 잡힌다. **다른
 ```bash
 git checkout main
 git pull origin main           # §3.0-2: 세션 시작 시 항상
-git checkout -b <owner>/<topic-slug>
+git checkout -b <contributor>/<topic-slug>
 ```
 
 ### 3.2 작업 중 main이 움직였다면 (PR 열기 전)
@@ -111,18 +109,14 @@ GitHub 웹 에디터는 편집 세션 중 base 브랜치 변경을 자동 감지
 
 **CLI가 익숙하지 않으면 Claude Code/Cursor에게 시키는 것이 웹 에디터보다 훨씬 안전하다.**
 
-### 3.5 파일 오너십 (주요 파일)
+### 3.5 파일 변경 조율
 
-주요 파일은 **오너**를 둔다. **다른 사람 오너 파일을 편집하려면 그 오너와 먼저 조율**하고, 불가피하면 PR 설명에 *왜* 건드렸는지 명시한다. (오너 없는 일반 파일은 rebase로 충돌만 차단.)
+파일·기능별 고정 담당은 두지 않는다. 변경 권한과 검토 범위는 **사전에 합의된 이슈**가 정하며, contributor slug나 과거 작성자는 현재 담당 근거가 아니다.
 
-| 파일 | 오너 | 비고 |
-|---|---|---|
-| `CLAUDE.md` · `AGENTS.md` · `CONTRIBUTING.md` | **gyehyu** | governance·머지 담당. 타인은 조율 후 |
-| `specs/backend.md` · `social.md` · `profile.md` · `onboarding.md` · `meta/*` · `specs/README.md` | **gyehyu** | 백엔드·소셜·내서재·온보딩 |
-| `specs/nest.md` · `systems.md` · `design.md` | **seungwon** | 책나무·성장 리듬·디자인과 레거시 XP 경계 |
-| 데모 코드 `docs/readinggo/js/*` · `index.html` | 해당 피처 오너 | 공용 `data.js`·`components.js`·`app.js` 변경 시 조율 |
-
-> 피처 spec 상세는 [`specs/README.md` 파일 소유권](./docs/readinggo/specs/README.md). 이 표는 *governance·공용 파일* 까지 포함한 상위 기준.
+- 같은 파일을 수정하는 open PR이 있으면 먼저 범위와 충돌 가능성을 확인한다.
+- `CLAUDE.md`·`AGENTS.md`·`CONTRIBUTING.md` 같은 governance 파일과 `data.js`·`components.js`·`app.js` 같은 공용 런타임은 영향이 넓으므로 이슈 수용 기준과 전체 diff를 특별히 검토한다.
+- 다른 spec까지 바꿔야 하면 해당 계약을 같은 이슈에 명시하거나 별도 이슈·spec-only PR로 분리한다.
+- 최종 merge 권한은 파일과 무관하게 §0의 김계휴 단일 원칙을 따른다.
 
 ### 3.6 worktree 병렬 개발 (멀티 세션)
 
@@ -193,11 +187,11 @@ claude --resume <name>        # 이름으로 재개 (다른 worktree 에서도)
 |---|---|
 | **무엇/왜** | 한두 줄. 배경·근거(스펙·분석 문서 링크) |
 | **범위** | IN(이 이슈가 다루는 것) / OUT(안 다루는 것·다른 이슈) |
-| **담당 / Phase** | owner(gyehyu/seungwon/yunji) · Phase(0/1/2) · 우선순위(P0/P1/P2, §5.5) |
+| **협업자 / Phase** | contributor slug(gyehyu/seungwon/yunji) 또는 GitHub assignee · Phase(0/1/2) · 우선순위(P0/P1/P2, §5.5) |
 | **수용 기준** | `- [ ]` 체크박스. *검증 가능하게* (모호한 "구현 완료" 금지) |
 | **링크** | 관련 스펙 절·PR·분석 문서 |
 
-**라벨**: `owner:gyehyu\|seungwon\|yunji` · `type:feat\|fix\|docs\|chore` · `phase:0\|1\|2` · 우선순위 `P0\|P1\|P2`. (`.github/ISSUE_TEMPLATE/` feature·bug 템플릿이 기본 라벨을 자동 적용.)
+**라벨**: `type:feat\|fix\|docs\|chore` · `phase:0\|1\|2` · 우선순위 `P0\|P1\|P2`. 작업자는 GitHub assignee 또는 본문의 협업자 항목으로 표시하고 사람별 담당 라벨을 만들지 않는다. (`.github/ISSUE_TEMPLATE/` feature·bug 템플릿이 기본 라벨을 자동 적용.)
 
 **버그**는 bug 템플릿: 재현 절차 · 기대 vs 실제 · 심각도 · 환경(브라우저/기기).
 
@@ -299,7 +293,7 @@ TODOS.md 항목, 스펙 문서(`docs/spec-*.md`), PR 설명에 아래 레이블�
 - `git commit --no-verify` — 훅을 스킵하지 않는다. 훅이 실패하면 근본 원인을 고친다.
 - `git rebase -i` 로 이미 원격에 올라간 공유 브랜치 재작성.
 - `git checkout --orphan` — 브랜치 히스토리를 초기화하는 명령. 새 작업은 반드시 `main`에서 새 브랜치를 따는 방식으로 시작한다.
-- **무단 구현 PR** — `gyehyu`/Hermes 또는 승인 contributor `jyj23-jeong` 외 계정은 이슈와 코멘트로 제안한다. 승인 contributor도 사전 합의된 이슈 밖의 구현 PR이나 자신의 PR 직접 머지는 금지한다.
+- **무단 구현 PR** — 김계휴/Hermes 또는 승인 contributor 외 계정은 이슈와 코멘트로 제안한다. 승인 contributor도 사전 합의된 이슈 밖의 구현 PR이나 자신의 PR 직접 머지는 금지한다.
 - `.env`, API 키, 비밀번호 커밋. `.gitignore`에 `.env` 등록되어 있으나 복사본도 금지.
 - 실제 사용자 개인정보(이름, 이메일, 연락처)를 평문으로 저장. 필요 시 익명화.
 
@@ -317,9 +311,9 @@ TODOS.md 항목, 스펙 문서(`docs/spec-*.md`), PR 설명에 아래 레이블�
 - [x] Require conversation resolution before merging
 - [x] Do not allow bypassing the above settings (관리자 포함)
 - [x] force push와 branch deletion 금지
-- [x] Write collaborator는 `GyehyuKim`과 승인 contributor `jyj23-jeong`으로 제한. 이슈는 public repo에서 누구나 생성 가능.
+- [x] Write collaborator는 김계휴가 승인한 contributor로 제한. 이슈는 public repo에서 누구나 생성 가능.
 
-> GitHub 개인 저장소는 branch protection에서 사용자별·경로별 push restriction을 지원하지 않는다. 따라서 최소 Write collaborator + PR 보호 + 합의 이슈 + contributor self-merge 금지를 함께 적용한다.
+> GitHub 개인 저장소는 Write collaborator별 merge 제한을 지원하지 않는다. 따라서 최소 Write collaborator + PR 보호 + 합의 이슈 + contributor self-merge 금지 + 김계휴 단독 최종 merge를 함께 적용한다. 엄격한 시스템 강제는 조직 저장소 또는 triage+fork 모델이 필요하다.
 
 ---
 
@@ -358,7 +352,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
 이 섹션은 AI 도구가 이 프로젝트에서 코드/문서 작업을 대신 수행할 때 **예외 없이** 따라야 하는
 규칙이다. 사용자가 위 섹션을 읽히지 않았더라도 LLM은 여기 적힌 내용을 자동 강제한다.
 
-1. **브랜치 생성 시 반드시 §1 네이밍 규칙을 따른다.** owner slug를 모르면 사용자에게 묻고 진행.
+1. **브랜치 생성 시 반드시 §1 네이밍 규칙을 따른다.** contributor slug를 모르면 사용자에게 묻고 진행.
    임의로 `feat/`, `fix/` 등 type prefix를 쓰지 않는다.
 2. **`main`에 직접 커밋/푸시하지 않는다.** 항상 feature 브랜치 → PR 경유.
 3. **브랜치를 생성하기 전에 `git pull origin main`으로 최신화**한다.
@@ -372,7 +366,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
    선제 실행한다. 에러 메시지에 `desktop.ini`가 보이면 먼저 이 정리부터 한다.
 10. **비밀정보**: `.env`, API 키, 점주/고객 개인정보를 절대 커밋하지 않는다. 사용자가 채팅에
     실수로 붙여넣은 경우에도 파일에 쓰지 않는다.
-11. **주요 파일 오너십(§3.5) 준수.** 다른 사람 오너 파일(특히 `CLAUDE`/`AGENTS`/`CONTRIBUTING`·타 피처 spec)을 편집하려면 사용자에게 먼저 확인한다. 동일 파일을 편집하는 타인의 open PR이 있는지 `gh pr list`로 확인하고, 충돌 가능성이 보이면 보고한다.
+11. **파일 변경 조율(§3.5) 준수.** 고정 담당을 가정하지 말고 합의된 이슈 범위를 따른다. 동일 파일을 편집하는 다른 open PR이 있는지 `gh pr list`로 확인하고, 충돌 가능성이 보이면 보고한다.
 12. **과거 사고 패턴**: 웹 에디터 stale-base로 인한 회귀 사고가 과거 2회 발생(§3.4). 큰 spec 파일(`backend.md`, `specs/README.md`)이나 여러 파일 동시 편집 시 편집 전후 diff를 특히 주의 깊게 검토한다.
 13. **`git checkout --orphan` 절대 금지.** 세션 시작 시 `git log --oneline -1`로 현재 브랜치가
     정상 커밋을 갖는지 확인한다. 실패하면 즉시 사용자에게 보고하고 임의로 수정하지 않는다.
@@ -381,7 +375,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
 16. **Spec/코드 PR 분리 (§4.1).** spec 파일과 구현 코드를 같은 PR에 묶지 않는다. spec PR이 먼저, 코드 PR이 나중. 묶어야 할 사유가 있으면 PR 설명에 명시.
 17. **Stack Lock 준수.** `CLAUDE.md` Stack Lock 절에 명시된 결정 (web-first, Capacitor 보류, React CDN 유지, 백엔드 Supabase, **책 데이터 canonical = Phase 1 Supabase `books` / Phase 0 현재는 TSV·#490** 등) 외 프레임워크/라이브러리 도입 제안 시 사용자에게 먼저 확인. 임의 도입 금지. 근거: [LF: Lock Stack](./docs/1. research_and_lectures/lecture-frameworks.md#lf-week9-lock-stack).
 18. **이슈 먼저, 그다음 PR(§4.2).** 의미 있는 작업은 **PR 생성 전에** `gh issue create`로 이슈를 먼저 열고(§4.3 형식) `Closes/Refs #N`로 연결한다. `gh issue list`로 기존 이슈도 점검한다. `no-issue:`는 오타·포맷 등 진짜 사소한 변경에만(상시 사용 금지). 이슈 없이 PR을 만들지 않는다.
-19. **구현·머지 권한(§0).** 이슈 제안자는 자동으로 구현자가 되지 않는다. 코드 변경은 `gyehyu`/Hermes와 승인 contributor `jyj23-jeong`이 수행하되, 윤지는 사전 합의된 이슈와 `yunji/*` 브랜치로 제한한다. 필수 CI가 모두 green이라고 자동 머지하거나 contributor가 self-merge하지 말고, Hermes가 PR의 이슈 연결·diff·테스트 근거·대화 해결을 확인한 뒤 계휴/Hermes가 머지한다.
+19. **구현·머지 권한(§0).** 이슈 제안자는 자동으로 구현자가 되지 않는다. 코드 변경은 김계휴/Hermes와 승인 contributor가 사전 합의된 이슈·자기 contributor slug 브랜치에서 수행한다. 필수 CI가 모두 green이라고 자동 머지하거나 contributor가 self-merge하지 말고, Hermes가 PR의 이슈 연결·diff·테스트 근거·대화 해결을 확인한 뒤 김계휴만 최종 merge한다.
 
 모순이 생기면 **이 `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > 기타**의 우선순위를 따른다.
 
@@ -391,7 +385,7 @@ DB 변경(테이블·RLS·함수)은 `docs/readinggo/supabase/NN_*.sql` 파일�
 
 제출자 스스로 체크:
 
-- [ ] 브랜치 이름이 `<owner>/<topic-slug>` 형식인가?
+- [ ] 브랜치 이름이 `<contributor>/<topic-slug>` 형식인가?
 - [ ] `main`과 rebase/merge로 최신 상태인가?
 - [ ] 변경이 논리적으로 하나의 단위인가?
 - [ ] 커밋 메시지가 Conventional Commits 형식인가?
