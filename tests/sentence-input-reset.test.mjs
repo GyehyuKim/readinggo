@@ -37,7 +37,7 @@ const retainedDrafts = nestSandbox.window._retainUnsavedDrafts([
 assert.deepEqual(Array.from(retainedDrafts, (draft) => draft.text), ['', '둘째'], '홈은 성공한 초안만 제거하고 빈 행·실패 초안을 보존');
 
 const submit = section(nestSource, 'const submitSentence', '// 쪽수 stepper');
-const successClear = submit.indexOf("setDrafts([{ text: '', visibility }])");
+const successClear = submit.indexOf("setDrafts([{ text: '' }])");
 const pageClear = submit.indexOf("setQuickSentPage('')");
 const persistenceWait = submit.indexOf('await Promise.resolve(handleCheckin(');
 const failureCatch = submit.indexOf('} catch (e) {');
@@ -51,7 +51,7 @@ assert.equal((submit.match(/awaitPersistence: true/g) || []).length, 2, '단일�
 assert.ok(guardCheck >= 0 && guardLock > guardCheck && persistenceWait > guardLock, '두 번째 동시 제출은 영속화 호출 전에 동기 차단해야 한다');
 assert.ok(persistenceWait >= 0 && successClear > persistenceWait, '입력 문장은 저장 성공을 기다린 뒤 비워야 한다');
 assert.ok(pageClear > persistenceWait, '문장별 페이지는 저장 성공을 기다린 뒤 비워야 한다');
-assert.ok(failureCatch > successClear && !submit.slice(failureCatch).includes("setDrafts([{ text: '', visibility }])"), '저장 실패 시 입력 전체를 비우지 않아야 한다');
+assert.ok(failureCatch > successClear && !submit.slice(failureCatch).includes("setDrafts([{ text: '' }])"), '저장 실패 시 입력 전체를 비우지 않아야 한다');
 assert.ok(/_retainUnsavedDrafts\(prev, saved\)/.test(submit.slice(failureCatch)), '부분 성공 시 검증된 helper로 성공 초안만 제거해야 한다');
 assert.ok(!submit.slice(failureCatch).includes('setQuickSentPage('), '저장 실패 시 문장별 페이지를 보존해야 한다');
 assert.ok(guardUnlock > failureCatch && submit.includes('} finally {'), '성공·실패 모두 제출 락을 해제해 실패 후 재시도할 수 있어야 한다');

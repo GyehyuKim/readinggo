@@ -12,39 +12,6 @@ const _bqiLength = (value) => Array.from(String(value == null ? '' : value).trim
 const _bqiPrimary = (on) => ({ flex: 1, padding: '13px 16px', borderRadius: 'var(--r-md)', border: 'none', background: on ? 'var(--brand)' : 'var(--brand-soft)', color: on ? '#fff' : 'var(--ink-3)', fontWeight: 800, fontSize: 15, cursor: on ? 'pointer' : 'default', letterSpacing: '-0.2px' });
 const _bqiTonal = { flex: '0 0 auto', padding: '13px 18px', borderRadius: 'var(--r-md)', border: '1px solid var(--brand-soft)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 15, cursor: 'pointer', letterSpacing: '-0.2px' };
 
-const _sentenceVisibilityOptions = [
-  { value: 'public', label: '전체 공개' },
-  { value: 'followers', label: '팔로워 공개' },
-  { value: 'private', label: '나만 보기' },
-];
-function normalizeSentenceVisibility(value) {
-  return _sentenceVisibilityOptions.some((o) => o.value === value) ? value : 'public';
-}
-async function readDefaultSentenceVisibility() {
-  try {
-    const api = window.DataStore && window.DataStore.settings;
-    const settings = api && api.get ? await Promise.resolve(api.get()) : {};
-    return settings && settings.default_sentence_visibility === 'private' ? 'private' : 'public';
-  } catch (e) {
-    showToast('기본 공개 범위를 불러오지 못했어요. 전체 공개로 시작해요.');
-    return 'public';
-  }
-}
-function SentenceVisibilitySelect({ value, onChange, label }) {
-  const current = normalizeSentenceVisibility(value);
-  return (
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>
-      <span>{label || '공개 범위'}</span>
-      <select value={current} onChange={(e) => onChange(e.target.value)} aria-label={label || '한 문장 공개 범위'}
-        style={{ padding: '6px 8px', borderRadius: 'var(--r-sm)', border: '1px solid var(--line)', background: 'var(--paper)', color: 'var(--ink)', fontSize: 12, fontWeight: 800 }}>
-        {_sentenceVisibilityOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </label>
-  );
-}
-window.normalizeSentenceVisibility = normalizeSentenceVisibility;
-window.readDefaultSentenceVisibility = readDefaultSentenceVisibility;
-window.SentenceVisibilitySelect = SentenceVisibilitySelect;
 
 async function saveSentenceBatch(items, saveOne) {
   const savedIndices = [];
@@ -67,19 +34,12 @@ window.RG_saveSentenceBatch = saveSentenceBatch;
 window.RG_retainFailedBatchItems = retainFailedBatchItems;
 
 function BatchQuoteImport({ onSave, onCancel, busy, initialItems }) {
-  const { useState: uS, useEffect: uE } = React;
+  const { useState: uS } = React;
   // initialItems(#844 사진 추출 결과 등)가 있으면 입력 단계 건너뛰고 바로 검토.
   const _hasInit = Array.isArray(initialItems) && initialItems.length > 0;
   const [step, setStep] = uS(_hasInit ? 'review' : 'input');   // 'input'(붙여넣기) → 'review'(검토)
   const [raw, setRaw] = uS('');
-  const [items, setItems] = uS(_hasInit ? initialItems.map((x) => ({ text: String(x.text || x), visibility: x.visibility || null })) : []);
-  uE(() => {
-    let alive = true;
-    readDefaultSentenceVisibility().then((visibility) => {
-      if (alive) setItems((arr) => arr.map((x) => x.visibility ? x : { ...x, visibility }));
-    });
-    return () => { alive = false; };
-  }, []);
+  const [items, setItems] = uS(_hasInit ? initialItems.map((x) => ({ text: String(x.text || x) })) : []);
 
   // 줄 단순 분리(§5.8 1차) — 줄바꿈 split + trim + 빈 줄 제거 + 중복 스킵. 마크다운 헤더기호(#)만 제거.
   const parse = () => {
@@ -87,15 +47,15 @@ function BatchQuoteImport({ onSave, onCancel, busy, initialItems }) {
     raw.split(/\r?\n/).forEach((line) => {
       const t = line.replace(/^#+\s*/, '').trim();
       if (!t || seen.has(t)) return;
-      seen.add(t); out.push({ text: t, visibility: null });
+      seen.add(t); out.push({ text: t });
     });
-    readDefaultSentenceVisibility().then((visibility) => setItems(out.map((x) => ({ ...x, visibility }))));
+    setItems(out);
     setStep('review');
   };
   const editItem = (i, patch) => setItems((arr) => arr.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const removeItem = (i) => setItems((arr) => arr.filter((_, j) => j !== i));
 
-  const valid = items.map((x) => ({ text: (x.text || '').trim(), visibility: normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
+  const valid = items.map((x) => ({ text: (x.text || '').trim() })).filter((x) => x.text);
   const tooLong = items.filter((x) => _bqiLength(x.text) > _BQI_MAX).length;
   const save = async () => {
     const result = await Promise.resolve(onSave(valid));
@@ -134,7 +94,7 @@ function BatchQuoteImport({ onSave, onCancel, busy, initialItems }) {
                 <textarea value={t} onChange={(e) => editItem(i, { text: e.target.value })}
                   rows={Math.min(5, Math.max(1, Math.ceil((length || 1) / 26)))}
                   style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-quote)', fontSize: 14, lineHeight: 1.55, color: 'var(--ink)', resize: 'none', padding: 0 }} />
-                <SentenceVisibilitySelect value={item.visibility} onChange={(visibility) => editItem(i, { visibility })} label={`${i + 1}번 문장 공개 범위`} />
+
                 </div>
                 {over && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: 'var(--fire)', marginTop: 8 }}>{length}/{_BQI_MAX}</span>}
                 <button onClick={() => removeItem(i)} aria-label="삭제" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px', marginTop: 4 }}>×</button>

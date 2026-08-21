@@ -27,15 +27,24 @@ function harness(state, { failSentenceOnce = false } = {}) {
   const SupabaseDataStore = {
     myBooks: { add: async ({ book }) => { bookAdds++; return { id: `remote-${book.title}` }; } },
     sessions: { addToday: async () => true },
-    sentences: { add: async (row) => {
-      sentenceAttempts++;
-      if (failSentenceOnce && sentenceAttempts === 1) throw new Error('synthetic sentence failure');
-      added.push(row);
-      return { id: `sentence-${sentenceAttempts}` };
-    } },
+    sentences: {
+      add: async (row) => {
+        sentenceAttempts++;
+        if (failSentenceOnce && sentenceAttempts === 1) throw new Error('synthetic sentence failure');
+        added.push(row);
+        return { id: `sentence-${sentenceAttempts}` };
+      },
+      importExisting: async (row) => {
+        sentenceAttempts++;
+        if (failSentenceOnce && sentenceAttempts === 1) throw new Error('synthetic sentence failure');
+        added.push(row);
+        return { id: `sentence-${sentenceAttempts}` };
+      },
+    },
     activeBook: { set: async () => true },
   };
-  const context = { window: { localStorageAdapter, SupabaseDataStore }, console: { log() {}, warn() {} }, Set };
+  const normalizeVisibility = (value) => value === 'friends' ? 'followers' : (value === 'public' || value === 'followers' || value === 'private' ? value : 'private');
+  const context = { window: { localStorageAdapter, SupabaseDataStore, RG_normalizeStoredSentenceVisibility: normalizeVisibility }, console: { log() {}, warn() {} }, Set };
   const fn = vm.runInNewContext(`(${extractFunction('syncPendingToSupabase')})`, context);
   return { run: fn, state: () => state, added, bookAdds: () => bookAdds };
 }

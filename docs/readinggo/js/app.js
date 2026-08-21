@@ -32,7 +32,7 @@ async function buildStateFromSupabase() {
     out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지는 책 없어도 XP로 유지 (#313)
   }
   // 항상 설정(없으면 []) — 로그인 시 데모 시드(INITIAL_STATE.myQuotes)가 '내 것'으로 남는 문제 방지 (#332).
-  out.myQuotes = (Array.isArray(mine) ? mine : []).map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', createdAt: s.created_at || '', note: s.my_note || '', kind: s.kind || 'quote', visibility: s.visibility || 'public', isPrivate: s.visibility === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
+  out.myQuotes = (Array.isArray(mine) ? mine : []).map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', createdAt: s.created_at || '', note: s.my_note || '', kind: s.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(s.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(s.visibility) === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
   // 소셜 isMine 판정 + 스포일러 동기맵: 현재 사용자 + 내 책별 현재 페이지 preload
   try {
     const me = await window.RG_SB.myProfile();
@@ -86,9 +86,9 @@ function hasPendingPublicUgc() {
   if (!la) return false;
   try {
     const local = la.read() || {};
-    const guestPublic = (local.user_books || []).some((ub) => (ub.sentences || []).some((se) => se && se._guest && se.visibility !== 'private'));
+    const guestPublic = (local.user_books || []).some((ub) => (ub.sentences || []).some((se) => se && se._guest && window.RG_normalizeStoredSentenceVisibility(se.visibility) !== 'private'));
     const pendingSentence = local.pending && local.pending.sentence;
-    return guestPublic || !!(pendingSentence && pendingSentence.text && pendingSentence.visibility !== 'private');
+    return guestPublic || !!(pendingSentence && pendingSentence.text && window.RG_normalizeStoredSentenceVisibility(pendingSentence.visibility) !== 'private');
   } catch (e) { return false; }
 }
 
@@ -131,9 +131,9 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
       const gsents = (ub.sentences || []).filter(se => se && se._guest)
         .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
       for (const se of gsents) {
-        if (se.visibility !== 'private' && !allowPublic) continue;
+        if (window.RG_normalizeStoredSentenceVisibility(se.visibility) !== 'private' && !allowPublic) continue;
         try {
-          await DS.sentences.add({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind, visibility: se.visibility });
+          await DS.sentences.importExisting({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind, visibility: se.visibility });
           syncedSentenceKeys.add(sentenceKey(se));
         } catch (e) { console.warn('[ReadingGo] 게스트 문장 1건 백필 보류:', e.message); }
       }
@@ -150,9 +150,9 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
           lastUbId = activeNewId = newUb.id;
           pendingBookSynced = true;
           try { await DS.sessions.addToday({ userBookId: newUb.id, page: pb.current_page || 0 }); } catch (e) {}
-          if (pend.sentence && pend.sentence.text && (pend.sentence.visibility === 'private' || allowPublic)) {
+          if (pend.sentence && pend.sentence.text && (window.RG_normalizeStoredSentenceVisibility(pend.sentence.visibility) === 'private' || allowPublic)) {
             try {
-              await DS.sentences.add({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text, visibility: pend.sentence.visibility });
+              await DS.sentences.importExisting({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text, visibility: pend.sentence.visibility });
               pendingSentenceSynced = true;
             } catch (e) { console.warn('[ReadingGo] pending 문장 백필 보류:', e.message); }
           }
@@ -937,7 +937,7 @@ function App() {
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
           xp: (typeof xpDb === 'number') ? xpDb : s.xp,
           myQuotes: Array.isArray(mineDb)
-            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: x.visibility || 'public', isPrivate: x.visibility === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
+            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(x.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(x.visibility) === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
         }));
         if (completion && completion.onSuccess) completion.onSuccess();

@@ -19,9 +19,18 @@ const RG_V41_KEY = 'rg_v41';
 
 // 한 문장 저장 계약(#1457): 공개범위와 무관하게 공백 제거 후 최대 1,000자.
 // 생성·본문 편집·공개범위 변경이 같은 정규화를 써서 로컬 우회를 막는다.
+function _storedSentenceVisibility(value) {
+  if (value === 'friends') return 'followers';
+  return value === 'public' || value === 'followers' || value === 'private' ? value : 'private';
+}
+function _defaultSentenceVisibility(settings) {
+  if (!settings || !Object.prototype.hasOwnProperty.call(settings, 'default_sentence_visibility')) return 'public';
+  return _storedSentenceVisibility(settings.default_sentence_visibility);
+}
+window.RG_normalizeStoredSentenceVisibility = _storedSentenceVisibility;
 function _validateSentenceText(text, visibility) {
   const value = String(text == null ? '' : text).trim();
-  const scope = visibility === 'private' ? 'private' : (visibility === 'followers' ? 'followers' : 'public');
+  const scope = _storedSentenceVisibility(visibility);
   if (!value) throw new Error('sentence_text_required');
   const characters = Array.from(value);
   const truncated = characters.length > 1000;
@@ -426,10 +435,10 @@ const DataStore = {
   /* 설정 ─────────────────────────────────────────── */
   settings: {
     get() {
-      return localStorageAdapter.mutate(s => ({
-        ...(s.settings || {}),
-        default_sentence_visibility: s.settings && s.settings.default_sentence_visibility === 'private' ? 'private' : 'public',
-      }));
+      return localStorageAdapter.mutate(s => {
+        const visibility = _defaultSentenceVisibility(s.settings);
+        return { ...(s.settings || {}), default_sentence_visibility: visibility };
+      });
     },
     update(patch) {
       return localStorageAdapter.mutate(s => {
@@ -640,16 +649,15 @@ const DataStore = {
 
   /* 한 문장 (sentences) ───────────────────────────── */
   sentences: {
-    add({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
+    add({ userBookId, sessionId, page, text, my_note, kind, visibility: _ignoredVisibility }) {
       return localStorageAdapter.mutate(s => {
         // #565: userBookId 가 명시됐는데 못 찾으면 active 책으로 폴백하지 않는다(잘못된 귀속 방지) — null 로 실패.
         // userBookId 미명시(레거시 호출)일 때만 active 책 사용.
         const ub = userBookId ? _ubById(s, userBookId) : _activeUB(s);
         if (!ub) return null;
         ub.sentences = ub.sentences || [];
-        const requestedVisibility = visibility === 'private' || visibility === 'followers' || visibility === 'public'
-          ? visibility
-          : (s.settings && s.settings.default_sentence_visibility === 'private' ? 'private' : 'public');
+        // 계정/게스트 기본 공개범위가 신규 문장의 단일 정본이다. 호출부 override는 무시한다.
+        const requestedVisibility = _defaultSentenceVisibility(s.settings);
         const checked = _validateSentenceText(text, requestedVisibility);
         const row = {
           id: _dsId('se'),
@@ -660,10 +668,28 @@ const DataStore = {
           text: checked.text,
           my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
-          // #1261: 호출부의 문장별 명시값이 우선. 없으면 저장된 기본값, 알 수 없는 값은 public.
+          // 저장 시점의 계정/게스트 기본 공개범위만 사용한다.
           visibility: checked.visibility,
           _guest: true,   // 게스트가 직접 남긴 문장(시드 아님) — 로그인 시 backfill 대상 (#370)
           created_at: Date.now(),
+        };
+        ub.sentences.push(row);
+        return row;
+      });
+    },
+    // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
+    importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
+      return localStorageAdapter.mutate(s => {
+        const ub = userBookId ? _ubById(s, userBookId) : _activeUB(s);
+        if (!ub) return null;
+        ub.sentences = ub.sentences || [];
+        const checked = _validateSentenceText(text, visibility);
+        const row = {
+          id: _dsId('se'), user_book_id: ub.id, book_id: ub.book_id,
+          session_id: sessionId || null,
+          page: typeof page === 'number' ? page : (ub.current_page || 0),
+          text: checked.text, my_note: my_note || null, kind: 'quote',
+          visibility: checked.visibility, _guest: true, created_at: Date.now(),
         };
         ub.sentences.push(row);
         return row;
