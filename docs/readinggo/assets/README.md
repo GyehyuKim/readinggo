@@ -17,5 +17,5 @@ npx @capacitor/assets generate   # icon.png/splash.png → ios·android 전 사�
 ```
 
 ## 메모
-- 초안 디자인(브랜드 기본). 최종 아이콘은 디자인 검토(승원) 후 교체 가능 — 이 파일만 갈아끼우면 위 명령으로 재생성.
+- 초안 디자인(브랜드 기본). 최종 아이콘은 합의된 이슈의 디자인 검토 후 교체 가능 — 이 파일만 갈아끼우면 위 명령으로 재생성.
 - Android 적응형 아이콘 전경/배경 분리가 필요하면 `icon-foreground.png`/`icon-background.png` 추가.

@@ -149,7 +149,7 @@ npx cap sync                    # 네이티브 프로젝트에 반영
 
 > 참고: 기본 `generate`는 다크모드 스플래시·일부 저밀도(ldpi) 변형·`ic_launcher_background.png`도 추가로 만든다. 현재 커밋본은 더 작은 세트라, 다크 스플래시까지 포함하려면 위 명령 재실행 후 산출물을 별도 PR로 커밋(네이티브 변경이라 빌드 검증 동반).
 
-**디자인 교체 시**: 최종 아이콘은 디자인 검토(승원) 후 `assets/icon.png`·`assets/splash.png`만 교체 → 위 명령 재생성. Android 적응형 아이콘 전경/배경 분리가 필요하면 `assets/icon-foreground.png`·`assets/icon-background.png` 추가.
+**디자인 교체 시**: 최종 아이콘은 합의된 이슈의 디자인 검토 후 `assets/icon.png`·`assets/splash.png`만 교체 → 위 명령 재생성. Android 적응형 아이콘 전경/배경 분리가 필요하면 `assets/icon-foreground.png`·`assets/icon-background.png` 추가.
 
 ---
 
@@ -197,7 +197,7 @@ iPad 6.5"/12.9", iOS 5.5" 등은 출시 후 보강 가능(iOS-PLAN §5.3). 첫 �
 - [ ] v17 구현과 Production QA가 끝난 동일 artifact를 기준으로 앱 이름·부제·설명·출시 노트 재승인
 - [ ] XP·둥지·스트릭·구 IA가 제거된 최신 iOS·Android 스크린샷 재생성
 - [ ] **Android 스크린샷** 캡처(계휴 Windows/에뮬레이터) → `assets/screenshots/android-phone/`
-- [ ] 최종 아이콘/스플래시 디자인 검토(승원) — 교체 시 `generate` 재실행
+- [ ] 최종 아이콘/스플래시 디자인 검토(합의된 이슈의 assignee) — 교체 시 `generate` 재실행
 - [ ] 개인정보처리방침 공개 URL 게시(`specs/privacy-policy.md` → GitHub Pages)
 - [ ] UGC 신고/차단 모더레이션 수단 확인(§6) — 없으면 별도 이슈
 - [ ] 연령 등급 설문(App Store / Play IARC) — UGC·소셜 정직 신고

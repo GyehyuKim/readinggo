@@ -47,7 +47,7 @@
 - 친구의 잎 본문과 개수는 해당 viewer가 `sentences_public`을 통해 실제로 읽을 수 있는 문장만 포함한다. `private` 문장의 존재·개수·본문과 `my_note`는 어떤 집계·빈 상태·차이 계산으로도 누출하지 않는다.
 - 내부 테이블 직접 조회를 피처 계약으로 삼지 않는다. 친구 책나무는 필드가 제한된 view 또는 `SECURITY INVOKER/DEFINER` RPC와 테스트 가능한 RLS 경계를 사용한다.
 
-**문장 저장 목표 (#1457)**: OCR·직접입력·배치/import와 `public|followers|private` 모두 공백 제거 후 1~1,000자를 저장한다. 200자 초과를 제외·절단하거나 `private`로 강제하지 않고 사용자가 선택한 공개범위를 보존한다. 1,001자 이상은 모든 클라이언트·Worker·직접 API/DB 쓰기에서 거부하되 검토 원문·초안은 보존한다. 아래 §7.2·§7.3의 200/1,000 조건부 경계는 `origin/main@39248ef`의 현행 as-built이며 #1457 구현 전까지 목표 완료로 해석하지 않는다.
+**문장 저장 목표 (#1457)**: OCR·직접입력·배치/import와 `public|followers|private` 모두 공백 제거 후 최대 1,000자를 저장한다. 200자 초과를 제외하거나 `private`로 강제하지 않고 사용자가 선택한 공개범위를 보존한다. 1,001자 이상은 클라이언트 저장 경계에서 `Array.from(trimmed).slice(0, 1000).join('')`과 동등한 Unicode 문자 기준으로 앞 1,000자를 저장하고, 절단 사실을 화면의 비차단 경고로 알린다. DB CHECK와 직접 API는 잘못된 우회 입력을 막기 위해 최종값 1~1,000자를 계속 강제하며 1,001자 원문을 그대로 수용하지 않는다. 아래 §7.2·§7.3의 200/1,000 조건부 경계는 `origin/main@39248ef`의 현행 as-built이며 #1457 구현 전까지 목표 완료로 해석하지 않는다.
 
 #### 7.0.3 현재 보안 갭과 전환 게이트
 
@@ -282,7 +282,7 @@ ai.extractBook(book, quotes)               → 추출 책 요약        // 드�
 
 **추가 메서드(계약 표면에 미열거, 코드 실재 — 드리프트 정정 2026-07-09)**: 위 목록 외에도 어댑터에 `sentences.updateText`/`setPage`/`setKind`/`remove`/`resurfaceCandidate`/`markResurfaced`, `books.saveRecap`, `admin.popularBooks`/`activeUsers`/`completionStats`/`cohortRetention`/`contentResonance` 가 존재한다(상세 문서화는 생략 — 표면만 명시).
 
-> 휴식코스(Pause) 관련 메서드(`pause.start(days)` 등)는 **상세 미정** — `systems.md`(승원)에서 기간·빈도·스트릭 동결 규칙 확정 후 본 계약에 추가.
+> 휴식코스(Pause) 관련 메서드(`pause.start(days)` 등)는 **상세 미정** — `systems.md`의 기간·빈도·스트릭 동결 규칙이 합의된 후속 이슈에서 확정된 뒤 본 계약에 추가.
 
 ### 7.2.1 책 데이터 소스 — 알라딘에서 국중도·카카오로 이전 (#1044, 출시 블로커)
 
@@ -592,7 +592,7 @@ inquiries                                   -- v7.2 신설 (09_inquiries.sql) �
 -- v7 제거: operator_replies 테이블 전체 (운영자 짹 폐기)
 ```
 
-> **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md`(승원) 확정 후 `pause_log` 류 테이블을 본 절에 추가.
+> **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md` 계약이 합의된 후속 이슈에서 확정된 뒤 `pause_log` 류 테이블을 본 절에 추가.
 
 JSONB 사용:
 - `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public"}`. 공개 범위 키는 `public|private`만 허용하며 키 없음·무효값은 `public`으로 해석한다. 설정 변경은 신규 `sentences.add` 초기값에만 적용하고 기존 문장을 갱신하지 않는다(#1261). 알림은 Phase 2 PWA 이후 실동작.

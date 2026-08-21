@@ -120,7 +120,7 @@
 
 | 슬립 트리거 | 대응 |
 |---|---|
-| Phase 0 Vite 전환 4일 이상 소요 | 윤지·승원 도움 요청. 컴포넌트 분리 작업 분할 가능 |
+| Phase 0 Vite 전환 4일 이상 소요 | 합의된 이슈에서 assignee를 정해 컴포넌트 분리 작업을 나눈다 |
 | iOS 시뮬 WKWebView 호환 깨짐 | 폴리필 또는 해당 기능 대체. WebView 차이는 보통 CSS 수준 |
 | Phase 2 OCR 통합 시간 부족 | 출시 전 P2로 강등, 출시 후 1주 내 OTA |
 | TestFlight Beta Review 거절 | 푸시·OCR·바코드 강조 재제출 (Minimum Functionality 거절 대응) |

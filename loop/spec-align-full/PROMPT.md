@@ -25,7 +25,7 @@ Exit: 아래 둘 다 만족하면 loop/spec-align-full/DONE 파일을 빈 내용
 Blocked (loop/spec-align-full/BLOCKED.md 에 누적 기록 후, 막힌 조항만 건너뛰고 계속 — 전체를 멈추지 말 것):
 - 스펙이 모호/두 해석 가능 → (a) 파일·절 (b) 해석 2개+ (c) 추천 해석.
 - 스펙 수정 필요(코드가 더 옳거나, 스펙이 과다/구식) → 어느 절을 어떻게 바꿀지 제안. 사용자가 별도 spec-only PR로 처리.
-- 타 owner 영역(nest/systems/design=승원)이라 코드 정합이 경계를 넘으면 → 어느 cross-owner 변경이 필요한지 명시 + decisions.md 플래그 제안만.
+- 합의된 이슈 범위를 넘어 다른 spec·런타임까지 변경해야 함 → 필요한 cross-file 변경과 수용 기준을 명시하고, 별도 이슈·spec-only PR 제안만 남길 것. 과거 작성자나 파일 경로를 고정 담당 경계로 사용하지 말 것.
 
 Constraints:
 - React 18 + Babel standalone CDN. 빌드 도구·새 라이브러리 금지 (CLAUDE.md Stack Lock).
