@@ -13,18 +13,20 @@ function section(source, startToken, endToken) {
   return source.slice(start, end);
 }
 
-const batchSandbox = { window: {}, Promise, Error, Array };
+const batchSandbox = { window: {}, Promise, Error, Array, _BQI_MAX: 1000, _bqiLength: (value) => Array.from(String(value == null ? '' : value).trim()).length };
 vm.createContext(batchSandbox);
 vm.runInContext(section(batchSource, 'async function saveSentenceBatch', 'function BatchQuoteImport'), batchSandbox);
-const batchResult = await batchSandbox.window.RG_saveSentenceBatch(['첫째', '둘째', '셋째'], async (_item, index) => {
+const batchItems = [{ text: '첫째' }, { text: '둘째' }, { text: '가'.repeat(1001) }, { text: '넷째' }];
+const batchResult = await batchSandbox.window.RG_saveSentenceBatch(batchItems, async (_item, index) => {
   if (index === 1) throw new Error('injected_failure');
-  if (index === 2) return null;
-  return { id: 'saved-0' };
+  if (index === 3) return null;
+  return { id: `saved-${index}` };
 });
-assert.deepEqual(Array.from(batchResult.savedIndices), [0], '실제 성공한 인덱스만 반환');
-assert.deepEqual(Array.from(batchResult.failedIndices), [1, 2], 'throw와 빈 row를 실패로 반환');
-assert.equal(batchResult.saved, 1, '0건 fallback 없이 실제 저장 수 반환');
-assert.deepEqual(Array.from(batchSandbox.window.RG_retainFailedBatchItems(['첫째', '둘째', '셋째'], batchResult.failedIndices)), ['둘째', '셋째'], '실패 초안만 검토 화면에 남김');
+assert.deepEqual(Array.from(batchResult.savedIndices), [0, 2], '실제 성공한 인덱스만 반환');
+assert.deepEqual(Array.from(batchResult.failedIndices), [1, 3], 'throw와 빈 row를 실패로 반환');
+assert.deepEqual(Array.from(batchResult.truncatedIndices), [2], '성공한 1001자 행만 절단 알림 대상으로 반환');
+assert.equal(batchResult.saved, 2, '0건 fallback 없이 실제 저장 수 반환');
+assert.deepEqual(Array.from(batchSandbox.window.RG_retainFailedBatchItems(batchItems, batchResult.failedIndices), (item) => item.text), ['둘째', '넷째'], '실패 초안만 검토 화면에 남김');
 
 const nestSandbox = { window: {}, Set, Array };
 vm.createContext(nestSandbox);
@@ -44,7 +46,7 @@ const guardLock = submit.indexOf('_sentenceSubmittingRef.current = true;');
 const guardUnlock = submit.indexOf('_sentenceSubmittingRef.current = false;');
 
 assert.ok(submit.startsWith('const submitSentence = async'), '한 문장 제출은 비동기 영속화를 기다려야 한다');
-assert.ok(/ready\.some\(\(x\) => Array\.from\(x\.text\)\.length > 1000\)[\s\S]+입력 내용은 그대로 두었어요/.test(submit), 'Unicode 1001자 입력은 영속화 전에 거부하고 초안을 보존해야 한다');
+assert.ok(/hadTruncation = ready\.some\(\(x\) => Array\.from\(x\.text\)\.length > 1000\)[\s\S]+await Promise\.resolve\(handleCheckin\([\s\S]+앞부분만 저장했어요/.test(submit), 'Unicode 1001자 입력은 영속 성공 후 절단 사실을 알려야 한다');
 assert.equal((submit.match(/awaitPersistence: true/g) || []).length, 2, '단일·배치 저장 모두 완료 신호를 요청해야 한다');
 assert.ok(guardCheck >= 0 && guardLock > guardCheck && persistenceWait > guardLock, '두 번째 동시 제출은 영속화 호출 전에 동기 차단해야 한다');
 assert.ok(persistenceWait >= 0 && successClear > persistenceWait, '입력 문장은 저장 성공을 기다린 뒤 비워야 한다');

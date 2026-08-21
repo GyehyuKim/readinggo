@@ -14,7 +14,6 @@ const _diBookRow = { display: 'flex', alignItems: 'center', gap: 10, width: '100
 
 function DataImport({ onClose }) {
   const { useState: uS, useEffect: uE, useRef: uR } = React;
-  const _importSentenceLength = (value) => Array.from(String(value == null ? '' : value).trim()).length;
   const [step, setStep] = uS('book');        // 'book' → 'upload' → 'review'
   const [myBooks, setMyBooks] = uS([]);
   const [bq, setBq] = uS('');
@@ -97,10 +96,6 @@ function DataImport({ onClose }) {
     const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
     if (!list.length) return { saved: 0, failedIndices: [] };
     if (!ubId) { showToast('가져올 책을 다시 선택해 주세요'); return { saved: 0, failedIndices: list.map((_, i) => i) }; }
-    if (list.some((x) => _importSentenceLength(x.text) > 1000)) {
-      showToast('1,000자가 넘는 문장을 줄여주세요. 입력 내용은 그대로 두었어요.');
-      return { saved: 0, failedIndices: list.map((_, i) => i) };
-    }
     setBusy(true);
     const result = await window.RG_saveSentenceBatch(list, async (item) => {
       const text = item.text;

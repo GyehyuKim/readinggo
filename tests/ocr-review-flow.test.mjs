@@ -42,8 +42,10 @@ check('201자 허용', validate('가'.repeat(201), '10', 20, 300).valid);
 check('1000자 허용', validate('가'.repeat(1000), '10', 20, 300).valid);
 check('이모지 1000자 허용', validate('😀'.repeat(1000), '10', 20, 300).valid);
 check('빈 원문 거부', !validate('   ', '10', 20, 300).valid);
-check('1001자 거부', !validate('가'.repeat(1001), '10', 20, 300).valid);
-check('이모지 1001자 거부', !validate('😀'.repeat(1001), '10', 20, 300).valid);
+result = validate('가'.repeat(1001), '10', 20, 300);
+check('1001자는 앞 1000자로 저장 정규화', result.valid && result.truncated && result.originalLength === 1001 && Array.from(result.sentence).length === 1000);
+result = validate('😀'.repeat(1001), '10', 20, 300);
+check('이모지 1001자는 surrogate pair를 깨지 않고 절단', result.valid && result.truncated && Array.from(result.sentence).length === 1000 && result.sentence === '😀'.repeat(1000));
 check('0 페이지 거부', !validate('문장', '0', 20, 300).valid);
 check('총 페이지 초과 거부', !validate('문장', '301', 20, 300).valid);
 check('총 페이지 미상은 1 이상 허용', validate('문장', '999', 20, 0).valid);
@@ -57,9 +59,11 @@ check('201~1000자도 길이 기반 private 강제 없이 기존 기본 공개�
   && /sentence: checked\.sentence, kind: 'quote'/.test(ocrSaveFlow));
 check('검토 화면은 N/1,000 카운터를 표시하고 장문 비공개 안내를 제거',
   /Array\.from\(ocrReview\.text\.trim\(\)\)\.length\}\/1,000자/.test(src)
+  && /저장 시 앞 1,000자만 남아요/.test(src)
   && !/200자를 넘어 나만 보기로 저장돼요/.test(src));
-check('OCR 응답을 1000자에서 자동 절단하지 않음',
+check('OCR 추출 응답은 검토 전 1000자에서 자동 절단하지 않음',
   !/String\(d\.text\)\.slice\(0,\s*1000\)/.test(fs.readFileSync(path.join(root, 'docs/readinggo/js/data.js'), 'utf8')));
+check('OCR 저장 성공 후 절단 사실을 알림', /checked\.truncated[\s\S]+앞부분만 저장했어요/.test(ocrSaveFlow));
 check('중복 저장 차단', /if \(!ocrReview \|\| ocrSaving\) return;/.test(src) && /disabled=\{ocrSaving\}/.test(src));
 check('실패 시 검토값 보존 안내', /내용을 유지했으니 다시 시도해주세요/.test(src));
 check('공개 UGC 동의 필요 시 원인별 재시도 안내', /code === 'ugc_terms_required'[\s\S]+\uCEE4뮤니티 안내에 동의한 뒤 다시 저장/.test(ocrSaveFlow));

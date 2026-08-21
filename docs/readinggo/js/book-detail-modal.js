@@ -40,7 +40,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   const saveNewQuote = async () => {
     const t = (addText || '').trim();
     if (!t) { showToast('한 문장을 입력해주세요'); return; }
-    if (_bookSentenceLength(t) > 1000) { showToast('한 문장은 1,000자 이내로 남겨주세요. 입력 내용은 그대로 두었어요.'); return; }
+    const wasTruncated = _bookSentenceLength(t) > 1000;
     if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return; }
     if (addBusy) return;
     setAddBusy(true);
@@ -55,20 +55,17 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
         createdAt: row.created_at || '', note: row.my_note || '', kind: 'quote', visibility: row.visibility || 'public',
       } } }));
       setAddText(''); setAddPage(''); setAddOpen(false);
-      showToast('한 문장을 남겼어요');
+      showToast(wasTruncated ? '1,000자를 넘어 앞부분만 저장했어요' : '한 문장을 남겼어요');
       if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote', source: 'book_detail' });
     } catch (e) { showToast('저장 실패 — 잠시 후 다시'); }
     finally { setAddBusy(false); }
   };
   // #848 여러 문장 일괄 담기 — saveNewQuote 패턴 재사용. sentences.add 반복 + xp.add(+20) 1회.
-  // 각 문장 rg:sentence-added 로 app myQuotes·목록 자동 반영. page 미상=null, 1,000자/중복은 컴포넌트에서 거름.
+  // 각 문장 rg:sentence-added 로 app myQuotes·목록 자동 반영. page 미상=null, 빈 값/중복은 컴포넌트에서 거름.
   const saveBatchQuotes = async (quotes) => {
     const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
     if (!list.length) return { saved: 0, failedIndices: [] };
-    if (list.some((x) => _bookSentenceLength(x.text) > 1000)) {
-      showToast('1,000자가 넘는 문장을 줄여주세요. 입력 내용은 그대로 두었어요.');
-      return { saved: 0, failedIndices: list.map((_, i) => i) };
-    }
+
     if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return { saved: 0, failedIndices: list.map((_, i) => i) }; }
     const result = await window.RG_saveSentenceBatch(list, async (item) => {
       const text = item.text;
@@ -726,10 +723,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               ) : (
                 <div style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:12, padding:12}}>
                   <textarea value={addText} onChange={e => setAddText(e.target.value)}
-                    aria-invalid={_bookSentenceLength(addText) > 1000}
+                    aria-describedby="book-sentence-length"
                     placeholder="이 책에서 남기고 싶은 한 문장" rows={3} autoFocus
                     style={{width:'100%', boxSizing:'border-box', border:'1.5px solid var(--line)', borderRadius:12, padding:10, fontSize:14, lineHeight:1.5, resize:'none'}} />
-                  <div style={{textAlign:'right', fontSize:11, color:_bookSentenceLength(addText)>1000?'var(--fire)':'var(--ink-3)'}}>{_bookSentenceLength(addText)}/1,000자{_bookSentenceLength(addText)>1000?' — 줄여주세요':''}</div>
+                  <div id="book-sentence-length" style={{textAlign:'right', fontSize:11, color:_bookSentenceLength(addText)>1000?'var(--fire)':'var(--ink-3)'}}>{_bookSentenceLength(addText)}/1,000자{_bookSentenceLength(addText)>1000?' — 저장 시 앞 1,000자만 남아요':''}</div>
                   {/* 인용/내 생각 토글 제거 (#596) — '내 생각' 폐기, 항상 인용(quote) 저장 */}
                   <div style={{display:'flex', gap:8, alignItems:'center', marginTop:8}}>
                     <input type="number" inputMode="numeric" min="0" max="99999" value={addPage} onChange={e => setAddPage(e.target.value)} placeholder="페이지"

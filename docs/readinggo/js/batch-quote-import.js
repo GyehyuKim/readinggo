@@ -49,14 +49,16 @@ window.SentenceVisibilitySelect = SentenceVisibilitySelect;
 async function saveSentenceBatch(items, saveOne) {
   const savedIndices = [];
   const failedIndices = [];
+  const truncatedIndices = [];
   for (let i = 0; i < items.length; i++) {
     try {
       const row = await Promise.resolve(saveOne(items[i], i));
       if (!row) throw new Error('sentence_batch_row_missing');
       savedIndices.push(i);
+      if (_bqiLength(items[i] && items[i].text) > _BQI_MAX) truncatedIndices.push(i);
     } catch (e) { failedIndices.push(i); }
   }
-  return { saved: savedIndices.length, savedIndices, failedIndices };
+  return { saved: savedIndices.length, savedIndices, failedIndices, truncatedIndices };
 }
 function retainFailedBatchItems(items, failedIndices) {
   return (failedIndices || []).map((i) => items[i]).filter(Boolean);
@@ -93,11 +95,13 @@ function BatchQuoteImport({ onSave, onCancel, busy, initialItems }) {
   const editItem = (i, patch) => setItems((arr) => arr.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const removeItem = (i) => setItems((arr) => arr.filter((_, j) => j !== i));
 
-  const valid = items.map((x) => ({ text: (x.text || '').trim(), visibility: normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text && _bqiLength(x.text) <= _BQI_MAX);
+  const valid = items.map((x) => ({ text: (x.text || '').trim(), visibility: normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
   const tooLong = items.filter((x) => _bqiLength(x.text) > _BQI_MAX).length;
   const save = async () => {
     const result = await Promise.resolve(onSave(valid));
     const failed = Array.isArray(result && result.failedIndices) ? result.failedIndices : [];
+    const truncated = Array.isArray(result && result.truncatedIndices) ? result.truncatedIndices.length : 0;
+    if (truncated > 0) showToast(`${truncated}개 문장이 1,000자를 넘어 앞부분만 저장됐어요`);
     if (failed.length) setItems(retainFailedBatchItems(valid, failed));
   };
 
@@ -137,7 +141,7 @@ function BatchQuoteImport({ onSave, onCancel, busy, initialItems }) {
               </div>
             );
           })}
-          {tooLong > 0 && <div style={{ fontSize: 12, color: 'var(--fire)', fontWeight: 700, padding: '4px 6px' }}>1,000자가 넘는 문장 {tooLong}개는 줄여야 담겨요.</div>}
+          {tooLong > 0 && <div style={{ fontSize: 12, color: 'var(--fire)', fontWeight: 700, padding: '4px 6px' }}>1,000자가 넘는 문장 {tooLong}개는 저장할 때 앞 1,000자만 남아요.</div>}
         </div>
       )}
 
@@ -150,7 +154,7 @@ function BatchQuoteImport({ onSave, onCancel, busy, initialItems }) {
         ) : (
           <>
             <button onClick={() => setStep('input')} style={_bqiTonal}>← 다시</button>
-            <button onClick={save} disabled={busy || valid.length === 0 || tooLong > 0} style={_bqiPrimary(!busy && valid.length > 0 && tooLong === 0)}>
+            <button onClick={save} disabled={busy || valid.length === 0} style={_bqiPrimary(!busy && valid.length > 0)}>
               {busy ? '담는 중…' : `${valid.length}개 담기`}
             </button>
           </>

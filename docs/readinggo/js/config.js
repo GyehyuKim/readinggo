@@ -89,7 +89,9 @@ window.RG_VALIDATE = (function () {
     },
     sentence: function (v) {
       var s = t(v);
-      return Array.from(s).length > 1000 ? { ok: false, value: s, msg: '한 문장은 1,000자 이내로 적어주세요.' } : { ok: true, value: s };
+      var chars = Array.from(s);
+      var truncated = chars.length > 1000;
+      return { ok: true, value: truncated ? chars.slice(0, 1000).join('') : s, truncated: truncated, originalLength: chars.length };
     },
     note: function (v) {
       var s = t(v);

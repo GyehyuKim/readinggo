@@ -17,15 +17,20 @@
 
 const RG_V41_KEY = 'rg_v41';
 
-// 한 문장 저장 계약(#1457): 공개범위와 무관하게 공백 제거 후 1~1,000자.
-// 생성·본문 편집·공개범위 변경이 같은 검증을 써서 로컬 우회를 막는다.
+// 한 문장 저장 계약(#1457): 공개범위와 무관하게 공백 제거 후 최대 1,000자.
+// 생성·본문 편집·공개범위 변경이 같은 정규화를 써서 로컬 우회를 막는다.
 function _validateSentenceText(text, visibility) {
   const value = String(text == null ? '' : text).trim();
   const scope = visibility === 'private' ? 'private' : (visibility === 'followers' ? 'followers' : 'public');
   if (!value) throw new Error('sentence_text_required');
-  // 기존 호출부의 error code 분기를 깨지 않되 모든 공개범위에 같은 상한을 적용한다.
-  if (Array.from(value).length > 1000) throw new Error(scope === 'private' ? 'sentence_text_too_long' : 'sentence_public_text_too_long');
-  return { text: value, visibility: scope };
+  const characters = Array.from(value);
+  const truncated = characters.length > 1000;
+  return {
+    text: truncated ? characters.slice(0, 1000).join('') : value,
+    visibility: scope,
+    truncated,
+    originalLength: characters.length,
+  };
 }
 window.RG_validateSentenceText = _validateSentenceText;
 

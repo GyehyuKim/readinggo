@@ -142,11 +142,16 @@ function CompanionModal({ sentence, onClose }) {
   const saveText = async () => {
     const v = stext.trim();
     if (!v) { setEditing(false); return; }
-    if (Array.from(v).length > 1000) { setStextError('한 문장은 1,000자 이내로 남겨주세요.'); return; }
+    const wasTruncated = Array.from(v).length > 1000;
     try {
-      if (DataStore.sentences && DataStore.sentences.updateText) await Promise.resolve(DataStore.sentences.updateText(sentence.id, v));
+      let savedText = window.RG_validateSentenceText ? window.RG_validateSentenceText(v, sentence.visibility).text : Array.from(v).slice(0, 1000).join('');
+      if (DataStore.sentences && DataStore.sentences.updateText) {
+        const row = await Promise.resolve(DataStore.sentences.updateText(sentence.id, v));
+        if (row && row.text) savedText = row.text;
+      }
       // 종류 변경(#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 수정.
-      sentence.text = v; setStextError(''); setEditing(false); showToast('문장 수정됨');
+      sentence.text = savedText; setStext(savedText); setStextError(''); setEditing(false);
+      showToast(wasTruncated ? '1,000자를 넘어 앞부분만 저장했어요' : '문장 수정됨');
     } catch (e) {
       setStextError('저장하지 못했어요. 입력 내용은 그대로 두었어요.');
     }
@@ -315,10 +320,10 @@ function CompanionModal({ sentence, onClose }) {
             <div style={{ marginBottom: 14 }}>
               {/* 인용↔내 생각 토글 (#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 편집. */}
               <textarea value={stext} onChange={(e) => { setStext(e.target.value); setStextError(''); }} rows={3}
-                aria-invalid={!!stextError || Array.from(stext.trim()).length > 1000}
+                aria-invalid={!!stextError}
                 style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--brand)', borderRadius: 12, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 11 }}>
-                <span style={{ color: 'var(--fire)' }}>{stextError}</span>
+                <span style={{ color: 'var(--fire)' }}>{stextError || (Array.from(stext.trim()).length > 1000 ? '저장 시 앞 1,000자만 남아요.' : '')}</span>
                 <span style={{ color: Array.from(stext.trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(stext.trim()).length}/1,000자</span>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>

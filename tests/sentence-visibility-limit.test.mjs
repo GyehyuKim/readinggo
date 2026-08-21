@@ -25,14 +25,19 @@ for (const visibility of scopes) {
     assert.equal(Array.from(row.text).length, length, `${visibility} ${length}자 저장`);
     assert.equal(row.visibility, visibility, `${visibility} 공개범위 보존`);
   }
-  const error = visibility === 'private' ? /sentence_text_too_long/ : /sentence_public_text_too_long/;
-  assert.throws(() => ds.sentences.add({ userBookId: ub.id, text: '가'.repeat(1001), visibility }), error, `${visibility} 1001자 거부`);
+  const longRow = ds.sentences.add({ userBookId: ub.id, text: '가'.repeat(1001), visibility });
+  assert.equal(Array.from(longRow.text).length, 1000, `${visibility} 1001자는 앞 1000자 저장`);
+  assert.equal(longRow.visibility, visibility, `${visibility} 절단 후 공개범위 보존`);
   assert.equal(Array.from(ds.sentences.add({ userBookId: ub.id, text: '😀'.repeat(1000), visibility }).text).length, 1000, `${visibility} 이모지 1000자 저장`);
-  assert.throws(() => ds.sentences.add({ userBookId: ub.id, text: '😀'.repeat(1001), visibility }), error, `${visibility} 이모지 1001자 거부`);
+  assert.equal(Array.from(ds.sentences.add({ userBookId: ub.id, text: '😀'.repeat(1001), visibility }).text).length, 1000, `${visibility} 이모지 1001자는 surrogate pair를 깨지 않고 절단`);
 }
 const private1000 = ds.sentences.add({ userBookId: ub.id, text: '가'.repeat(1000), visibility: 'private' });
 assert.equal(ds.sentences.setVisibility(private1000.id, { visibility: 'followers' }).visibility, 'followers', '1000자 공개범위 변경 허용');
-assert.throws(() => ds.sentences.updateText(private1000.id, '가'.repeat(1001)), /sentence_public_text_too_long/, '본문 편집 우회 차단');
+assert.equal(Array.from(ds.sentences.updateText(private1000.id, '가'.repeat(1001)).text).length, 1000, '본문 편집도 앞 1000자로 정규화');
+const checkedLong = sandbox.window.RG_validateSentenceText('😀'.repeat(1001), 'followers');
+assert.equal(checkedLong.truncated, true, '공통 validator는 절단 여부를 반환');
+assert.equal(checkedLong.originalLength, 1001, '공통 validator는 원래 Unicode 문자 수를 반환');
+assert.equal(Array.from(checkedLong.text).length, 1000, '공통 validator는 이모지 경계를 보존해 절단');
 
 const supabaseSource = fs.readFileSync(path.join(root, 'docs/readinggo/js/datastore-supabase.js'), 'utf8');
 assert.match(supabaseSource, /validateSentenceText\(text, sentenceVisibility\)/, 'Supabase insert 사전 검증');
@@ -55,9 +60,9 @@ const nest = fs.readFileSync(path.join(root, 'docs/readinggo/js/nest.js'), 'utf8
 const companion = fs.readFileSync(path.join(root, 'docs/readinggo/js/companion.js'), 'utf8');
 const sentenceCard = fs.readFileSync(path.join(root, 'docs/readinggo/js/sentence-card.js'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'docs/readinggo/js/app.js'), 'utf8');
-assert.match(config, /sentence:[\s\S]+Array\.from\(s\)\.length > 1000 \? \{ ok: false, value: s,/, '공통 validator는 Unicode 문자 수를 쓰고 원문을 절단하지 않는다');
-assert.doesNotMatch(config, /sentence:[\s\S]{0,240}slice\(0, 1000\)/, '문장 validator silent truncation 금지');
+assert.match(config, /sentence:[\s\S]+chars = Array\.from\(s\)[\s\S]+chars\.slice\(0, 1000\)\.join\(''\)[\s\S]+truncated:/, '공통 폼 validator는 Unicode 절단값과 메타데이터를 반환한다');
 assert.match(batchImport, /const _bqiLength = \(value\) => Array\.from/);
+assert.match(batchImport, /truncatedIndices[\s\S]+앞부분만 저장됐어요/, 'batch는 성공한 절단 행 인덱스와 사용자 알림을 제공한다');
 assert.match(batchImport, /RG_saveSentenceBatch = saveSentenceBatch[\s\S]+retainFailedBatchItems\(valid, failed\)/, 'batch 부분 실패는 실행 검증된 helper로 실패 초안만 남긴다');
 assert.match(dataImport, /RG_saveSentenceBatch\(list[\s\S]+result\.failedIndices\.length[\s\S]+else \{ showToast\(`\$\{result\.saved\}개를 가져왔어요`\); onClose\(\); \}/, '외부 import는 공용 helper를 사용하고 전부 성공한 경우에만 닫는다');
 assert.match(bookDetail, /RG_saveSentenceBatch\(list[\s\S]+return result/, '책 상세 batch는 공용 helper의 부분 실패 결과를 반환한다');
@@ -66,7 +71,9 @@ assert.match(bookDetail, /onChange=\{e => setAddText\(e\.target\.value\)\}/, '�
 assert.match(nest, /onChange=\{\(e\) => setDraft\(0, \{ text: e\.target\.value \}\)\}/, '홈 직접 입력은 1001자 원문도 초안에 보존');
 assert.match(nest, /_retainUnsavedDrafts\(prev, saved\)/, '홈 부분 실패는 실행 검증된 helper로 성공 초안만 제거한다');
 assert.match(app, /RG_saveSentenceBatch\(batch[\s\S]+result\.failedIndices\.length[\s\S]+throw error[\s\S]+completion\.onSuccess/, '홈 batch 실패는 공용 helper를 거쳐 성공 콜백 전에 reject한다');
-assert.match(companion, /const saveText = async \(\) =>[\s\S]+Array\.from\(v\)\.length > 1000[\s\S]+await Promise\.resolve/, '기존 문장 편집은 Unicode 검증 후 저장 성공에만 반영');
-assert.match(sentenceCard, /Array\.from\(text\)\.length > 1000[\s\S]+aria-invalid=\{Array\.from\(dText\.trim\(\)\)\.length > 1000\}/, '공용 인라인 편집도 Unicode 카운터와 명시 오류를 쓴다');
+assert.match(companion, /wasTruncated = Array\.from\(v\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '기존 문장 편집은 Unicode 절단 후 실제 저장값과 알림을 반영한다');
+assert.match(sentenceCard, /wasTruncated = Array\.from\(text\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '공용 인라인 편집도 Unicode 절단 후 실제 저장값과 알림을 반영한다');
+assert.match(nest, /hadTruncation[\s\S]+앞부분만 저장했어요/, '홈 직접입력은 저장 성공 후 절단 알림을 표시한다');
+assert.match(nest, /const savedSentence = sentence \? normalizeText\(sentence, visibility\)[\s\S]+const savedSentences = Array\.isArray\(sentences\)[\s\S]+ns\.myQuotes = \[\{ text: savedSentence[\s\S]+onCheckin\(ns, newLv, xpGain, savedSentence/, '홈 낙관 UI·게스트 pending·영속 payload는 같은 절단값을 쓴다');
 
 console.log('sentence visibility limits: ok');

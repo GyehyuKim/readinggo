@@ -175,7 +175,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     stop(e);
     const text = (dText || '').trim();
     if (!text) { showToast('문장 내용을 입력해 주세요'); return; }
-    if (Array.from(text).length > 1000) { showToast('한 문장은 1,000자 이내로 남겨주세요. 입력 내용은 그대로 두었어요.'); return; }
+    const wasTruncated = Array.from(text).length > 1000;
     const pageRaw = (dPage || '').trim();
     const page = pageRaw === '' ? null : parseInt(pageRaw, 10);
     if (pageRaw !== '' && (!isFinite(page) || page < 0)) { showToast('페이지 번호를 확인해 주세요'); return; }
@@ -183,11 +183,12 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     setSaving(true);
     const ops = [Promise.resolve(DataStore.sentences.updateText(id, text))];
     if (DataStore.sentences.setPage) ops.push(Promise.resolve(DataStore.sentences.setPage(id, page)));
-    Promise.all(ops).then(() => {
-      sentence.text = text; sentence.page = page;   // 카드 즉시 정합
+    Promise.all(ops).then(([updated]) => {
+      const savedText = (updated && updated.text) || (window.RG_validateSentenceText ? window.RG_validateSentenceText(text, sentence.visibility).text : Array.from(text).slice(0, 1000).join(''));
+      sentence.text = savedText; sentence.page = page; setDText(savedText);   // 카드 즉시 정합
       setEditing(false); setSaving(false);
-      window.dispatchEvent(new CustomEvent('rg:sentence-updated', { detail: { id, text, page } }));
-      showToast('한 문장을 수정했어요');
+      window.dispatchEvent(new CustomEvent('rg:sentence-updated', { detail: { id, text: savedText, page } }));
+      showToast(wasTruncated ? '1,000자를 넘어 앞부분만 저장했어요' : '한 문장을 수정했어요');
     }).catch(() => { setSaving(false); showToast('수정 실패 — 잠시 후 다시'); });
   };
   const del = (e) => { stop(e); if (!(DataStore.sentences && DataStore.sentences.remove)) return; if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return; Promise.resolve(DataStore.sentences.remove(id)).then(() => { if (onRemoved) onRemoved(id); window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id } })); showToast('한 문장을 삭제했어요'); }).catch(() => showToast('삭제 실패 — 잠시 후 다시')); };
@@ -219,8 +220,8 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }} onClick={stop}>
         <textarea value={dText} onChange={(e) => setDText(e.target.value)} rows={3} placeholder="문장 내용"
-          aria-invalid={Array.from(dText.trim()).length > 1000} style={{ ...inputBase, resize: 'vertical', lineHeight: 1.5 }} />
-        <div style={{ textAlign: 'right', fontSize: 11, color: Array.from(dText.trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(dText.trim()).length}/1,000자{Array.from(dText.trim()).length > 1000 ? ' — 줄여주세요' : ''}</div>
+          style={{ ...inputBase, resize: 'vertical', lineHeight: 1.5 }} />
+        <div style={{ textAlign: 'right', fontSize: 11, color: Array.from(dText.trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(dText.trim()).length}/1,000자{Array.from(dText.trim()).length > 1000 ? ' — 저장 시 앞 1,000자만 남아요' : ''}</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>페이지</label>
           <input type="number" min="0" inputMode="numeric" value={dPage} onChange={(e) => setDPage(e.target.value)} placeholder="미상" style={{ ...inputBase, width: 110 }} />
