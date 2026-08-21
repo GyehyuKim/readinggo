@@ -438,7 +438,7 @@
       async setVisibility(sentenceId, patch) {
         const id = await uid();
         const nextPatch = { ...(patch || {}) };
-        if (patch && patch.visibility) {
+        if (patch && Object.prototype.hasOwnProperty.call(patch, 'visibility')) {
           const current = unwrap(await sb().from('sentences').select('text').eq('id', sentenceId).eq('user_id', id).single());
           const checked = validateSentenceText(current && current.text, patch.visibility);
           nextPatch.visibility = checked.visibility;

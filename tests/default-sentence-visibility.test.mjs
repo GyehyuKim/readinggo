@@ -45,6 +45,8 @@ const importedPrivate = ds.sentences.importExisting({ userBookId: ub.id, text: '
 assert.equal(importedPrivate.visibility, 'private', '기존 게스트 private 이관은 계정 기본값과 무관하게 보존');
 const unknownChanged = ds.sentences.setVisibility(importedPrivate.id, { visibility: 'unexpected' });
 assert.equal(unknownChanged.visibility, 'private', '사후 unknown 공개범위도 private fail-closed');
+const nullChanged = ds.sentences.setVisibility(importedPrivate.id, { visibility: null });
+assert.equal(nullChanged.visibility, 'private', '사후 명시적 null 공개범위도 private fail-closed');
 
 ds.drafts.save('book-1', [{ text: '열린 초안', visibility: 'public' }]);
 assert.deepEqual(JSON.parse(JSON.stringify(ds.drafts.load('book-1'))), [{ text: '열린 초안', visibility: 'public' }], '레거시 초안 원본은 보존');
@@ -67,7 +69,7 @@ assert.match(supabase, /hasOwnProperty\.call\(settings, 'default_sentence_visibi
 assert.match(settingsUi, /function normalizeDefaultSentenceVisibility[\s\S]+hasOwnProperty\.call\(settings, 'default_sentence_visibility'\)[\s\S]+: 'private'/, '설정 UI도 null·unknown을 private로 표시');
 assert.match(source, /importExisting\([\s\S]+visibility: checked\.visibility/, 'local 이관 API가 기존 privacy 보존');
 assert.match(supabase, /async importExisting\([\s\S]+sentenceVisibility = storedSentenceVisibility\(visibility\)/, 'Supabase 이관 API가 기존 privacy 보존');
-assert.match(supabase, /async setVisibility[\s\S]+const checked = validateSentenceText\(current && current\.text, patch\.visibility\)[\s\S]+nextPatch\.visibility = checked\.visibility[\s\S]+update\(nextPatch\)/, 'Supabase 사후 unknown 공개범위도 private 정규화값으로 UPDATE');
+assert.match(supabase, /async setVisibility[\s\S]+hasOwnProperty\.call\(patch, 'visibility'\)[\s\S]+const checked = validateSentenceText\(current && current\.text, patch\.visibility\)[\s\S]+nextPatch\.visibility = checked\.visibility[\s\S]+update\(nextPatch\)/, 'Supabase 사후 unknown·null 공개범위도 private 정규화값으로 UPDATE');
 assert.equal((app.match(/DS\.sentences\.importExisting\(/g) || []).length, 2, '게스트 일반·pending 이관은 전용 API 사용');
 assert.doesNotMatch(settingsUi, /value:\s*'friends'/, '설정 UI는 friends alias를 새로 저장하지 않음');
 assert.ok((settingsUi.match(/value:\s*'followers'/g) || []).length >= 2, '설정 modal·view 모두 followers canonical 값 사용');
