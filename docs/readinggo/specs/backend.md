@@ -307,6 +307,15 @@ ai.extractBook(book, quotes)               → 추출 책 요약        // 드�
 - primary provider 할당 결과가 effective limit을 이미 채워 남은 슬롯이 없으면 Google 보강을 호출하지 않는다. 카카오/알라딘 primary 성공 응답은 24시간, provider 실패 후 Google fallback 성공 응답은 1시간 캐시한다.
 - 회귀 검증은 `max=1·2·5·10·20·20초과`, 기본/invalid/0/음수, 카카오·알라딘 성공/실패, Google 중복 제거·불필요 호출 방지, ISBN 단건 비영향을 포함한다.
 
+**레거시 Aladin upstream 오류·캐시 계약 (`GET /aladin`, #1461):**
+
+- Aladin base는 공지된 `https://aladin.co.kr/ttb/api/`를 사용한다. `http` 리다이렉트와 `www`·`openapi` 별칭에 의존하지 않는다.
+- `aladinFetch`는 본문 파싱 전에 HTTP status를 판정한다. 429와 모든 4xx/5xx, 네트워크 예외, 파싱 불가능한 비JSON 응답, Aladin 오류 객체는 upstream 실패다. 이들을 정상 빈 `items: []`로 해석하거나 24시간 캐시하지 않는다. HTTP 200의 유효 응답에서 `item`이 비어 있는 경우만 정상 빈 검색 결과다.
+- 검색의 Aladin upstream 실패는 기존 Google Books fallback으로 전환한다. Google fallback이 유효 결과 또는 유효한 빈 결과를 반환하면 200과 최대 1시간 캐시를 사용한다. Aladin과 Google이 모두 실패하면 502를 반환하고 `Cache-Control: no-store`로 실패를 캐시하지 않는다.
+- ISBN 단건의 Aladin upstream 실패는 Google 검색 fallback으로 성공을 위장하지 않는다. 안정적인 generic 502 오류 코드를 반환하고 실패 응답을 캐시하지 않는다. provider 원문 본문, TTB key, 내부 요청 URL·query, stack·예외 message는 클라이언트 응답에 포함하지 않는다.
+- 운영 로그는 `provider=aladin`, 분류(`network|http|parse|provider`), HTTP status(있을 때), route 종류(`search|isbn`)만 구조화해 남긴다. secret·원문 본문·전체 URL은 기록하지 않는다.
+- 구현 회귀는 mock으로 429, 대표 4xx, 5xx JSON·비JSON, 네트워크 예외, 오류 객체, 정상 빈 결과를 검증한다. 검색 fallback 1시간, 정상 primary 24시간, 이중 실패·ISBN 실패 `no-store`, provider 본문·키 비노출, 카카오·국중도 정상 경로 비영향을 포함한다. 비공개 rate limit을 소모하는 반복 실 API 호출은 하지 않고, 공식 base 1회 smoke는 DEV 승격 검증에서만 수행한다.
+
 **worker 이전 지점 (`worker/index.mjs`):**
 
 | 현행 함수 | 현재(알라딘) | 이전 후 | 비고 |
