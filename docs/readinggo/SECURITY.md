@@ -9,13 +9,13 @@
 |---|---|---|---|
 | 아이디 `@handle` | 2~20자 · 한글/영문/숫자/_ · 고유 | 유지 | `users_handle_fmt` + `unique` |
 | 표시 이름 `display_name` | 1~40자 | 유지 | `users_dname_len` |
-| 한 문장 `text` | `private`는 1~1,000자, `public\|followers`는 최대 200자. OCR 201~1,000자는 `private` 강제, 배치 추출은 200자 초과 제외 | 모든 입력·공개범위에서 1~1,000자. 길이에 따른 제외·절단·`private` 강제 없음 | 현행 `52_sentence_visibility_length.sql`; 목표 CHECK는 #1457 구현 PR에서 교체 |
+| 한 문장 `text` | `private`는 1~1,000자, `public\|followers`는 최대 200자. OCR 201~1,000자는 `private` 강제, 배치 추출은 200자 초과 제외 | 모든 입력·공개범위에서 최종값 1~1,000자. 1,001자 이상은 클라이언트 저장 시 앞 1,000 Unicode 문자로 절단·안내하며 공개범위 유지 | 현행 `52_sentence_visibility_length.sql`; 목표 CHECK는 #1457 구현 PR에서 교체 |
 | 사후 감상 `my_note` | ≤1000자 | 유지 | `sentences_note_len` |
 | 완독 소감 `review_text` | ≤1000자(UI 300) | 유지 | `ub_review_len` |
 | 별점 `rating` | 0.5~5.0 · 0.5 단위 | 유지 | `ub_rating_range` |
 | `bio` | ≤300자 | 유지 | `users_bio_len` |
 
-**전환 원칙**: #1457의 Worker·DataStore·DB CHECK·OCR·직접입력·배치/import·카피·경계 테스트가 모두 반영되고 DEV 역할별 저장/재조회 증거가 생기기 전에는 1,000자 공개 저장을 구현 완료로 표시하지 않는다. 잘못된 값은 인라인으로 안내하고 서버가 최종 거부한다. 새 입력 필드는 클라 검증과 DB CHECK를 함께 추가한다.
+**전환 원칙**: #1457의 Worker·DataStore·DB CHECK·OCR·직접입력·배치/import·카피·경계 테스트가 모두 반영되고 DEV 역할별 저장/재조회 증거가 생기기 전에는 1,000자 공개 저장을 구현 완료로 표시하지 않는다. 정상 클라이언트는 1,001자 이상을 앞 1,000 Unicode 문자로 정규화하고 사용자에게 알리며, 직접 API/DB 우회 입력은 서버와 CHECK가 최종 거부한다. 새 입력 필드는 클라 검증과 DB CHECK를 함께 추가한다.
 
 ## 2. 보안 감사 요약 (2026-06-04)
 **2026-06 당시 감사 범위**의 위험도는 LOW–MEDIUM, Critical/High 0건이었다. 이 평가는 이후 추가된 친구 책나무·공개범위·구 APK 전환의 안전 판정이 아니다. 현재 알려진 broad `user_books` read와 private 문장 존재 추론 side channel은 v17 친구 책나무 출시 차단급 결함이다.
