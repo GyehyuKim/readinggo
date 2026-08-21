@@ -48,7 +48,7 @@
 - DB migration 파일명·SHA-256·적용 순서·대상 환경·원격 ledger read-back·영향 건수·rollback 쿼리
 - Play versionCode·AAB checksum·서명/출처·내부/Production 트랙·설치 기기 QA
 - owner·friend·nonfriend·blocked·anonymous 직접 API와 UI 허용·거부 결과
-- 공개 1,000자·크롤 seed Production 활성화 단위는 #1463의 실제 takedown 접수 링크, 책임자, 임시 숨김→삭제→이의·기록 SOP, 피드·책 상세·검색·캐시 비노출 E2E를 포함한다. 하나라도 미확인이면 `BLOCKED`다.
+- 공개 1,000자 승격은 문장 길이·공개범위·출처표기·삭제 후 비노출 회귀를 검증하되, 후순위 #1463 전용 takedown 시스템을 선행 게이트로 두지 않는다. 크롤 seed 확대·상용화·반복 권리요청이 발생하면 실제 접수 링크, 책임자, 임시 숨김→삭제→이의·기록 SOP와 전 표면 비노출 E2E를 별도 승인한다.
 - XP 신규 획득 경로의 DB 값 변화 0, app version별 legacy 호출량, 분석 격리
 
 모든 검증 항목은 `PASS | FAIL | BLOCKED | NOT_RUN` 중 하나다. skip·unknown·secret 부재·"workflow success"만으로 PASS를 만들지 않는다.
