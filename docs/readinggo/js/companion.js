@@ -117,6 +117,7 @@ function CompanionModal({ sentence, onClose }) {
   const [rated, setRated] = _useState(null);               // 질문 평가 👍/👎 (#371)
   const [editing, setEditing] = _useState(false);          // 한 문장 본문 편집 (#325)
   const [stext, setStext] = _useState(sentence.text || '');
+  const [stextError, setStextError] = _useState('');
   const [skind, setSkind] = _useState(sentence.kind === 'thought' ? 'thought' : 'quote'); // 인용↔내 의견 (#381)
   const _compTailRef = _useRef(null);                      // 대화 말단 anchor (#407 화면 점프 방지)
   const consent = window.RG_consent ? window.RG_consent.get() : 'yes';
@@ -138,12 +139,22 @@ function CompanionModal({ sentence, onClose }) {
   _useEffect(() => { if (mode === 'jacky') _syncPresetFade(); }, [mode]);
   const _presetMask = `linear-gradient(to right, ${presetFade.l ? 'transparent' : '#000'} 0, #000 16px, #000 calc(100% - 16px), ${presetFade.r ? 'transparent' : '#000'} 100%)`;
   const bt = sentence.bookTitle || '', au = sentence.author || '';
-  const saveText = () => {
+  const saveText = async () => {
     const v = stext.trim();
     if (!v) { setEditing(false); return; }
-    if (DataStore.sentences && DataStore.sentences.updateText) Promise.resolve(DataStore.sentences.updateText(sentence.id, v)).catch(() => {});
-    // 종류 변경(#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 수정.
-    sentence.text = v; setEditing(false); showToast('문장 수정됨');
+    const wasTruncated = Array.from(v).length > 1000;
+    try {
+      let savedText = window.RG_validateSentenceText ? window.RG_validateSentenceText(v, sentence.visibility).text : Array.from(v).slice(0, 1000).join('');
+      if (DataStore.sentences && DataStore.sentences.updateText) {
+        const row = await Promise.resolve(DataStore.sentences.updateText(sentence.id, v));
+        if (row && row.text) savedText = row.text;
+      }
+      // 종류 변경(#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 수정.
+      sentence.text = savedText; setStext(savedText); setStextError(''); setEditing(false);
+      showToast(wasTruncated ? '1,000자를 넘어 앞부분만 저장했어요' : '문장 수정됨');
+    } catch (e) {
+      setStextError('저장하지 못했어요. 입력 내용은 그대로 두었어요.');
+    }
   };
   // 재키 질문 생성 — 재키 모드에서만(감상 모드는 LLM 호출 안 함, #1070). 감상→재키 전환으로
   // 처음 재키에 들어올 때 1회 생성. 이미 질문이 있거나 종료(done)면 재생성하지 않는다.
@@ -308,11 +319,16 @@ function CompanionModal({ sentence, onClose }) {
           {editing ? (
             <div style={{ marginBottom: 14 }}>
               {/* 인용↔내 생각 토글 (#381) 제거 — '내 생각'(thought) 폐기 (#596). 텍스트만 편집. */}
-              <textarea value={stext} onChange={(e) => { if (e.target.value.length <= 1000) setStext(e.target.value); }} rows={3}
+              <textarea value={stext} onChange={(e) => { setStext(e.target.value); setStextError(''); }} rows={3}
+                aria-invalid={!!stextError}
                 style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--brand)', borderRadius: 12, padding: 10, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 11 }}>
+                <span style={{ color: 'var(--fire)' }}>{stextError || (Array.from(stext.trim()).length > 1000 ? '저장 시 앞 1,000자만 남아요.' : '')}</span>
+                <span style={{ color: Array.from(stext.trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(stext.trim()).length}/1,000자</span>
+              </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 {/* 취소 = 3차 텍스트(DESIGN.md #1032: ghost 금지) */}
-                <button onClick={() => { setStext(sentence.text || ''); setSkind(sentence.kind === 'thought' ? 'thought' : 'quote'); setEditing(false); }}
+                <button onClick={() => { setStext(sentence.text || ''); setStextError(''); setSkind(sentence.kind === 'thought' ? 'thought' : 'quote'); setEditing(false); }}
                   style={{ flex: '0 0 auto', padding: '7px 14px', borderRadius: 999, border: 'none', background: 'transparent', color: 'var(--ink-2)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>취소</button>
                 <button onClick={saveText}
                   style={{ flex: 1, padding: '7px 14px', borderRadius: 999, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>저장</button>
@@ -326,7 +342,7 @@ function CompanionModal({ sentence, onClose }) {
                 </span>{sentence.text}</>
               ) : `"${sentence.text}"`}
               <span style={{ position: 'absolute', top: 6, right: 8, display: 'flex', gap: 4 }}>
-                <button onClick={() => { setStext(sentence.text || ''); setEditing(true); }} title="문장 수정" aria-label="문장 수정"
+                <button onClick={() => { setStext(sentence.text || ''); setStextError(''); setEditing(true); }} title="문장 수정" aria-label="문장 수정"
                   style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.55, padding: 3, display: 'flex', alignItems: 'center' }}>
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M9 2l2 2-7 7H2v-2L9 2z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </button>

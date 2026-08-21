@@ -7,6 +7,7 @@
    ========================================================= */
 
 const { useState: _useState, useEffect: _useEffect } = React;
+const _bookSentenceLength = (value) => Array.from(String(value == null ? '' : value).trim()).length;
 
 /* ── BookDetailModal ─────────────────────────────────────── */
 function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
@@ -39,6 +40,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   const saveNewQuote = async () => {
     const t = (addText || '').trim();
     if (!t) { showToast('한 문장을 입력해주세요'); return; }
+    const wasTruncated = _bookSentenceLength(t) > 1000;
     if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return; }
     if (addBusy) return;
     setAddBusy(true);
@@ -53,38 +55,35 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
         createdAt: row.created_at || '', note: row.my_note || '', kind: 'quote', visibility: row.visibility || 'public',
       } } }));
       setAddText(''); setAddPage(''); setAddOpen(false);
-      showToast('한 문장을 남겼어요');
+      showToast(wasTruncated ? '1,000자를 넘어 앞부분만 저장했어요' : '한 문장을 남겼어요');
       if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote', source: 'book_detail' });
     } catch (e) { showToast('저장 실패 — 잠시 후 다시'); }
     finally { setAddBusy(false); }
   };
   // #848 여러 문장 일괄 담기 — saveNewQuote 패턴 재사용. sentences.add 반복 + xp.add(+20) 1회.
-  // 각 문장 rg:sentence-added 로 app myQuotes·목록 자동 반영. page 미상=null, 200자/중복은 컴포넌트에서 거름.
+  // 각 문장 rg:sentence-added 로 app myQuotes·목록 자동 반영. page 미상=null, 빈 값/중복은 컴포넌트에서 거름.
   const saveBatchQuotes = async (quotes) => {
-    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text && x.text.length <= 200);
-    if (!list.length) return { saved: 0 };
-    if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return { error: true, saved: 0 }; }
-    let saved = 0;
-    for (const item of list) {
+    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
+    if (!list.length) return { saved: 0, failedIndices: [] };
+
+    if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return { saved: 0, failedIndices: list.map((_, i) => i) }; }
+    const result = await window.RG_saveSentenceBatch(list, async (item) => {
       const text = item.text;
-      try {
-        const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
-        if (row && row.id) {
-          saved++;
-          if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote', source: 'book_detail_import' });
-          window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
-            id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
-            page: (typeof row.page === 'number' ? row.page : 0), when: '방금',
-            createdAt: row.created_at || '', note: row.my_note || '', kind: 'quote', visibility: row.visibility || 'public',
-          } } }));
-        }
-      } catch (e) { /* 개별 실패 스킵 */ }
-    }
-    if (saved > 0) {
+      const row = await Promise.resolve(DataStore.sentences.add({ userBookId: book.ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
+      if (!row || !row.id) return null;
+      if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote', source: 'book_detail_import' });
+      window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
+        id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
+        page: (typeof row.page === 'number' ? row.page : 0), when: '방금',
+        createdAt: row.created_at || '', note: row.my_note || '', kind: 'quote', visibility: row.visibility || 'public',
+      } } }));
+      return row;
+    });
+    if (result.saved > 0) {
       try { await Promise.resolve(DataStore.xp.add(20, 'batch')); } catch (e) {}
-      if (window.rgTrack) window.rgTrack('text_import_saved', { book_id: book.id, saved });
+      if (window.rgTrack) window.rgTrack('text_import_saved', { book_id: book.id, saved: result.saved });
     }
-    return { saved };
+    return result;
   };
   // #844 배치 OCR — 앨범 N장 → 각 장 Gemini vision 강조 추출(순차+지연, 무료 10 RPM) → 추출 문장 → BatchQuoteImport(initialItems) 검토.
   const runOcrBatch = async (files) => {
@@ -723,9 +722,11 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                 </>
               ) : (
                 <div style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:12, padding:12}}>
-                  <textarea value={addText} onChange={e => { if (e.target.value.length <= 1000) setAddText(e.target.value); }}
+                  <textarea value={addText} onChange={e => setAddText(e.target.value)}
+                    aria-describedby="book-sentence-length"
                     placeholder="이 책에서 남기고 싶은 한 문장" rows={3} autoFocus
                     style={{width:'100%', boxSizing:'border-box', border:'1.5px solid var(--line)', borderRadius:12, padding:10, fontSize:14, lineHeight:1.5, resize:'none'}} />
+                  <div id="book-sentence-length" style={{textAlign:'right', fontSize:11, color:_bookSentenceLength(addText)>1000?'var(--fire)':'var(--ink-3)'}}>{_bookSentenceLength(addText)}/1,000자{_bookSentenceLength(addText)>1000?' — 저장 시 앞 1,000자만 남아요':''}</div>
                   {/* 인용/내 생각 토글 제거 (#596) — '내 생각' 폐기, 항상 인용(quote) 저장 */}
                   <div style={{display:'flex', gap:8, alignItems:'center', marginTop:8}}>
                     <input type="number" inputMode="numeric" min="0" max="99999" value={addPage} onChange={e => setAddPage(e.target.value)} placeholder="페이지"
@@ -839,9 +840,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             setBatchBusy(true);
             try {
               const r = await saveBatchQuotes(quotes);
-              if (r && r.error) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
-              else { showToast((r.saved || quotes.length) + '개 담았어요'); setQuotePasteOpen(false); }
-            } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
+              if (r.failedIndices.length) showToast(`${r.saved}개 저장, ${r.failedIndices.length}개는 다시 확인해 주세요`);
+              else { showToast(r.saved + '개 담았어요'); setQuotePasteOpen(false); }
+              return r;
+            } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); return { saved: 0, failedIndices: quotes.map((_, i) => i) }; }
             finally { setBatchBusy(false); }
           }} />
       )}
@@ -863,9 +865,10 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             setBatchBusy(true);
             try {
               const r = await saveBatchQuotes(quotes);
-              if (r && r.error) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
-              else { showToast((r.saved || quotes.length) + '개 담았어요'); setOcrItems(null); }
-            } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); }
+              if (r.failedIndices.length) showToast(`${r.saved}개 저장, ${r.failedIndices.length}개는 다시 확인해 주세요`);
+              else { showToast(r.saved + '개 담았어요'); setOcrItems(null); }
+              return r;
+            } catch (e) { showToast('담기 실패 — 잠시 후 다시 시도해요'); return { saved: 0, failedIndices: quotes.map((_, i) => i) }; }
             finally { setBatchBusy(false); }
           }} />
       )}

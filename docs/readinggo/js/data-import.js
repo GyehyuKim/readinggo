@@ -93,30 +93,28 @@ function DataImport({ onClose }) {
 
   // 검토 확정 → 선택 책에 일괄 담기. page=null, kind='quote'. book-detail-modal.saveBatchQuotes 패턴.
   const commit = async (quotes) => {
-    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text && x.text.length <= 200);
-    if (!list.length || !ubId) { onClose(); return; }
+    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
+    if (!list.length) return { saved: 0, failedIndices: [] };
+    if (!ubId) { showToast('가져올 책을 다시 선택해 주세요'); return { saved: 0, failedIndices: list.map((_, i) => i) }; }
     setBusy(true);
-    let saved = 0;
-    for (const item of list) {
+    const result = await window.RG_saveSentenceBatch(list, async (item) => {
       const text = item.text;
-      try {
-        const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
-        if (row && row.id) {
-          saved++;
-          window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
-            id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
-            page: 0, when: '방금', createdAt: row.created_at || '', note: '', kind: 'quote', visibility: row.visibility || 'public',
-          } } }));
-        }
-      } catch (e) { /* 개별 실패 스킵 */ }
-    }
-    if (saved > 0) {
+      const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
+      if (!row || !row.id) return null;
+      window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
+        id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
+        page: 0, when: '방금', createdAt: row.created_at || '', note: '', kind: 'quote', visibility: row.visibility || 'public',
+      } } }));
+      return row;
+    });
+    if (result.saved > 0) {
       try { await Promise.resolve(DataStore.xp.add(20, 'import')); } catch (e) {}
-      if (window.rgTrack) window.rgTrack('external_import_saved', { book_id: book.id, saved });
+      if (window.rgTrack) window.rgTrack('external_import_saved', { book_id: book.id, saved: result.saved });
     }
     setBusy(false);
-    showToast(saved > 0 ? `${saved}개를 가져왔어요` : '가져오지 못했어요');
-    onClose();
+    if (result.failedIndices.length) showToast(`${result.saved}개 저장, ${result.failedIndices.length}개는 다시 확인해 주세요`);
+    else { showToast(`${result.saved}개를 가져왔어요`); onClose(); }
+    return result;
   };
 
   // 검토 단계는 BatchQuoteImport 재사용(사진 추출과 동일 UX). ← 다시=업로드로.

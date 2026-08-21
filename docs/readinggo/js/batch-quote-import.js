@@ -7,7 +7,8 @@
    ========================================================= */
 
 // DESIGN.md 버튼 위계: 1차=솔리드(--brand), 2차=tonal(--brand-soft 배경 + --brand-3 글씨). ghost 금지.
-const _BQI_MAX = 200;   // sentences.text CHECK (1~200자, backend.md §sentences)
+const _BQI_MAX = 1000;
+const _bqiLength = (value) => Array.from(String(value == null ? '' : value).trim()).length;  // sentences.text CHECK (공개범위 공통 1~1,000자, #1457)
 const _bqiPrimary = (on) => ({ flex: 1, padding: '13px 16px', borderRadius: 'var(--r-md)', border: 'none', background: on ? 'var(--brand)' : 'var(--brand-soft)', color: on ? '#fff' : 'var(--ink-3)', fontWeight: 800, fontSize: 15, cursor: on ? 'pointer' : 'default', letterSpacing: '-0.2px' });
 const _bqiTonal = { flex: '0 0 auto', padding: '13px 18px', borderRadius: 'var(--r-md)', border: '1px solid var(--brand-soft)', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 15, cursor: 'pointer', letterSpacing: '-0.2px' };
 
@@ -45,7 +46,27 @@ window.normalizeSentenceVisibility = normalizeSentenceVisibility;
 window.readDefaultSentenceVisibility = readDefaultSentenceVisibility;
 window.SentenceVisibilitySelect = SentenceVisibilitySelect;
 
-function BatchQuoteImport({ onCancel, onSave, busy, initialItems }) {
+async function saveSentenceBatch(items, saveOne) {
+  const savedIndices = [];
+  const failedIndices = [];
+  const truncatedIndices = [];
+  for (let i = 0; i < items.length; i++) {
+    try {
+      const row = await Promise.resolve(saveOne(items[i], i));
+      if (!row) throw new Error('sentence_batch_row_missing');
+      savedIndices.push(i);
+      if (_bqiLength(items[i] && items[i].text) > _BQI_MAX) truncatedIndices.push(i);
+    } catch (e) { failedIndices.push(i); }
+  }
+  return { saved: savedIndices.length, savedIndices, failedIndices, truncatedIndices };
+}
+function retainFailedBatchItems(items, failedIndices) {
+  return (failedIndices || []).map((i) => items[i]).filter(Boolean);
+}
+window.RG_saveSentenceBatch = saveSentenceBatch;
+window.RG_retainFailedBatchItems = retainFailedBatchItems;
+
+function BatchQuoteImport({ onSave, onCancel, busy, initialItems }) {
   const { useState: uS, useEffect: uE } = React;
   // initialItems(#844 사진 추출 결과 등)가 있으면 입력 단계 건너뛰고 바로 검토.
   const _hasInit = Array.isArray(initialItems) && initialItems.length > 0;
@@ -74,8 +95,15 @@ function BatchQuoteImport({ onCancel, onSave, busy, initialItems }) {
   const editItem = (i, patch) => setItems((arr) => arr.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const removeItem = (i) => setItems((arr) => arr.filter((_, j) => j !== i));
 
-  const valid = items.map((x) => ({ text: (x.text || '').trim(), visibility: normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text && x.text.length <= _BQI_MAX);
-  const tooLong = items.filter((x) => (x.text || '').trim().length > _BQI_MAX).length;
+  const valid = items.map((x) => ({ text: (x.text || '').trim(), visibility: normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
+  const tooLong = items.filter((x) => _bqiLength(x.text) > _BQI_MAX).length;
+  const save = async () => {
+    const result = await Promise.resolve(onSave(valid));
+    const failed = Array.isArray(result && result.failedIndices) ? result.failedIndices : [];
+    const truncated = Array.isArray(result && result.truncatedIndices) ? result.truncatedIndices.length : 0;
+    if (truncated > 0) showToast(`${truncated}개 문장이 1,000자를 넘어 앞부분만 저장됐어요`);
+    if (failed.length) setItems(retainFailedBatchItems(valid, failed));
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, height: 'var(--app-h, 100dvh)', background: 'var(--paper)', zIndex: 1100, display: 'flex', flexDirection: 'column' }}>
@@ -97,22 +125,23 @@ function BatchQuoteImport({ onCancel, onSave, busy, initialItems }) {
           {items.length === 0 && <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 13, marginTop: 40 }}>나눌 문장이 없어요 — 다시 입력해 주세요</div>}
           {items.map((item, i) => {
             const t = item.text || '';
-            const over = t.trim().length > _BQI_MAX;
+            const length = _bqiLength(t);
+            const over = length > _BQI_MAX;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--card)', border: `1px solid ${over ? 'var(--fire)' : 'var(--line)'}`, borderRadius: 'var(--r-sm)', padding: '8px 10px', marginBottom: 8 }}>
                 <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: 'var(--ink-3)', marginTop: 8, minWidth: 18, textAlign: 'right' }}>{i + 1}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                 <textarea value={t} onChange={(e) => editItem(i, { text: e.target.value })}
-                  rows={Math.min(5, Math.max(1, Math.ceil(((t || '').length || 1) / 26)))}
+                  rows={Math.min(5, Math.max(1, Math.ceil((length || 1) / 26)))}
                   style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-quote)', fontSize: 14, lineHeight: 1.55, color: 'var(--ink)', resize: 'none', padding: 0 }} />
                 <SentenceVisibilitySelect value={item.visibility} onChange={(visibility) => editItem(i, { visibility })} label={`${i + 1}번 문장 공개 범위`} />
                 </div>
-                {over && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: 'var(--fire)', marginTop: 8 }}>{(t || '').trim().length}/{_BQI_MAX}</span>}
+                {over && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: 'var(--fire)', marginTop: 8 }}>{length}/{_BQI_MAX}</span>}
                 <button onClick={() => removeItem(i)} aria-label="삭제" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 4px', marginTop: 4 }}>×</button>
               </div>
             );
           })}
-          {tooLong > 0 && <div style={{ fontSize: 12, color: 'var(--fire)', fontWeight: 700, padding: '4px 6px' }}>200자가 넘는 문장 {tooLong}개는 줄여야 담겨요.</div>}
+          {tooLong > 0 && <div style={{ fontSize: 12, color: 'var(--fire)', fontWeight: 700, padding: '4px 6px' }}>1,000자가 넘는 문장 {tooLong}개는 저장할 때 앞 1,000자만 남아요.</div>}
         </div>
       )}
 
@@ -125,7 +154,7 @@ function BatchQuoteImport({ onCancel, onSave, busy, initialItems }) {
         ) : (
           <>
             <button onClick={() => setStep('input')} style={_bqiTonal}>← 다시</button>
-            <button onClick={() => onSave(valid)} disabled={busy || valid.length === 0} style={_bqiPrimary(!busy && valid.length > 0)}>
+            <button onClick={save} disabled={busy || valid.length === 0} style={_bqiPrimary(!busy && valid.length > 0)}>
               {busy ? '담는 중…' : `${valid.length}개 담기`}
             </button>
           </>
