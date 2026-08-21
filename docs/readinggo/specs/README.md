@@ -77,15 +77,14 @@
 ### 살아있는 spec 의무
 구현 중 ① 가정이 틀림 ② 예상보다 어려움 ③ 예측 못 한 사용자 행동 발견 → **spec commit 먼저, 코드 commit 나중**. 근거: [LF: Living Document](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week9-living-document).
 
-### 파일 소유권
+### 파일 변경 조율
 
-| 피처 파일 | owner | 비고 |
-|---|---|---|
-| `nest.md` · `systems.md` · `design.md` | **seungwon** | 책나무 화면·성장 리듬·디자인 |
-| `feed.md` · `profile.md` · `backend.md` · `onboarding.md` | **gyehyu** | 공개범위·서재·백엔드·가입 |
-| `meta/*` · `README.md` | **gyehyu** | 결정 기록·통합 (머지 담당) |
+피처 파일별 고정 담당은 두지 않는다. 김계휴/Hermes와 승인 contributor 이승원·정윤지는 사전에 합의된 이슈 범위에서 필요한 spec을 변경할 수 있으며, 과거 작성자·branch slug·파일 경로를 현재 담당이나 편집 허가 근거로 사용하지 않는다.
 
-> **SSOT 규칙**: 책나무 화면=`nest.md`, 성장일·XP 전환=`systems.md`, 데이터·RLS=`backend.md`, 문장 공개=`feed.md`, 결정 우선순위=`meta/decisions.md`. 과거 XP·둥지 수치표는 레거시 호환 근거일 뿐 새 제품 계약이 아니다.
+- 동일 파일을 수정하는 open PR이 있으면 먼저 충돌 가능성과 수용 기준 중복을 확인한다.
+- 동작·계약 변경은 해당 피처의 spec-only PR을 먼저 승인·머지한 뒤 코드 PR로 진행한다.
+- 감독 게이트를 통과한 PR은 승인 contributor·Hermes도 `main`에 merge하고 stable DEV까지 검증할 수 있다. Production 승격은 김계휴만 수행한다.
+- **SSOT 규칙**: 책나무 화면=`nest.md`, 성장일·XP 전환=`systems.md`, 데이터·RLS=`backend.md`, 문장 공개=`feed.md`, 결정 우선순위=`meta/decisions.md`. 과거 XP·둥지 수치표는 레거시 호환 근거일 뿐 새 제품 계약이 아니다.
 
 ---
 

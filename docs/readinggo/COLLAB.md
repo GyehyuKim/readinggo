@@ -6,7 +6,7 @@
 
 ## 0. 핵심 전제 — Slack은 GitHub를 복제하지 않는다
 
-ReadingGo의 협업은 이미 GitHub 중심으로 규율화되어 있다: 이슈-퍼스트(§4.2), owner 분담(gyehyu/seungwon/yunji), P0/P1/P2 라벨, 마일스톤 트리아지, spec-PR/code-PR 분리. Slack이 메꿀 공백은 **실시간·비동기 소통 하나뿐**이다.
+ReadingGo의 협업은 이미 GitHub 중심으로 규율화되어 있다: 이슈-퍼스트(§4.2), 합의된 이슈 범위의 contributor 협업, P0/P1/P2 라벨, 마일스톤 트리아지, spec-PR/code-PR 분리, 감독 게이트를 통과한 main/DEV merge, 김계휴 단독 Production 승격. Slack이 메꿀 공백은 **실시간·비동기 소통 하나뿐**이다.
 
 - **GitHub = 진실 소스** — 무엇을·왜·상태. 확정된 작업은 반드시 이슈.
 - **Slack = 얇은 실시간 레이어** — 의사결정·조율·알림.
@@ -17,21 +17,21 @@ ReadingGo의 협업은 이미 GitHub 중심으로 규율화되어 있다: 이슈
 | Slack #readinggo | GitHub |
 |---|---|
 | "이거 이슈로 열까 말까" 빠른 합의 | 확정된 태스크 = 이슈 |
-| owner 경계 넘는 파일 수정 사전 조율(§3.5) | PR 리뷰·승인·머지 |
+| 합의된 이슈 범위를 넘는 파일 수정 사전 조율(§3.5) | PR 리뷰·승인·머지 |
 | 팀미팅 필요 결정 소집 | 결정 결과 = `specs/meta/decisions.md` |
 | P0 보안/배포 알림, "지금 머지해도 돼?" | 스펙 논의 상세 |
 | 마일스톤 트리아지·데모 D-day 리듬 | 이슈 라벨(P0/P1/P2) |
 
 ## 2. 채널 컨벤션
 
-- **owner 프리픽스**: 메시지 앞에 `[gyehyu]` `[seungwon]` `[yunji]` `[claude]` 를 붙여 영역을 즉시 구분. 브랜치/파일 owner 규칙(CONTRIBUTING §3.5)과 1:1 매핑.
+- **contributor 프리픽스**: 필요할 때 메시지 앞에 `[gyehyu]` `[seungwon]` `[yunji]` `[claude]`를 붙여 작성 주체를 구분한다. 이는 파일·기능의 고정 담당을 뜻하지 않으며, 실제 작업 범위는 합의된 이슈가 정한다.
 - **결정은 스레드로, 결론은 기록으로**: 결론이 나면 "→ decisions.md / #이슈에 기록함" 한 줄로 닫는다. Slack에만 남은 결정은 사라진 결정.
 - **핀·북마크 고정**: CONTRIBUTING.md, iOS-PLAN.md, 데모 URL(`https://readinggo.hyuniverse.workers.dev`), 오픈 이슈 필터, "이슈 먼저" 리마인더.
 - **채널 토픽**: "ReadingGo 런칭(Capacitor iOS+Android 앱스토어) — 진실 소스는 GitHub, 여긴 실시간 조율. 태스크는 이슈로."
 
 ## 3. Claude 봇 활용
 
-- **이슈 → 브랜치 → 드래프트 PR**: 채널에서 명시적으로 요청하면 governance(브랜치 네이밍·rebase-before-push·spec/code 분리)를 지켜 PR까지. 머지는 규칙대로 계휴가 웹에서(또는 명시적 "머지" 지시 + green 실측 시 봇이).
+- **이슈 → 브랜치 → PR → DEV**: 채널에서 명시적으로 요청하면 governance(브랜치 네이밍·rebase-before-push·spec/code 분리)를 지켜 PR을 만들고, 감독 게이트 통과 후 `main` merge와 stable DEV 검증까지 진행할 수 있다. Production 승격은 김계휴만 수행한다.
 - **P0 알림 라우팅**: 런칭 블로커(보안 감사 결과 등)를 채널에 요약·상태 추적.
 - **베타 피드백 브리핑**: 유저 문의 auto-sync 이슈(#701)를 하루 한 번 요약.
 - 주의: **채널 논의는 참고, 실행 트리거는 명시적으로.** 봇이 Slack 대화만 근거로 코드를 바꾸지 않는다.
@@ -47,5 +47,5 @@ ReadingGo의 협업은 이미 GitHub 중심으로 규율화되어 있다: 이슈
 - **결정을 Slack에만 남기기** → 결론은 반드시 이슈/`decisions.md`에 기록. Slack에만 남은 결정은 사라진 결정.
 - **작업 상태를 Slack에 이중 트래킹** → 상태의 진실 소스는 이슈. 채널은 알림·조율만.
 - **시크릿·API 키·토큰을 채널/스레드에 붙여넣기** → 절대 금지. 서버 시크릿은 `wrangler secret`/Supabase에만.
-- **봇에게 Slack 대화만 근거로 코드·머지 실행시키기** → 실행 트리거는 명시적 요청 + governance 준수.
-- **owner 경계를 말없이 넘기** → 파일 owner(§3.5)를 넘는 수정은 채널에서 먼저 한 줄 조율.
+- **봇에게 Slack 대화만 근거로 코드 실행시키기** → 실행 트리거는 명시적 요청 + governance 준수. merge는 대화 경로와 무관하게 김계휴만 수행.
+- **합의된 이슈 범위를 말없이 넘기** → 다른 파일·기능까지 수정해야 하면 채널에서 먼저 한 줄 조율.
