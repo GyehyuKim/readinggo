@@ -54,7 +54,11 @@ function _pickMilestone({ isComplete, castleGained, newCastles, newStreak, book 
 // 보존해 "부담없이 적어놓고 덮을 때 한번에 기록"을 가능케 한다(양 모드 동일, 로컬 전용).
 // 저장소 접근은 DataStore 계약(`drafts` 도메인)에 위임 — 피처 파일은 localStorage 직접 호출 금지.
 function _loadDrafts(bookId) {
-  try { const d = window.DataStore && window.DataStore.drafts; return d ? d.load(bookId) : [{ text: '', visibility: null }]; } catch (e) { return [{ text: '', visibility: null }]; }
+  try {
+    const d = window.DataStore && window.DataStore.drafts;
+    const rows = d ? d.load(bookId) : [];
+    return Array.isArray(rows) && rows.length ? rows.map((item) => ({ text: String(item && item.text || '') })) : [{ text: '' }];
+  } catch (e) { return [{ text: '' }]; }
 }
 function _saveDrafts(bookId, arr) {
   try { const d = window.DataStore && window.DataStore.drafts; if (d) d.save(bookId, arr); } catch (e) { /* 초안은 부가 기능 — 실패 무해 */ }
@@ -92,18 +96,18 @@ function _ocrFailureMessage(code) {
 window._ocrFailureMessage = _ocrFailureMessage;
 
 // 홈 앨범 다중 OCR 결과를 기존 초안에 안전하게 합친다(#1378).
-// 사용자가 직접 쓴 내용·공개범위는 보존하고, 빈 행을 먼저 채운 뒤 새 행을 붙인다.
-function _mergeOcrDrafts(existing, texts, visibility) {
+// 사용자가 직접 쓴 본문은 보존하고, 빈 행을 먼저 채운 뒤 새 행을 붙인다.
+function _mergeOcrDrafts(existing, texts) {
   const drafts = Array.isArray(existing) && existing.length
-    ? existing.map((item) => ({ ...item }))
-    : [{ text: '', visibility: null }];
+    ? existing.map((item) => ({ text: String(item && item.text || '') }))
+    : [{ text: '' }];
   const seen = new Set(drafts.map((item) => String(item.text || '').trim()).filter(Boolean));
   const additions = [];
   (texts || []).forEach((value) => {
     const text = String(value || '').trim();
     if (!text || seen.has(text)) return;
     seen.add(text);
-    additions.push({ text, visibility });
+    additions.push({ text });
   });
   additions.forEach((item) => {
     const emptyIndex = drafts.findIndex((draft) => !String(draft.text || '').trim());
@@ -255,20 +259,11 @@ function NestView({ state, onCheckin, onOpenSearch }) {
 
   // 초안 임시저장 (#1198) — drafts 변경마다 현재 책 키로 영속(리로드·네비게이션 보존).
   _useEffect(() => { _saveDrafts(nestState.book.id, drafts); }, [drafts, nestState.book.id]);
-  _useEffect(() => {
-    let alive = true;
-    if (!drafts.some((x) => !x.visibility)) return () => { alive = false; };
-    window.readDefaultSentenceVisibility().then((visibility) => {
-      if (alive) setDrafts((arr) => arr.map((x) => x.visibility ? x : { ...x, visibility }));
-    });
-    return () => { alive = false; };
-  }, [nestState.book.id]);
+
   const _draftCount = drafts.filter((x) => (x.text || '').trim()).length; // 실내용 있는 초안 수(버튼 라벨·요약)
   const setDraft = (i, patch) => setDrafts((d) => d.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const addDraft = () => {
-    window.readDefaultSentenceVisibility().then((visibility) => setDrafts((d) => [...d, { text: '', visibility }]));
-  };
-  const removeDraft = (i) => setDrafts((d) => { const n = d.filter((_, j) => j !== i); return n.length ? n : [{ text: '', visibility: null }]; });
+  const addDraft = () => setDrafts((d) => [...d, { text: '' }]);
+  const removeDraft = (i) => setDrafts((d) => { const n = d.filter((_, j) => j !== i); return n.length ? n : [{ text: '' }]; });
 
   const closeOcrReview = () => {
     _ocrSavingRef.current = false;
@@ -463,24 +458,25 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setRepairCard(null); // 이번 진입 동안만 숨김 — 다음 진입 때 아직 복구 가능하면 다시 권유(주 1회는 datastore가 강제)
   };
 
-  const handleCheckin = async ({ page, sentence, visibility, kind, sentPage, sentences, awaitPersistence }) => {
+  const handleCheckin = async ({ page, sentence, kind, sentPage, sentences, awaitPersistence }) => {
+    const settings = await Promise.resolve(window.DataStore.settings.get());
+    const configuredVisibility = settings && settings.default_sentence_visibility;
+    const defaultVisibility = configuredVisibility == null ? 'public'
+      : (configuredVisibility === 'friends' ? 'followers'
+        : (configuredVisibility === 'public' || configuredVisibility === 'followers' || configuredVisibility === 'private'
+          ? configuredVisibility : 'private'));
     // #1457: 낙관 UI·게스트 pending·이벤트 payload도 실제 영속값과 같도록 체크인 경계에서 먼저 정규화한다.
     const normalizeText = (text, scope) => window.RG_validateSentenceText
       ? window.RG_validateSentenceText(text, scope).text
       : Array.from(String(text == null ? '' : text).trim()).slice(0, 1000).join('');
-    const savedSentence = sentence ? normalizeText(sentence, visibility) : sentence;
+    const savedSentence = sentence ? normalizeText(sentence, defaultVisibility) : sentence;
     const savedSentences = Array.isArray(sentences)
-      ? sentences.map((item) => item && item.text ? { ...item, text: normalizeText(item.text, item.visibility) } : item)
+      ? sentences.map((item) => item && item.text ? { text: normalizeText(item.text, defaultVisibility), page: item.page, visibility: defaultVisibility } : item)
       : sentences;
     // #1392 공개 UGC 동의는 세션/XP/낙관 UI를 건드리기 전에 확인한다.
     // 실패 뒤 DataStore에서 막으면 reading_sessions만 저장되는 부분 상태가 생길 수 있다.
     if (window.DataStore === window.SupabaseDataStore && (sentence || (Array.isArray(sentences) && sentences.length))) {
-      const settings = await window.DataStore.settings.get();
-      const fallbackVisibility = settings.default_sentence_visibility === 'private' ? 'private' : 'public';
-      const requested = Array.isArray(sentences) && sentences.length
-        ? sentences.map((item) => item && item.visibility)
-        : [visibility];
-      const hasPublicUgc = requested.some((value) => (value || fallbackVisibility) !== 'private');
+      const hasPublicUgc = defaultVisibility !== 'private';
       const terms = settings && settings.ugc_terms;
       if (hasPublicUgc && !(terms && terms.version === window.RG_UGC_TERMS_VERSION && terms.accepted_at)) {
         window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
@@ -536,10 +532,10 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const batch = Array.isArray(savedSentences) ? savedSentences.filter((s) => s && s.text && String(s.text).trim()) : null;
     const sentenceCount = (batch && batch.length) ? batch.length : (savedSentence ? 1 : 0);
     if (batch && batch.length) {
-      const rows = batch.map((s) => ({ text: String(s.text).trim(), bookId: ns.book.id, bookTitle: ns.book.title || '', page: (typeof s.page === 'number') ? s.page : quotePage, when: '방금', kind: kind || 'quote', visibility: s.visibility }));   /* #1224: bookTitle 동봉 — 게스트 책은 getBook 미해소라 흔적 카드가 '책' 폴백 */
+      const rows = batch.map((s) => ({ text: String(s.text).trim(), bookId: ns.book.id, bookTitle: ns.book.title || '', page: (typeof s.page === 'number') ? s.page : quotePage, when: '방금', kind: kind || 'quote', visibility: defaultVisibility }));   /* #1224: bookTitle 동봉 — 게스트 책은 getBook 미해소라 흔적 카드가 '책' 폴백 */
       ns.myQuotes = [...rows, ...ns.myQuotes];
     } else if (savedSentence) {
-      ns.myQuotes = [{ text: savedSentence, bookId: ns.book.id, bookTitle: ns.book.title || '', page: quotePage, when: '방금', kind: kind || 'quote', visibility }, ...ns.myQuotes];
+      ns.myQuotes = [{ text: savedSentence, bookId: ns.book.id, bookTitle: ns.book.title || '', page: quotePage, when: '방금', kind: kind || 'quote', visibility: defaultVisibility }, ...ns.myQuotes];
     }
 
     prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
@@ -556,7 +552,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     }
     let checkinResult;
     try {
-      checkinResult = onCheckin(ns, newLv, xpGain, savedSentence, kind, quotePage, batch, visibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
+      checkinResult = onCheckin(ns, newLv, xpGain, savedSentence, kind, quotePage, batch, defaultVisibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
     } catch (error) {
       if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation();
       throw error;
@@ -649,8 +645,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
 
       const validCount = new Set(extracted.map((text) => String(text || '').trim()).filter(Boolean)).size;
       if (validCount > 0) {
-        const visibility = await window.readDefaultSentenceVisibility();
-        setDrafts((current) => _mergeOcrDrafts(current, extracted, visibility));
+        setDrafts((current) => _mergeOcrDrafts(current, extracted));
         if (failed > 0) showToast(`사진 ${failed}장은 처리하지 못했어요 — 찾은 문장 ${validCount}개만 담았어요`);
         else showToast(`사진에서 찾은 문장 ${validCount}개를 담았어요`);
       } else if (failed >= files.length) {
@@ -712,7 +707,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   // 한 문장 섹션 [저장/한번에 기록] (#497·#1198) — 초안(drafts) 1개면 단일 저장(기존 경로 그대로),
   //   2개 이상이면 배치로 한번에 기록(세리머니·스트릭·XP는 1회, 문장만 N개 영속).
   const submitSentence = async () => {
-    const ready = drafts.map((x) => ({ text: (x.text || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
+    const ready = drafts.map((x) => ({ text: (x.text || '').trim() })).filter((x) => x.text);
     if (!ready.length) { showToast('한 문장을 입력해주세요'); return; }
     const hadTruncation = ready.some((x) => Array.from(x.text).length > 1000);
     // #589/#1202: 한 문장 전용/공유 페이지(quickSentPage = 덮을 때의 쪽). 비우면 현재 진도.
@@ -728,13 +723,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setSentenceSubmitting(true);
     try {
       if (ready.length === 1) {
-        await Promise.resolve(handleCheckin({ page: progressPage, sentence: ready[0].text, visibility: ready[0].visibility, kind: 'quote', sentPage: sp, awaitPersistence: true }));
+        await Promise.resolve(handleCheckin({ page: progressPage, sentence: ready[0].text, kind: 'quote', sentPage: sp, awaitPersistence: true }));
       } else {
         // 배치: 공유 페이지(sp)를 모든 문장에 적용. 세리머니는 1회(§5.4.2).
         await Promise.resolve(handleCheckin({ page: progressPage, sentences: ready.map((x) => ({ ...x, page: sp })), kind: 'quote', sentPage: sp, awaitPersistence: true }));
       }
-      const visibility = await window.readDefaultSentenceVisibility();
-      setDrafts([{ text: '', visibility }]);
+      setDrafts([{ text: '' }]);
       setQuickSentPage('');
       if (hadTruncation) showToast('1,000자를 넘어 앞부분만 저장했어요');
     } catch (e) {
@@ -1063,7 +1057,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <div key="d0"><textarea ref={_quickSentRef} value={draft.text} onChange={(e) => setDraft(0, { text: e.target.value })}
               placeholder="오늘 읽은 문장을 남겨요…" rows={4}
               style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', resize: 'none', padding: 0, fontFamily: 'inherit' }} />
-              <SentenceVisibilitySelect value={draft.visibility} onChange={(visibility) => setDraft(0, { visibility })} />
+
               <div style={{ textAlign: 'right', fontSize: 11, color: Array.from(String(draft.text || '').trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(String(draft.text || '').trim()).length}/1,000자{Array.from(String(draft.text || '').trim()).length > 1000 ? ' — 저장 시 앞 1,000자만 남아요' : ''}</div>
             </div>
           ) : (
@@ -1071,7 +1065,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
               <div style={{ flex: 1 }}><textarea value={draft.text} onChange={(e) => setDraft(i, { text: e.target.value })}
                 placeholder="또 다른 문장…" rows={2} autoFocus
                 style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', resize: 'none', padding: 0, fontFamily: 'inherit' }} />
-                <SentenceVisibilitySelect value={draft.visibility} onChange={(visibility) => setDraft(i, { visibility })} label={`${i + 1}번 문장 공개 범위`} />
+
                 <div style={{ textAlign: 'right', fontSize: 11, color: Array.from(String(draft.text || '').trim()).length > 1000 ? 'var(--fire)' : 'var(--ink-3)' }}>{Array.from(String(draft.text || '').trim()).length}/1,000자{Array.from(String(draft.text || '').trim()).length > 1000 ? ' — 저장 시 앞 1,000자만 남아요' : ''}</div>
               </div>
               <button onClick={() => removeDraft(i)} aria-label="이 문장 삭제"

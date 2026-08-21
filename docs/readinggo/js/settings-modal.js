@@ -7,6 +7,13 @@
 // loadBabel 파일별 eval 스코프 → 훅 재구조분해 필수(#761).
 const { useState, useEffect } = React;
 
+function normalizeDefaultSentenceVisibility(settings) {
+  if (!settings || !Object.prototype.hasOwnProperty.call(settings, 'default_sentence_visibility')) return 'public';
+  const configured = settings.default_sentence_visibility;
+  if (configured === 'friends') return 'followers';
+  return configured === 'public' || configured === 'followers' || configured === 'private' ? configured : 'private';
+}
+
 /* ── SettingsModal: 설정 (#567 #568 재배치)
    그룹: ① 계정 ② 개인정보·데이터 ③ 읽기 환경 ④ 지원 ⑤ 정보
    닉네임 편집 → 프로필 헤더 인라인 (#568), 내보내기 → 서재 (#568),
@@ -23,7 +30,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
     if (!(settingsApi && settingsApi.get)) { setSentenceVisibilityBusy(false); return () => { alive = false; }; }
     Promise.resolve(settingsApi.get()).then((settings) => {
       if (!alive) return;
-      setSentenceVisibility(settings && settings.default_sentence_visibility === 'private' ? 'private' : 'public');
+      setSentenceVisibility(normalizeDefaultSentenceVisibility(settings));
     }).catch(() => {
       if (alive) showToast('기본 공개 범위를 불러오지 못했어요. 다시 열어 주세요.');
     }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
@@ -197,7 +204,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
               {[
                 { value: 'public', label: '전체 공개', description: '피드에 공개돼요' },
-                { value: 'friends', label: '친구 공개', description: '맞팔 친구만 볼 수 있어요' },
+                { value: 'followers', label: '친구 공개', description: '맞팔 친구만 볼 수 있어요' },
                 { value: 'private', label: '나만 보기', description: '나만 볼 수 있어요' },
               ].map((option) => (
                 <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: sentenceVisibilityBusy ? 'default' : 'pointer', opacity: sentenceVisibilityBusy ? 0.6 : 1 }}>
@@ -354,7 +361,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
     if (!(settingsApi && settingsApi.get)) { setSentenceVisibilityBusy(false); return () => { alive = false; }; }
     Promise.resolve(settingsApi.get()).then((s) => {
       if (!alive) return;
-      setSentenceVisibility(s && s.default_sentence_visibility === 'private' ? 'private' : 'public');
+      setSentenceVisibility(normalizeDefaultSentenceVisibility(s));
     }).catch(() => {
       if (alive) showToast('기본 공개 범위를 불러오지 못했어요.');
     }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
@@ -580,7 +587,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
         <fieldset disabled={sentenceVisibilityBusy} style={{ margin: 0, padding: '14px', border: 'none' }}>
           <legend style={{ float: 'left', width: '100%', padding: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', marginBottom: 10 }}>한 문장 기본 공개 범위</legend>
           <div style={{ display: 'flex', gap: 8, clear: 'both' }}>
-            {[{ value: 'public', label: '전체 공개' }, { value: 'friends', label: '친구 공개' }, { value: 'private', label: '나만 보기' }].map((opt) => {
+            {[{ value: 'public', label: '전체 공개' }, { value: 'followers', label: '친구 공개' }, { value: 'private', label: '나만 보기' }].map((opt) => {
               const sel = sentenceVisibility === opt.value;
               return (
                 <label key={opt.value} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, cursor: sentenceVisibilityBusy ? 'default' : 'pointer', padding: '10px 12px', borderRadius: 'var(--r-sm)', border: `1.5px solid ${sel ? 'var(--brand)' : 'var(--line)'}`, background: sel ? 'var(--brand-tint)' : 'var(--paper)', opacity: sentenceVisibilityBusy ? 0.6 : 1 }}>

@@ -20,6 +20,14 @@
     if (!window.RG_validateSentenceText) throw new Error('한 문장 검증기 미초기화');
     return window.RG_validateSentenceText(text, visibility);
   }
+  function storedSentenceVisibility(value) {
+    if (value === 'friends') return 'followers';
+    return value === 'public' || value === 'followers' || value === 'private' ? value : 'private';
+  }
+  function defaultSentenceVisibility(settings) {
+    if (!settings || !Object.prototype.hasOwnProperty.call(settings, 'default_sentence_visibility')) return 'public';
+    return storedSentenceVisibility(settings.default_sentence_visibility);
+  }
 
   let _uid = null;
   async function uid() {
@@ -115,7 +123,7 @@
       async get() {
         const u = await A.profile.get();
         const settings = (u && u.settings) || {};
-        return { ...settings, default_sentence_visibility: settings.default_sentence_visibility === 'private' ? 'private' : 'public' };
+        return { ...settings, default_sentence_visibility: defaultSentenceVisibility(settings) };
       },
       async update(patch) {
         // 정규화된 get() 결과를 병합하면 키 없는 기존 계정까지 public 으로 백필된다.
@@ -359,21 +367,16 @@
 
     /* 한 문장 (sentences) */
     sentences: {
-      async add({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
+      async add({ userBookId, sessionId, page, text, my_note, kind, visibility: _ignoredVisibility }) {
         // #565: userBookId 없이는 insert 금지 — 무효/누락 ID 로 조용히 잘못 저장하지 않는다(명확히 실패).
         if (!userBookId) throw new Error('sentences.add: userBookId 필요 (#565)');
         const id = await uid();
-        // #1261: 호출부의 문장별 명시값이 우선. 없으면 계정 설정, 알 수 없는 값은 public.
-        let sentenceVisibility = visibility === 'private' || visibility === 'followers' || visibility === 'public' ? visibility : null;
-        let settings = null;
-        if (!sentenceVisibility) {
-          settings = await A.settings.get();
-          sentenceVisibility = settings.default_sentence_visibility === 'private' ? 'private' : 'public';
-        }
+        // 계정 기본 공개범위가 신규 문장의 단일 정본이다. 호출부의 문장별 override는 무시한다.
+        const settings = await A.settings.get();
+        const sentenceVisibility = defaultSentenceVisibility(settings);
         const checked = validateSentenceText(text, sentenceVisibility);
         if (sentenceVisibility !== 'private') {
-          settings = settings || await A.settings.get();
-          if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION)) {
+          if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION && settings.ugc_terms.accepted_at)) {
             window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
             throw new Error('ugc_terms_required');
           }
@@ -383,6 +386,24 @@
           page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
           visibility: sentenceVisibility,
+        }).select().single());
+      },
+      // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
+      async importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
+        if (!userBookId) throw new Error('sentences.importExisting: userBookId 필요');
+        const id = await uid();
+        const sentenceVisibility = storedSentenceVisibility(visibility);
+        const checked = validateSentenceText(text, sentenceVisibility);
+        const settings = await A.settings.get();
+        if (sentenceVisibility !== 'private'
+          && !(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION && settings.ugc_terms.accepted_at)) {
+          window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
+          throw new Error('ugc_terms_required');
+        }
+        return unwrap(await sb().from('sentences').insert({
+          user_id: id, user_book_id: userBookId, session_id: sessionId || null,
+          page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
+          kind: 'quote', visibility: sentenceVisibility,
         }).select().single());
       },
       // 사후 감상 추가·편집 (작성 시점 무관) — profile §5.8.4
@@ -415,20 +436,21 @@
       // patch: { visibility?: 'public'|'followers'|'private', note_private?: boolean }
       // note_private(감상 비공개)는 유지. is_private는 deprecated — visibility로 대체(v7.2).
       async setVisibility(sentenceId, patch) {
-        // patch: { visibility?: 'public'|'followers'|'private', note_private?: boolean }
-        if (patch && (patch.visibility === 'public' || patch.visibility === 'followers')) {
+        const id = await uid();
+        const nextPatch = { ...(patch || {}) };
+        if (patch && patch.visibility) {
+          const current = unwrap(await sb().from('sentences').select('text').eq('id', sentenceId).eq('user_id', id).single());
+          const checked = validateSentenceText(current && current.text, patch.visibility);
+          nextPatch.visibility = checked.visibility;
+        }
+        if (nextPatch.visibility === 'public' || nextPatch.visibility === 'followers') {
           const settings = await A.settings.get();
           if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION && settings.ugc_terms.accepted_at)) {
             window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
             throw new Error('ugc_terms_required');
           }
         }
-        const id = await uid();
-        if (patch && patch.visibility) {
-          const current = unwrap(await sb().from('sentences').select('text').eq('id', sentenceId).eq('user_id', id).single());
-          validateSentenceText(current && current.text, patch.visibility);
-        }
-        return unwrap(await sb().from('sentences').update(patch).eq('id', sentenceId).eq('user_id', id).select().single());
+        return unwrap(await sb().from('sentences').update(nextPatch).eq('id', sentenceId).eq('user_id', id).select().single());
       },
       async listByBook(userBookId) {
         return unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)
