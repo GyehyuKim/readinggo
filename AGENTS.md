@@ -28,7 +28,7 @@
 - **v17 목표**: 사용자당 나무 1그루, 책당 가지 1개, 저장 문장당 잎 1장. XP·둥지 진화·스트릭 상실 UX는 신규 노출·적립에서 폐기하고, 최근 14일 독서 리듬과 누적 성장일을 사용한다. 친구 공개는 상호 팔로우 친구에게 제한하며, 4-B 결정에 따라 기존 사용자에게 사전 고지 후 자동 활성화하되 언제든 전체 opt-out할 수 있어야 한다.
 - **현행 구현 경계**: 코드와 구 APK에는 XP·둥지·스트릭·전체 공개 경로가 남아 있다. 이는 목표 제품 규범이 아니라 호환·삭제 계획이 필요한 레거시 as-built다.
 - **형태**: **Capacitor 채택**(런칭 결정, 2026-06) — 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드 = **Vite 전환 완료**(#871). Phase 0 데모(현행) → Phase 1 Supabase. *이전 web-first·Capacitor Phase 3 보류는 해제* (`CLAUDE.md` Stack Lock · `iOS-PLAN.md`).
-- **협업자 (dev 3인)**: maintainer 김계휴(`gyehyu`), contributor 이승원(`seungwon`)·정윤지(`jyj23-jeong`, actor slug `yunji`). 파일·기능별 고정 담당은 없으며, 세 사람은 사전에 합의된 이슈 범위에서 자기 actor slug 브랜치로 구현·PR한다. 승원·윤지는 self-merge하지 않고 최종 merge는 김계휴만 수행한다.
+- **협업자 (dev 3인)**: maintainer 김계휴(`gyehyu`), contributor 이승원(`seungwon`)·정윤지(`jyj23-jeong`, actor slug `yunji`). 파일·기능별 고정 담당은 없으며, 세 사람은 사전에 합의된 이슈 범위에서 자기 actor slug 브랜치로 구현·PR한다. 감독 게이트를 통과한 PR은 승인 contributor·Hermes도 `main`/DEV까지 merge할 수 있고, Production 승격은 김계휴만 수행한다.
 - **주요 산출물**: `docs/readinggo/` (현행 데모), `docs/readinggo/specs/` (피처별 spec, v17 목표와 레거시 as-built 분리).
 - **언어**: 모든 커뮤니케이션과 문서는 **한국어**가 기본. 코드 식별자만 영어.
 
@@ -68,7 +68,7 @@ git commit -m "docs: 왜 바꿨는지 한 문장"
 # 4. push 전 항상 (조건 없이 — 그 사이 머지된 PR이 있을 수 있다. CONTRIBUTING §3.0)
 git fetch origin && git rebase origin/main
 
-# 5. 푸시 + PR (필수 CI green 뒤 Hermes가 diff·이슈·테스트·대화를 확인하고 Hyu가 최종 merge)
+# 5. 푸시 + PR (필수 CI green 뒤 감독 게이트를 통과하면 main merge·stable DEV 검증)
 #    PR 본문에 관련 이슈 연결: Closes #N(완료) / Refs #N(관련) — CONTRIBUTING §4.2
 #    작업 중 발견한 새 일은 이슈로 (§4.3 형식)
 git push -u origin gyehyu/example-topic
@@ -82,7 +82,7 @@ gh pr create --title "..." --body "..."
 
 **이슈 동기화**: PR은 관련 이슈를 연결(`Closes #N` 완료 / `Refs #N` 관련)하고, 작업 중 발견한 새 일은 이슈로 만든다 (CONTRIBUTING §4.2–4.3).
 
-**운영 권한**: 이슈는 누구나 만들고 의견을 남길 수 있다. 구현 브랜치·코드/스펙 변경·PR 작성은 김계휴/Hermes와 승인 contributor 이승원·정윤지가 사전에 합의된 이슈 범위에서 수행한다. 파일·기능별 고정 담당은 없고 승원·윤지는 self-merge하지 않는다. CI green은 자동 머지 승인이 아니며, Hermes가 PR의 이슈 연결·diff·테스트 근거·미해결 대화를 확인한 뒤 김계휴만 최종 merge한다 (`CONTRIBUTING.md` §0).
+**운영 권한**: 이슈는 누구나 만들고 의견을 남길 수 있다. 구현 브랜치·코드/스펙 변경·PR 작성은 김계휴/Hermes와 승인 contributor 이승원·정윤지가 사전에 합의된 이슈 범위에서 수행한다. 파일·기능별 고정 담당은 없다. CI green은 자동 머지 승인이 아니며, 감독 게이트를 통과한 PR은 김계휴·Hermes·승인 contributor가 `main`에 merge하고 stable DEV까지 검증할 수 있다. Production 승격은 김계휴만 수행한다 (`CONTRIBUTING.md` §0).
 
 ---
 

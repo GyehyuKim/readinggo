@@ -151,7 +151,7 @@ PR 생성 또는 머지 요청 전 반드시 아래 순서를 따른다.
 
 2. **왜 필요한가**: 다른 팀원의 PR이 먼저 main에 머지되면 내 브랜치가 뒤처진다. 이 상태로 머지하면 충돌이 발생하거나 변경사항이 덮어써질 수 있다. `Require branches to be up to date` 브랜치 보호 규칙이 이를 시스템적으로 강제한다.
 
-3. **머지 권한**: main 머지는 계휴(gyehyu)가 GitHub 웹에서 수행. LLM이 직접 머지하지 않고 PR 생성까지만 한다.
+3. **머지·배포 권한**: 필수 CI와 감독 게이트를 통과한 PR은 계휴·Hermes·승인 contributor가 `main`에 merge하고 stable DEV까지 검증할 수 있다. 검증된 동일 SHA의 Production 승격은 계휴만 수동으로 수행한다.
 
 ## Pages / Demo
 
