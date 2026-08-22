@@ -157,7 +157,7 @@ function UserProfileModal({ handle, onClose }) {
             <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 8, fontSize: 12, color: 'var(--ink-2)', fontWeight: 800 }}>
               <span>완독 {data.completed.length}</span>
               <span>읽는 중 {data.reading.length}</span>
-              <span>{data.user.xp || 0} XP</span>
+              <span>문장 {data.sents.length}</span>
             </div>
             {following !== null && (
               <button onClick={toggleFollow}

@@ -23,13 +23,10 @@ function _mrFmtDate(t) {
 function _mrCopy(milestone) {
   const m = milestone || {};
   if (m.type === 'complete') {
-    return { badge: '🏰', title: '한 권을 끝까지 읽었어요', lead: m.bookTitle ? `《${m.bookTitle}》를 덮으며, 그동안 이 책에 남긴 흔적을 돌아봐요.` : '책을 덮으며, 그동안 남긴 흔적을 돌아봐요.' };
+    return { badge: window.rgIcon('book', 30), title: '한 권을 끝까지 읽었어요', lead: m.bookTitle ? `《${m.bookTitle}》를 덮으며, 그동안 이 책에 남긴 흔적을 돌아봐요.` : '책을 덮으며, 그동안 남긴 흔적을 돌아봐요.' };
   }
   if (m.type === 'streak') {
     return { badge: '🔥', title: `${m.value}일 연속, 매일 읽었어요`, lead: '하루하루 쌓인 날들. 그동안 마음에 담아둔 문장들을 다시 만나요.' };
-  }
-  if (m.type === 'castle') {
-    return { badge: '🏰', title: '둥지가 성이 되었어요', lead: '한 주기를 완성하는 동안 당신이 남긴 순간들. 천천히 돌아봐요.' };
   }
   return { badge: '✨', title: '여기까지 왔어요', lead: '그동안 남긴 한 문장들을 돌아봐요.' };
 }

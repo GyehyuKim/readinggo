@@ -70,6 +70,8 @@ jobs:
           node tests/book-tree-selector.test.mjs
           node tests/book-tree-home-ui.test.mjs
           node tests/book-tree-surface.test.mjs
+          node tests/user-facing-book-tree-copy.test.mjs
+          node tests/phase3b-xp-write.test.mjs
           node tests/barcode-focus.test.mjs
           node tests/book-upsert-auth.test.mjs
           node tests/aladin-upstream-errors.test.mjs

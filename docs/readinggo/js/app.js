@@ -7,15 +7,14 @@
 async function buildStateFromSupabase() {
   const DS = window.SupabaseDataStore;
   if (!DS) return null;
-  const [ub, st, xpv, mine] = await Promise.all([
+  const [ub, st, mine] = await Promise.all([
     DS.activeBook.get().catch(() => null),
     DS.streak.get().catch(() => null),
-    DS.xp.get().catch(() => 0),
     DS.sentences.listMine().catch(() => []),
   ]);
   const out = {
     streak: st ? (st.current || 0) : 0,
-    xp: xpv || 0,
+    xp: 0,
     castleCount: 0, // 완독 권수(posthog books_count) — 아래 myBooks 파생으로 채움 (#513: castles.list 호출 제거)
   };
   if (ub && ub.book) {
@@ -25,11 +24,11 @@ async function buildStateFromSupabase() {
       cur: ub.current_page || 0, total, days: 1,
       cover: ub.book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
     };
-    out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지 = 누적 XP (#313), 책 무관
+    out.nest = { lv: 1 }; // v17 신규 클라이언트는 XP를 읽지 않는다.
   } else {
     // 활성 책 없음(Supabase 모드): 데모책(b008) 환영 방지 — 빈 sentinel 로 '책 등록' 유도.
     out.book = { id: '', title: '', author: '', pub: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
-    out.nest = { lv: getNestStageByXp(xpv).lv }; // 둥지는 책 없어도 XP로 유지 (#313)
+    out.nest = { lv: 1 };
   }
   // 항상 설정(없으면 []) — 로그인 시 데모 시드(INITIAL_STATE.myQuotes)가 '내 것'으로 남는 문제 방지 (#332).
   out.myQuotes = (Array.isArray(mine) ? mine : []).map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', createdAt: s.created_at || '', note: s.my_note || '', kind: s.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(s.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(s.visibility) === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
@@ -58,11 +57,10 @@ function buildStateFromGuest() {
   try {
     const ub = DS.activeBook && DS.activeBook.get && DS.activeBook.get();
     const st = DS.streak && DS.streak.get && DS.streak.get();
-    const xpv = (DS.xp && DS.xp.get && DS.xp.get()) || 0;
     const out = {
       streak: st ? (st.current || 0) : 0,
-      xp: xpv,
-      nest: { lv: getNestStageByXp(xpv).lv },
+      xp: 0,
+      nest: { lv: 1 },
     };
     if (ub && ub.book) {
       const b = ub.book;
@@ -263,12 +261,12 @@ class ErrorBoundary extends React.Component {
         <div style={{ padding: '48px 24px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><window.SparrowMark size={44} /></div>
           <div style={{ fontWeight: 900, fontSize: 17, color: 'var(--ink)', marginBottom: 6 }}>이 화면을 여는 데 문제가 생겼어요</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6, marginBottom: 20 }}>잠깐 길을 잃었네요. 다시 시도하거나 둥지로 돌아가요.</div>
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6, marginBottom: 20 }}>잠깐 길을 잃었네요. 다시 시도하거나 홈으로 돌아가요.</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button onClick={() => this.setState({ hasError: false })}
               style={{ padding: '12px 20px', borderRadius: 12, border: '1.5px solid var(--line)', background: '#fff', color: 'var(--ink-2)', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>다시 시도</button>
             <button onClick={() => { this.setState({ hasError: false }); if (this.props.onReset) this.props.onReset(); }}
-              style={{ padding: '12px 20px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{window.rgIcon('home', 15)} 둥지로 가기</button>
+              style={{ padding: '12px 20px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{window.rgIcon('home', 15)} 홈으로 가기</button>
           </div>
         </div>
       );
@@ -437,7 +435,7 @@ function DevReviewPersonaPicker({ personas, onSelect, onClose, busy }) {
   );
 }
 
-let _rgVisitGranted = false;  // 데모: 방문 XP 세션 1회 적립 가드
+
 /* 인앱 브라우저(카카오 등) 안내 배너 (#1096) — 외부 기본 브라우저로 빼야 로그인·복사·공유가 풀린다.
    카카오는 openExternal 스킴으로 원클릭, 그 외(인스타·페북)는 안내만. dismiss 가능. */
 function InAppBanner() {
@@ -584,7 +582,7 @@ function App() {
     };
     return () => { window.RG_openShelfImport = null; window.RG_openTextImport = null; };
   }, [authUser]);
-  const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE, ...(buildStateFromGuest() || {}) }));
+  const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE, ...(buildStateFromGuest() || {}), xp: 0, nest: { lv: 1 } }));
   // TopBar와 전용 책나무 화면은 같은 읽기 전용 projection을 사용한다. 세계관 온보딩
   // 플래그가 아직 없으므로 익숙한 책·문장 용어만 표시하고 로딩 중 0으로 단정하지 않는다.
   const [topbarTree, setTopbarTree] = useState({ tree: null, loading: true, error: false });
@@ -650,25 +648,6 @@ function App() {
     return () => { alive = false; };
   }, []);
 
-  // XP 적립 이벤트 버스 — 방문·반응 XP(grantXp → 'rg:xp')를 상단바 appState.xp 에 반영.
-  useEffect(() => {
-    const onXp = (e) => {
-      const amt = e && e.detail ? e.detail.amount : 0;
-      if (amt) setAppState(s => ({ ...s, xp: (s.xp || 0) + amt }));
-    };
-    window.addEventListener('rg:xp', onXp);
-    return () => window.removeEventListener('rg:xp', onXp);
-  }, []);
-
-  // 스트릭 '하루 만회'(#938, A1) — nest 복구 카드가 streak 을 되살리면 상단 표시·state.streak 정합.
-  useEffect(() => {
-    const onRepair = (e) => {
-      const v = e && e.detail ? e.detail.streak : null;
-      if (typeof v === 'number') setAppState(s => ({ ...s, streak: v }));
-    };
-    window.addEventListener('rg:streak-repaired', onRepair);
-    return () => window.removeEventListener('rg:streak-repaired', onRepair);
-  }, []);
 
   // 한 문장 삭제(#1)·종류변경(#381) — CompanionModal 등에서 변경 시 appState.myQuotes 즉시 반영.
   useEffect(() => {
@@ -687,19 +666,11 @@ function App() {
     return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); window.removeEventListener('rg:sentence-note', onNote); window.removeEventListener('rg:sentence-updated', onUpd); window.removeEventListener('rg:sentence-added', onAdd); };
   }, []);
 
-  // 단순 방문 보상 — 하루 첫 열람(데모: 세션 1회). 3단계 위계 중 가장 낮은 티어.
-  useEffect(() => {
-    // 합성 검수 fixture는 reload/reset 뒤에도 결정적이어야 한다. 방문 보상으로 XP·DEV DB를 자동 변형하지 않는다.
-    if (window.RG_DEV_REVIEW && window.RG_DEV_REVIEW.current()) return;
-    if (_rgVisitGranted) return;
-    _rgVisitGranted = true;
-    grantXp(XP_RULES.visit, 'visit');
-  }, []);
 
   // 게스트 myQuotes hydration (#367) — INITIAL_STATE.myQuotes 시드엔 id가 없어
   // 책상세·컬렉션의 공개/좋아요/감상/삭제 버튼(q.id 가드)이 안 떴음. 로컬 어댑터의
   // 시드 문장(id 보유, #366)을 appState 로 끌어와 첫인상부터 기능 노출.
-  // + 활성 책·스트릭·XP hydration (#1221) — #1136 빈 시작 이후 게스트 부팅은 appState.book 이
+  // + 활성 책·스트릭 hydration (#1221) — #1136 빈 시작 이후 게스트 부팅은 appState.book 이
   //   항상 빈 센티널이라, 책을 등록해도 리로드하면 홈이 '읽을 책 등록' hero 로 떨어졌다
   //   (데이터는 rg_v41 에 멀쩡 — 기록이 사라진 걸로 오인, 게스트 리텐션 킬러). 로그인 경로
   //   (buildStateFromSupabase)와 대칭으로 localStorage 활성 책을 끌어온다.
@@ -711,8 +682,7 @@ function App() {
     Promise.all([
       Promise.resolve(DataStore.activeBook && DataStore.activeBook.get ? DataStore.activeBook.get() : null).catch(() => null),
       Promise.resolve(DataStore.streak && DataStore.streak.get ? DataStore.streak.get() : null).catch(() => null),
-      Promise.resolve(DataStore.xp && DataStore.xp.get ? DataStore.xp.get() : null).catch(() => null),
-    ]).then(([ub, st, xp]) => {
+    ]).then(([ub, st]) => {
       if (!alive || !ub || !ub.book) return;   // 활성 책 없으면 빈 시작 유지
       const total = ub.book.total_pages || 0;  // 0 = 쪽수 미상 (#204)
       setAppState(s => ({
@@ -723,7 +693,6 @@ function App() {
           cover: ub.book.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], toc: [],
         },
         streak: (st && typeof st.current === 'number') ? st.current : s.streak,
-        xp: (typeof xp === 'number') ? xp : s.xp,
       }));
     }).catch(() => {});
     Promise.resolve((DataStore.sentences && DataStore.sentences.listMine) ? DataStore.sentences.listMine() : [])
@@ -951,20 +920,18 @@ function App() {
           await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));
           if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
         }
-        if (xpGain) await Promise.resolve(DataStore.xp.add(xpGain, 'checkin'));
+
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ubId + ')');
         // 오늘 기록 완료 → 리마인더 재무장(오늘치 취소, 내일로). '읽었는데 알림 발화' 방지(#1163). 웹/비네이티브 no-op.
         try { if (window.RG_streakReminder) window.RG_streakReminder.reschedule(); } catch (e) {}
-        // DB 권위값으로 스트릭·XP·내 한 문장 정합 (낙관 표시 어긋남 + 새 문장 id 부재 → 감상 버튼 지연 방지, H2/§5.8.4)
-        const [stDb, xpDb, mineDb] = await Promise.all([
+        // DB 권위값으로 스트릭·내 한 문장 정합 (낙관 표시 어긋남 + 새 문장 id 부재 → 감상 버튼 지연 방지, H2/§5.8.4)
+        const [stDb, mineDb] = await Promise.all([
           Promise.resolve(DataStore.streak.get()).catch(() => null),
-          Promise.resolve(DataStore.xp.get()).catch(() => null),
           Promise.resolve(DataStore.sentences.listMine()).catch(() => null),
         ]);
         setAppState(s => ({
           ...s,
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
-          xp: (typeof xpDb === 'number') ? xpDb : s.xp,
           myQuotes: Array.isArray(mineDb)
             ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(x.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(x.visibility) === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
@@ -1035,7 +1002,7 @@ function App() {
             if (window.rgTrack) window.rgTrack('book_completed', { book_id: ub.book_id || (ub.book && ub.book.id) || '', rating_present: false, review_present: false });
           }
           window.dispatchEvent(new CustomEvent('rg:wish-changed')); // 서재 목록 갱신 신호 재사용
-          showToast(`🏰 '${book.title}' 완독 책장에 — 서재에서 별점·소감을 남겨보세요`);
+          showToast(`'${book.title}' 완독 책장에 — 서재에서 별점·소감을 남겨보세요`);
           return;
         }
         // 읽는중(기존) — 활성 책 + 둥지 반영. 원본 검색 row가 아니라 저장된 user_book을

@@ -116,11 +116,10 @@ function reactionXpFor(prevCount){
   return Math.min(XP_RULES.reaction, XP_RULES.reactionDailyMax - already);
 }
 function grantXp(amount, reason){
-  const amt = Math.max(0, amount || 0);
-  if (!amt) return 0;
-  try { if (window.DataStore && DataStore.xp && DataStore.xp.add) DataStore.xp.add(amt, reason || 'earn'); } catch (e) {}
-  try { window.dispatchEvent(new CustomEvent('rg:xp', { detail: { amount: amt, reason } })); } catch (e) {}
-  return amt;
+  // v17 신규 클라이언트는 XP를 더 이상 적립하지 않는다. 함수명은 구 번들의 호출 계약과
+  // 오래된 모듈 캐시가 섞여도 안전하도록 compatibility shim으로 남긴다.
+  void amount; void reason;
+  return 0;
 }
 
 // 검증 가능한 출처가 없는 합성 NPC 인용문은 제공하지 않는다(#1431).

@@ -73,18 +73,11 @@ async function rgAutoJoinPublicRoom(book, opts) {
   } catch (e) { return null; }   // 실패해도 등록 자체는 막지 않음(조용히)
 }
 
-/* ── 둥지 단계 이모지: 숲 책 진척% → 5단계 (nest.md §5.2 SSOT 이모지) ──
-   멤버 그리드는 "숲 지정 책의 진척 단계"를 보여준다(개인 XP 둥지와 다른 책-진척 매핑).
-   진척% 5구간으로 🌿🪹🪺🐣🏰 (NEST_STAGES 이모지 시퀀스 재사용). */
+/* ── 멤버별 책 진척 아이콘 ──
+   제품 아이콘 최종 결정 전까지 진척률과 무관한 중립 책 아이콘을 사용한다. */
 function rgRoomNestEmoji(pct) {
-  const stages = (window.NEST_STAGES || []).map(s => s.short);
-  const seq = stages.length === 5 ? stages : ['🌿', '🪹', '🪺', '🐣', '🏰'];
-  const p = Math.max(0, Math.min(100, pct || 0));
-  if (p >= 100) return seq[4];
-  if (p >= 70) return seq[3];
-  if (p >= 40) return seq[2];
-  if (p >= 10) return seq[1];
-  return seq[0];
+  void pct;
+  return window.rgIcon('book', 18);
 }
 
 // 숲 카드 표시용 집계 — members 배열에서 인원·오늘 읽은 수·평균 진도%.

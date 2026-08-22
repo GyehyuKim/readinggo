@@ -107,10 +107,7 @@ function DataImport({ onClose }) {
       } } }));
       return row;
     });
-    if (result.saved > 0) {
-      try { await Promise.resolve(DataStore.xp.add(20, 'import')); } catch (e) {}
-      if (window.rgTrack) window.rgTrack('external_import_saved', { book_id: book.id, saved: result.saved });
-    }
+    if (result.saved > 0 && window.rgTrack) window.rgTrack('external_import_saved', { book_id: book.id, saved: result.saved });
     setBusy(false);
     if (result.failedIndices.length) showToast(`${result.saved}개 저장, ${result.failedIndices.length}개는 다시 확인해 주세요`);
     else { showToast(`${result.saved}개를 가져왔어요`); onClose(); }
