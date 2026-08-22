@@ -8,7 +8,7 @@
 -- Production 적용은 DEV schema readback과 동일 SHA/digest 검증 후 Hyu 승인 대상이다.
 -- =====================================================================
 
-begin;
+-- Transaction ownership: migrate-dev.yml wraps this SQL and the ledger insert atomically.
 
 create schema if not exists migration_backups;
 revoke all on schema migration_backups from public, anon, authenticated;
@@ -221,5 +221,3 @@ begin
   end if;
 end
 $readback$;
-
-commit;
