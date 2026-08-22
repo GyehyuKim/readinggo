@@ -11,7 +11,7 @@
 
 1. **결정 정합**: `meta/decisions.md`와 기능 SSOT가 구현 사실·목표 계약·미결정을 분리한다.
 2. **스펙 승인·머지**: spec-only PR의 CI, 리뷰, 미해결 대화 0을 확인하고 main에 머지한다.
-3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, analytics, fixture, 백업·rollback을 작업 순서와 함께 승인한다. 구 APK 호환은 요구하지 않는다.
+3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, analytics, fixture, 백업·rollback을 작업 순서와 함께 승인한다. **Phase 4의 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않으며, friend-tree/RLS·공개범위·재독의 별도 구버전 안전 게이트는 유지한다.
 4. **코드·DB 구현**: 앱·DataStore·분석의 XP·둥지·성·하루 만회 전용 표면을 제거하고, DEV migration에 백업 생성·RPC/컬럼 삭제·schema readback 검증을 포함한다. 친구 공개 확대는 별도 범위다.
 5. **DEV 배포·QA**: 자동 회귀와 DEV 전용 합성 fixture로 책·문장·세션·최근 14일 리듬·누적 성장일 보존과 legacy 참조 0을 검증한다. Hyu에게는 자동 판정할 수 없는 화면·사용감만 최소 항목으로 요청한다. Production 실사용자 데이터를 fixture로 쓰지 않는다.
 6. **동일 SHA Production 승격**: DEV에서 승인한 commit SHA와 migration digest만 승격한다. 환경 차이·백업·적용 migration을 기록한다.
