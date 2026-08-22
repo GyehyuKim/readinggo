@@ -57,6 +57,12 @@ test('Phase 4 migration delegates atomic transaction ownership to migrate-dev an
   assert.match(migration, /users_public XP target could not be removed safely/i);
   assert.doesNotMatch(migration, /where public\.moderation_user_visible\(u\.id\)/i,
     'Phase 4 migration must not assume an independently deployed moderation helper');
+  assert.match(migration, /view_reloptions text\[\][\s\S]*view_acl_sql text/i);
+  assert.match(migration, /c\.reloptions[\s\S]*aclexplode\(coalesce\(c\.relacl, acldefault\('r', c\.relowner\)\)\)/i,
+    'first snapshot must preserve live view options and custom ACL grants');
+  assert.match(migration, /alter view public\.users_public set \(%s\)[\s\S]*array_to_string\(legacy_reloptions/i);
+  assert.match(migration, /execute legacy_acl_sql/i);
+  assert.match(migration, /alter view public\.users_public owner to %I[\s\S]*legacy_owner/i);
   assert.match(migration, /execute 'grant select on public\.users_public to authenticated'/i);
   assert.match(migration, /execute 'revoke select on public\.users_public from public, anon'/i);
   assert.match(migration, /has_table_privilege\('authenticated', 'public\.users_public', 'select'\)/i);
