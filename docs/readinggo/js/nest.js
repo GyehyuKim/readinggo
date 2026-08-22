@@ -558,18 +558,11 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       throw error;
     }
 
-    // 성 획득(1,600 주기 완료)은 단계 toast보다 우선 — 경계 통과 시 둥지 단계는 Lv4→Lv1로
-    // 리셋되어 nestUp=false 이므로, 성 획득은 별도로 안내한다 (#520/#521).
-    if (castleGained) {
-      showToast(`🏰 전설의 재키 성주! ${newCastles}번째 성을 완성했어요`);
-    } else if (nestUp) {
-      const copy = getEvolutionCopy(prevLv, newLv);
-      if (copy) showToast(`${getNestStageByXp(ns.xp).short} ${copy}`);
-    }
+    // 레거시 XP·단계·성 계산은 구 클라이언트 호환을 위해 유지하되 신규 사용자 피드백에는 노출하지 않는다.
 
     // 마일스톤 회고 (#938, A2) — 완독·연속 7/30일·둥지 성에서만, 절제해서. 세리머니가 닫힌 뒤 1개만 띄운다(겹침 방지).
     // 빈도 게이트(마일스톤별 1회 + 하루 1회)는 DataStore.milestone 이 강제. 점수·미션 아님 — 기존 한 문장 자산으로 서사 증폭.
-    pendingMilestoneRef.current = _pickMilestone({ isComplete, castleGained, newCastles, newStreak: ns.streak, book: ns.book });
+    pendingMilestoneRef.current = _pickMilestone({ isComplete, castleGained: false, newCastles, newStreak: ns.streak, book: ns.book });
 
     // 이 책에서 모은 한 문장 수 (#549) — 세리머니가 거짓 '저장됨' 대신 정직한 누적/독려 표시.
     const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
@@ -775,7 +768,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         console.warn('[nest] 완독 기록 저장 실패:', (e && e.message) || e);
       }
     })();
-    showToast('🏰 성 컬렉션에 기록이 남았어요!');
+    showToast('완독 기록을 저장했어요!');
   };
 
   // 세리머니 닫힘 → 대기 중 마일스톤 회고를 게이트 통과 시 1개 띄움 (#938, A2).

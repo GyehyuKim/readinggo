@@ -1,8 +1,8 @@
 /* =========================================================
    ReadingGo — streak-reminder.js  (#1033 스트릭 리마인더 로컬 알림)
 
-   매일 정해진 시각에 *로컬* 알림으로 "오늘 아직 안 읽었어요"를 띄워 스트릭을
-   이어가게 한다. @capacitor/local-notifications(공식 플러그인) — 서버·FCM 불필요,
+   매일 정해진 시각에 *로컬* 알림으로 부담 없는 독서 기록 제안을 보낸다.
+   @capacitor/local-notifications(공식 플러그인) — 서버·FCM 불필요,
    기기 안에서만 스케줄. 웹/비네이티브에선 전부 no-op(플러그인 web 스텁 + RG_NATIVE 가드).
 
    - 설정: localStorage `rg_streak_reminder` = { enabled, hour, minute }. 기본 21:00 OFF.
@@ -23,11 +23,11 @@ const RG_REMINDER_DEFAULT = { enabled: false, hour: 21, minute: 0 };
 // 고정, 매일 순환. ponytail: repeats:true 는 재스케줄 전까지 같은 문구를 재사용 —
 //   앱 진입/복귀마다 _rmReschedule 이 돌아 그날 문구로 갱신됨(며칠 미실행 시만 직전 문구 반복).
 const RG_REMINDER_LINES = [
-  { title: '오늘의 한 줄, 아직이에요', body: '잠깐이면 돼요. 오늘 읽은 한 문장으로 둥지를 이어가요.' },
-  { title: '재키가 기다려요', body: '오늘 읽은 자리의 한 문장, 같이 곱씹어볼까요?' },
-  { title: '한 문장이면 충분해요', body: '한 쪽만 펼쳐도 돼요. 마음에 걸린 한 줄을 남겨요.' },
-  { title: '둥지가 오늘을 기다려요', body: '오늘의 한 문장이 쌓여 내가 돼요. 잠깐 들러요.' },
-  { title: '오늘 만난 문장 있어요?', body: '재키가 물어볼 게 있대요 — 오늘 읽은 한 줄로요.' },
+  { title: '마음에 남은 문장이 있나요?', body: '새로 만난 문장이 있다면 편할 때 남겨보세요.' },
+  { title: '읽었던 자리부터 펼쳐보세요', body: '잠깐 읽었던 자리부터 다시 시작해도 괜찮아요.' },
+  { title: '한 문장이면 충분해요', body: '한 쪽만 펼쳐도 돼요. 마음에 걸린 한 줄을 남겨보세요.' },
+  { title: '오늘 만난 문장을 남겨보세요', body: '책에서 발견한 한 문장을 기록해둘 수 있어요.' },
+  { title: '책을 펼치고 싶은 순간에', body: '새로 만난 문장이 있을 때 편하게 들러주세요.' },
 ];
 function _rmPickLine() {
   // 로컬 일자 기준(자정 경계) — UTC로 하면 KST는 09:00에 문구가 바뀌는 버그(#1163).

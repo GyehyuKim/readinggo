@@ -9,7 +9,7 @@
 import { chromium } from 'playwright';
 
 const URL = process.env.SMOKE_URL || 'http://localhost:4173/';
-const TABS = ['함께', '둥지', '프로필', '설정', '홈']; // 하단 내비 5탭 — 전부 클릭해 렌더 검증
+const TABS = ['함께', '책나무', '프로필', '설정', '홈']; // 하단 내비 5탭 — 전부 클릭해 렌더 검증
 const isNoise = (e) => /posthog|fonts\.googleapis|net::ERR|Failed to load resource|\/api\/|\/aladin/i.test(e);
 
 const fails = [];

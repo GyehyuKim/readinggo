@@ -41,6 +41,7 @@ test('empty input still projects exactly one empty tree', () => {
   assert.equal(tree.selectedBranch, null);
   assert.equal(tree.candidates, null);
   assert.equal(tree.candidateCount, null);
+  assert.equal(tree.familiarSummary, '책 0권 · 문장 0개');
   assert.equal(tree.accessibilitySummary, '책 0권, 문장 0개');
 });
 

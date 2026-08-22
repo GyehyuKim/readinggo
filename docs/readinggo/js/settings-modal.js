@@ -249,7 +249,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                   style={{ padding: '8px 2px', border: 'none', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
               ) : (
                 <div style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--danger, #E5484D)', background: 'var(--danger-tint, rgba(229,72,77,0.06))' }}>
-                  <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 기록(한 문장·서재·둥지·대화)이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 독서 기록(책·문장·대화)이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={deleteAccount} disabled={deleting}
                       style={{ flex: 1, padding: '11px', borderRadius: 12, border: 'none', background: 'var(--danger, #E5484D)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}>{deleting ? '삭제 중…' : '삭제 확정'}</button>
@@ -653,7 +653,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
                     style={{ padding: '6px 0', border: 'none', background: 'transparent', color: 'var(--danger, #E5484D)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>계정 삭제</button>
                 ) : (
                   <div style={{ padding: '12px', borderRadius: 'var(--r-sm)', border: '1.5px solid var(--danger, #E5484D)', background: 'rgba(229,72,77,0.06)', marginTop: 4 }}>
-                    <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 기록이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>정말 삭제할까요? <b>모든 독서 기록(책·문장·대화)이 영구 삭제</b>되고 되돌릴 수 없어요.</div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={deleteAccount} disabled={deleting}
                         style={{ flex: 1, padding: '11px', borderRadius: 'var(--r-sm)', border: 'none', background: 'var(--danger, #E5484D)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}>

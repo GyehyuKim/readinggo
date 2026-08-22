@@ -585,7 +585,36 @@ function App() {
     return () => { window.RG_openShelfImport = null; window.RG_openTextImport = null; };
   }, [authUser]);
   const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE, ...(buildStateFromGuest() || {}) }));
+  // TopBar와 전용 책나무 화면은 같은 읽기 전용 projection을 사용한다. 세계관 온보딩
+  // 플래그가 아직 없으므로 익숙한 책·문장 용어만 표시하고 로딩 중 0으로 단정하지 않는다.
+  const [topbarTree, setTopbarTree] = useState({ tree: null, loading: true, error: false });
   const [popularBooks, setPopularBooks] = useState(null);  // #835: 검색 추천 인기 도서(우리 사이트) — startedThisWeek + ALL_BOOKS 폴백
+
+  useEffect(() => {
+    let alive = true;
+    let requestId = 0;
+    const refresh = () => {
+      const currentRequest = ++requestId;
+      setTopbarTree((current) => ({ ...current, loading: !current.tree, error: false }));
+      Promise.resolve(window.RG_bookTree.fromDataStore(window.DataStore))
+        .then((tree) => {
+          if (alive && currentRequest === requestId) setTopbarTree({ tree, loading: false, error: false });
+        })
+        .catch(() => {
+          if (alive && currentRequest === requestId) setTopbarTree((current) => ({ ...current, loading: false, error: true }));
+        });
+    };
+    refresh();
+    window.addEventListener('rg:sentence-added', refresh);
+    window.addEventListener('rg:sentence-removed', refresh);
+    window.addEventListener('rg:wish-changed', refresh);
+    return () => {
+      alive = false;
+      window.removeEventListener('rg:sentence-added', refresh);
+      window.removeEventListener('rg:sentence-removed', refresh);
+      window.removeEventListener('rg:wish-changed', refresh);
+    };
+  }, [authUser, dataReady, appState.book && appState.book.ubId]);
 
   // 검색 추천 '인기 도서' (#835) — 우리 사이트 인기(최근 등록 상위, social과 동일 RPC) 우선, 부족분은 카탈로그 폴백.
   useEffect(() => {
@@ -1157,19 +1186,22 @@ function App() {
         {/* 상단 바 */}
         <header className="topbar">
           <div className="topbar-row">
-            <div className="brand-mark" role="button" tabIndex={0} title="둥지로 (홈)"
+            <div className="brand-mark" role="button" tabIndex={0} title="홈으로"
               onClick={() => switchTab('nest')}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchTab('nest'); }}>
               <span className="sparrow" aria-hidden="true"><window.SparrowMark size={24} /></span>
               <span>Reading<span className="go">Go</span></span>
             </div>
             <div className="topbar-stats">
-              {/* #1415: XP는 유지하고 사용자 Lv 대신 1,600 XP 주기 완료 수를 표시한다. */}
-              <span className="stat xp" title="현재 XP (systems.md §6.3)">
-                <span>XP {(appState.xp || 0).toLocaleString()}</span>
-              </span>
-              <span className="stat nest-count" title="완성한 둥지 수 (1,600 XP당 1개)">
-                <span>· 🪺 둥지 {nestCastleCount(appState.xp)}개</span>
+              <span
+                className="stat book-tree-count"
+                role="status"
+                aria-live="polite"
+                title={topbarTree.error ? '책과 문장 수를 불러오지 못했어요' : undefined}
+              >
+                {topbarTree.tree
+                  ? topbarTree.tree.familiarSummary
+                  : (topbarTree.loading ? '책과 문장 불러오는 중…' : '책 · 문장')}
               </span>
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               {/* #790: 돋보기 아이콘만으론 '책 추가' 동선 발견성이 낮음 → '도서 찾기' 라벨 + 틴트 배경칩으로 강조. */}
@@ -1253,7 +1285,7 @@ function App() {
           </ErrorBoundary>
         </main>
 
-        {/* 하단 탭바 — 홈·함께·둥지·프로필·설정 (#library-tab-ux) */}
+        {/* 하단 탭바 — 내부 nest-grow 키는 호환을 위해 유지하고 사용자 라벨만 책나무로 전환. */}
         <nav className="tabbar">
           {[
             { id: 'nest', label: '홈', svg: (
@@ -1270,13 +1302,8 @@ function App() {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             )},
-            { id: 'nest-grow', label: '둥지', svg: (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2C8 2 4 5 4 9c0 3 1.5 5.5 4 7h8c2.5-1.5 4-4 4-7 0-4-4-7-8-7z"/>
-                <path d="M8 14c0 2 1.5 4 4 5 2.5-1 4-3 4-5"/>
-                <circle cx="12" cy="9" r="2" fill="currentColor" stroke="none"/>
-              </svg>
-            )},
+            // 최종 책나무 아이콘 결정 전까지 기존 모노라인 책 아이콘을 중립 폴백으로 사용한다.
+            { id: 'nest-grow', label: '책나무', svg: window.rgIcon('book', 22) },
             { id: 'profile', label: '프로필', svg: (
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4"/>
@@ -1294,6 +1321,7 @@ function App() {
               key={t.id}
               className={'tab' + (activeTab === t.id ? ' active' : '')}
               onClick={() => switchTab(t.id)}
+              aria-label={t.label}
             >
               <span className="ico">{t.svg}</span>
               <span>{t.label}</span>

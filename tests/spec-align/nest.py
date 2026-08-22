@@ -30,7 +30,8 @@ def find(pattern: str, text: str, flags: int = 0) -> bool:
 # spec section -> (description, file, regex pattern)
 # v7 (2026-06-01): The Path(DynamicPath/ZIGZAG)·첫 7일 가속 invariant 제거 —
 # v7은 The Path와 가속을 폐기하고 "둥지가 자란다"(진척률 5단계)로 대체. 부재 검증은
-# align_v7.py(S3/S4)가 담당. 이 파일은 v7 둥지 *존재* invariant만 남긴다.
+# align_v7.py(S3/S4)가 담당. v17 사용자 표면 전환은 book-tree-surface.test.mjs가 담당하며,
+# 이 파일은 구 APK 호환을 위해 아직 남겨 둔 v7 계산 계약만 검증한다.
 INVARIANTS = [
     (
         "§5.2",
@@ -68,12 +69,6 @@ INVARIANTS = [
         "활성 책 전환 — 좌우 캐러셀 (RG_activateBook, #185)",
         "nest.js",
         r"RG_activateBook",
-    ),
-    (
-        "§5.2",
-        "완독 세리머니 (🏰 표시)",
-        "nest.js",
-        r"🏰",
     ),
     (
         "§5.1",
