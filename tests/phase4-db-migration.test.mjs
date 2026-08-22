@@ -22,7 +22,7 @@ test('Phase 4 migration is sequential and snapshots every legacy DB surface befo
 
   const backups = [
     ['increment_xp', /create table if not exists migration_backups\.phase4_increment_xp/i, /drop function if exists public\.increment_xp\(int\)/i],
-    ['users_public view', /create table if not exists migration_backups\.phase4_users_public_view/i, /drop view if exists public\.users_public/i],
+    ['users_public view', /create table if not exists migration_backups\.phase4_users_public_view/i, /execute 'drop view public\.users_public'/i],
     ['reading_sessions.xp_earned', /create table if not exists migration_backups\.phase4_reading_sessions_xp/i, /alter table if exists public\.reading_sessions drop column if exists xp_earned/i],
     ['users.xp', /create table if not exists migration_backups\.phase4_users_xp/i, /alter table if exists public\.users drop column if exists xp/i],
     ['streak.last_repair_date', /create table if not exists migration_backups\.phase4_streak_repair/i, /alter table if exists public\.streak drop column if exists last_repair_date/i],
@@ -48,12 +48,17 @@ test('Phase 4 migration delegates atomic transaction ownership to migrate-dev an
     'users_public snapshot must only be captured while the legacy XP column exists');
   assert.match(migration, /to_regprocedure\('public\.increment_xp\(integer\)'\)/g);
   assert.match(migration, /pg_get_viewdef\(c\.oid, true\)/i);
-  const viewDrop = position(/drop view if exists public\.users_public/i, 'users_public drop');
-  const viewCreate = position(/create view public\.users_public as[\s\S]*u\.wishlist_public, u\.created_at[\s\S]*moderation_user_visible\(u\.id\)/i, 'XP-free users_public recreation');
+  const viewDrop = position(/execute 'drop view public\.users_public'/i, 'users_public drop');
+  const viewCreate = position(/execute 'create view public\.users_public as ' \|\| xp_free_definition/i, 'XP-free users_public recreation');
   const usersXpDrop = position(/alter table if exists public\.users drop column if exists xp/i, 'users.xp drop');
   assert.ok(viewDrop < viewCreate && viewCreate < usersXpDrop, 'users_public must be recreated without XP before users.xp is dropped');
-  assert.match(migration, /grant select on public\.users_public to authenticated/i);
-  assert.match(migration, /revoke select on public\.users_public from public, anon/i);
+  assert.match(migration, /from migration_backups\.phase4_users_public_view[\s\S]*regexp_replace\([\s\S]*legacy_definition/i,
+    'users_public must be rebuilt from the backed-up live definition');
+  assert.match(migration, /users_public XP target could not be removed safely/i);
+  assert.doesNotMatch(migration, /where public\.moderation_user_visible\(u\.id\)/i,
+    'Phase 4 migration must not assume an independently deployed moderation helper');
+  assert.match(migration, /execute 'grant select on public\.users_public to authenticated'/i);
+  assert.match(migration, /execute 'revoke select on public\.users_public from public, anon'/i);
   assert.match(migration, /has_table_privilege\('authenticated', 'public\.users_public', 'select'\)/i);
   assert.match(migration, /has_table_privilege\('anon', 'public\.users_public', 'select'\)/i);
   assert.match(migration, /backup mismatch/g);

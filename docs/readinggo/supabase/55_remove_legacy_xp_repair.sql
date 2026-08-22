@@ -170,14 +170,42 @@ $backup_columns$;
 drop function if exists public.increment_xp(int);
 
 -- CREATE OR REPLACE VIEW는 기존 컬럼 제거를 허용하지 않으므로 같은 transaction에서 drop/create한다.
+-- 현재 DEV view의 WHERE/security 계약을 보존하고 select-list의 legacy XP target만 fail-closed로 제거한다.
 -- CASCADE를 사용하지 않아 예상하지 못한 의존 객체가 있으면 migration 전체가 rollback된다.
-drop view if exists public.users_public;
-create view public.users_public as
-  select u.id, u.handle, u.display_name, u.avatar_url, u.bio, u.wishlist_public, u.created_at
-  from public.users u
-  where public.moderation_user_visible(u.id);
-grant select on public.users_public to authenticated;
-revoke select on public.users_public from public, anon;
+do $rebuild_users_public$
+declare
+  legacy_definition text;
+  xp_free_definition text;
+begin
+  select view_definition
+  into legacy_definition
+  from migration_backups.phase4_users_public_view
+  where view_identity = 'public.users_public';
+
+  if legacy_definition is not null then
+    xp_free_definition := regexp_replace(
+      legacy_definition,
+      '[[:space:]]*[[:alnum:]_]+[.]xp([[:space:]]+as[[:space:]]+xp)?[[:space:]]*,[[:space:]]*',
+      ' ',
+      'i'
+    );
+
+    if xp_free_definition = legacy_definition
+       or xp_free_definition ~* '[[:alnum:]_]+[.]xp'
+    then
+      raise exception 'users_public XP target could not be removed safely';
+    end if;
+
+    execute 'drop view public.users_public';
+    execute 'create view public.users_public as ' || xp_free_definition;
+  end if;
+
+  if to_regclass('public.users_public') is not null then
+    execute 'grant select on public.users_public to authenticated';
+    execute 'revoke select on public.users_public from public, anon';
+  end if;
+end
+$rebuild_users_public$;
 
 alter table if exists public.reading_sessions drop column if exists xp_earned;
 alter table if exists public.users drop column if exists xp;
