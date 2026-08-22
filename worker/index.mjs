@@ -12,7 +12,7 @@
    배포: npx wrangler deploy
    ========================================================= */
 
-const ALADIN = 'http://www.aladin.co.kr/ttb/api/';
+const ALADIN = 'https://aladin.co.kr/ttb/api/';
 
 /* ── 도서 데이터 provider 스위치 (#1044, spec backend.md §7.2.1) ──────────
    알라딘 OpenAPI ToS(영리 이용 불가 + 저장·캐시 금지)가 canonical 캐시(books upsert)와 충돌 →
@@ -2107,12 +2107,16 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
     }
     return json({ items }, 200, 86400);
   } catch (e) {
+    if (e instanceof AladinUpstreamError) logAladinFailure(e, isbn ? 'isbn' : 'search');
     // 알라딘 자체 실패 시 검색은 Google Books로 한 번 더 (외서 가용성↑).
     if (query) {
       const fallbackMax = Math.min(max, 10);
-      try { const gb = await googleBooksSearch(query, fallbackMax, env); if (gb.length) return json({ items: gb.slice(0, fallbackMax) }, 200, 3600); } catch (e2) {}
+      try {
+        const gb = await googleBooksSearch(query, fallbackMax, env);
+        return json({ items: gb.slice(0, fallbackMax) }, 200, 3600);
+      } catch (e2) { /* generic failure below */ }
     }
-    return json({ error: '알라딘 호출 실패', detail: String((e && e.message) || e) }, 502);
+    return jsonNoStore({ error: 'upstream_failure' }, 502);
   }
 }
 
@@ -2122,7 +2126,7 @@ async function googleBooksSearch(query, max, env) {
   const key = env && env.GOOGLE_BOOKS_API_KEY ? `&key=${env.GOOGLE_BOOKS_API_KEY}` : '';
   const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${Math.min(max || 10, 20)}&printType=books&country=KR${key}`;
   const r = await fetch(url);
-  if (!r.ok) return [];
+  if (!r.ok) throw new Error('google upstream http failure');
   const d = await r.json();
   return (d.items || []).map((it) => {
     const v = it.volumeInfo || {};
@@ -2321,13 +2325,46 @@ async function backfillPages(env) {
 }
 
 /* ── 공용 헬퍼 ──────────────────────────────────────────── */
+class AladinUpstreamError extends Error {
+  constructor(classification, status) {
+    super('aladin upstream failure');
+    this.name = 'AladinUpstreamError';
+    this.classification = classification;
+    if (status != null) this.status = status;
+  }
+}
+
 async function aladinFetch(url) {
-  const r = await fetch(url);
-  const t = await r.text();
+  let r;
+  try { r = await fetch(url); }
+  catch (e) { throw new AladinUpstreamError('network'); }
+  if (!r.ok) throw new AladinUpstreamError('http', r.status);
+
+  let t;
+  try { t = await r.text(); }
+  catch (e) { throw new AladinUpstreamError('network'); }
   let d;
   try { d = JSON.parse(t); }
-  catch (e) { const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a < 0 || b <= a) return []; d = JSON.parse(t.slice(a, b + 1)); }
+  catch (e) { throw new AladinUpstreamError('parse'); }
+
+  const hasItem = d && typeof d === 'object' && Object.prototype.hasOwnProperty.call(d, 'item');
+  const providerError = d && typeof d === 'object'
+    && (d.errorCode != null || d.errorMessage != null || d.error != null);
+  if (!hasItem || providerError || (d.item != null && !Array.isArray(d.item))) {
+    throw new AladinUpstreamError('provider');
+  }
   return d.item || [];
+}
+
+function logAladinFailure(error, route) {
+  const event = {
+    event: 'provider_failure',
+    provider: 'aladin',
+    classification: error.classification,
+  };
+  if (error.status != null) event.status = error.status;
+  event.route = route;
+  console.error(JSON.stringify(event));
 }
 
 function normalize(it) {
@@ -2539,6 +2576,16 @@ function json(obj, status, maxAge) {
   const headers = { 'content-type': 'application/json; charset=utf-8' };
   if (maxAge) headers['cache-control'] = `public, max-age=${maxAge}`;
   return new Response(JSON.stringify(obj), { status, headers });
+}
+
+function jsonNoStore(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  });
 }
 
 // ── per-IP 레이트리밋 (#1158/#1159) — 고비용 LLM/OCR 엔드포인트 남용·키드레인 규모 차단.

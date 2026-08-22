@@ -143,7 +143,7 @@ async function searchResult(max, {
       if (googleFailure === 'http') return Response.json({ error: 'google failure' }, { status: 502 });
       return Response.json({ items: googleItems });
     }
-    if (url.hostname === 'www.aladin.co.kr') {
+    if (url.hostname === 'aladin.co.kr') {
       if (aladinFails) throw new Error('aladin network failure');
       return Response.json({ item: url.searchParams.has('ItemId') ? [aladinItems[0]] : aladinItems });
     }
@@ -213,7 +213,7 @@ for (const max of [2, 20]) {
 }
 
 const legacyFull = await searchResult(5, { legacy: true });
-assert.deepEqual(legacyFull.upstream.map((url) => url.hostname), ['www.aladin.co.kr'], 'Aladin 할당이 상한을 채우면 Google을 호출하지 않아야 한다');
+assert.deepEqual(legacyFull.upstream.map((url) => url.hostname), ['aladin.co.kr'], 'Aladin 할당이 상한을 채우면 Google을 호출하지 않아야 한다');
 const legacyDeduped = await searchItems(10, { legacy: true });
 assert.equal(new Set(legacyDeduped.map((item) => item.isbn13 || item.title)).size, legacyDeduped.length, 'Aladin+Google 병합 결과도 중복을 제거해야 한다');
 
