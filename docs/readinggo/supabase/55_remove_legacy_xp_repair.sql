@@ -208,13 +208,13 @@ begin
   if legacy_definition is not null then
     xp_free_definition := regexp_replace(
       legacy_definition,
-      '[[:space:]]*[[:alnum:]_]+[.]xp([[:space:]]+as[[:space:]]+xp)?[[:space:]]*,[[:space:]]*',
+      '[[:space:]]*([[:alnum:]_]+[.])?xp[[:space:]]*,[[:space:]]*',
       ' ',
       'i'
     );
 
     if xp_free_definition = legacy_definition
-       or xp_free_definition ~* '[[:alnum:]_]+[.]xp'
+       or xp_free_definition ~* '(^|[^[:alnum:]_])([[:alnum:]_]+[.])?xp([^[:alnum:]_]|$)'
     then
       raise exception 'users_public XP target could not be removed safely';
     end if;
