@@ -34,7 +34,7 @@ test('Phase 4 migration is sequential and snapshots every legacy DB surface befo
   }
 });
 
-test('Phase 4 migration is retry-safe and verifies DEV-readable postconditions', () => {
+test('Phase 4 migration delegates atomic transaction ownership to migrate-dev and is retry-safe', () => {
   assert.doesNotMatch(migration, /^\s*(?:begin|commit|rollback)\s*;/im,
     'migrate-dev.yml owns the transaction that atomically includes SQL and ledger insertion');
   assert.match(migrateDevWorkflow, /migration must not manage its own transaction/);
