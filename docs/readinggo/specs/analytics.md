@@ -145,10 +145,10 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 | `book_paused` | 사용자가 명시적으로 중단 상태로 전환한 뒤 | `book_id`, `previous_status` | 미독서 기간을 실패값으로 해석한 속성 |
 
 - 정확한 가지·잎 수는 제품 화면의 사용자 소유 데이터이며, PostHog에는 구간값만 보낸다. Admin 운영 집계가 필요하면 Supabase의 권한 제한 집계를 사용한다.
-- `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`는 컷오버 전 `legacy_*` 이벤트군으로 분리한다. 새 버전에서 발화하지 않고 WAU·리텐션·책나무 퍼널의 분자·분모에 포함하지 않는다.
-- 기존 데이터 이름을 소급 변경하지 않는다. 분석 쿼리에서 `release_sha`·`schema_version`·컷오버 시각으로 legacy를 분리하고, 과거 리포트 재현성을 유지한다.
-- XP 물리 삭제 게이트는 지원 중인 app version·release SHA별 XP mutation, legacy RPC 호출, 직접 `users.xp` 수정 시도, OTA 수신·스토어 버전 분포를 관측할 수 있어야 한다. 현재 이 관측면은 없어 삭제 승인 불가다.
-- 정확한 이벤트명이 바뀌어도 "신규 버전의 XP 값 변화 0"과 "지원 중 버전의 legacy 호출 소멸"을 객관적으로 판정하는 결과 계약은 유지한다. 관측 기간과 삭제 임계값은 운영 승인 전 미결정이다.
+- `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`는 과거 데이터에서만 legacy로 취급한다. 새 번들의 이벤트 상수·호출·속성 정의는 제거하고 WAU·리텐션·책나무 퍼널의 분자·분모에 포함하지 않는다.
+- 기존 저장 이벤트 이름을 소급 변경하지 않는다. 과거 리포트는 `release_sha`·`schema_version`·컷오버 시각으로 재현한다.
+- XP 물리 삭제는 구 APK 버전 분포나 legacy 호출 소멸 telemetry를 기다리지 않는다. Production module graph·운영 쿼리에서 참조 0, DEV 백업·drop migration·schema readback 성공을 증거로 삼는다.
+- Production 적용은 검증된 동일 SHA와 migration digest를 제시한 뒤 Hyu 승인을 받는다.
 - `reading_session_end`와 `sentence_added`는 현행 실제 독서·기록 성공 이벤트로 보존한다. 성장일은 이벤트 합계가 아니라 권위 DB의 distinct local date를 사용한다.
 - 친구 책나무 분석에는 비공개 문장의 존재·개수나 공개범위 판정 이유를 보내지 않는다.
 

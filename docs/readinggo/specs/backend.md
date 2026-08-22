@@ -80,9 +80,9 @@
 - 구 앱이 회차 컬럼을 모르는 동안의 읽기·쓰기 호환
 - 기존 행 무손실·nullable 의미·백업·rollback 검증
 
-#### 7.0.5 XP 호환 경계
+#### 7.0.5 XP·만회 레거시 삭제 경계
 
-`users.xp`, `reading_sessions.xp_earned`, `increment_xp(int)`와 기존 XP DataStore 표면은 구 APK 호환을 위해 즉시 삭제하지 않는다. **6-A 결정**에 따라 신규 XP 쓰기 제거→운영·분석 참조 제거→최소 지원 버전 강제→지원 버전 전체 legacy 호출 0 증거→release cadence에 따른 rollback 기간 순으로 확인한 뒤 RPC→세션 XP→사용자 XP를 물리 삭제한다. 임의 날짜를 두거나 UI에서만 숨긴 채 영구 유지하지 않는다. 자세한 단계와 수용기준은 [systems.md §6.0](./systems.md)을 따른다.
+2026-08-22 Hyu 결정으로 구 APK는 책나무 전환 이후 지원하지 않는다. `increment_xp(int)`·기존 XP/성 DataStore 표면·`streak.repair*`를 앱에서 제거한 뒤, DEV migration은 Production rollback용 백업을 먼저 만들고 `increment_xp(int)`→`reading_sessions.xp_earned`→`users.xp`→`streak.last_repair_date` 순으로 물리 삭제한다. 책·문장·진도·독서 세션과 `reading_sessions.session_date`는 최근 14일 리듬·누적 성장일의 권위 데이터이므로 보존한다. DEV schema readback과 동일 SHA 검증 전에는 Production migration을 실행하지 않으며, Production은 Hyu 승인 대상이다. 자세한 수용기준은 [systems.md §6.0](./systems.md)을 따른다.
 
 ### 7.1 플랫폼
 
@@ -210,12 +210,10 @@ sentences.setVisibility(id, {visibility?, note_private?})    // v7.2: visibility
 sentences.listMine()                       → Sentence[]
 sentences.random()                         → Sentence        // 무작위 회상 — 내 과거 한 문장 1개 (§profile 5.8.7)
 
-// 스트릭 / XP / 성(XP 주기 완료)
-streak.get()                               → Streak
-streak.bumpOnCheckIn()                                      // 입력 즉시 호출. **Supabase: addToday 원자 RPC(checkin_atomic, #1161) 안에 접혀 실행** — 어댑터 메서드는 게스트 어댑터·표면 parity 로 유지(현재 addToday 밖 호출자 없음)
-xp.get() / xp.add(amount, reason)   // Supabase: xp.add = 원자 RPC increment_xp(p_amount)(#1161) — 구 read-modify-write 레이스 제거
-books.complete(userBookId, {rating?, review_text?})         // 완독 상태·별점·소감 저장. 성 직접 지급 없음
-castles.list()                             → Castle[]        // DB 조회 없이 users.xp 파생. length=floor(totalXp/1600)
+// 독서 리듬·완독
+streak.get()                               → Streak          // 전환 중 legacy 연속일 필드는 읽지 않으며 세션 날짜 기반 리듬으로 대체
+streak.bumpOnCheckIn()                                      // 현재 addToday 원자 RPC 내부의 세션 날짜 기록과 함께 동작; Phase 4 DB migration에서 legacy 연속일 필드 의존 제거 대상
+books.complete(userBookId, {rating?, review_text?})         // 완독 상태·별점·소감 저장
 
 // 일일 기록 (추가)
 sessions.calendar(days?)               → {readDates, shieldDates}  // 스트릭 캘린더 — 최근 N일(기본 35) 읽은/방패 날짜

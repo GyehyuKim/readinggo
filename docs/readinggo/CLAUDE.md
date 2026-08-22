@@ -2,7 +2,7 @@
 
 이 디렉토리(`docs/readinggo/`)가 ReadingGo Phase 0 데모의 루트다.
 
-> **제품 계약 경계:** 아래 파일 구조와 코드 설명은 현행/구 APK의 레거시 as-built다. 활성 v17 목표는 [`specs/README.md`](./specs/README.md)를 먼저 따른다. v17은 사용자당 책나무 1그루·책당 가지 1개·저장 문장당 잎 1장을 사용하며 XP·둥지 진화·스트릭 상실 UX를 신규 제품 계약에서 폐기한다. 코드의 `nest`·`social`·XP·스트릭 식별자는 구현 전환 중 호환 이름일 수 있다.
+> **제품 계약 경계:** 아래 파일 구조와 코드 설명에는 레거시 as-built가 섞여 있다. 활성 v17 목표는 [`specs/README.md`](./specs/README.md)를 먼저 따른다. v17은 사용자당 책나무 1그루·책당 가지 1개·저장 문장당 잎 1장을 사용하며 XP·둥지 진화·스트릭 상실 UX를 폐기한다. 2026-08-22 Hyu 결정으로 구 APK 호환은 유지하지 않으며, `nest-grow` route의 책나무 목적지만 보존하고 XP·둥지·만회 전용 식별자와 구현은 제거한다.
 
 ## 도서 데이터 — Supabase `books` (canonical)
 
