@@ -1,8 +1,9 @@
-# OTA 릴리스 자동화 — main 머지 → beta 채널 자동 publish (#876 페이즈 C, 이슈 #982)
+# OTA beta 릴리스 — 승인된 main SHA를 수동 publish (#876 페이즈 C, 이슈 #982)
 #
-# 흐름(spec ota.md §4): main 머지 → Vite build(dist) → @capgo/cli 로 dist zip + SHA-256
+# 흐름(spec ota.md §4): workflow_dispatch 입력 SHA → stable DEV/main gate
+#   → Vite build(dist) → @capgo/cli로 dist zip + SHA-256
 #   → R2(readinggo-ota) 업로드 → KV(OTA_KV) `ota:android:beta` 매니페스트 갱신.
-#   = 베타 채널 자동 publish. prod 승격은 수동(ota-promote.yml, workflow_dispatch) — 앱판 카나리.
+#   production 승격은 별도 수동 workflow(ota-promote.yml)로만 수행한다.
 #
 # 인프라(전부 기설정, 이 워크플로우는 정책 코드만 — 앱/계약 코드 무변경):
 #   - Worker /api/ota         : PR #980 머지됨. KV `ota:android:<channel>` JSON 을 읽어 앱에 반환.
@@ -11,11 +12,8 @@
 #                                (키 X 로 올린 객체는 <base>/X 로 다운로드 가능).
 #   - 시크릿                    : CLOUDFLARE_API_TOKEN · CLOUDFLARE_ACCOUNT_ID (preview-smoke 와 공유, repo Settings→Secrets).
 #
-# ⚠️ 선행: 페이즈 B(PR #983) 머지 필수. @capgo/cli 의 `bundle zip` 은 (a) `@capgo/capacitor-updater`
-#   가 node_modules 에 있는지, (b) 빌드 산출물이 `notifyAppReady()` 를 호출하는지 검사한다.
-#   둘 다 #983 이 추가한다. #983 전엔 zip 스텝이 실패(=안전망: 미완성 셸 번들을 publish 하지 않음).
-#   (b) 코드 체크는 의도적으로 유지한다(롤백 안전망). 단 (a) 의존성 체크는 --no-code-check 로도 못 끈다 —
-#   #983 머지가 진짜 선행 조건.
+# 안전망: @capgo/cli `bundle zip`의 updater 의존성·notifyAppReady() 검사를 유지한다.
+# 부팅 준비 신호를 보장하지 못하는 번들은 publish하지 않는다.
 #
 # semver 규칙: @capgo/cli 는 비-semver(예: 2026.06.24-sha)를 invalid_semver 로 거부한다.
 #   → 버전은 `1.0.<run_number>`(단조 증가). git sha·날짜는 매니페스트 METADATA(sha/date)로만 싣는다
@@ -30,7 +28,7 @@ on:
         required: true
         type: string
 
-# 연속 머지 시 직렬화(KV/R2 동시 쓰기로 인한 매니페스트-자산 불일치 방지). 진행 중인 릴리스는 취소 안 함.
+# 연속 수동 실행 시 직렬화(KV/R2 동시 쓰기로 인한 매니페스트-자산 불일치 방지). 진행 중인 릴리스는 취소 안 함.
 concurrency:
   group: ota-release
   cancel-in-progress: false

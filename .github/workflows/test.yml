@@ -6,7 +6,8 @@ on:
   pull_request:
     branches: [main]
 
-# 배포는 Cloudflare Workers Build(main 푸시 시 자동)가 담당 — Netlify deploy job 제거(#254).
+# 이 workflow는 CI만 수행한다. main 배포는 deploy-dev.yml이 stable DEV까지만 담당하고,
+# Production은 stable DEV에서 검증된 동일 SHA를 promote-production.yml로 수동 승격한다.
 
 jobs:
   spec-align:
@@ -249,4 +250,4 @@ jobs:
           fi
           python tests/spec-align/migrations_applied.py
 
-# (deploy/detect 제거됨 — 배포는 Cloudflare Workers Build가 main 푸시 시 자동 처리)
+# (deploy/detect 제거됨 — 배포는 deploy-dev와 승인형 promote-production workflow로 분리)
