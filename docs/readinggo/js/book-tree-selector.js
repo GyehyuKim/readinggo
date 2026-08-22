@@ -136,6 +136,7 @@ export function selectBookTree({
     selectedBranch,
     candidateCount: candidates ? candidates.length : null,
     candidates,
+    familiarSummary: `책 ${branches.length}권 · 문장 ${totalLeafCount}개`,
     accessibilitySummary: `책 ${branches.length}권, 문장 ${totalLeafCount}개`,
   });
 }
