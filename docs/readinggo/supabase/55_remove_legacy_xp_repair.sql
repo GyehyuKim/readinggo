@@ -26,8 +26,13 @@ create table if not exists migration_backups.phase4_users_public_view (
   view_definition text not null,
   view_owner text not null,
   view_acl text,
+  view_reloptions text[],
+  view_acl_sql text,
   backed_up_at timestamptz not null default now()
 );
+alter table migration_backups.phase4_users_public_view
+  add column if not exists view_reloptions text[],
+  add column if not exists view_acl_sql text;
 
 create table if not exists migration_backups.phase4_reading_sessions_xp (
   session_id uuid primary key,
@@ -89,13 +94,28 @@ begin
     where table_schema = 'public' and table_name = 'users_public' and column_name = 'xp'
   ) then
     insert into migration_backups.phase4_users_public_view (
-      view_identity, view_definition, view_owner, view_acl
+      view_identity, view_definition, view_owner, view_acl, view_reloptions, view_acl_sql
     )
     select
       'public.users_public',
       pg_get_viewdef(c.oid, true),
       pg_get_userbyid(c.relowner),
-      c.relacl::text
+      c.relacl::text,
+      c.reloptions,
+      (
+        select string_agg(
+          format(
+            'grant %s on public.users_public to %s%s;',
+            privilege_type,
+            case when grantee = 0 then 'public' else format('%I', pg_get_userbyid(grantee)) end,
+            case when is_grantable then ' with grant option' else '' end
+          ),
+          ' '
+          order by grantee, privilege_type
+        )
+        from aclexplode(coalesce(c.relacl, acldefault('r', c.relowner)))
+        where grantee <> c.relowner
+      )
     from pg_class c
     where c.oid = view_oid
     on conflict (view_identity) do nothing;
@@ -170,14 +190,60 @@ $backup_columns$;
 drop function if exists public.increment_xp(int);
 
 -- CREATE OR REPLACE VIEW는 기존 컬럼 제거를 허용하지 않으므로 같은 transaction에서 drop/create한다.
+-- 현재 DEV view의 WHERE/security 계약을 보존하고 select-list의 legacy XP target만 fail-closed로 제거한다.
 -- CASCADE를 사용하지 않아 예상하지 못한 의존 객체가 있으면 migration 전체가 rollback된다.
-drop view if exists public.users_public;
-create view public.users_public as
-  select u.id, u.handle, u.display_name, u.avatar_url, u.bio, u.wishlist_public, u.created_at
-  from public.users u
-  where public.moderation_user_visible(u.id);
-grant select on public.users_public to authenticated;
-revoke select on public.users_public from public, anon;
+do $rebuild_users_public$
+declare
+  legacy_definition text;
+  legacy_owner text;
+  legacy_reloptions text[];
+  legacy_acl_sql text;
+  xp_free_definition text;
+begin
+  select view_definition, view_owner, view_reloptions, view_acl_sql
+  into legacy_definition, legacy_owner, legacy_reloptions, legacy_acl_sql
+  from migration_backups.phase4_users_public_view
+  where view_identity = 'public.users_public';
+
+  if legacy_definition is not null then
+    xp_free_definition := regexp_replace(
+      legacy_definition,
+      '[[:space:]]*([[:alnum:]_]+[.])?xp[[:space:]]*,[[:space:]]*',
+      ' ',
+      'i'
+    );
+
+    if xp_free_definition = legacy_definition
+       or xp_free_definition ~* '(^|[^[:alnum:]_])([[:alnum:]_]+[.])?xp([^[:alnum:]_]|$)'
+    then
+      raise exception 'users_public XP target could not be removed safely';
+    end if;
+
+    execute 'drop view public.users_public';
+    execute 'create view public.users_public as ' || xp_free_definition;
+
+    if coalesce(cardinality(legacy_reloptions), 0) > 0 then
+      execute format(
+        'alter view public.users_public set (%s)',
+        array_to_string(legacy_reloptions, ', ')
+      );
+    end if;
+
+    if legacy_acl_sql is not null then
+      execute legacy_acl_sql;
+    end if;
+  end if;
+
+  if to_regclass('public.users_public') is not null then
+    execute 'grant select on public.users_public to authenticated';
+    execute 'revoke select on public.users_public from public, anon';
+
+    if legacy_owner is not null then
+      execute format('alter view public.users_public owner to %I', legacy_owner);
+    end if;
+  end if;
+end
+$rebuild_users_public$;
 
 alter table if exists public.reading_sessions drop column if exists xp_earned;
 alter table if exists public.users drop column if exists xp;
