@@ -84,6 +84,46 @@ function _mergeOcrDrafts(existing, texts) {
 }
 window._mergeOcrDrafts = _mergeOcrDrafts;
 
+
+// 홈 다중 일반 OCR의 페이지 순서를 보존해 문장 초안으로 나눈다(#1495).
+// null/빈 페이지는 hard boundary라 서로 떨어진 페이지의 잔여 문장을 합치지 않는다.
+function _splitOcrPageTexts(pageTexts) {
+  const terminal = new Set(['.', '!', '?', '。', '！', '？', '…']);
+  const closing = new Set(['"', "'", '”', '’', '」', '』', '》', '〉', ')', ']', '}', '）', '］', '｝', '】', '〕', '〗', '〙', '〛', '»', '›']);
+  const result = [];
+  let group = [];
+
+  const flush = () => {
+    const combined = group.join(' ').replace(/\s+/g, ' ').trim();
+    group = [];
+    if (!combined) return;
+    const chars = Array.from(combined);
+    let start = 0;
+    for (let i = 0; i < chars.length; i++) {
+      if (!terminal.has(chars[i])) continue;
+      if (chars[i] === '.' && /\d/.test(chars[i - 1] || '') && /\d/.test(chars[i + 1] || '')) continue;
+      let end = i + 1;
+      while (end < chars.length && terminal.has(chars[end])) end++;
+      while (end < chars.length && closing.has(chars[end])) end++;
+      const sentence = chars.slice(start, end).join('').trim();
+      if (sentence) result.push(sentence);
+      start = end;
+      i = end - 1;
+    }
+    const remainder = chars.slice(start).join('').trim();
+    if (remainder) result.push(remainder);
+  };
+
+  (pageTexts || []).forEach((value) => {
+    const text = String(value || '').trim();
+    if (!text) { flush(); return; }
+    group.push(text);
+  });
+  flush();
+  return result;
+}
+window._splitOcrPageTexts = _splitOcrPageTexts;
+
 function _retainUnsavedDrafts(drafts, savedIndices) {
   const saved = new Set(Array.isArray(savedIndices) ? savedIndices : []);
   let readyIndex = -1;
@@ -468,50 +508,60 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       .finally(() => setQuickOcrBusy(false));
   };
 
-  // 홈 앨범 다중 선택(#1378) — 한 장은 기존 크롭·단발 검토, 여러 장은 책 상세와 같은
-  // 강조 추출 API를 순차 호출해 홈 초안에 누적한다. 저장은 기존 N개 한번에 기록 경로가 담당.
+  // 홈 앨범 다중 선택(#1378/#1495) — 한 장은 기존 크롭·단발 검토, 여러 장은
+  // 일반 OCR을 순차 호출해 문장별 홈 초안으로 누적한다. 저장은 기존 N개 한번에 기록 경로가 담당.
   const runOcrAlbumBatch = async (files) => {
     if (!files || files.length < 2 || quickOcrBusy) return;
     setQuickOcrBusy(true);
     setQuickOcrProgress({ done: 0, total: files.length });
     rgTrack('ocr_batch_started', { count: files.length, source: 'home_album' });
-    const extracted = [];
+    const pageTexts = Array(files.length).fill(null);
     let failed = 0;
+    let unreadable = 0;
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!file || file.size > 8 * 1024 * 1024) {
           failed++;
+          rgTrack('ocr_failed', { page_idx: i, code: 'ocr_image_too_large', stage: 'client', source: 'home_album' });
           setQuickOcrProgress({ done: i + 1, total: files.length });
           continue;
         }
         try {
-          const fd = new FormData();
-          fd.append('document', file, file.name || `page-${i + 1}.jpg`);
-          const response = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
-          if (!response.ok) failed++;
-          else {
-            const data = await response.json();
-            const sentences = data && Array.isArray(data.sentences) ? data.sentences : [];
-            extracted.push(...sentences);
-            rgTrack('highlights_extracted', { page_idx: i, n: sentences.length, source: 'home_album' });
+          const data = await Promise.resolve(window.ocrExtractSentence
+            ? window.ocrExtractSentence(file)
+            : { text: '', error: 'unavailable', stage: 'client', status: 0 });
+          const text = String(data && data.text || '').trim();
+          if (text) {
+            pageTexts[i] = text;
+            rgTrack('ocr_extracted', { page_idx: i, chars: Array.from(text).length, source: 'home_album' });
+          } else if (data && data.empty) {
+            unreadable++;
+            rgTrack('ocr_failed', { page_idx: i, code: data.code || 'ocr_empty', stage: data.stage || 'result', source: 'home_album' });
+          } else {
+            failed++;
+            rgTrack('ocr_failed', { page_idx: i, code: (data && data.error) || 'ocr_failed', stage: (data && data.stage) || 'unknown', http_status: (data && data.status) || 0, source: 'home_album' });
           }
-        } catch (e) { failed++; }
+        } catch (e) {
+          failed++;
+          rgTrack('ocr_failed', { page_idx: i, code: 'ocr_network_failure', stage: 'client', source: 'home_album' });
+        }
         setQuickOcrProgress({ done: i + 1, total: files.length });
         if (i < files.length - 1) await new Promise((resolve) => setTimeout(resolve, 1200));
       }
 
+      const extracted = _splitOcrPageTexts(pageTexts);
       const validCount = new Set(extracted.map((text) => String(text || '').trim()).filter(Boolean)).size;
       if (validCount > 0) {
         setDrafts((current) => _mergeOcrDrafts(current, extracted));
-        if (failed > 0) showToast(`사진 ${failed}장은 처리하지 못했어요 — 찾은 문장 ${validCount}개만 담았어요`);
+        if (failed + unreadable > 0) showToast(`사진 ${failed + unreadable}장은 글자를 찾지 못했어요 — 찾은 문장 ${validCount}개만 담았어요`);
         else showToast(`사진에서 찾은 문장 ${validCount}개를 담았어요`);
       } else if (failed >= files.length) {
         showToast('사진을 처리하지 못했어요 — 잠시 후 다시 시도해 주세요');
       } else if (failed > 0) {
-        showToast('일부 사진을 처리하지 못했고, 강조 문장도 찾지 못했어요');
+        showToast('일부 사진을 처리하지 못했고, 글자도 찾지 못했어요');
       } else {
-        showToast('강조된 문장을 찾지 못했어요 — 더 또렷한 사진으로');
+        showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
       }
     } finally {
       setQuickOcrProgress(null);
