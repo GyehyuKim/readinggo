@@ -191,6 +191,16 @@ test('environment 위반은 critical이고 기타 계약 위반은 warning이다
 test('품질 감사 행 제한은 이상 유무보다 우선해 incomplete로 표시한다', () => {
   const result = analyzeDataQuality(quality([], { qualityRowsAtLimit: true }));
   assert.equal(result.status, 'incomplete');
+  assert.equal(result.anomalyTotals.some((row) => row.type === 'collection_silence'), false);
+});
+
+test('완료된 감사 기간에 핵심 이벤트가 없으면 collection_silence critical을 보고한다', () => {
+  const result = analyzeDataQuality(quality([]));
+  assert.equal(result.status, 'critical');
+  assert.deepEqual(result.anomalyTotals, [{
+    type: 'collection_silence', severity: 'critical', label: '감사 대상 핵심 이벤트 수집 없음', count: 0, users: 0, groups: 1,
+  }]);
+  assert.equal(result.anomalyGroups[0].event, 'book_opened,reading_session_end,sentence_added,answer_saved,book_completed');
 });
 
 test('마크다운에 품질 상태, 환경, 이상 요약과 상세를 출력한다', () => {
