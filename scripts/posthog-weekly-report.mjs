@@ -198,6 +198,7 @@ function isMissing(value) {
 }
 
 const ANOMALY_METADATA = {
+  collection_silence: { severity: 'critical', label: '감사 대상 핵심 이벤트 수집 없음' },
   missing_environment: { severity: 'critical', label: 'environment 누락' },
   invalid_environment: { severity: 'critical', label: 'environment 허용값 위반' },
   missing_release_sha: { severity: 'warning', label: 'production release_sha 누락' },
@@ -233,6 +234,12 @@ export function analyzeDataQuality(quality) {
   const activeIds = new Set();
   const groups = new Map();
   const totals = new Map();
+
+  if (!events.length && !quality.qualityRowsAtLimit) {
+    const dimensions = { type: 'collection_silence', event: CORE_EVENTS.join(','), property: '', environment: '(감사 기간)', releaseSha: '(감사 대상)', schemaVersion: '(감사 대상)', platform: '(감사 대상)' };
+    groups.set(JSON.stringify(dimensions), { ...dimensions, count: 0, ids: new Set(), firstSeen: quality.windowStart || '', lastSeen: quality.windowEnd || '' });
+    totals.set('collection_silence', { count: 0, ids: new Set(), groups: 0 });
+  }
 
   for (const row of events) {
     activeIds.add(row.distinctId);
@@ -289,6 +296,7 @@ export function analyzeDataQuality(quality) {
     environmentCounts: Object.fromEntries([...environmentCounts.entries()].sort(([a], [b]) => a.localeCompare(b))),
     missingEnvironment: anomalyTotals.find((row) => row.type === 'missing_environment')?.count || 0,
     missingReleaseSha: anomalyTotals.find((row) => row.type === 'missing_release_sha')?.count || 0,
+    auditedEvents: CORE_EVENTS,
     anomalyTotals,
     anomalyGroups: anomalyGroups.slice(0, QUALITY_DETAIL_LIMIT),
     hiddenAnomalyGroups: Math.max(0, anomalyGroups.length - QUALITY_DETAIL_LIMIT),

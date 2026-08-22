@@ -387,8 +387,32 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
-  const handleCheckin = async ({ page, sentence, kind, sentPage, sentences, awaitPersistence }) => {
-    const settings = await Promise.resolve(window.DataStore.settings.get());
+  const reportCheckinPreflightFailure = async ({ source, error, correlationId, itemCount }) => {
+    const reportableError = error && typeof error === 'object' ? error : new Error(String(error || 'checkin_preflight_failed'));
+    const properties = await window.RG_trackCheckinSaveFailed({ source, stage: 'preflight', error: reportableError, correlationId, retryCount: 0, itemCount });
+    try {
+      reportableError.correlationId = properties.correlation_id;
+      reportableError.checkinFailureCode = properties.code;
+      reportableError.checkinFailureStage = 'preflight';
+      return reportableError;
+    } catch (_) {
+      const decoratedError = new Error(properties.code);
+      decoratedError.correlationId = properties.correlation_id;
+      decoratedError.checkinFailureCode = properties.code;
+      decoratedError.checkinFailureStage = 'preflight';
+      return decoratedError;
+    }
+  };
+
+  const handleCheckin = async ({ page, sentence, kind, sentPage, sentences, awaitPersistence, source = 'home' }) => {
+    const correlationId = window.RG_createCheckinCorrelationId();
+    const itemCount = Array.isArray(sentences) ? sentences.filter((item) => item && item.text && String(item.text).trim()).length : (sentence ? 1 : 0);
+    let settings;
+    try {
+      settings = await Promise.resolve(window.DataStore.settings.get());
+    } catch (error) {
+      throw await reportCheckinPreflightFailure({ source, error, correlationId, itemCount });
+    }
     const configuredVisibility = settings && settings.default_sentence_visibility;
     const defaultVisibility = configuredVisibility == null ? 'public'
       : (configuredVisibility === 'friends' ? 'followers'
@@ -398,10 +422,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const normalizeText = (text, scope) => window.RG_validateSentenceText
       ? window.RG_validateSentenceText(text, scope).text
       : Array.from(String(text == null ? '' : text).trim()).slice(0, 1000).join('');
-    const savedSentence = sentence ? normalizeText(sentence, defaultVisibility) : sentence;
-    const savedSentences = Array.isArray(sentences)
-      ? sentences.map((item) => item && item.text ? { text: normalizeText(item.text, defaultVisibility), page: item.page, visibility: defaultVisibility } : item)
-      : sentences;
+    let savedSentence, savedSentences;
+    try {
+      savedSentence = sentence ? normalizeText(sentence, defaultVisibility) : sentence;
+      savedSentences = Array.isArray(sentences)
+        ? sentences.map((item) => item && item.text ? { text: normalizeText(item.text, defaultVisibility), page: item.page, visibility: defaultVisibility } : item)
+        : sentences;
     // #1392 공개 UGC 동의는 세션/낙관 UI를 건드리기 전에 확인한다.
     // 실패 뒤 DataStore에서 막으면 reading_sessions만 저장되는 부분 상태가 생길 수 있다.
     if (window.DataStore === window.SupabaseDataStore && (sentence || (Array.isArray(sentences) && sentences.length))) {
@@ -411,6 +437,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
         throw new Error('ugc_terms_required');
       }
+    }
+    } catch (error) {
+      throw await reportCheckinPreflightFailure({ source, error, correlationId, itemCount });
     }
     setModalOpen(false);
     setCheckedToday(true);
@@ -458,13 +487,18 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         completion = {
           rollback: { book: previousNestState.book, streak: previousNestState.streak, myQuotes: previousNestState.myQuotes },
           onSuccess: resolve,
-          onFailure: (error) => { setNestState(previousNestState); setCheckedToday(false); setCeremony(null); setShowConfetti(false); reject(error); },
+          onFailure: (error) => {
+            if (!error || !error.checkinReadbackFailed) {
+              setNestState(previousNestState); setCheckedToday(false); setCeremony(null); setShowConfetti(false);
+            }
+            reject(error);
+          },
         };
       });
     }
     let checkinResult;
     try {
-      checkinResult = onCheckin(ns, savedSentence, kind, quotePage, batch, defaultVisibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
+      checkinResult = onCheckin(ns, savedSentence, kind, quotePage, batch, defaultVisibility, completion, pagesAdded, isComplete, { source, correlationId, itemCount }); // batch 있으면 app 이 N개 문장 영속(#1198)
     } catch (error) {
       throw error;
     }
@@ -580,19 +614,17 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     _ocrSavingRef.current = true; setOcrSaving(true); setOcrErrors({ text: '', page: '', status: '저장 중입니다.' });
     try {
       const progressPage = Math.max(nestState.book.cur || 0, checked.page);
-      await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, kind: 'quote', sentPage: checked.page, awaitPersistence: true }));
+      await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, kind: 'quote', sentPage: checked.page, awaitPersistence: true, source: 'ocr_review' }));
       setOcrErrors({ text: '', page: '', status: '저장했습니다.' });
       if (checked.truncated) showToast('1,000자를 넘어 앞부분만 저장했어요');
       if (_ocrHistoryRef.current) window.history.back(); else closeOcrReview();
     } catch (e) {
       _ocrSavingRef.current = false; setOcrSaving(false);
-      const rawCode = e && (e.message === 'ugc_terms_required' ? e.message : e.code);
-      const code = typeof rawCode === 'string' && /^[A-Za-z0-9_]{1,48}$/.test(rawCode) ? rawCode : 'unknown';
+      const code = window.RG_normalizeCheckinFailure(e, 'preflight');
+      const inquiryCode = e && e.correlationId ? String(e.correlationId).slice(0, 8) : '';
       const status = code === 'ugc_terms_required'
         ? '공개 저장을 위한 커뮤니티 안내에 동의한 뒤 다시 저장해주세요. 내용은 그대로 유지했어요.'
-        : '저장하지 못했어요. 내용을 유지했으니 다시 시도해주세요.';
-      // #1404: 원문·사용자 ID는 제외하고 안전한 분류값만 남긴다.
-      rgTrack('checkin_save_failed', { source: 'ocr_review', stage: code === 'ugc_terms_required' ? 'consent' : 'persistence', code });
+        : `저장하지 못했어요. 내용을 유지했으니 다시 시도해주세요.${inquiryCode ? ` 문의 코드 ${inquiryCode}` : ''}`;
       setOcrErrors((prev) => ({ ...prev, status }));
     }
   };
@@ -609,7 +641,11 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const submitPage = () => {
     if (quickPage === '') { showToast('쪽수를 입력해주세요'); return; }
     const p = _quickTargetPage();
-    handleCheckin({ page: p, sentence: null, kind: 'quote' });
+    Promise.resolve(handleCheckin({ page: p, sentence: null, kind: 'quote' })).catch((error) => {
+      if (error && error.checkinFailureStage === 'preflight' && error.checkinFailureCode !== 'ugc_terms_required') {
+        showToast(`기록을 시작하지 못했어요.${error.correlationId ? ` 문의 코드 ${String(error.correlationId).slice(0, 8)}` : ''}`);
+      }
+    });
     setQuickPage(''); // quickText 보존 — 페이지만 업데이트해도 문장 입력창 유지
   };
   // 한 문장 섹션 [저장/한번에 기록] (#497·#1198) — 초안(drafts) 1개면 단일 저장(기존 경로 그대로),
@@ -643,6 +679,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       // 부분 성공은 저장된 행만 제거하고 실패 초안·문장 페이지를 재시도할 수 있게 보존한다.
       const saved = Array.isArray(e && e.savedBatchIndices) ? e.savedBatchIndices : [];
       if (saved.length) setDrafts((prev) => _retainUnsavedDrafts(prev, saved));
+      if (e && e.checkinFailureStage === 'preflight' && e.checkinFailureCode !== 'ugc_terms_required') {
+        showToast(`저장을 시작하지 못했어요. 내용은 유지했어요.${e.correlationId ? ` 문의 코드 ${String(e.correlationId).slice(0, 8)}` : ''}`);
+      }
     } finally {
       _sentenceSubmittingRef.current = false;
       setSentenceSubmitting(false);

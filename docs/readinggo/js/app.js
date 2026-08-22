@@ -206,11 +206,13 @@ async function backfillCompanionSessions() {
 // 서재 빈 채 + 체크인 'user_book 미해소'. 그동안 console.warn 으로만 삼켜져 사용자 무피드백이었다.
 // 처리: ① getUser(네트워크 검증) → 살아있으면 일시 오류 안내, ② 죽었으면 refreshSession 시도,
 //       ③ 그래도 실패면 세션 만료 안내 + 재로그인 화면. 게스트/localStorage 모드는 일반 안내만.
-async function surfaceWriteError(e, msg) {
+async function surfaceWriteError(e, msg, correlationId) {
   console.warn('[ReadingGo] 쓰기 실패:', e);
+  const inquiryCode = typeof correlationId === 'string' ? correlationId.slice(0, 8) : '';
+  const withInquiryCode = (text) => `${text}${inquiryCode ? ` 문의 코드 ${inquiryCode}` : ''}`;
   const supa = !!(window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured());
   if (!(supa && window.DataStore === window.SupabaseDataStore)) {
-    if (window.showToast) window.showToast(msg || '저장에 실패했어요 — 잠시 후 다시 시도해주세요');
+    if (window.showToast) window.showToast(withInquiryCode(msg || '저장에 실패했어요 — 잠시 후 다시 시도해주세요'));
     return;
   }
   let sessionOk = false;
@@ -223,9 +225,9 @@ async function surfaceWriteError(e, msg) {
     }
   } catch (_) { sessionOk = false; }
   if (sessionOk) {
-    if (window.showToast) window.showToast(msg || '저장에 실패했어요 — 다시 시도해주세요');
+    if (window.showToast) window.showToast(withInquiryCode(msg || '저장에 실패했어요 — 다시 시도해주세요'));
   } else {
-    if (window.showToast) window.showToast('세션이 만료됐어요 — 다시 로그인하면 저장돼요');
+    if (window.showToast) window.showToast(withInquiryCode('세션이 만료됐어요 — 다시 로그인하면 저장돼요'));
     if (window.RG_login) window.RG_login();   // 로그인 화면(app.js RG_login 등록)
   }
 }
@@ -849,7 +851,7 @@ function App() {
   }, []);
 
   // NestView가 체크인 후 자체 업데이트하고 콜백으로 상위 동기화.
-  const handleCheckin = useCallback((ns, sentence, kind, sentPage, sentences, visibility, completion, pagesLogged, isComplete) => {
+  const handleCheckin = useCallback((ns, sentence, kind, sentPage, sentences, visibility, completion, pagesLogged, isComplete, checkinContext = {}) => {
     // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
     // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
@@ -879,48 +881,89 @@ function App() {
     // sessions.addToday 가 스트릭 bump 까지 연동(양 어댑터). 활성 책 없으면 no-op.
     return (async () => {
       try {
+        const source = checkinContext.source === 'ocr_review' ? 'ocr_review' : 'home';
+        const correlationId = typeof checkinContext.correlationId === 'string'
+          ? checkinContext.correlationId
+          : window.RG_createCheckinCorrelationId();
+        const itemCount = Number.isInteger(checkinContext.itemCount) ? checkinContext.itemCount : (batch && batch.length ? batch.length : (sentence ? 1 : 0));
+        const reportFailure = async (stage, error, endpointOrRpc) => {
+          const reportableError = error && typeof error === 'object' ? error : new Error(String(error || 'checkin_failure'));
+          const properties = await window.RG_trackCheckinSaveFailed({ source, stage, error: reportableError, endpointOrRpc, correlationId, retryCount: 0, itemCount });
+          try {
+            reportableError.correlationId = properties.correlation_id;
+            reportableError.checkinFailureCode = properties.code;
+            return reportableError;
+          } catch (_) {
+            const decoratedError = new Error(properties.code);
+            decoratedError.correlationId = properties.correlation_id;
+            decoratedError.checkinFailureCode = properties.code;
+            return decoratedError;
+          }
+        };
         // #565: 화면 책(ns.book)에 정확히 귀속 — 전역 activeBook 타이밍(리볼빙 전환 race)에 의존하지 않는다.
         // 1순위 ns.book.ubId(readingBooks·buildState 에서 동결한 user_book id). 없으면 ns.book.id 로 내 책을 해소
         // (active 폴백 아님 — 화면 책 기준). 둘 다 실패하면 잘못 저장하지 말고 중단.
         let ubId = ns.book && ns.book.ubId;
         if (!ubId && ns.book && ns.book.id) {
-          const myb = await Promise.resolve(DataStore.myBooks.list()).catch(() => []);
-          const found = (myb || []).find(u => (u.book_id === ns.book.id) || (u.book && u.book.id === ns.book.id));
-          ubId = found && found.id;
+          try {
+            const myb = await Promise.resolve(DataStore.myBooks.list());
+            const found = (myb || []).find(u => (u.book_id === ns.book.id) || (u.book && u.book.id === ns.book.id));
+            ubId = found && found.id;
+          } catch (error) {
+            throw await reportFailure('preflight', error);
+          }
         }
-        if (!ubId) { console.warn('[ReadingGo] 체크인: 화면 책의 user_book 미해소 — 잘못된 귀속 방지 위해 저장 건너뜀'); throw new Error('user_book 미해소'); }
-        await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
+        if (!ubId) {
+          console.warn('[ReadingGo] 체크인: 화면 책의 user_book 미해소 — 잘못된 귀속 방지 위해 저장 건너뜀');
+          throw await reportFailure('preflight', new Error('missing_user_book'));
+        }
+        try {
+          await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
+        } catch (error) {
+          throw await reportFailure('session', error, 'checkin_atomic');
+        }
         if (window.rgTrack) window.rgTrack('reading_session_end', {
           book_id: ns.book.id || '',
           pages_logged: Math.max(0, Number(pagesLogged || 0)),
           is_complete: !!isComplete,
         });
-        if (batch && batch.length) {
-          // 배치: 공용 실행기가 부분 실패 인덱스를 반환해 실패 초안만 보존한다.
-          const result = await window.RG_saveSentenceBatch(batch, async (s) => {
-            const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote', visibility: s.visibility }));
+        try {
+          if (batch && batch.length) {
+            // 배치: 공용 실행기가 부분 실패 인덱스를 반환해 실패 초안만 보존한다.
+            const result = await window.RG_saveSentenceBatch(batch, async (s) => {
+              const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: (typeof s.page === 'number') ? s.page : qPage, text: String(s.text).trim(), kind: kind || 'quote', visibility: s.visibility }));
+              if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
+              return row;
+            });
+            if (result.failedIndices.length) {
+              const error = new Error('sentence_batch_partial_failure');
+              error.savedBatchIndices = result.savedIndices;
+              error.failedBatchIndices = result.failedIndices;
+              throw error;
+            }
+          } else if (sentence) {
+            await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));
             if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
-            return row;
-          });
-          if (result.failedIndices.length) {
-            const error = new Error('sentence_batch_partial_failure');
-            error.savedBatchIndices = result.savedIndices;
-            error.failedBatchIndices = result.failedIndices;
-            throw error;
           }
-        } else if (sentence) {
-          await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));
-          if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
+        } catch (error) {
+          throw await reportFailure('sentence', error, 'sentences');
         }
 
         console.log('[ReadingGo] ✅ 체크인 저장 완료 (ub=' + ubId + ')');
         // 오늘 기록 완료 → 리마인더 재무장(오늘치 취소, 내일로). '읽었는데 알림 발화' 방지(#1163). 웹/비네이티브 no-op.
         try { if (window.RG_streakReminder) window.RG_streakReminder.reschedule(); } catch (e) {}
         // DB 권위값으로 스트릭·내 한 문장 정합 (낙관 표시 어긋남 + 새 문장 id 부재 → 감상 버튼 지연 방지, H2/§5.8.4)
-        const [stDb, mineDb] = await Promise.all([
-          Promise.resolve(DataStore.streak.get()).catch(() => null),
-          Promise.resolve(DataStore.sentences.listMine()).catch(() => null),
-        ]);
+        let stDb, mineDb;
+        try {
+          [stDb, mineDb] = await Promise.all([
+            Promise.resolve(DataStore.streak.get()),
+            Promise.resolve(DataStore.sentences.listMine()),
+          ]);
+        } catch (error) {
+          const reportedError = await reportFailure('readback', error, 'streak+sentences');
+          reportedError.checkinReadbackFailed = true;
+          throw reportedError;
+        }
         setAppState(s => ({
           ...s,
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
@@ -930,8 +973,14 @@ function App() {
         }));
         if (completion && completion.onSuccess) completion.onSuccess();
       } catch (e) {
-        await surfaceWriteError(e, '기록을 저장하지 못했어요 — 다시 시도해주세요');
-        if (completion && completion.rollback) {
+        if (e && e.checkinFailureCode === 'ugc_terms_required') {
+          window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
+        } else if (e && e.checkinReadbackFailed) {
+          await surfaceWriteError(e, '저장은 되었지만 최신 기록을 불러오지 못했어요.', e && e.correlationId);
+        } else {
+          await surfaceWriteError(e, '기록을 저장하지 못했어요 — 다시 시도해주세요.', e && e.correlationId);
+        }
+        if (completion && completion.rollback && !(e && e.checkinReadbackFailed)) {
           const prev = completion.rollback;
           setAppState(s => ({ ...s, book: prev.book, streak: prev.streak, myQuotes: prev.myQuotes }));
         }

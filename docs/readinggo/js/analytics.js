@@ -4,6 +4,13 @@
 const RG_ANALYTICS_SCHEMA_VERSION = 1;
 const RG_ANALYTICS_ENVIRONMENTS = new Set(['development', 'production']);
 const RG_ANALYTICS_PLATFORMS = new Set(['web', 'ios', 'android']);
+const RG_CHECKIN_SOURCES = new Set(['home', 'ocr_review']);
+const RG_CHECKIN_STAGES = new Set(['preflight', 'session', 'sentence', 'readback']);
+const RG_CHECKIN_CODES = new Set([
+  'ugc_terms_required', 'invalid_sentence', 'missing_user_book', 'auth_expired', 'network',
+  'session_write_failed', 'sentence_write_failed', 'batch_partial_failure', 'readback_failed', 'unknown',
+]);
+const RG_CHECKIN_ENDPOINTS = new Set(['checkin_atomic', 'sentences', 'streak+sentences']);
 
 // 원문·개인정보·자유형 오류를 담을 가능성이 있는 키는 값과 무관하게 폐기한다.
 // code/stage/status 같은 안정된 오류 분류만 허용한다.
@@ -31,6 +38,68 @@ function sanitizeAnalyticsValue(value) {
     clean[key] = sanitizeAnalyticsValue(nested);
   }
   return clean;
+}
+
+function createCheckinCorrelationId(cryptoImpl = globalThis.crypto) {
+  try {
+    if (cryptoImpl && typeof cryptoImpl.randomUUID === 'function') return cryptoImpl.randomUUID();
+  } catch (e) { /* 비식별 UUID 폴백 사용 */ }
+  const bytes = new Uint8Array(16);
+  try {
+    if (cryptoImpl && typeof cryptoImpl.getRandomValues === 'function') cryptoImpl.getRandomValues(bytes);
+    else for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  } catch (e) {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function normalizeCheckinFailure(error, stage) {
+  const rawCode = String((error && error.code) || (error && error.message) || '').toLowerCase();
+  if (rawCode.includes('ugc_terms_required')) return 'ugc_terms_required';
+  if (rawCode.includes('invalid_sentence') || rawCode.includes('sentence_text_invalid') || rawCode.includes('sentence_text_required')) return 'invalid_sentence';
+  if (rawCode.includes('missing_user_book') || rawCode.includes('user_book') || rawCode.includes('미해소')) return 'missing_user_book';
+  if (rawCode.includes('jwt') || rawCode.includes('auth') || rawCode.includes('unauthorized') || Number(error && error.status) === 401) return 'auth_expired';
+  if (rawCode.includes('network') || rawCode.includes('fetch') || rawCode.includes('timeout')) return 'network';
+  if (rawCode.includes('sentence_batch_partial_failure')) return 'batch_partial_failure';
+  if (stage === 'session') return 'session_write_failed';
+  if (stage === 'sentence') return 'sentence_write_failed';
+  if (stage === 'readback') return 'readback_failed';
+  return 'unknown';
+}
+
+let nativeAppVersionPromise;
+async function getNativeAppVersion() {
+  if (typeof window === 'undefined' || !window.RG_NATIVE || !window.CapApp || typeof window.CapApp.getInfo !== 'function') return undefined;
+  if (!nativeAppVersionPromise) {
+    nativeAppVersionPromise = Promise.resolve(window.CapApp.getInfo())
+      .then((info) => (info && typeof info.version === 'string' && info.version.length <= 32 ? info.version : undefined))
+      .catch(() => undefined);
+  }
+  return nativeAppVersionPromise;
+}
+
+async function trackCheckinSaveFailed({ source, stage, error, endpointOrRpc, correlationId, retryCount = 0, itemCount = 0, track } = {}) {
+  const safeStage = RG_CHECKIN_STAGES.has(stage) ? stage : 'preflight';
+  const props = {
+    source: RG_CHECKIN_SOURCES.has(source) ? source : 'home',
+    stage: safeStage,
+    code: RG_CHECKIN_CODES.has(normalizeCheckinFailure(error, safeStage)) ? normalizeCheckinFailure(error, safeStage) : 'unknown',
+    correlation_id: typeof correlationId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(correlationId) ? correlationId : createCheckinCorrelationId(),
+    retry_count: Number.isInteger(retryCount) && retryCount >= 0 ? retryCount : 0,
+    item_count: Number.isInteger(itemCount) && itemCount >= 0 ? itemCount : 0,
+  };
+  if (RG_CHECKIN_ENDPOINTS.has(endpointOrRpc)) props.endpoint_or_rpc = endpointOrRpc;
+  const status = Number(error && error.status);
+  if (Number.isInteger(status) && status >= 100 && status <= 599) props.status = status;
+  const appVersion = await getNativeAppVersion();
+  if (appVersion) props.app_version = appVersion;
+  const tracker = track || (typeof window !== 'undefined' && window.rgTrack);
+  try { if (typeof tracker === 'function') tracker('checkin_save_failed', props); } catch (e) { /* 분석 실패는 저장 흐름을 막지 않는다. */ }
+  return props;
 }
 
 function resolveAnalyticsPlatform(capacitor) {
@@ -88,6 +157,9 @@ const runtime = typeof window === 'undefined'
 if (typeof window !== 'undefined') {
   window.RG_ANALYTICS = runtime;
   window.rgTrack = runtime.track;
+  window.RG_createCheckinCorrelationId = createCheckinCorrelationId;
+  window.RG_normalizeCheckinFailure = normalizeCheckinFailure;
+  window.RG_trackCheckinSaveFailed = trackCheckinSaveFailed;
 }
 
-export { createAnalyticsRuntime, sanitizeAnalyticsValue };
+export { createAnalyticsRuntime, createCheckinCorrelationId, normalizeCheckinFailure, sanitizeAnalyticsValue, trackCheckinSaveFailed };

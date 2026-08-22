@@ -67,8 +67,9 @@ check('OCR 저장 성공 후 절단 사실을 알림', /checked\.truncated[\s\S]
 check('중복 저장 차단', /if \(!ocrReview \|\| ocrSaving\) return;/.test(src) && /disabled=\{ocrSaving\}/.test(src));
 check('실패 시 검토값 보존 안내', /내용을 유지했으니 다시 시도해주세요/.test(src));
 check('공개 UGC 동의 필요 시 원인별 재시도 안내', /code === 'ugc_terms_required'[\s\S]+\uCEE4뮤니티 안내에 동의한 뒤 다시 저장/.test(ocrSaveFlow));
-check('OCR 저장 실패 진단은 원문 없는 분류값만 기록',
-  /rgTrack\('checkin_save_failed', \{ source: 'ocr_review', stage:[^}]+code \}\)/.test(ocrSaveFlow)
+check('OCR 저장 실패 진단은 공통 경로에 맡기고 원문을 직접 기록하지 않음',
+  /source: 'ocr_review'/.test(ocrSaveFlow)
+  && !/rgTrack\('checkin_save_failed'/.test(ocrSaveFlow)
   && !/checkin_save_failed[^\n]+(?:sentence|text|user_id|book_id)/.test(ocrSaveFlow));
 check('취소·뒤로가기·Escape 후 시작 버튼 포커스 복귀', /window\.history\.back\(\)/.test(ocrCloseFlow)
   && /e\.key === 'Escape'/.test(ocrCloseFlow) && /_ocrTriggerRef\.current\.focus\(\)/.test(ocrCloseFlow));
