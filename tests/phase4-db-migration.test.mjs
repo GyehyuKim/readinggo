@@ -8,6 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrations = path.join(root, 'docs', 'readinggo', 'supabase');
 const migrationName = '55_remove_legacy_xp_repair.sql';
 const migration = fs.readFileSync(path.join(migrations, migrationName), 'utf8');
+const migrateDevWorkflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'migrate-dev.yml'), 'utf8');
 
 const position = (pattern, label) => {
   const index = migration.search(pattern);
@@ -33,8 +34,12 @@ test('Phase 4 migration is sequential and snapshots every legacy DB surface befo
   }
 });
 
-test('Phase 4 migration is retry-safe and verifies DEV-readable postconditions', () => {
-  assert.match(migration, /begin;[\s\S]*commit;/i);
+test('Phase 4 migration delegates atomic transaction ownership to migrate-dev and is retry-safe', () => {
+  assert.doesNotMatch(migration, /^\s*(?:begin|commit|rollback)\s*;/im,
+    'migrate-dev.yml owns the transaction that atomically includes SQL and ledger insertion');
+  assert.match(migrateDevWorkflow, /migration must not manage its own transaction/);
+  assert.match(migrateDevWorkflow, /transaction = f'''begin;[\s\S]*\{sql\}[\s\S]*insert into public\.hermes_dev_migrations[\s\S]*commit;'''/,
+    'migrate-dev.yml must apply SQL and ledger insertion in one transaction');
   assert.match(migration, /create schema if not exists migration_backups/i);
   assert.match(migration, /information_schema\.columns/g);
   assert.match(migration, /on conflict \([^)]*\) do nothing/g);
