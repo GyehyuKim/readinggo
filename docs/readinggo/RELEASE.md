@@ -132,60 +132,87 @@ git tag v1.2.0 && git push origin v1.2.0
 
 ---
 
-## 3. 버전 범프 절차 (스토어 빌드 시)
+## 3. 역할별 버전 절차
 
-### 3.1 버전이 사는 4(+1) 곳
+### 3.1 버전 SSOT
 
-| # | 파일 | 키 | 현재값 | 의미 |
+| 역할 | 파일/생성 위치 | 키·형식 | 현재값 | 계약 |
 |---|---|---|---|---|
-| 1 | `docs/readinggo/package.json` | `version` | `0.1.0` | 프로젝트 명목 버전(npm). SemVer 의 SoT 로 사용. |
-| 2 | `docs/readinggo/android/app/build.gradle` | `versionName` | `"1.0.3"` | Android 마케팅 버전(사용자 노출 = SemVer). |
-| 2b | `docs/readinggo/android/app/build.gradle` | `versionCode` | `4` | Android 내부 **정수, 빌드마다 +1 단조 증가**(Play 가 순서 판단). |
-| 3 | `docs/readinggo/ios/App/App.xcodeproj/project.pbxproj` | `MARKETING_VERSION` | `1.0` | iOS 마케팅 버전(= SemVer). `Info.plist` `CFBundleShortVersionString` 가 이 변수를 참조. |
-| 3b | 〃 | `CURRENT_PROJECT_VERSION` | `1` | iOS 빌드 번호(정수, 빌드마다 +1). `CFBundleVersion` 가 참조. |
+| npm·웹 패키지 메타데이터 | `docs/readinggo/package.json` | `version` | `0.1.0` | 내부 웹 패키지·빌드 메타데이터. Android/iOS 출시 버전의 SSOT가 아니다. |
+| Android 마케팅 버전 | `docs/readinggo/android/app/build.gradle` | `versionName` | `"1.0.3"` | Play 사용자에게 노출되는 Android native release 정본. |
+| Android 빌드 번호 | 같은 파일 | `versionCode` | `4` | Play 업로드 순서를 판단하는 Android 독립 정수. Android 스토어 업로드마다 단조 증가한다. |
+| OTA 번들 버전 | `.github/workflows/ota-release.yml` | `1.0.<github.run_number>` | 실행별 자동 생성 | 웹 번들의 단조 증가 식별자. npm·Android·iOS 마케팅 버전과 동기화하지 않는다. |
+| OTA native 하한 | 같은 workflow가 Android Gradle에서 읽음 | `minNative` | 현재 `versionCode`에서 파생 | 기존 Android 셸 호환성 게이트. 별도 숫자나 npm/iOS 버전에서 파생하지 않는다. |
+| iOS 마케팅 버전 | `docs/readinggo/ios/App/App.xcodeproj/project.pbxproj` | `MARKETING_VERSION` | `1.0` | iOS native 출시 시 App Store 사용자에게 노출되는 독립 정본. |
+| iOS 빌드 번호 | 같은 파일 | `CURRENT_PROJECT_VERSION` | `1` | App Store 업로드 순서를 판단하는 iOS 독립 정수. iOS 업로드마다 단조 증가한다. |
 
-> `capacitor.config.json` 에는 **버전 필드가 없다**(앱 버전은 네이티브 프로젝트 소유). Capgo `@capgo/capacitor-updater` 의 OTA 버전은 빌드타임이 아니라 런타임 매니페스트가 결정하므로 여기 박을 필요 없음.
+> `capacitor.config.json` 에는 **버전 필드가 없다**(앱 버전은 네이티브 프로젝트 소유). Capgo `@capgo/capacitor-updater` 의 OTA 버전은 빌드타임이 아니라 릴리스 workflow가 만든 런타임 매니페스트가 결정한다.
 >
-> ⚠️ `build.gradle`·iOS `project.pbxproj` 의 실제 **편집 명령·빌드·서명**은 `RELEASE-BUILD.md`(#1024) 소관. 여기서는 *무엇을 어떤 값으로* 맞추는지(정합 규칙)만 정의한다.
+> ⚠️ `build.gradle`·iOS `project.pbxproj` 의 실제 **편집 명령·빌드·서명**은 `RELEASE-BUILD.md`(#1024) 소관이다. 여기서는 어떤 역할이 어느 정본을 소유하는지만 정의한다.
 
-### 3.2 동기화 규칙
+### 3.2 독립 관리 규칙
 
-- **마케팅 버전 3곳 일치**: `package.json version` = `versionName` = `MARKETING_VERSION` = `x.y.z`.
-- **빌드 번호 단조 증가**: `versionCode`(Android)·`CURRENT_PROJECT_VERSION`(iOS)는 **스토어 업로드마다 반드시 +1**. 같은 마케팅 버전이라도 재업로드하면 빌드 번호는 올려야 한다(Play/App Store 가 중복 거부). 둘을 같은 정수로 맞춰 두면 추적이 쉽다(예: 둘 다 `5`).
-- **OTA `minNative`**: `ota-release.yml`이 Android `versionCode`를 직접 읽어 매니페스트에 넣는다. 수동 상수는 두지 않으며 계약 테스트가 이 연결을 검증한다.
+- **플랫폼 간 문자열 일치 요구 없음**: npm `version`, Android `versionName`, OTA 번들 버전, iOS `MARKETING_VERSION`을 같은 값으로 강제하지 않는다. 각 값은 릴리스 주기와 소비자가 다르다.
+- **Android**: `versionName`은 Android 마케팅 버전으로 관리하고 `versionCode`는 Play 업로드마다 이전 승인 빌드보다 크게 올린다.
+- **OTA**: 번들 버전은 workflow run number로 자동 생성한다. `minNative`는 `ota-release.yml`이 Android `versionCode`를 직접 읽어 매니페스트에 넣으며 수동 상수를 두지 않는다.
+- **npm**: 내부 웹 패키지·빌드 메타데이터를 배포할 때만 독립적으로 범프한다. npm 범프가 Android·iOS native release를 자동으로 요구하지 않는다.
+- **iOS**: Android 공개 출시 게이트와 분리한다. iOS native 출시를 준비할 때 `MARKETING_VERSION`과 `CURRENT_PROJECT_VERSION`을 App Store 이력에 맞춰 독립적으로 올린다.
+- **빌드 번호도 플랫폼 간 동기화하지 않음**: Android `versionCode`와 iOS `CURRENT_PROJECT_VERSION`은 각 스토어 안에서만 단조 증가하면 된다.
 
-### 3.3 동기화 체크리스트 (release 브랜치에서)
+### 3.3 릴리스별 체크리스트
+
+**Android native release**
 
 ```text
-[ ] release/x.y.z 컷 (origin/main 최신에서)
-[ ] package.json        version  → x.y.z
-[ ] build.gradle        versionName → "x.y.z"
-[ ] build.gradle        versionCode → (직전 +1)
-[ ] project.pbxproj     MARKETING_VERSION → x.y.z   (2곳: Debug/Release 모두)
-[ ] project.pbxproj     CURRENT_PROJECT_VERSION → (직전 +1)  (2곳)
-[ ] ota-release.yml 이 build.gradle versionCode 를 minNative 로 읽는지 계약 테스트 통과
-[ ] 아래 §3.4 스크립트로 정합 확인
-[ ] 빌드·서명·제출 → RELEASE-BUILD.md
-[ ] git tag vx.y.z && push
-[ ] 버전 범프 커밋 main 으로 머지/체리픽
+[ ] origin/main의 승인된 SHA에서 Android release PR 준비
+[ ] build.gradle versionName → 이번 Android 마케팅 버전
+[ ] build.gradle versionCode → 직전 Play 승인/업로드 번호보다 크게 증가
+[ ] ota-release.yml이 같은 build.gradle versionCode를 minNative로 읽는 계약 테스트 통과
+[ ] Android 빌드·서명·내부 테스트 → RELEASE-BUILD.md
+[ ] staged rollout 및 rollback/roll-forward 계획 확인
+```
+
+**OTA release**
+
+```text
+[ ] main → stable DEV의 동일 SHA와 QA 근거 확인
+[ ] ota-release.yml 수동 실행: 승인 SHA를 beta에 발행
+[ ] version=1.0.<run_number>, minNative=Android versionCode readback
+[ ] beta 앱 검증 후 같은 SHA를 ota-promote.yml로 production 수동 승격
+```
+
+**iOS native release — Android 공개 출시 후 별도**
+
+```text
+[ ] iOS release PR에서 MARKETING_VERSION 결정
+[ ] CURRENT_PROJECT_VERSION을 직전 App Store Connect 업로드보다 크게 증가
+[ ] Debug/Release 두 설정값이 각각 동일한지 확인
+[ ] iOS 빌드·서명·TestFlight·실기기 검증 → RELEASE-BUILD.md
+```
+
+**npm·웹 패키지 메타데이터**
+
+```text
+[ ] 내부 패키지 배포가 실제 필요한지 확인
+[ ] package.json version만 npm SemVer 정책에 따라 독립 범프
+[ ] Android/iOS 버전 파일은 해당 native release가 아니면 변경하지 않음
 ```
 
 ### 3.4 정합 확인 스크립트 (읽기 전용)
 
-빌드 전, 마케팅 버전 3곳이 일치하는지 한 번에 본다(편집 안 함 — 확인용):
+아래 명령은 각 정본의 현재값을 읽는다. **출력값끼리 같은지는 통과 조건이 아니다.** 각 값이 파싱 가능하고, Android `versionCode`가 OTA `minNative`의 유일한 원천인지 검증한다.
 
 ```bash
 # docs/readinggo 에서 실행
-echo "package.json : $(node -p "require('./package.json').version")"
-echo "versionName  : $(grep -m1 versionName android/app/build.gradle | grep -oE '\"[^\"]+\"')"
-echo "versionCode  : $(grep -m1 versionCode android/app/build.gradle | grep -oE '[0-9]+')"
-echo "MARKETING_VERSION (iOS):"; grep -o 'MARKETING_VERSION = [^;]*' ios/App/App.xcodeproj/project.pbxproj | sort -u
-echo "CURRENT_PROJECT_VERSION (iOS):"; grep -o 'CURRENT_PROJECT_VERSION = [^;]*' ios/App/App.xcodeproj/project.pbxproj | sort -u
+node -p "'npm metadata: ' + require('./package.json').version"
+grep -m1 -E '^\\s*versionName\\s+' android/app/build.gradle
+grep -m1 -E '^\\s*versionCode\\s+' android/app/build.gradle
+grep -o 'MARKETING_VERSION = [^;]*' ios/App/App.xcodeproj/project.pbxproj | sort -u
+grep -o 'CURRENT_PROJECT_VERSION = [^;]*' ios/App/App.xcodeproj/project.pbxproj | sort -u
+node ../../tests/ota-native-gate.test.mjs
 ```
 
-마케팅 버전 3줄(package.json / versionName / MARKETING_VERSION)이 같은 `x.y.z` 면 통과. 다르면 §3.3 으로 맞춘다.
-
-> 자동 범프 스크립트(한 번에 4곳 수정)는 `RELEASE-BUILD.md`(#1024)에서 빌드 메커닉과 함께 제공하는 것이 적절하다(파일을 실제 수정하므로). 본 문서는 *무엇을 맞춰야 하는가*의 계약만 정의한다.
+CI는 플랫폼 간 버전 문자열 일치가 아니라 파일별 형식·중복 선언·Android `versionCode`→OTA `minNative` 연결을 검증한다. 자동 범프는 플랫폼별 release 절차에서만 수행하며 여러 플랫폼 파일을 한 번에 수정하지 않는다.
 
 ---
 
