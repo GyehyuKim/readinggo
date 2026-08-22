@@ -4,6 +4,8 @@
 > iOS-PLAN [§10.5 업데이트 전략](../iOS-PLAN.md)의 OTA 골격을 구체화한 **피처 스펙**.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec PR 먼저 → 코드 PR 나중.
 > **현행 정합 (2026-08-22, `origin/main@2a84029`)**: `@capgo/capacitor-updater`, Worker `/api/ota`, R2 `readinggo-ota`, KV `ota:android:<channel>`이 구현돼 있다. 현재 `ota-release.yml`과 `ota-promote.yml`은 모두 `workflow_dispatch`이며 stable DEV receipt·`origin/main`·입력 SHA 일치와 GitHub `production` environment 승인을 요구한다. main push는 설치 사용자 채널을 자동 변경하지 않는다.
+>
+> **채널 격리 갱신 (#1489)**: 채널(beta|production) 선택은 `custom_id`가 아니라 `defaultChannel`로 한다 — Capgo 플러그인이 `capacitor.config.json` `plugins.CapacitorUpdater.defaultChannel` 값을 네이티브 부팅 시 읽어 **첫 업데이트 체크 요청부터** `defaultChannel` 필드로 싣는다(런타임 JS 호출 불필요, 빌드 시점 결정적 고정). `custom_id`는 별개 필드(계정 타게팅용, §3④ Phase 2 OUT)라 채널 선택에 쓰지 않는다. Worker는 명시적 `defaultChannel`이 `beta`/`production`일 때만 해당 채널을 사용한다. #1489 이전 release 셸은 `defaultChannel` 없이 native `is_prod:true`를 보내므로 이 경우에만 production 호환을 유지한다. DEV의 `is_prod:false`, 필드 누락, 빈 값, 명시적 미상 값은 **fail-closed** no-update다. DEV/debug APK(`android-apk.yml`)는 커밋된 `capacitor.config.json`의 `defaultChannel: "production"` 기본값을 `beta`로 override해 발행하며, OTA 자체를 끄지 않는다(과거엔 `updateUrl` 삭제 + `autoUpdate:false`로 OTA를 전면 비활성했으나 이는 beta 채널 회귀 검증을 막는 임시방편이었다).
 
 ## 0. 목적
 
@@ -39,7 +41,7 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 - **플러그인**: `@capgo/capacitor-updater` — 오픈소스, **자가호스팅**(Capgo 클라우드 미사용 → 비용 0·데이터 보유·우리 스택 일관). Appflow(`@capacitor/live-updates`)는 2026 종료 예정이라 배제.
 - **번들 저장**: Cloudflare **R2 `readinggo-ota`** public bucket. `ota-release.yml`이 zip을 `--remote`로 올리고 Worker는 KV 매니페스트의 R2 URL을 반환한다. GitHub Releases 후보와 “R2 미활성”은 superseded.
 - **매니페스트**: Workers **KV** `ota:<platform>:<channel>` → `{version, url, checksum, minNative}` (구현 #979 페이즈 A).
-- **엔드포인트**: 기존 `readinggo` 워커에 **`POST /api/ota`** 추가(구현 #979) — Capgo 규약(`platform·version_name·version_code·custom_id`) 수신 → 매니페스트 비교 → `{version,url,checksum}` 또는 `{}`(no-update). 동일출처 게이트 없음(네이티브 클라).
+- **엔드포인트**: 기존 `readinggo` 워커의 **`POST /api/ota`**가 Capgo 규약(`platform·version_name·version_code·defaultChannel·is_prod`)을 수신해 매니페스트를 비교하고 `{version,url,checksum}` 또는 `{}`(no-update)를 반환한다. `custom_id`는 채널 선택에 사용하지 않는다. 동일출처 게이트 없음(네이티브 클라).
 
 ## 3. 의사결정
 
@@ -86,12 +88,12 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 
 - **신규 의존성**: `@capgo/capacitor-updater` — Capacitor 1차 생태계, 오픈소스, 자가호스팅. **Capacitor 단일 lock 내**(새 프레임워크 아님). 코드 PR에서 추가 시 재확인.
 
-## 8. 구현 상태 (2026-08-22 `main@2a84029`)
+## 8. 구현 계약 (#1489)
 
-1. ✅ `capacitor.config.json`: `updateUrl`, `autoUpdate:true`, `directUpdate:false`, `resetWhenUpdate:true`.
-2. ✅ `main.js`: 네이티브 부팅 성공 후 `notifyAppReady()`.
-3. ✅ Worker/KV: `POST /api/ota` + `minNative` 게이트.
-4. ✅ `ota-release.yml`: trigger는 `workflow_dispatch`이며 승인 SHA 입력 → stable DEV/main gate → build → zip/checksum → R2 → beta다. main push 자동 발행은 사용하지 않는다.
-5. ✅ `ota-promote.yml`: `workflow_dispatch` + 같은 SHA gate → beta manifest 검증 → production verbatim 승격 + `:prev` 백업.
+1. `capacitor.config.json`의 release/production 기본값은 `updateUrl`, `autoUpdate:true`, `directUpdate:false`, `resetWhenUpdate:true`, `defaultChannel:"production"`을 사용한다.
+2. `main.js`는 네이티브 부팅 성공 후 `notifyAppReady()`를 호출하고, 수동 QA용 `window.RG_otaDiagnostics()`에서 활성/빌트인/다운로드 번들의 id·version만 반환한다. 토큰·사용자·문장 데이터는 포함하지 않는다.
+3. Worker `POST /api/ota`는 `defaultChannel`로 채널을 선택하고 `custom_id`는 채널에 사용하지 않는다. 명시적 미상 채널과 DEV 미설정은 fail-closed no-update이며, `defaultChannel`이 없는 구 release 셸의 `is_prod:true`만 production 호환을 유지한다.
+4. `android-apk.yml`은 DEV/debug APK의 `defaultChannel`을 `beta`로 override하고 OTA 자체는 유지한다. 과거의 전면 비활성 임시 가드를 되살리지 않는다.
+5. `ota-release.yml`은 stable DEV/main gate를 통과한 승인 SHA의 build/checksum을 beta에 발행하고, `ota-promote.yml`은 같은 manifest를 production에 수동 승격한다. main push 자동 발행은 사용하지 않는다.
 
-> 실제 R2/KV 객체와 설치 기기의 수신 성공은 워크플로우 실행·기기 QA 근거로 별도 판정한다.
+> 실제 R2/KV 객체와 설치 기기의 수신 성공은 워크플로우 실행·기기 QA 근거로 별도 판정한다. `defaultChannel` override가 실기기에서 실제로 `/api/ota` 요청에 실리는지는 기기 QA(예: `window.RG_otaDiagnostics()` + 네트워크 캡처)로만 확정된다. 진단 함수는 `active`, `builtin`, `downloaded` 각각의 bundle id·version만 반환한다.
