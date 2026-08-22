@@ -3,7 +3,7 @@
 > **신설 (2026-06-24)**: 설치된 네이티브 앱에 웹 레이어(JS/HTML/CSS)를 스토어 우회로 갱신.
 > iOS-PLAN [§10.5 업데이트 전략](../iOS-PLAN.md)의 OTA 골격을 구체화한 **피처 스펙**.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec PR 먼저 → 코드 PR 나중.
-> **현행 정합 (2026-08-19, `origin/main@39248ef`)**: `@capgo/capacitor-updater`, Worker `/api/ota`, R2 `readinggo-ota`, KV `ota:android:<channel>`이 구현돼 있다. 현재 `ota-release.yml`과 `ota-promote.yml`은 모두 `workflow_dispatch`이며 stable DEV receipt·`origin/main`·입력 SHA 일치와 GitHub `production` environment 승인을 요구한다.
+> **현행 정합 (2026-08-22, `origin/main@2a84029`)**: `@capgo/capacitor-updater`, Worker `/api/ota`, R2 `readinggo-ota`, KV `ota:android:<channel>`이 구현돼 있다. 현재 `ota-release.yml`과 `ota-promote.yml`은 모두 `workflow_dispatch`이며 stable DEV receipt·`origin/main`·입력 SHA 일치와 GitHub `production` environment 승인을 요구한다. main push는 설치 사용자 채널을 자동 변경하지 않는다.
 
 ## 0. 목적
 
@@ -32,8 +32,8 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
   ▼
 앱: url(R2)에서 zip 다운로드 → checksum 검증 → **다음 앱 시작 시** 적용
 
-[릴리스] GitHub Action(main 머지)
-  vite build → dist zip → SHA-256 → R2 업로드 → KV manifest 갱신(채널=beta)
+[릴리스] GitHub Action(workflow_dispatch + 승인된 main SHA)
+  stable DEV/main SHA gate → vite build → dist zip → SHA-256 → R2 업로드 → KV manifest 갱신(채널=beta)
 ```
 
 - **플러그인**: `@capgo/capacitor-updater` — 오픈소스, **자가호스팅**(Capgo 클라우드 미사용 → 비용 0·데이터 보유·우리 스택 일관). Appflow(`@capacitor/live-updates`)는 2026 종료 예정이라 배제.
@@ -86,12 +86,12 @@ CF Worker  /api/ota   ──(채널별 최신 manifest 조회)──▶  Workers
 
 - **신규 의존성**: `@capgo/capacitor-updater` — Capacitor 1차 생태계, 오픈소스, 자가호스팅. **Capacitor 단일 lock 내**(새 프레임워크 아님). 코드 PR에서 추가 시 재확인.
 
-## 8. 구현 상태 (2026-07-21 `main`)
+## 8. 구현 상태 (2026-08-22 `main@2a84029`)
 
 1. ✅ `capacitor.config.json`: `updateUrl`, `autoUpdate:true`, `directUpdate:false`, `resetWhenUpdate:true`.
 2. ✅ `main.js`: 네이티브 부팅 성공 후 `notifyAppReady()`.
 3. ✅ Worker/KV: `POST /api/ota` + `minNative` 게이트.
-4. ✅ `ota-release.yml`: 실제 trigger는 `workflow_dispatch`이며 승인 SHA 입력 → stable DEV/main gate → build → zip/checksum → R2 → beta다. 파일 상단의 과거 "main 머지 자동" 설명은 실행 trigger가 아닌 stale 주석으로 #1464에서 정정한다.
+4. ✅ `ota-release.yml`: trigger는 `workflow_dispatch`이며 승인 SHA 입력 → stable DEV/main gate → build → zip/checksum → R2 → beta다. main push 자동 발행은 사용하지 않는다.
 5. ✅ `ota-promote.yml`: `workflow_dispatch` + 같은 SHA gate → beta manifest 검증 → production verbatim 승격 + `:prev` 백업.
 
 > 실제 R2/KV 객체와 설치 기기의 수신 성공은 워크플로우 실행·기기 QA 근거로 별도 판정한다.
