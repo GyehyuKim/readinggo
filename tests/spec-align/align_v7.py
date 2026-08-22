@@ -32,7 +32,7 @@ FEATURE_FILES = [
     "library.js", "search.js",
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
     "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js", "book-detail-modal.js",
-    "companion.js", "ocr-crop-overlay.js", "ceremony.js", "nest-theatre.js", "follow-list-modal.js",
+    "companion.js", "ocr-crop-overlay.js", "ceremony.js", "follow-list-modal.js",
     "user-profile-modal.js", "sentence-collection-modal.js",
     "shelf-import.js",
     "milestone-recap.js",  # #938 A2 — 마일스톤 회고 모달(직접 localStorage 금지 범위 포함)
@@ -80,8 +80,8 @@ INVARIANTS = [
         ADAPTER_FILES, r"window\.DataStore\s*="),
     ("S1", "present", "DataStore 계약 메서드 표면 (addToday/bumpOnCheckIn/myCurrentPage)",
         ADAPTER_FILES, r"addToday"),
-    ("S1", "present", "DataStore 계약 — 완독/성/짹 (books.complete·castles·claps)",
-        ADAPTER_FILES, r"complete\b[\s\S]*castles[\s\S]*claps|claps[\s\S]*castles"),
+    ("S1", "present", "DataStore 계약 — 완독/좋아요 (books.complete·claps)",
+        ADAPTER_FILES, r"complete\b[\s\S]*claps|claps[\s\S]*complete\b"),
     ("S1", "absent", "피처 파일 localStorage 직접 호출 (어댑터만 허용)",
         FEATURE_FILES, r"localStorage\.(get|set)Item"),
 
@@ -100,35 +100,19 @@ INVARIANTS = [
         r"The Path|path-wrap|pathNodes|DynamicPath|ZIGZAG"),
     ("S3", "absent", "주간 리그 잔재 (league/리그)", None, r"league|리그"),
 
-    # ── S4: 둥지가 자란다 (진척률 5단계) ──────────────────────
-    ("S4", "absent", "구 8단계 health-decay 둥지 잔재", None,
-        r"nestHealth|twigCount|NEST_LADDER|daysSinceRead"),
-    ("S4", "present", "NEST_STAGES 5단계 + getNestStageByXp", ADAPTER_FILES,
-        r"NEST_STAGES[\s\S]*getNestStageByXp|getNestStageByXp[\s\S]*NEST_STAGES"),
-    # #522: 둥지 단계는 XP 단일 소스. NestTheatre 가 xp prop 으로 받아 getNestStageByXp 로 계산하고,
-    # 전용 둥지 탭(NestGrowView)은 state.xp 를 그대로 넘긴다 → 세리머니(newLv)와 항상 일치(책 진도% 재도입 금지).
-    ("S4", "present", "NestTheatre 둥지 단계 = XP 단일 소스 (#522)",
-        ["nest-theatre.js"], r"function NestTheatre\(\{\s*xp"),
-    ("S4", "present", "둥지 탭 NestTheatre 에 XP 전달 (#522 단일 소스)",
-        ["nest-grow.js"], r"NestTheatre\s+xp=\{xp\}"),
-    ("S4", "present", "둥지 단계 안내 가이드 팝업 (#511)",
-        ["nest-theatre.js"], r"둥지가 자라는 방법"),
+    # ── S4/S5: Phase 4 물리 삭제 — 책나무가 내부 nest-grow route를 대체 ────
+    ("S4", "absent", "레거시 XP/둥지 진화 계산·기하",
+        None, r"NEST_STAGES|NEST_CYCLE_XP|getNestStageByXp|nestXpProgress|nestCastleCount|NEST_TWIGS|drawNest"),
+    ("S4", "absent", "레거시 둥지 시어터/성장 컴포넌트",
+        None, r"NestTheatre|NestGrowView|nest-health|nest-progress|nest-evo"),
+    ("S5", "absent", "레거시 성 컬렉션 DataStore 계약",
+        ["datastore.js", "datastore-supabase.js"], r"castles\s*:\s*\{"),
     ("S4", "present", "세리머니 한 문장 카드 정직 표시 — bookQuoteCount (#549)",
         ["nest.js"], r"bookQuoteCount"),
     ("S4", "present", "빠른입력 페이지/한 문장 독립 제출 (#497)",
         ["nest.js"], r"submitPage[\s\S]*submitSentence|submitSentence[\s\S]*submitPage"),
     ("S4", "present", "이 책 한 문장 전체기간 + 액션(SentenceActions 경유) (#499→#610)",
         ["nest.js"], r"bookQuotes[\s\S]*<SentenceActions|<SentenceActions[\s\S]*bookQuotes"),
-    ("S4", "present", "5단계 이모지 시퀀스 🌿🪹🪺🐣🏰 (#756 둥지·새 테마)", ADAPTER_FILES,
-        r"🌿[\s\S]*🪹[\s\S]*🪺[\s\S]*🐣[\s\S]*🏰"),
-    ("S4", "present", "1,600 XP 주기 단계 임계값 (maxXp 99/399/899/1599)", ADAPTER_FILES,
-        r"99[\s\S]{0,40}399[\s\S]{0,40}899[\s\S]{0,40}1599"),
-    ("S4", "present", "진화 마이크로카피 4종", None,
-        r"자리를 잡|살림을 차|다정한 이웃|성주"),
-
-    # ── S5: 성(🏰) 컬렉션 (완독 파생) ─────────────────────────
-    ("S5", "present", "성 컬렉션 — castles.list 사용 + 🏰 배지", FEATURE_FILES,
-        r"castles\.list|🏰\s*[×xX]"),
 
     # ── S6: 완독 별점 + 소감 ──────────────────────────────────
     ("S6", "present", "완독 별점/소감 (rating + review_text)", FEATURE_FILES,
@@ -248,14 +232,9 @@ INVARIANTS = [
     ("C", "present", "LLM 대화 backfill은 선택 동의('yes')만 (#394·#752)",
         ["app.js"], r"RG_consent[\s\S]{0,40}=== 'yes'[\s\S]{0,200}backfill|backfillCompanionSessions[\s\S]{0,260}RG_consent[\s\S]{0,40}=== 'yes'"),
 
-    # ── D: 고양감 결 강화 (#938) — 스트릭 복구(A1) + 마일스톤 회고(A2). 점수·경쟁 추가 금지 ──
-    # A1 정책 SSOT — 양 어댑터가 _streakRepairStatus 한 함수로 복구 규칙(주 1회·하루치)을 공유.
-    ("D", "present", "스트릭 복구 정책 SSOT — _streakRepairStatus (#938 A1)",
-        ["datastore.js"], r"_streakRepairStatus"),
-    ("D", "present", "스트릭 복구 계약 — streak.repair/repairStatus (localStorage 어댑터, #938 A1)",
-        ["datastore.js"], r"repairStatus\(\)[\s\S]*repair\(\)|repair\(\)[\s\S]*repairStatus\(\)"),
-    ("D", "present", "스트릭 복구 계약 — supabase 어댑터 대칭 (#938 A1)",
-        ["datastore-supabase.js"], r"async repair\(\)[\s\S]*last_repair_date|last_repair_date[\s\S]*async repair\(\)"),
+    # ── D: Phase 4에서 스트릭 만회는 물리 삭제, 마일스톤 회고는 유지 ──────
+    ("D", "absent", "스트릭 복구 정책·DataStore 계약 제거",
+        ["datastore.js", "datastore-supabase.js"], r"_streakRepairStatus|repairStatus\s*\(|last_repair_date"),
     # A2 — 마일스톤 회고: 빈도 게이트 + 회고 모달 + nest 트리거.
     ("D", "present", "마일스톤 회고 빈도 게이트 — milestone.shouldShow/markShown (#938 A2)",
         ["datastore.js"], r"shouldShow\(key\)[\s\S]*markShown|markShown[\s\S]*shouldShow\(key\)"),

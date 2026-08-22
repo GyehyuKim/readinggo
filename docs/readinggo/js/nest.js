@@ -1,44 +1,10 @@
 /* =========================================================
    ReadingGo — nest.js
    둥지 탭(NestView): 책 카드, 체크인 CTA(짹), 내 한 문장, 같은 책 피드 + 책정보 수정(BookEditModal).
-   NestTheatre·Ceremony·CompanionModal·OcrCropOverlay는 #761로 별도 모듈 분리, CheckinModal은 #252 폐기 후 제거.
+   Ceremony·CompanionModal·OcrCropOverlay는 #761로 별도 모듈 분리, CheckinModal은 #252 폐기 후 제거.
    ========================================================= */
 const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _useMemo } = React;
 
-// 안전 래퍼 — data.js 전역(nestXpProgress) 미준비/캐시 스큐 시에도 nest 탭 전체 크래시 방지.
-// 정상 시 동일 동작, 미정의·예외 시 0(=진행 0%). 근본 원인은 Vite 빌드(해시 자산)로 차단.
-function _xpProg(xp) {
-  try { return (typeof nestXpProgress === 'function') ? nestXpProgress(xp) : (window.nestXpProgress ? window.nestXpProgress(xp) : 0); }
-  catch (e) { return 0; }
-}
-// 단계 구간 진척 안전 래퍼 (#682) — nestStageProgress 미준비/예외 시 폴백.
-function _stageProg(xp) {
-  try {
-    const fn = (typeof nestStageProgress === 'function') ? nestStageProgress : (window.nestStageProgress || null);
-    if (fn) return fn(xp);
-  } catch (e) {}
-  return { stage: { lv: 1, minXp: 0 }, next: null, intoXp: 0, spanXp: 0, pct: 0, isMax: false };
-}
-// 현재 주기 누적 XP(0~1599) 안전 래퍼 — nestCycleXp 미준비/예외 시 폴백.
-function _cycleXp(xp) {
-  try {
-    const fn = (typeof nestCycleXp === 'function') ? nestCycleXp : (window.nestCycleXp || null);
-    if (fn) return fn(xp);
-  } catch (e) {}
-  return Math.max(0, (xp || 0)) % 1600;
-}
-// 절대 기준 진행% (#743) — cycleXp / next.minXp. 표시 숫자(cycleXp / next.minXp)와
-// 진행바를 같은 기준으로 일치시킨다(단계-상대 71/500이 아니라 절대 471/900).
-function _absPct(xp, sp) {
-  if (!sp || sp.isMax || !sp.next || !sp.next.minXp) return 100;
-  return Math.max(0, Math.min(100, Math.round(_cycleXp(xp) / sp.next.minXp * 100)));
-}
-// #871 Vite 회귀 픽스 — ceremony.js·nest-theatre.js 가 cross-file 로 호출(옛 loadBabel 전역). 모듈 스코프라 전역 노출 필요.
-window._stageProg = _stageProg; window._cycleXp = _cycleXp; window._absPct = _absPct;
-
-// 마일스톤 회고 선택 (#938, A2) — 이번 체크인이 어떤 마일스톤에 닿았는지 1개만 고른다(절제).
-// 우선순위: 완독 > 둥지 성(주기 완료) > 연속 30일 > 연속 7일. value/ubId/bookTitle 은 회고 헤더·타임라인 소스.
-// 실제 노출 여부(마일스톤별 1회 + 하루 1회)는 DataStore.milestone.shouldShow 가 결정 — 여기서는 후보 descriptor 만 만든다.
 function _pickMilestone({ isComplete, newStreak, book }) {
   const bk = book || {};
   if (isComplete) return { type: 'complete', ubId: bk.ubId || null, bookId: bk.id || null, bookTitle: bk.title || '', key: 'complete:' + (bk.ubId || bk.id || bk.title || '?') };
@@ -213,13 +179,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const _pctOf = (bk) => bk && bk.total ? Math.round(bk.cur / bk.total * 100) : 0;
   const [nestState, setNestState] = _useState({
     streak: state.streak,
-    xp: state.xp,
     myQuotes: state.myQuotes,
     book: state.book,
-    skipStreakRisk: false,   // 데모 '하루 거르기' — 방패 1회 흡수 후 다음 거르기에 스트릭 리셋
   });
-  // 직전 진척률 가지 수 — 새 가지 stack 애니메이션 기준.
-  const prevTwigsRef = _useRef(twigsForProgress(_xpProg(state.xp)));
   // 마일스톤 회고 대기 (#938, A2) — 세리머니가 닫힌 뒤 띄울 마일스톤(겹침 방지). 게이트(빈도)는 DataStore.milestone.
   const pendingMilestoneRef = _useRef(null);
   // 한 문장 삭제(#1)·종류변경(#381) 이벤트 → 둥지 '내 한 문장' 목록 즉시 반영.
@@ -236,15 +198,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     return () => { window.removeEventListener('rg:sentence-removed', onRm); window.removeEventListener('rg:sentence-kind', onKind); window.removeEventListener('rg:sentence-note', onNote); window.removeEventListener('rg:sentence-updated', onUpd); };
   }, []);
 
-  // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드. 둥지(XP 기반)는 유지 — 책과 무관(#313).
+  // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드.
   _useEffect(() => {
-    prevTwigsRef.current = twigsForProgress(_xpProg(state.xp));
     setNestState({
       streak: state.streak,
-      xp: state.xp,
       myQuotes: state.myQuotes,
       book: state.book,
-      skipStreakRisk: false,
     });
     setDrafts(_loadDrafts(state.book.id)); // 책 전환 시 그 책의 초안을 복원(#1198)
   }, [state.book.id]);
@@ -403,7 +362,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const savedSentences = Array.isArray(sentences)
       ? sentences.map((item) => item && item.text ? { text: normalizeText(item.text, defaultVisibility), page: item.page, visibility: defaultVisibility } : item)
       : sentences;
-    // #1392 공개 UGC 동의는 세션/XP/낙관 UI를 건드리기 전에 확인한다.
+    // #1392 공개 UGC 동의는 세션/낙관 UI를 건드리기 전에 확인한다.
     // 실패 뒤 DataStore에서 막으면 reading_sessions만 저장되는 부분 상태가 생길 수 있다.
     if (window.DataStore === window.SupabaseDataStore && (sentence || (Array.isArray(sentences) && sentences.length))) {
       const hasPublicUgc = defaultVisibility !== 'private';
@@ -419,9 +378,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
     // 스트릭은 실제 마지막 기록일 기준으로 계산(#927). 종전 `ns.streak += 1`(맹목 증가)은
-    // 며칠 건너뛴 뒤에도 +1 해 세리머니에 부풀린 값을 띄우고, 그 값으로 7/30일 스트릭 XP를
-    // 잘못 지급·영속했다. DataStore.streak 규칙(systems.md §6.1, bumpOnCheckIn)과 동일한
-    // 순수 함수 _nextStreak 로 같은 값을 미리 계산해 세리머니·XP가 영속값과 일치하게 한다.
+    // 며칠 건너뛴 뒤에도 +1 해 세리머니에 부풀린 값을 띄우던 문제를 막기 위해
+    // DataStore.streak 규칙과 같은 순수 함수 _nextStreak로 값을 미리 계산한다.
     let prevStreak = ns.streak || 0, lastCheckIn = null;
     try {
       const st = (window.DataStore && DataStore.streak && DataStore.streak.get) ? DataStore.streak.get() : null;
@@ -432,23 +390,13 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const newStreak = (window._nextStreak ? _nextStreak(prevStreak, lastCheckIn, today) : prevStreak + 1);
     const wasReset = newStreak === 1 && prevStreak !== 0; // 공백으로 1로 떨어진 진짜 리셋(첫 기록 제외)
     const prevPct = _pctOf(ns.book);            // 책 진척(완독 판정용)
-    const prevXp = ns.xp;
-    const prevLv = getNestStageByXp(prevXp).lv; // 둥지 단계 = 현재 주기 XP (#520)
-
 
     ns.book = { ...ns.book, cur: page };
     ns.streak = newStreak;
-    ns.skipStreakRisk = false;
 
     const newPct = _pctOf(ns.book);
     // 완독: 마지막 장 도달 (이번 체크인에 100% 처음 도달).
     const isComplete = newPct >= 100 && prevPct < 100;
-
-    // v17 신규 클라이언트는 XP를 적립하지 않는다. 기존 값은 호환 read state로만 보존한다.
-    const xpGain = 0;
-
-    const newLv = getNestStageByXp(ns.xp).lv;   // XP 증가 후 둥지 단계
-    const nestUp = newLv > prevLv;
 
 
     // #1202: 흔적은 문장 고유 페이지(sentPage)를 그대로 — 현재 진도(cur)보다 낮아도 입력값 그대로.
@@ -463,13 +411,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       ns.myQuotes = [{ text: savedSentence, bookId: ns.book.id, bookTitle: ns.book.title || '', page: quotePage, when: '방금', kind: kind || 'quote', visibility: defaultVisibility }, ...ns.myQuotes];
     }
 
-    prevTwigsRef.current = twigsForProgress(_xpProg(prevXp));
     setNestState(ns);
     let completionPromise = null, completion = null;
     if (awaitPersistence) {
       completionPromise = new Promise((resolve, reject) => {
         completion = {
-          rollback: { book: previousNestState.book, streak: previousNestState.streak, xp: previousNestState.xp, nestLv: getNestStageByXp(previousNestState.xp).lv, myQuotes: previousNestState.myQuotes },
+          rollback: { book: previousNestState.book, streak: previousNestState.streak, myQuotes: previousNestState.myQuotes },
           onSuccess: resolve,
           onFailure: (error) => { setNestState(previousNestState); setCheckedToday(false); setCeremony(null); setShowConfetti(false); reject(error); },
         };
@@ -477,14 +424,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     }
     let checkinResult;
     try {
-      checkinResult = onCheckin(ns, newLv, xpGain, savedSentence, kind, quotePage, batch, defaultVisibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
+      checkinResult = onCheckin(ns, savedSentence, kind, quotePage, batch, defaultVisibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
     } catch (error) {
       throw error;
     }
 
-    // 레거시 XP·단계·성 계산은 구 클라이언트 호환을 위해 유지하되 신규 사용자 피드백에는 노출하지 않는다.
-
-    // 마일스톤 회고 (#938, A2) — 완독·연속 7/30일·둥지 성에서만, 절제해서. 세리머니가 닫힌 뒤 1개만 띄운다(겹침 방지).
+    // 마일스톤 회고 (#938, A2) — 완독·연속 7/30일에만, 세리머니가 닫힌 뒤 1개만 띄운다.
     // 빈도 게이트(마일스톤별 1회 + 하루 1회)는 DataStore.milestone 이 강제. 점수·미션 아님 — 기존 한 문장 자산으로 서사 증폭.
     pendingMilestoneRef.current = _pickMilestone({ isComplete, newStreak: ns.streak, book: ns.book });
 
@@ -498,7 +443,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   };
 
   // 빠른 기록 (#462) — 홈 상시 입력 폼에서 페이지/한 문장을 한 번에 체크인.
-  // handleCheckin 단일 경로 재사용 → 스트릭·XP·세리머니·문장 영속(app onCheckin)·companion(#438) 보존.
+  // handleCheckin 단일 경로 재사용 → 독서 리듬·세리머니·문장 영속(app onCheckin)·companion(#438) 보존.
   // 빠른입력 OCR (#498/#1265) — Upstage OCR + solar-pro3 → 전체화면에서 원문·페이지 검토 후 저장.
   // 공유 헬퍼 window.ocrExtractSentence(data.js) 로 OCR 호출(#939). 토스트·busy·tracking 은 여기서.
   const runOcrQuick = (file) => {
@@ -618,7 +563,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setQuickPage(''); // quickText 보존 — 페이지만 업데이트해도 문장 입력창 유지
   };
   // 한 문장 섹션 [저장/한번에 기록] (#497·#1198) — 초안(drafts) 1개면 단일 저장(기존 경로 그대로),
-  //   2개 이상이면 배치로 한번에 기록(세리머니·스트릭·XP는 1회, 문장만 N개 영속).
+  //   2개 이상이면 배치로 한번에 기록(세리머니·독서 리듬 갱신은 1회, 문장만 N개 영속).
   const submitSentence = async () => {
     const ready = drafts.map((x) => ({ text: (x.text || '').trim() })).filter((x) => x.text);
     if (!ready.length) { showToast('한 문장을 입력해주세요'); return; }
@@ -902,7 +847,6 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         )}
       </div>
 
-      {/* 둥지 시어터(NestTheatre)는 프로필 상단으로 이동 (#428) — 홈은 책읽기 중심 */}
 
       {/* 데모 '하루 거르기' 제거 (#481) */}
 
@@ -1214,7 +1158,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
 
       {/* 컨페티 — portal */}
       {showConfetti && ReactDOM.createPortal(
-        <Confetti active={showConfetti} nestUp={ceremony ? ceremony.nestUp : false} />,
+        <Confetti active={showConfetti} />,
         document.body
       )}
       {/* 책 정보 수정 (#410) — ⚙️ 진입. 저장 시 둥지 진척(total) 즉시 반영 */}

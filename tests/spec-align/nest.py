@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Verify nest spec (docs/readinggo/specs/nest.md) invariants exist in code.
-
-Strategy: presence checks (regex over JS source). Behavior correctness is
-covered by E2E scenarios under tests/e2e/.
-
-Exit 0 if all invariants pass. Exit 1 on any failure with a punch list.
-"""
+"""Verify the active v17 book-tree route and Phase 4 legacy-absence contracts."""
 
 import io
 import re
@@ -23,90 +17,32 @@ def read(rel: str) -> str:
     return (JS_DIR / rel).read_text(encoding="utf-8")
 
 
-def find(pattern: str, text: str, flags: int = 0) -> bool:
-    return re.search(pattern, text, flags) is not None
+def check_present(section: str, desc: str, file: str, pattern: str):
+    ok = re.search(pattern, read(file), re.DOTALL) is not None
+    return ok, f"{'OK  ' if ok else 'FAIL'} [{section}] {desc} ({file})"
 
 
-# spec section -> (description, file, regex pattern)
-# v7 (2026-06-01): The Path(DynamicPath/ZIGZAG)·첫 7일 가속 invariant 제거 —
-# v7은 The Path와 가속을 폐기하고 "둥지가 자란다"(진척률 5단계)로 대체. 부재 검증은
-# align_v7.py(S3/S4)가 담당. v17 사용자 표면 전환은 book-tree-surface.test.mjs가 담당하며,
-# 이 파일은 구 APK 호환을 위해 아직 남겨 둔 v7 계산 계약만 검증한다.
-INVARIANTS = [
-    (
-        "§5.2",
-        "NEST_STAGES 정의 (5단계 진화)",
-        "data.js",
-        r"const\s+NEST_STAGES\s*=",
-    ),
-    (
-        "§5.2",
-        "5단계 이모지 (나뭇가지 → 빈둥지 → 따뜻 → 다정 → 성) — #756 둥지·새 테마",
-        "data.js",
-        r"🌿.*🪹.*🪺.*🐣.*🏰",
-    ),
-    (
-        "§5.2",
-        "1,600 XP 주기 단계 임계값 (maxXp 99/399/899/1599)",
-        "data.js",
-        r"maxXp:\s*99\b.*maxXp:\s*399\b.*maxXp:\s*899\b.*maxXp:\s*1599\b",
-    ),
-    (
-        "§5.2",
-        "getNestStageByXp 함수 (XP 주기 단계)",
-        "data.js",
-        r"function\s+getNestStageByXp\b",
-    ),
-    (
-        "§5.2",
-        "진화 마이크로카피 (참새 자리잡기 등)",
-        "nest.js|data.js|components.js",
-        r"(자리를 잡|살림을 차|다정한 이웃|성주)",
-    ),
-    (
-        # v7.2(#185): 활성 책 전환 = 좌우 리볼빙 캐러셀(시트 폐기). 구 ActiveBookSheet 대체.
-        "§5.3",
-        "활성 책 전환 — 좌우 캐러셀 (RG_activateBook, #185)",
-        "nest.js",
-        r"RG_activateBook",
-    ),
-    (
-        "§5.1",
-        "NestView 최상위 컴포넌트",
-        "nest.js",
-        r"function\s+NestView\b",
-    ),
-    (
-        "§5.1",
-        "window.NestView 노출 (다른 파일에서 사용)",
-        "nest.js",
-        r"window\.NestView\s*=",
-    ),
-]
-
-
-def check(section: str, desc: str, file_spec: str, pattern: str) -> tuple[bool, str]:
-    files = file_spec.split("|")
-    for f in files:
-        try:
-            text = read(f.strip())
-        except FileNotFoundError:
-            continue
-        if find(pattern, text, re.DOTALL):
-            return True, f"OK  [{section}] {desc} ({f.strip()})"
-    return False, f"FAIL [{section}] {desc} — not found in {file_spec}"
+def check_absent(section: str, desc: str, files: list[str], pattern: str):
+    existing = [name for name in files if (JS_DIR / name).exists()]
+    corpus = "\n".join(read(name) for name in existing)
+    ok = re.search(pattern, corpus, re.DOTALL) is None
+    return ok, f"{'OK  ' if ok else 'FAIL'} [{section}] {desc}"
 
 
 def main() -> int:
-    results = [check(s, d, f, p) for s, d, f, p in INVARIANTS]
-    passed = sum(1 for ok, _ in results if ok)
-    total = len(results)
-
-    for ok, msg in results:
-        print(msg, file=sys.stderr if not ok else sys.stdout)
-
-    print(f"\n{passed}/{total} invariants passed", file=sys.stderr)
-    return 0 if passed == total else 1
+    results = [
+        check_present("v17", "내부 nest-grow route는 BookTreeHomeView를 렌더", "app.js", r"activeTab === 'nest-grow'[\s\S]*BookTreeHomeView"),
+        check_present("v17", "책나무 selector/UI 모듈 노출", "book-tree-home-ui.js", r"window\.BookTreeHomeView\s*="),
+        check_present("v17", "홈 체크인·활성책 전환 유지", "nest.js", r"function\s+NestView\b[\s\S]*RG_activateBook"),
+        check_absent("P4", "XP/둥지 진화 계산 제거", ["data.js", "nest.js", "app.js", "datastore.js", "datastore-supabase.js"], r"NEST_STAGES|NEST_CYCLE_XP|getNestStageByXp|nestXpProgress|nestCastleCount|XP_RULES|computeCheckinXp|grantXp"),
+        check_absent("P4", "레거시 UI 모듈 제거", ["nest-theatre.js", "nest-grow.js", "streak-repair-copy.js"], r"."),
+        check_absent("P4", "DataStore XP/성/만회 계약 제거", ["datastore.js", "datastore-supabase.js"], r"\bxp\s*:\s*\{|\bcastles\s*:\s*\{|repairStatus\s*\(|last_repair_date"),
+    ]
+    for ok, message in results:
+        print(message, file=sys.stdout if ok else sys.stderr)
+    passed = sum(ok for ok, _ in results)
+    print(f"\n{passed}/{len(results)} invariants passed", file=sys.stderr)
+    return 0 if passed == len(results) else 1
 
 
 if __name__ == "__main__":

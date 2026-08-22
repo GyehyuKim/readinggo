@@ -13,7 +13,6 @@ import './js/data.js';
 import './js/datastore.js';
 import './js/book-tree-selector.js'; // #1453 읽기 전용 책=가지·문장=잎 projection + 호환 shim
 import './js/book-tree-home-ui.js'; // #1453 Phase 2 책나무 요약·가지 목록·선택 상세
-import './js/streak-repair-copy.js'; // #1429 스트릭 만회 카드 카피·오늘 기록 경계
 import './js/icons.js';
 import './js/components.js';
 import './js/moderation.js'; // #1392 UGC 약관·신고·차단 공용 UI
@@ -35,11 +34,9 @@ import './js/co-reading.js';
 import './js/social.js';
 import './js/admin-dashboard.js';
 import './js/book-detail-modal.js';
-import './js/nest-theatre.js';
 import './js/follow-list-modal.js';
 import './js/library.js';
 import './js/settings-modal.js';
-import './js/nest-grow.js';
 import './js/shelf-import.js';
 import './js/streak-reminder.js';   // #1033 스트릭 리마인더 로컬 알림 (window.RG_streakReminder)
 import './js/sheet-drag.js';        // #1046 바텀시트 글로벌 drag-to-dismiss (grip 끌어 닫기)

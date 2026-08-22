@@ -175,7 +175,7 @@
         if (!res.ok) throw new Error('book-upsert 실패: ' + res.status);
         return await res.json();
       },
-      // 완독 → status='completed' (+rating/review_text). 성 직접 지급 없음 — 성(🏰)은 XP 주기 파생(castles.list, #520/#521).
+      // 완독 → status='completed' (+rating/review_text).
       async complete(userBookId, opts) {
         opts = opts || {};
         const u = await A.profile.get();
@@ -614,7 +614,7 @@
       },
     },
 
-    /* 스트릭 (클라 날짜 로직) / XP */
+    /* 스트릭 (클라 날짜 로직) */
     streak: {
       async get() {
         const id = await uid();
@@ -632,56 +632,8 @@
         return unwrap(await sb().from('streak').update({ current: cur, longest, last_check_in_date: today })
           .eq('user_id', id).select().single());
       },
-      // 스트릭 복구 가능 여부 (#938) — localStorage 어댑터와 표면 일치. 정책은 _streakRepairStatus SSOT(datastore.js, 런타임 로드됨) 재사용.
-      async repairStatus() {
-        const st = await A.streak.get();
-        const today = _today();
-        const fn = (typeof window !== 'undefined') && window._streakRepairStatus;
-        if (fn) return fn(st, today);
-        // 폴백(헬퍼 미로드) — 보수적으로 불가 처리.
-        return { canRepair: false, lostStreak: (st && st.current) || 0, brokenDays: 0, cooldownDays: 0, reason: 'no_helper' };
-      },
-      // '하루 만회' (#938, systems.md §6.1) — 깨진 스트릭을 끊김 직전 값으로 되살리고 last_check_in_date 를 '어제'로,
-      // last_repair_date 에 오늘을 기록(주 1회 쿨다운). 35_streak_repair.sql 로 last_repair_date 컬럼 추가.
-      async repair() {
-        const id = await uid();
-        const today = _today();
-        const st = await A.streak.get();
-        const fn = (typeof window !== 'undefined') && window._streakRepairStatus;
-        const status = fn ? fn(st, today) : { canRepair: false, reason: 'no_helper' };
-        if (!status.canRepair) return { ok: false, reason: status.reason, cooldownDays: status.cooldownDays || 0, streak: st };
-        const cur = Math.max(1, status.lostStreak);
-        const longest = Math.max((st && st.longest) || 0, cur);
-        const yest = (typeof window !== 'undefined' && window._todayMinus) ? window._todayMinus(1)
-          : new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-        const out = unwrap(await sb().from('streak')
-          .update({ current: cur, longest, last_check_in_date: yest, last_repair_date: today })
-          .eq('user_id', id).select().single());
-        return { ok: true, reason: 'repaired', lostStreak: cur, streak: out };
-      },
-    },
-    xp: {
-      async get() { const u = await A.profile.get(); return (u && u.xp) || 0; },
-      async add(amount) {
-        // 원자 increment RPC(#1161) — 구 read-modify-write(cur+amount)는 두 탭/경로 경쟁 시 증가분 유실.
-        const out = unwrap(await sb().rpc('increment_xp', { p_amount: amount || 0 }));
-        return typeof out === 'number' ? out : null;
-      },
     },
 
-    /* 성(🏰) 컬렉션 — 완독 파생 */
-    castles: {
-      // 성(🏰) = XP 주기 완료 수 (#520/#521, backend.md §7.2). length = floor(totalXp / 1600).
-      // DB 조회 없이 users.xp 파생 — 완독(status='completed')과 분리.
-      async list() {
-        const u = await A.profile.get();
-        const xp = (u && u.xp) || 0;
-        const n = (typeof window.nestCastleCount === 'function')
-          ? window.nestCastleCount(xp)
-          : Math.floor(Math.max(0, xp) / 1600);
-        return Array.from({ length: n }, (_, i) => ({ index: i + 1, earnedAtXp: (i + 1) * 1600 }));
-      },
-    },
 
     /* 소셜 — 좋아요(claps) / 관심책 / 콕찌르기 / 팔로우
        #641: 짹+저장(구 bookmark) → claps 단일. 자기 문장 좋아요(저장) 허용 — RLS claps_mod(from_user_id=auth.uid())가 작성자 여부와 무관하게 insert 허용. */

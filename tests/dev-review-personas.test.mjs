@@ -100,35 +100,39 @@ assert.ok(fixture.user_books.some(book => book.status === 'reading'));
 assert.ok(fixture.user_books.some(book => book.status === 'completed'));
 assert.ok(fixture.user_books.flatMap(book => book.sessions).length >= 4);
 assert.ok(fixture.user_books.flatMap(book => book.sentences).some(row => /Q\.\s/.test(row.my_note || '') && /A\.\s/.test(row.my_note || '')));
-assert.ok(fixture.streak.current > 0 && fixture.xp > 0 && fixture.wish_books.length > 0);
+assert.ok(fixture.streak.current > 0 && fixture.wish_books.length > 0);
+assert.equal(Object.hasOwn(fixture, 'xp'), false, 'Phase 4 fixture에는 XP 상태가 없어야 한다');
 
-fixture.xp += 77;
+fixture.settings.default_sentence_visibility = 'private';
 storage.set(activeKey, fixture);
 versions.set(activeKey, (versions.get(activeKey) || 0) + 1);
 dirty = true;
 writeHook(clone(fixture), versions.get(activeKey));
 await new Promise(resolve => setTimeout(resolve, 320));
-assert.equal(server.get(personas[0].id).state.xp, fixture.xp, '변경을 DEV 서버 저장소에 동기화해야 한다');
+assert.equal(server.get(personas[0].id).state.settings.default_sentence_visibility, 'private', '변경을 DEV 서버 저장소에 동기화해야 한다');
 
 await devReviewPersonas.activate(personas[1].id);
 await devReviewPersonas.activate(personas[0].id);
-assert.equal(storage.get(activeKey).xp, fixture.xp, '페르소나별 변경은 전환 뒤에도 유지돼야 한다');
+assert.equal(storage.get(activeKey).settings.default_sentence_visibility, 'private', '페르소나별 변경은 전환 뒤에도 유지돼야 한다');
 const serverBeforeConflict = server.get(personas[0].id);
 server.set(personas[0].id, {
-  state: { ...clone(serverBeforeConflict.state), xp: serverBeforeConflict.state.xp + 500 },
+  state: {
+    ...clone(serverBeforeConflict.state),
+    settings: { ...serverBeforeConflict.state.settings, default_sentence_visibility: 'friends' },
+  },
   revision: serverBeforeConflict.revision + 1,
 });
 const staleLocal = storage.get(activeKey);
-staleLocal.xp += 1;
+staleLocal.settings.default_sentence_visibility = 'public';
 versions.set(activeKey, (versions.get(activeKey) || 0) + 1);
 dirty = true;
 writeHook(clone(staleLocal), versions.get(activeKey));
 await new Promise(resolve => setTimeout(resolve, 320));
-assert.equal(server.get(personas[0].id).state.xp, serverBeforeConflict.state.xp + 500, 'stale 탭은 최신 서버 revision을 덮어쓰면 안 된다');
+assert.equal(server.get(personas[0].id).state.settings.default_sentence_visibility, 'friends', 'stale 탭은 최신 서버 revision을 덮어쓰면 안 된다');
 assert.equal(dirty, true, 'revision 충돌 상태는 재시도/리셋 전까지 dirty로 남겨야 한다');
 await devReviewPersonas.reset();
-assert.notEqual(storage.get(activeKey).xp, fixture.xp, '리셋은 초기 fixture를 복원해야 한다');
-assert.equal(server.get(personas[0].id).state.xp, storage.get(activeKey).xp, '리셋 상태도 DEV 서버에 저장해야 한다');
+assert.equal(storage.get(activeKey).settings.default_sentence_visibility, 'public', '리셋은 초기 fixture를 복원해야 한다');
+assert.equal(server.get(personas[0].id).state.settings.default_sentence_visibility, 'public', '리셋 상태도 DEV 서버에 저장해야 한다');
 
 const serialized = JSON.stringify([...server.values()].map(row => row.state));
 assert.doesNotMatch(serialized, /@[a-z0-9.-]+\.[a-z]{2,}/i, 'fixture에 이메일이 있으면 안 된다');

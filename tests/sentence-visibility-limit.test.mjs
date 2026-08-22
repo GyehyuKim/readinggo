@@ -76,6 +76,6 @@ assert.match(app, /RG_saveSentenceBatch\(batch[\s\S]+result\.failedIndices\.leng
 assert.match(companion, /wasTruncated = Array\.from\(v\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '기존 문장 편집은 Unicode 절단 후 실제 저장값과 알림을 반영한다');
 assert.match(sentenceCard, /wasTruncated = Array\.from\(text\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '공용 인라인 편집도 Unicode 절단 후 실제 저장값과 알림을 반영한다');
 assert.match(nest, /hadTruncation[\s\S]+앞부분만 저장했어요/, '홈 직접입력은 저장 성공 후 절단 알림을 표시한다');
-assert.match(nest, /const savedSentence = sentence \? normalizeText\(sentence, defaultVisibility\)[\s\S]+const savedSentences = Array\.isArray\(sentences\)[\s\S]+ns\.myQuotes = \[\{ text: savedSentence[\s\S]+onCheckin\(ns, newLv, xpGain, savedSentence/, '홈 낙관 UI·게스트 pending·영속 payload는 계정 기본값과 같은 절단값을 쓴다');
+assert.match(nest, /const savedSentence = sentence \? normalizeText\(sentence, defaultVisibility\)[\s\S]+const savedSentences = Array\.isArray\(sentences\)[\s\S]+ns\.myQuotes = \[\{ text: savedSentence[\s\S]+onCheckin\(ns, savedSentence, kind, quotePage, batch, defaultVisibility/, '홈 낙관 UI·게스트 pending·영속 payload는 계정 기본값과 같은 절단값을 쓴다');
 
 console.log('sentence visibility limits: ok');
