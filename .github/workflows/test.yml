@@ -71,7 +71,8 @@ jobs:
           node tests/book-tree-home-ui.test.mjs
           node tests/book-tree-surface.test.mjs
           node tests/user-facing-book-tree-copy.test.mjs
-          node tests/phase3b-xp-write.test.mjs
+          node tests/phase4-legacy-absence.test.mjs
+          node tests/phase4-db-migration.test.mjs
           node tests/barcode-focus.test.mjs
           node tests/book-upsert-auth.test.mjs
           node tests/aladin-upstream-errors.test.mjs
@@ -83,9 +84,6 @@ jobs:
           node tests/forest-like-count.test.mjs
           node tests/liked-sentence-consistency.test.mjs
           node tests/library-reading-highlight.test.mjs
-          node tests/nest-cycle.test.mjs
-          node tests/nest-grow-date.test.mjs
-          node tests/nest-progress.test.mjs
           node tests/topbar-nest-count.test.mjs
           node tests/ocr-response.test.mjs
           node tests/ocr-review-flow.test.mjs

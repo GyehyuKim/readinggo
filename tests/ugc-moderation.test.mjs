@@ -53,7 +53,11 @@ assert.ok(card.includes('RG_openReport'), 'SentenceCard report entry missing');
 assert.ok(profile.includes('프로필 신고') && profile.includes('사용자 차단'), 'profile safety actions missing');
 assert.ok(app.includes('await syncPendingToSupabase({ allowPublic: ugcAccepted })'), 'private guest sync must run before UGC acceptance');
 assert.ok(app.includes('syncedSentenceKeys.has'), 'guest sync must clear only successful rows');
-assert.ok(nest.includes('공개 UGC 동의는 세션/XP/낙관 UI를 건드리기 전에 확인한다'), 'public check-in must preflight terms before persistence');
+const ugcPreflight = nest.indexOf('if (window.DataStore === window.SupabaseDataStore');
+const ugcRequired = nest.indexOf("window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'))", ugcPreflight);
+const checkinPersistence = nest.indexOf('checkinResult = onCheckin(', ugcPreflight);
+assert.ok(ugcPreflight >= 0 && ugcRequired > ugcPreflight && checkinPersistence > ugcRequired,
+  'public check-in must preflight terms before persistence');
 assert.ok(card.includes("error.message !== 'ugc_terms_required'"), 'visibility UI must not move before a rejected public update');
 assert.ok(admin.includes('moderationReports') && admin.includes('moderationAction'), 'admin moderation queue missing');
 assert.ok(admin.includes('moderationReview') && admin.includes('검토 시작'), 'reviewed-state transition missing');

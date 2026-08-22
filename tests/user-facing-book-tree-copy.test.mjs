@@ -2,13 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const root = 'docs/readinggo/js';
-// 호환 read shim·미마운트 레거시 구현·Phase 4 삭제 대상은 사용자 표면 검사에서 제외한다.
-const compatibilityOnly = new Set([
-  'data.js', 'datastore.js', 'datastore-supabase.js', 'icons.js',
-  'nest-grow.js', 'nest-theatre.js', 'library.test.js',
-]);
 const runtimeFiles = fs.readdirSync(root)
-  .filter((name) => name.endsWith('.js') && !name.endsWith('.test.js') && !compatibilityOnly.has(name));
+  .filter((name) => name.endsWith('.js') && !name.endsWith('.test.js'));
 
 function withoutComments(source) {
   return source

@@ -60,7 +60,7 @@ function _dayDiff(fromDate, toDate) {
   const b = new Date(toDate + 'T00:00:00');
   return Math.round((b - a) / 86400000);
 }
-/* 스트릭 규칙 SSOT (systems.md §6.1) — bumpOnCheckIn 과 체크인 세리머니/XP 가 같은 값을 쓰도록
+/* 독서 리듬 내부 카운터 규칙 — bumpOnCheckIn과 체크인 세리머니가 같은 값을 쓰도록
    순수 함수로 추출(#927). 입력일자(today) 기준으로 다음 current 값을 계산한다.
    - 같은 날 재기록  → 그대로(하루 1회만 증가)
    - 정확히 1일 차   → +1 (연속)
@@ -76,29 +76,6 @@ function _nextStreak(prevCurrent, lastDate, today) {
 function _isStreakBroken(lastDate, today) {
   if (!lastDate) return false;                    // 기록 없음 — 끊김 판정 안 함
   return _dayDiff(lastDate, today) > 1;           // 어제·오늘이면 유효, 그보다 오래면 끊김
-}
-/* 스트릭 복구('하루 만회') 정책 SSOT (#938, systems.md §6.1) — 깨진 스트릭의 복구를 양 어댑터가 같은 규칙으로 쓰도록 순수 함수로 추출.
-   관용은 좌절 이탈을 막지만 과다하면 스트릭 의미가 퇴색하므로 **주 1회·조건 없음(광고/결제 X)·하루치 유예**로 제한한다.
-   복구 = 끊기기 직전 current 값을 보존하고 last_check_in_date 를 '어제'로 세팅 → 오늘 체크인하면 끊김 없이 +1 로 이어진다.
-   입력: streak 행({current, last_check_in_date, last_repair_date?}), today(YYYY-MM-DD).
-   반환: { canRepair, lostStreak(복구 시 살아날 값), brokenDays(공백 일수), cooldownDays(다음 만회까지 남은 일), reason } */
-const STREAK_REPAIR_COOLDOWN_DAYS = 7; // 주 1회 (관용 상한 — 의미 퇴색 방지)
-function _streakRepairStatus(st, today) {
-  const cur = Math.max(0, (st && st.current) || 0);
-  const last = st && st.last_check_in_date;
-  // 끊기지 않았으면(어제/오늘 기록) 복구 불필요. 기록이 아예 없으면 살릴 스트릭도 없음.
-  if (!_isStreakBroken(last, today)) return { canRepair: false, lostStreak: cur, brokenDays: 0, cooldownDays: 0, reason: 'not_broken' };
-  // 저장된 current(끊긴 시점 값, get()의 0 정상화 전)가 1 미만이면 살릴 것이 없음.
-  if (cur < 1) return { canRepair: false, lostStreak: 0, brokenDays: _dayDiff(last, today), cooldownDays: 0, reason: 'nothing_to_save' };
-  // 주 1회 제한 — 마지막 만회로부터 7일 안이면 쿨다운.
-  const lr = st && st.last_repair_date;
-  if (lr) {
-    const since = _dayDiff(lr, today);
-    if (since < STREAK_REPAIR_COOLDOWN_DAYS) {
-      return { canRepair: false, lostStreak: cur, brokenDays: _dayDiff(last, today), cooldownDays: STREAK_REPAIR_COOLDOWN_DAYS - since, reason: 'cooldown' };
-    }
-  }
-  return { canRepair: true, lostStreak: cur, brokenDays: _dayDiff(last, today), cooldownDays: 0, reason: 'ok' };
 }
 function _todayMinus(n) {
   // n일 전 날짜 (YYYY-MM-DD). 캘린더 since 계산용 (#367).
@@ -178,7 +155,6 @@ const localStorageAdapter = (function () {
     }
 
     // 완독 책을 INITIAL_BOOKSHELF 에서 시드 → 프로필 "읽은 책" 목록(§5.8)에 반영.
-    // 성(🏰)은 완독 파생이 아니라 XP 주기 파생(floor(totalXp/1600), #520/#521) — 완독과 별개 축.
     // 활성 책과 별개 행.
     const shelf = window.INITIAL_BOOKSHELF || {};
     Object.keys(shelf).forEach(bookId => {
@@ -216,7 +192,6 @@ const localStorageAdapter = (function () {
         // 부팅 표시(12) 유지 + 오늘 체크인 시 연속 13 으로 자연스럽게 이어진다.
         last_check_in_date: _todayMinus(1),
       },
-      xp: (window.INITIAL_STATE && window.INITIAL_STATE.xp) || 0,
       claps: {},      // sentenceId -> true
       bookmarks: {},  // sentenceId -> true
       wish_books: Array.isArray(window.WISHLIST) ? window.WISHLIST.slice() : [],
@@ -380,8 +355,7 @@ function _applyBookOverrides(ub) {
 }
 // #871 Vite 회귀 픽스 — datastore-supabase.js 가 cross-file 로 호출(옛 loadBabel 전역). 모듈 스코프라 전역 노출 필요.
 window._today = _today; window._dayDiff = _dayDiff; window._applyBookOverrides = _applyBookOverrides;
-window._nextStreak = _nextStreak; window._isStreakBroken = _isStreakBroken; // 체크인 세리머니/XP 가 스트릭 규칙 공유(#927)
-window._streakRepairStatus = _streakRepairStatus; window._todayMinus = _todayMinus; // 스트릭 복구 정책 SSOT(#938) — 양 어댑터 공유
+window._nextStreak = _nextStreak; window._isStreakBroken = _isStreakBroken; // 체크인 세리머니와 어댑터가 리듬 규칙 공유(#927)
 function _allSentences(s) {
   const out = [];
   s.user_books.forEach(ub => {
@@ -881,45 +855,10 @@ const DataStore = {
         return { ...st };
       });
     },
-    // 스트릭 복구 가능 여부 (#938, systems.md §6.1) — UI가 복구 카드 노출/문구를 결정. 저장값(raw current) 기준.
-    repairStatus() {
-      return localStorageAdapter.mutate(s => _streakRepairStatus(s.streak, _today()));
-    },
-    // '하루 만회' 실행 (#938) — 깨진 스트릭을 끊김 직전 값으로 되살리고 last_check_in_date 를 '어제'로.
-    // 주 1회·조건 없음(_streakRepairStatus 게이트). 오늘 체크인하면 +1 로 자연스럽게 이어진다.
-    // 반환: { ok, streak(복구 후 행), lostStreak, reason }. 불가 시 ok:false + 사유.
-    repair() {
-      const today = _today();
-      return localStorageAdapter.mutate(s => {
-        const status = _streakRepairStatus(s.streak, today);
-        if (!status.canRepair) return { ok: false, reason: status.reason, cooldownDays: status.cooldownDays, streak: { ...s.streak } };
-        const st = s.streak;
-        // 끊김 직전 값 보존 + 어제로 세팅(오늘 체크인 시 _nextStreak 가 +1). longest 도 안전하게 유지.
-        st.current = Math.max(1, status.lostStreak);
-        if (st.current > (st.longest || 0)) st.longest = st.current;
-        st.last_check_in_date = _todayMinus(1);
-        st.last_repair_date = today;   // 주 1회 쿨다운 기준
-        return { ok: true, reason: 'repaired', lostStreak: st.current, streak: { ...st } };
-      });
-    },
   },
 
-  /* XP ──────────────────────────────────────────── */
-  xp: {
-    get() {
-      return localStorageAdapter.mutate(s => s.xp || 0);
-    },
-    add(amount, reason) {
-      return localStorageAdapter.mutate(s => {
-        s.xp = (s.xp || 0) + (amount || 0);
-        return s.xp;
-      });
-    },
-  },
-
-  /* 완독 / 성(🏰) ─────────────────────────────────
-     books.complete → status='completed' + completed_at (완독 상태·별점·소감, 성 직접 지급 없음).
-     castles.list → floor(totalXp / 1600) 파생 (#520/#521). 완독 권수와 분리. */
+  /* 완독 ───────────────────────────────────────────
+     books.complete → status='completed' + completed_at (완독 상태·별점·소감). */
   books: {
     // 책 카탈로그 단건 조회 (§7.2 Supabase 어댑터 getById 표면 일치) — Phase 0/게스트는 정적 카탈로그(getBook).
     // 누락돼 있어 BookInfoModal 의 `DS.books.getById` 가 undefined → 게스트(미로그인) 책 상세가
@@ -993,19 +932,6 @@ const DataStore = {
       return window.recommendRelated ? window.recommendRelated(book, limit) : Promise.resolve([]);
     },
   },
-  castles: {
-    // 성(🏰) = XP 주기 완료 수 (#520/#521, backend.md §7.2). length = floor(totalXp / 1600).
-    // 완독 권수 파생 폐기 — 완독과 성은 별개 축(완독 책은 '읽은 책' 목록에 남음).
-    list() {
-      return localStorageAdapter.mutate(s => {
-        const n = (typeof window.nestCastleCount === 'function')
-          ? window.nestCastleCount(s.xp)
-          : Math.floor(Math.max(0, s.xp || 0) / 1600);
-        return Array.from({ length: n }, (_, i) => ({ index: i + 1, earnedAtXp: (i + 1) * 1600 }));
-      });
-    },
-  },
-
   /* 소셜 (좋아요 / 관심책) ─────────────────────
      claps.toggle = ❤️ 좋아요 (한 문장 반응+저장 단일화, #641) 토글.
      #641: 짹+저장(구 bookmark) → claps 단일 수렴. 자기 문장 좋아요(저장) 허용 — localStorage는 작성자 구분 없이 토글. */

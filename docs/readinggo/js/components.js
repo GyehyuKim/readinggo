@@ -4,10 +4,6 @@
    ========================================================= */
 const { useState, useEffect, useRef, useCallback } = React;
 
-// 데모: 반응(짹) XP 일일 상한용 카운터(세션 단위). 운영 빌드는 일자 기준 서버 집계.
-// #871 Vite 회귀 픽스 — sentence-card.js 가 cross-file 로 읽고 증가. 모듈 스코프 let 은 공유 안 되므로 전역 바인딩.
-window._rgReactToday = 0;
-
 /* ── 스포일러 블라인드 (페이지 기반, social.md §5.7.1 SSOT) ──
    전역 토글 컨텍스트: revealAll=true 면 모든 블라인드 해제. */
 const SpoilerContext = React.createContext(false);
@@ -77,14 +73,14 @@ function BookCover({ title, author, cover, fb, className, style, radius }) {
 }
 
 /* ── Confetti ─────────────────────────────────────────── */
-function Confetti({ active, nestUp }) {
+function Confetti({ active }) {
   const boxRef = useRef(null);
   useEffect(() => {
     if (!active || !boxRef.current) return;
     const box = boxRef.current;
     box.innerHTML = '';
     const colors = ['#3FD17F','#FFC233','#FF8A3D','#5AB5F0','#F08A9A','#B690F0','#2EB867','#FFD66B'];
-    const n = nestUp ? 36 : 18;
+    const n = 18;
     for (let i = 0; i < n; i++) {
       const el = document.createElement('i');
       el.style.left = (Math.random() * 100) + '%';

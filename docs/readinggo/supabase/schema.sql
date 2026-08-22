@@ -22,7 +22,6 @@ create table if not exists public.users (
   daily_pace          int,
   active_user_book_id uuid,                       -- FK 는 user_books 생성 후 추가(순환 회피)
   settings            jsonb not null default '{}'::jsonb,
-  xp                  int not null default 0,
   created_at          timestamptz not null default now()
 );
 
@@ -83,7 +82,6 @@ create table if not exists public.reading_sessions (
   current_page     int,
   pages_read_today int,
   duration_sec     int default 0,   -- #430: 그날 읽기 세션 누적 시간(초)
-  xp_earned        int,
   created_at       timestamptz not null default now(),
   unique (user_book_id, session_date)
 );

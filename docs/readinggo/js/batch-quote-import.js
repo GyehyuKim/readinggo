@@ -3,7 +3,7 @@
    BatchQuoteImport: 비정형 문장 텍스트 일괄 입력 (spec nest.md §5.8).
    텍스트 뭉치 → 줄 단순 분리(1차) → 검토(편집/삭제/스킵) → onSave(quotes[]).
    자립적(자체 훅, cross-file 의존 없음). book-detail-modal.js **이전** 로드(BookDetailModal이 <BatchQuoteImport> 소비).
-   LLM 파싱(2차, §5.8)·OCR 배치(#844)는 후속 PR. 저장(일괄+XP 합산)은 app onBatchSave.
+   LLM 파싱(2차, §5.8)·OCR 배치(#844)는 후속 PR. 저장은 app onBatchSave.
    ========================================================= */
 
 // DESIGN.md 버튼 위계: 1차=솔리드(--brand), 2차=tonal(--brand-soft 배경 + --brand-3 글씨). ghost 금지.

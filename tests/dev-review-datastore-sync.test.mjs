@@ -7,7 +7,7 @@ globalThis.localStorage = {
   removeItem: key => values.delete(key),
 };
 globalThis.window = {
-  INITIAL_STATE: { book: null, streak: 0, xp: 0, myQuotes: [] },
+  INITIAL_STATE: { book: null, streak: 0, myQuotes: [] },
   getBook: id => ({ id, title: id }),
 };
 
@@ -15,7 +15,7 @@ await import(`../docs/readinggo/js/datastore.js?sync-test=${Date.now()}`);
 const adapter = window.LocalDataStore;
 const fixture = {
   user_books: [], active_user_book_id: null,
-  streak: { current: 1, longest: 1 }, xp: 10,
+  streak: { current: 1, longest: 1 },
   claps: {}, bookmarks: {}, wish_books: [],
   settings: { default_sentence_visibility: 'public' }, pending: {},
 };
@@ -26,7 +26,7 @@ adapter.local.setWriteHook((_state, version) => { writes += 1; lastVersion = ver
 
 const beforeVersion = adapter.local.version();
 assert.equal(adapter.settings.get().default_sentence_visibility, 'public');
-assert.equal(adapter.xp.get(), 10);
+assert.equal(Object.hasOwn(adapter.local.read(), 'xp'), false, 'Phase 4 local fixture에는 XP 상태가 없어야 한다');
 assert.equal(writes, 0, '순수 조회는 write hook을 호출하면 안 된다');
 assert.equal(adapter.local.isDirty(), false, '순수 조회는 dirty를 만들면 안 된다');
 assert.equal(adapter.local.version(), beforeVersion, '순수 조회는 local version을 올리면 안 된다');

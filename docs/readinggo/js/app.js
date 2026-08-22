@@ -14,8 +14,7 @@ async function buildStateFromSupabase() {
   ]);
   const out = {
     streak: st ? (st.current || 0) : 0,
-    xp: 0,
-    castleCount: 0, // 완독 권수(posthog books_count) — 아래 myBooks 파생으로 채움 (#513: castles.list 호출 제거)
+    completedBookCount: 0, // 완독 권수(posthog books_count) — 아래 myBooks에서 파생
   };
   if (ub && ub.book) {
     const total = ub.book.total_pages || 0; // 0 = 쪽수 미상 (#204) — 진척률 계산 시 가드
@@ -24,11 +23,9 @@ async function buildStateFromSupabase() {
       cur: ub.current_page || 0, total, days: 1,
       cover: ub.book.cover_url, fb: ['#9AA7B2', '#C7D0D8'], toc: [],
     };
-    out.nest = { lv: 1 }; // v17 신규 클라이언트는 XP를 읽지 않는다.
   } else {
     // 활성 책 없음(Supabase 모드): 데모책(b008) 환영 방지 — 빈 sentinel 로 '책 등록' 유도.
     out.book = { id: '', title: '', author: '', pub: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
-    out.nest = { lv: 1 };
   }
   // 항상 설정(없으면 []) — 로그인 시 데모 시드(INITIAL_STATE.myQuotes)가 '내 것'으로 남는 문제 방지 (#332).
   out.myQuotes = (Array.isArray(mine) ? mine : []).map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', createdAt: s.created_at || '', note: s.my_note || '', kind: s.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(s.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(s.visibility) === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
@@ -43,7 +40,7 @@ async function buildStateFromSupabase() {
     let completed = 0;
     (myb || []).forEach(u => { if (u.book_id) pages[u.book_id] = u.current_page || 0; if (u.status === 'completed') completed++; });
     window.RG_MY_PAGES = pages;
-    out.castleCount = completed; // 완독 권수 — castles.list 대신 myBooks 파생 (#513)
+    out.completedBookCount = completed;
   } catch (e) {}
   return out;
 }
@@ -59,8 +56,6 @@ function buildStateFromGuest() {
     const st = DS.streak && DS.streak.get && DS.streak.get();
     const out = {
       streak: st ? (st.current || 0) : 0,
-      xp: 0,
-      nest: { lv: 1 },
     };
     if (ub && ub.book) {
       const b = ub.book;
@@ -582,7 +577,7 @@ function App() {
     };
     return () => { window.RG_openShelfImport = null; window.RG_openTextImport = null; };
   }, [authUser]);
-  const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE, ...(buildStateFromGuest() || {}), xp: 0, nest: { lv: 1 } }));
+  const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE, ...(buildStateFromGuest() || {}) }));
   // TopBar와 전용 책나무 화면은 같은 읽기 전용 projection을 사용한다. 세계관 온보딩
   // 플래그가 아직 없으므로 익숙한 책·문장 용어만 표시하고 로딩 중 0으로 단정하지 않는다.
   const [topbarTree, setTopbarTree] = useState({ tree: null, loading: true, error: false });
@@ -793,7 +788,7 @@ function App() {
         // 거부·미질문이면 식별 생략(익명 분석은 유지) — PIPA 비필수 분리(#752).
         try {
           if (window.posthog && authUser && authUser.id && window.RG_consent && window.RG_consent.get() === 'yes') {
-            window.posthog.identify(authUser.id, { books_count: (next && next.castleCount) || 0 });
+            window.posthog.identify(authUser.id, { books_count: (next && next.completedBookCount) || 0 });
           }
         } catch (e) {}
         if (alive && next) {
@@ -853,9 +848,8 @@ function App() {
     if (main) main.scrollTop = 0;
   }, []);
 
-  // NestView가 체크인/simskip 후 자체 업데이트하고 콜백으로 상위 동기화.
-  // 둥지 단계(nest.lv)는 누적 XP에서 파생 (#313) → NestView가 계산해 넘긴다(§5.2).
-  const handleCheckin = useCallback((ns, nestLv, xpGain, sentence, kind, sentPage, sentences, visibility, completion, pagesLogged, isComplete) => {
+  // NestView가 체크인 후 자체 업데이트하고 콜백으로 상위 동기화.
+  const handleCheckin = useCallback((ns, sentence, kind, sentPage, sentences, visibility, completion, pagesLogged, isComplete) => {
     // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
     // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
@@ -864,8 +858,6 @@ function App() {
       ...s,
       book: ns.book,
       streak: ns.streak,
-      xp: ns.xp,
-      nest: { ...s.nest, lv: nestLv },
       myQuotes: ns.myQuotes,
     }));
     window.dispatchEvent(new CustomEvent('rg:today-checked'));
@@ -941,7 +933,7 @@ function App() {
         await surfaceWriteError(e, '기록을 저장하지 못했어요 — 다시 시도해주세요');
         if (completion && completion.rollback) {
           const prev = completion.rollback;
-          setAppState(s => ({ ...s, book: prev.book, streak: prev.streak, xp: prev.xp, nest: { ...s.nest, lv: prev.nestLv }, myQuotes: prev.myQuotes }));
+          setAppState(s => ({ ...s, book: prev.book, streak: prev.streak, myQuotes: prev.myQuotes }));
         }
         if (completion && completion.onFailure) completion.onFailure(e);
       }
