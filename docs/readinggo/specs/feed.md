@@ -199,6 +199,13 @@ ReadingGo의 공개 한 문장과 프로필은 사용자 제작 콘텐츠(UGC)�
 - 게스트는 공개 피드에 서버 UGC를 게시하지 못한다. 로컬 게스트 문장은 저장 가능하되 로그인 후 공개 동기화 직전에 같은 동의를 요구한다.
 - 가이드라인은 성적·폭력적·혐오·괴롭힘·스팸·불법 콘텐츠 금지와 신고·조치 가능성을 명시하고, 앱 안과 공개 URL에서 열 수 있어야 한다.
 
+**체크인 저장 순서와 부분 성공 방지 (#1499)**
+
+- 홈 체크인에 한 문장 1건 이상이 포함되면 첫 서버 write 전에 화면 책의 `user_book_id`, 모든 문장의 Unicode 길이·공개범위, 공개·친구공개 문장에 필요한 현재 UGC 약관 버전을 한 번에 검증한다. 진행도만 저장하는 체크인은 UGC 약관을 요구하지 않는다.
+- preflight에서 `ugc_terms_required`가 발생하면 동의 화면과 구체적인 안내를 보여주고 `checkin_atomic`·sentence write를 모두 호출하지 않는다. 일반 “기록 저장 실패” 토스트로 덮지 않는다.
+- preflight가 통과한 뒤에만 `checkin_atomic → sentence write → readback` 순으로 실행한다. 같은 날 세션은 서버 upsert를 사용하고, 배치는 성공한 문장만 초안에서 제거해 재시도 중복을 막는다.
+- 실패는 `preflight | session | sentence | readback` 단계와 allowlist 오류 코드로 분류한다. 문장 원문·책/사용자 식별자·토큰·request body는 오류 이벤트에 넣지 않는다.
+
 **신고**
 
 - 타인의 `SentenceCard`와 `UserProfileModal`에 보조 메뉴 `신고`를 제공한다. 본인 대상에는 노출하지 않는다.

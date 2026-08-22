@@ -104,6 +104,9 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 | `sentence_added` | 한 문장 1건 저장 성공 뒤. 배치는 성공 건마다 1회 | `book_id`, `kind`, `source` | 핵심 자산 생성 |
 | `book_completed` | `books.complete()` 성공 뒤 | `book_id`, `rating_present`, `review_present` | 완독 전환 |
 | `answer_saved` | 독서 대화 답변 저장 성공 뒤 | `book_id`, `lens`, `answer_length` | AI 대화 가치 |
+| `checkin_save_failed` | 체크인 시도 1건이 최종 실패로 확정된 뒤 1회 | `source`, `stage`, `code`, `correlation_id`, `retry_count`, `item_count`; 선택 `endpoint_or_rpc`, `status`, `app_version` | 저장 장애 운영 진단 |
+
+`checkin_save_failed`의 `source`는 최소 `home | ocr_review`, `stage`는 `preflight | session | sentence | readback` allowlist를 쓴다. `code`는 자유형 예외 메시지가 아니라 `ugc_terms_required | invalid_sentence | missing_user_book | auth_expired | network | session_write_failed | sentence_write_failed | batch_partial_failure | readback_failed | unknown` 중 하나로 정규화한다. 한 저장 시도의 실패 이벤트는 가장 구체적인 최종 stage에서 1회만 발화하며, `correlation_id`는 클라이언트가 시도 시작 시 생성한 비식별 UUID다. 공통 `environment`·`release_sha`·`schema_version`·`platform`은 중앙 `rgTrack`이 붙인다.
 
 - 재시도는 실제 저장 성공 건만 기록한다. 저장 실패·rollback은 성공 이벤트를 남기지 않는다.
 - 이벤트 속성명은 `snake_case`로 통일한다. `bookId`, `from`, `to`, 의미 불명 `id`는 신규 발화에서 금지한다.
@@ -118,7 +121,7 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - ISBN·초대 토큰·URL query/hash
 - 자유형 예외 메시지와 provider 응답 본문
 
-오류는 allowlist `code`, `stage`, `status`만 전송한다. 로그인 사용자의 PostHog distinct ID는 Supabase UUID만 쓰되 선택 동의자에 한하고, email person property는 전송하지 않는다.
+오류는 allowlist `source`, `stage`, `code`, `endpoint_or_rpc`, `status`, `app_version`, `correlation_id`, `retry_count`, `item_count`만 전송한다. 로그인 사용자의 PostHog distinct ID는 Supabase UUID만 쓰되 선택 동의자에 한하고, email person property는 전송하지 않는다.
 
 ### 3.1.2 WAU·리텐션·주간 리포트
 
@@ -129,6 +132,7 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - 아직 다음 주가 끝나지 않은 미성숙 코호트는 제외한다. 표본 10 미만은 참고치로 표시하고 50% 달성 판정에 사용하지 않는다.
 - **런칭 기준**: 가장 최근 성숙 코호트(표본 10 이상)의 W1 리텐션이 50% 이상인지 주간으로 확인한다.
 - 주간 자동 리포트는 production만 조회하고 WAU, 핵심 이벤트 사용자·건수, 4단계 퍼널, W1 리텐션, 누락 환경/SHA 데이터 품질 경고를 GitHub Actions summary와 artifact로 남긴다.
+- 완료된 조회 구간의 핵심 이벤트가 0건이면 `dataQuality: ok`로 두지 않고 `collection_silence` critical anomaly로 판정한다. 이는 “사용자 행동 0”을 자동 확정하는 값이 아니라 수집 중단 가능성을 운영자가 확인해야 하는 fail-visible 신호다.
 - PostHog Personal API key는 읽기 전용 GitHub Secret으로만 보관한다. 미설정이면 workflow는 명시적으로 실패하되 앱 배포를 막지 않는다.
 
 ### 3.1.3 책나무·성장 리듬 측정 계약 (v17, 구현 후속)
