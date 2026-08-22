@@ -12,6 +12,7 @@ import './js/turnstile.js';   // #1158/#1159 Turnstile 봇 검증 — RG_apiFetc
 import './js/data.js';
 import './js/datastore.js';
 import './js/book-tree-selector.js'; // #1453 읽기 전용 책=가지·문장=잎 projection + 호환 shim
+import './js/book-tree-home-ui.js'; // #1453 Phase 2 책나무 요약·가지 목록·선택 상세
 import './js/streak-repair-copy.js'; // #1429 스트릭 만회 카드 카피·오늘 기록 경계
 import './js/icons.js';
 import './js/components.js';

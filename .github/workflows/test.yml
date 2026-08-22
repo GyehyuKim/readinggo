@@ -67,6 +67,8 @@ jobs:
           node tests/forest-sentence-date.test.mjs
           node tests/inquiry-direct-response.test.mjs
           node tests/book-detail-hierarchy.test.mjs
+          node tests/book-tree-selector.test.mjs
+          node tests/book-tree-home-ui.test.mjs
           node tests/barcode-focus.test.mjs
           node tests/book-upsert-auth.test.mjs
           node tests/aladin-upstream-errors.test.mjs

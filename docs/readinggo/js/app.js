@@ -1090,6 +1090,30 @@ function App() {
   // 활성 책 전환을 전역 노출 — 둥지 캐러셀(#185)이 호출
   useEffect(() => { window.RG_activateBook = handleActivateUserBook; return () => { window.RG_activateBook = null; }; }, [handleActivateUserBook]);
 
+  // 책나무 가지에서 활성 책을 고를 때는 기존 activeBook.set 쓰기를 UI 컴포넌트가
+  // 완료한 뒤 홈 입력 흐름이 참조하는 appState.book만 같은 user_book으로 맞춘다.
+  // 탭은 책나무에 남겨 선택 상세가 즉시 다시 렌더되게 한다.
+  const handleBookTreeActiveChange = useCallback((branch) => {
+    if (!branch || !branch.book) return;
+    setAppState(s => ({
+      ...s,
+      book: {
+        id: branch.book.id || branch.bookId,
+        ubId: branch.id,
+        title: branch.book.title || '책',
+        author: branch.book.author || '',
+        pub: '',
+        cur: branch.currentPage || 0,
+        total: branch.book.totalPages || 0,
+        days: 1,
+        cover: branch.book.coverUrl || '',
+        fb: ['#9AA7B2', '#C7D0D8'],
+        toc: [],
+      },
+    }));
+    showToast(`${branch.book.title || '책'} — 활성 책으로 변경`);
+  }, []);
+
   // 뒤로가기로 최상위 오버레이 닫기 (#1199, nav.js). 각 오버레이 상태가 열리면 합성 history
   // 엔트리를 push하고, 브라우저/OS 뒤로가기(모바일 Safari 엣지 스와이프)가 오면 최상위 하나만
   // 닫는다 — 실제 앱 히스토리/로그인 상태로 튕기지 않도록. 훅은 매 렌더 같은 순서로 호출.
@@ -1207,7 +1231,13 @@ function App() {
             />
           )}
           {activeTab === 'nest-grow' && (
-            <NestGrowView key="nest-grow" state={appState} />
+            <window.BookTreeHomeView
+              key="nest-grow"
+              dataStore={window.DataStore}
+              activeUserBookId={appState.book && appState.book.ubId}
+              onActiveBookChange={handleBookTreeActiveChange}
+              onOpenSearch={() => setIsSearchOpen(true)}
+            />
           )}
           {activeTab === 'profile' && (
             <LibraryView
