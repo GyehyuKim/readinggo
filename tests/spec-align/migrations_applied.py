@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
-"""Verify Supabase migrations are actually applied to the live database.
+"""Verify Supabase migrations are actually applied to the Production database.
 
 근거: [LF: Spec Drift 방어](../../docs/1.%20research_and_lectures/lecture-frameworks.md#lf-week11-spec-drift-defense).
 코드/`.sql`은 main에 머지돼도 프로덕션 DB에 적용되지 않으면 런타임 400
 (`column ... does not exist`)으로 조용히 실패한다 (2026-06-16 QA: 11/22/23 누락).
 
 전략: docs/readinggo/supabase/*.sql (`*.dev.sql` 제외)에서 `add column if not exists` 와
-`create table if not exists` 대상을 파싱하고, Supabase Management API 로
-라이브 프로젝트의 information_schema 를 조회해 **DB 에 없는 마이그레이션 객체**를
+`create table if not exists` 대상을 schema-qualified 객체로 파싱하고, Supabase Management
+API로 Production 프로젝트의 expected schema만 조회해 **DB에 없는 마이그레이션 객체**를
 보고한다.
 
 Read-only — DDL 을 실행하지 않는다 (감지 전용). 적용은 사람이 확인 후 수동/승인.
 
 Exit 0: 전부 적용됨 — 또는 API 일시 5xx·네트워크/타임아웃으로 검사 불가 시 skip(경고).
 Exit 1: 미적용 객체 존재(punch list).
-Exit 2: 설정 오류(토큰 미설정, 4xx 토큰/프로젝트). (CI는 토큰 미설정을 test.yml 래퍼에서 미리 skip.)
+Exit 2: 설정 오류(토큰 미설정, 4xx 토큰/프로젝트).
+Exit 3: SQL parser 오류. 이 경우 live DB drift로 보고하지 않는다.
 
 Env:
   SUPABASE_ACCESS_TOKEN   Management API 토큰(sbp_...). 없으면 ROOT/.env 폴백.
-  SUPABASE_PROJECT_REF    프로젝트 ref (기본: cttllwwkaddghqttyhkg).
+  SUPABASE_PROJECT_REF    Production 프로젝트 ref (기본: cttllwwkaddghqttyhkg).
 """
+
+from __future__ import annotations
 
 import io
 import json
@@ -36,6 +39,12 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[2]
 SQL_DIR = ROOT / "docs" / "readinggo" / "supabase"
 DEFAULT_REF = "cttllwwkaddghqttyhkg"
+_IDENT = r'(?:"(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)'
+_QUALIFIED_IDENT = re.compile(rf"(?:(?P<schema>{_IDENT})\.)?(?P<table>{_IDENT})\Z")
+
+
+class MigrationParseError(ValueError):
+    """Raised when a tracked migration statement has an unsupported table target."""
 
 
 def _strip_sql_comments(text: str) -> str:
@@ -43,39 +52,82 @@ def _strip_sql_comments(text: str) -> str:
     return re.sub(r"--[^\n]*", "", text)
 
 
-def parse_expected() -> tuple[set[tuple[str, str]], set[str]]:
-    """Return (expected (table, column) pairs, expected table names) from all *.sql."""
-    cols: set[tuple[str, str]] = set()
-    tables: set[str] = set()
-    for f in sorted(SQL_DIR.glob("*.sql")):
+def _normalize_identifier(identifier: str) -> str:
+    """Match PostgreSQL identifier folding: unquoted lower-case, quoted exact-case."""
+    if identifier.startswith('"') and identifier.endswith('"'):
+        return identifier[1:-1].replace('""', '"')
+    return identifier.lower()
+
+
+def _parse_table_target(token: str, source: Path) -> tuple[str, str]:
+    match = _QUALIFIED_IDENT.fullmatch(token)
+    if not match:
+        raise MigrationParseError(f"{source.name}: unsupported table target {token!r}")
+    schema = _normalize_identifier(match.group("schema") or "public")
+    table = _normalize_identifier(match.group("table"))
+    return schema, table
+
+
+def parse_expected(
+    sql_dir: Path = SQL_DIR,
+) -> tuple[set[tuple[str, str, str]], set[tuple[str, str]]]:
+    """Return expected (schema, table, column) and (schema, table) objects."""
+    cols: set[tuple[str, str, str]] = set()
+    tables: set[tuple[str, str]] = set()
+    for path in sorted(sql_dir.glob("*.sql")):
         # `*.dev.sql` is intentionally applied only to the isolated DEV project.
         # Production drift checks must not require those DEV-only tables.
-        if f.name.endswith(".dev.sql"):
+        if path.name.endswith(".dev.sql"):
             continue
-        raw = _strip_sql_comments(f.read_text(encoding="utf-8"))
-        for m in re.finditer(
-            r"create\s+table\s+if\s+not\s+exists\s+(?:public\.)?(\w+)", raw, re.I
+        raw = _strip_sql_comments(path.read_text(encoding="utf-8"))
+        for statement in re.finditer(
+            r"create\s+table\s+if\s+not\s+exists\s+(?P<target>[^\s(]+)",
+            raw,
+            re.I,
         ):
-            tables.add(m.group(1).lower())
-        # `alter table public.X ... ;` block — collect every add-column inside it.
-        for blk in re.finditer(
-            r"alter\s+table\s+(?:public\.)?(\w+)(.*?);", raw, re.I | re.S
+            tables.add(_parse_table_target(statement.group("target"), path))
+        # `alter table [if exists] schema.X ... ;` block — collect every add-column inside it.
+        for block in re.finditer(
+            r"alter\s+table\s+(?:if\s+exists\s+)?(?P<target>[^\s;]+)(?P<body>.*?);",
+            raw,
+            re.I | re.S,
         ):
-            tbl = blk.group(1).lower()
-            for cm in re.finditer(
-                r"add\s+column\s+if\s+not\s+exists\s+(\w+)", blk.group(2), re.I
+            schema, table = _parse_table_target(block.group("target"), path)
+            for column in re.finditer(
+                rf"add\s+column\s+if\s+not\s+exists\s+(?P<column>{_IDENT})",
+                block.group("body"),
+                re.I,
             ):
-                cols.add((tbl, cm.group(1).lower()))
+                cols.add(
+                    (schema, table, _normalize_identifier(column.group("column")))
+                )
     return cols, tables
 
 
+def find_missing(
+    expected_cols: set[tuple[str, str, str]],
+    expected_tables: set[tuple[str, str]],
+    live_cols: set[tuple[str, str, str]],
+    live_tables: set[tuple[str, str]],
+) -> list[str]:
+    """Return fully-qualified missing objects without duplicating missing-table columns."""
+    missing: list[str] = []
+    for schema, table in sorted(expected_tables):
+        if (schema, table) not in live_tables:
+            missing.append(f"table {schema}.{table}")
+    for schema, table, column in sorted(expected_cols):
+        if (schema, table) in live_tables and (schema, table, column) not in live_cols:
+            missing.append(f"column {schema}.{table}.{column}")
+    return missing
+
+
 def _token() -> str | None:
-    t = os.environ.get("SUPABASE_ACCESS_TOKEN")
-    if t:
-        return t.strip()
-    envf = ROOT / ".env"
-    if envf.exists():
-        for line in envf.read_text(encoding="utf-8").splitlines():
+    token = os.environ.get("SUPABASE_ACCESS_TOKEN")
+    if token:
+        return token.strip()
+    env_file = ROOT / ".env"
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
             if line.startswith("SUPABASE_ACCESS_TOKEN="):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return None
@@ -83,7 +135,7 @@ def _token() -> str | None:
 
 def _query(ref: str, token: str, sql: str) -> list[dict]:
     url = f"https://api.supabase.com/v1/projects/{ref}/database/query"
-    req = urllib.request.Request(
+    request = urllib.request.Request(
         url,
         method="POST",
         data=json.dumps({"query": sql}).encode("utf-8"),
@@ -93,12 +145,22 @@ def _query(ref: str, token: str, sql: str) -> list[dict]:
             "User-Agent": "readinggo-migration-check/1.0",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310 (trusted host)
-        return json.loads(r.read().decode("utf-8"))
+    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _sql_string(value: str) -> str:
+    """Quote a parsed SQL identifier as an information_schema string literal."""
+    return "'" + value.replace("'", "''") + "'"
 
 
 def main() -> int:
-    exp_cols, exp_tables = parse_expected()
+    try:
+        expected_cols, expected_tables = parse_expected()
+    except (MigrationParseError, OSError, UnicodeError) as error:
+        print(f"FAIL: migration SQL parser error: {error}", file=sys.stderr)
+        return 3
+
     token = _token()
     if not token:
         print(
@@ -107,68 +169,80 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+
     ref = os.environ.get("SUPABASE_PROJECT_REF", DEFAULT_REF)
+    schemas = sorted(
+        {schema for schema, _ in expected_tables}
+        | {schema for schema, _, _ in expected_cols}
+    )
+    schema_literals = ", ".join(_sql_string(schema) for schema in schemas)
+    print(
+        f"Target: Production Supabase project {ref} (read-only); "
+        f"schemas={','.join(schemas)}"
+    )
     try:
-        col_rows = _query(
+        column_rows = _query(
             ref,
             token,
-            "select table_name, column_name from information_schema.columns "
-            "where table_schema='public';",
+            "select table_schema, table_name, column_name "
+            "from information_schema.columns "
+            f"where table_schema in ({schema_literals});",
         )
-        tbl_rows = _query(
+        table_rows = _query(
             ref,
             token,
-            "select table_name from information_schema.tables "
-            "where table_schema='public';",
+            "select table_schema, table_name from information_schema.tables "
+            f"where table_schema in ({schema_literals});",
         )
-    except urllib.error.HTTPError as e:
-        # 5xx = Supabase 쪽 일시 서버 장애(502/503/504 등) → 드리프트 신호 아님 → 경고+skip.
-        # 4xx = 토큰(401/403)·프로젝트(404) 설정 오류 → 진짜 문제 → fail.
-        # (HTTPError 가 URLError 하위클래스라 먼저 잡는다.)
-        if e.code >= 500:
+    except urllib.error.HTTPError as error:
+        # 5xx = Supabase 일시 장애 ≠ drift. 4xx = 토큰/프로젝트 설정 오류.
+        if error.code >= 500:
             print(
                 f"::warning::migrations 검사 skip — Management API 일시 오류 "
-                f"(HTTP {e.code}). 마이그레이션 드리프트 아님(서버 측). (#699)",
+                f"(HTTP {error.code}). 마이그레이션 드리프트 아님(서버 측). (#699)",
                 file=sys.stderr,
             )
             return 0
-        print(f"FAIL: Management API 설정 오류: HTTP {e.code} {e.reason}", file=sys.stderr)
-        return 2
-    except (urllib.error.URLError, TimeoutError) as e:
-        # 네트워크 불가/타임아웃 = 검사 자체가 불가능 ≠ 드리프트 확정 → 경고+skip (토큰 미설정과 동일 철학).
         print(
-            f"::warning::migrations 검사 skip — Management API 통신 실패 ({e}). "
+            f"FAIL: Management API 설정 오류: HTTP {error.code} {error.reason}",
+            file=sys.stderr,
+        )
+        return 2
+    except (urllib.error.URLError, TimeoutError) as error:
+        print(
+            f"::warning::migrations 검사 skip — Management API 통신 실패 ({error}). "
             f"네트워크/타임아웃. (#699)",
             file=sys.stderr,
         )
         return 0
 
-    live_cols = {(r["table_name"].lower(), r["column_name"].lower()) for r in col_rows}
-    live_tables = {r["table_name"].lower() for r in tbl_rows}
-
-    missing: list[str] = []
-    for t in sorted(exp_tables):
-        if t not in live_tables:
-            missing.append(f"table {t}")
-    for t, c in sorted(exp_cols):
-        # Only flag a column when its table exists; a missing table is reported above.
-        if t in live_tables and (t, c) not in live_cols:
-            missing.append(f"column {t}.{c}")
+    live_cols = {
+        (
+            row["table_schema"],
+            row["table_name"],
+            row["column_name"],
+        )
+        for row in column_rows
+    }
+    live_tables = {
+        (row["table_schema"], row["table_name"]) for row in table_rows
+    }
+    missing = find_missing(expected_cols, expected_tables, live_cols, live_tables)
 
     if missing:
         print(
-            "FAIL: migration objects missing from live DB "
+            "FAIL: migration objects missing from Production live DB "
             "(unapplied .sql in docs/readinggo/supabase/):",
             file=sys.stderr,
         )
-        for m in missing:
-            print(f"  - {m}", file=sys.stderr)
+        for item in missing:
+            print(f"  - {item}", file=sys.stderr)
         print(f"\n{len(missing)} object(s) missing", file=sys.stderr)
         return 1
 
     print(
-        f"OK: all {len(exp_tables)} tables + {len(exp_cols)} "
-        "migration columns present in live DB"
+        f"OK: all {len(expected_tables)} tables + {len(expected_cols)} "
+        "migration columns present in Production live DB"
     )
     return 0
 
