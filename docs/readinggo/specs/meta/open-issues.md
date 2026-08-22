@@ -14,7 +14,7 @@
 
 ### 13.1 XP destination — 과거 해소 후 v17 폐기
 
-**역사**: #1086·#1415에서는 XP를 1,600 XP 둥지 성장의 연료로 정했다. **v17(2026-08-19, #1452)이 이 제품 계약을 supersede**했다. XP의 새 용도를 다시 찾지 않으며 별도 화폐·상점·보상으로 이전하지 않는다. 신규 적립을 동결하고 구 APK 호환층을 거쳐 단계 삭제한다. 삭제 게이트는 [systems.md §6.0](../systems.md)이다.
+**역사**: #1086·#1415에서는 XP를 1,600 XP 둥지 성장의 연료로 정했다. **v17(2026-08-19, #1452)이 이 제품 계약을 supersede**했고 2026-08-22 Hyu 결정으로 구 APK 호환층도 유지하지 않는다. XP를 별도 화폐·상점·보상으로 이전하지 않고 앱·DataStore·DB·분석의 전용 표면을 단계 삭제한다. 삭제 게이트는 [systems.md §6.0](../systems.md)이다.
 
 ### 13.2 T2 mini — 같은 책 자동 패널
 
@@ -98,7 +98,7 @@
 | 권리자 takedown 운영 (#1463) | 현재 규모에서는 기존 문의 이메일과 관리자 수동 비공개·삭제를 최소 대응으로 사용. 전용 상태 시스템·이의 절차·자동 전 표면 검증은 후순위 운영 백로그 | 반복 요청, 공개량·활성 사용자·영리성 증가, 수동 처리 누락·지연이 실제로 나타나면 접수 폼·상태 전이·감사 기록·캐시 비노출 E2E를 재검토 | 1,000자 계약과 일반 DEV·Production 배포를 차단하지 않음. 크롤 seed 확대·상용화 시 별도 위험 검토 |
 | 레거시 배포 workflow 드리프트 (#1464) | 정상 경로는 stable DEV→동일 SHA 수동 Production 승격. `deploy-verify`는 수동 전용이지만 직접 rollback 계약이 충돌하고 OTA 상단 주석도 실제 trigger와 다름 | workflow 제거·재설계, 자동 rollback 제거, test/OTA 주석 정렬, rollback receipt 검증 | 레거시 workflow 수동 실행과 OTA 운영. 이 spec-only PR 머지는 비차단 |
 | base RLS·구 APK 컷오버 | **5-A** 제한 view/RPC·신규 앱 선배포→최소 버전 미만 차단→broad `ub_sel` 소유자 전용 축소. 보안 rollback으로 broad 정책 복원 금지 | 버전별 직접 조회 인벤토리, OTA/스토어 수신·호출 증거, 정확한 최소 버전, 구버전 실패·rollback 테스트 | base RLS 축소와 친구 책나무 Production 활성화 |
-| XP 물리 삭제 (#1452) | **6-A** 신규 쓰기·참조 제거→최소 버전 강제→legacy 호출 0→rollback 기간 후 물리 삭제 | 실제 최소 버전, 지원 버전 전체 호출 0 telemetry, 운영·분석 참조 0, 백업·migration·rollback 증거 | 컬럼·RPC·legacy adapter 삭제 |
+| XP·만회 물리 삭제 (#1452·#1453) | 구 APK 미지원. 앱·DataStore·분석 참조 제거 후 DEV 백업·drop·schema readback 검증 | production module graph·운영 참조 0, migration digest, 백업·rollback, 동일 SHA DEV 증거 | Hyu 승인 후 Production 컬럼·RPC 삭제 |
 | 재독 회차 스키마 | **3-A** 책당 `user_book`·가지 하나 + `reading_rounds` 명시 회차. 기존 문장 `reading_round_id=NULL` 무손실 보존 | 정확한 컬럼·FK·상태 전이, 신규 문장 귀속, 구 앱 호환, migration·rollback 테스트 | 회차별 UI·DB migration |
 
 ### 13.8 공개 문장 누적 저작권 위험 — 수용·추후 검토

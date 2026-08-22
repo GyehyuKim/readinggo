@@ -11,11 +11,11 @@
 
 1. **결정 정합**: `meta/decisions.md`와 기능 SSOT가 구현 사실·목표 계약·미결정을 분리한다.
 2. **스펙 승인·머지**: spec-only PR의 CI, 리뷰, 미해결 대화 0을 확인하고 main에 머지한다.
-3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, legacy APK, analytics, fixture, rollback을 작업 순서와 함께 승인한다.
-4. **코드·DB 구현**: 신규 XP 쓰기 제거와 친구용 제한 권한을 코드·migration으로 구현한다. 기존 사용자 공개 확대와 XP 물리 삭제는 이 단계의 자동 포함 범위가 아니다.
-5. **DEV 배포·QA**: DEV 전용 합성 fixture로 본인·친구·비친구·차단·공개범위·수백 가지/잎·구 APK 호환을 검증한다. Production 실사용자 데이터를 fixture로 쓰지 않는다.
-6. **동일 SHA Production 승격**: DEV에서 승인한 commit SHA만 승격한다. 환경 차이와 적용 migration을 기록한다.
-7. **Production QA**: 실제 Production에서 읽기·문장 저장·친구 권한·XP 무증가·롤백 경로를 직접 검증한다. CI·배포 성공만으로 완료 처리하지 않는다.
+3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, analytics, fixture, 백업·rollback을 작업 순서와 함께 승인한다. 구 APK 호환은 요구하지 않는다.
+4. **코드·DB 구현**: 앱·DataStore·분석의 XP·둥지·성·하루 만회 전용 표면을 제거하고, DEV migration에 백업 생성·RPC/컬럼 삭제·schema readback 검증을 포함한다. 친구 공개 확대는 별도 범위다.
+5. **DEV 배포·QA**: 자동 회귀와 DEV 전용 합성 fixture로 책·문장·세션·최근 14일 리듬·누적 성장일 보존과 legacy 참조 0을 검증한다. Hyu에게는 자동 판정할 수 없는 화면·사용감만 최소 항목으로 요청한다. Production 실사용자 데이터를 fixture로 쓰지 않는다.
+6. **동일 SHA Production 승격**: DEV에서 승인한 commit SHA와 migration digest만 승격한다. 환경 차이·백업·적용 migration을 기록한다.
+7. **Production QA**: 실제 Production에서 읽기·문장 저장·책나무·독서 리듬과 legacy 표면 부재·rollback 경로를 직접 검증한다. CI·배포 성공만으로 완료 처리하지 않는다.
 8. **Play Store**: Production QA와 네이티브 빌드 검증 뒤에만 스토어 빌드를 제출한다.
 
 ### 0.1 구 클라이언트·RLS 컷오버 순서
@@ -35,9 +35,9 @@
 
 - **책나무 UI 노출 게이트**: 새 책나무 UI와 읽기 모델의 노출을 제어한다. off면 기존 화면으로 돌아가되 신규 XP 쓰기를 다시 켜지 않는다. 실제 flag 식별자는 구현 계획에서 정한다.
 - **친구 공개 게이트**: 친구 책나무 UI와 제한 friend view/RPC 호출을 제어한다. RLS·구버전 컷오버가 배포·검증되기 전 기본 off다. 실제 flag 식별자는 구현 계획에서 정한다.
-- XP 동결은 feature flag rollback 대상이 아니다. 구 APK 호환 RPC가 no-op으로 안전해야 하며, 장애 시에도 신규 XP 적립을 재개하지 않는다.
+- XP·둥지·성·하루 만회 제거는 feature flag rollback 대상이 아니다. 장애 시에도 신규 XP 적립을 재개하지 않으며, DB rollback이 필요하면 승인된 migration 백업에서 폐기 컬럼·RPC만 복원한다.
 - 공개범위 migration은 가역적 mapping과 영향 건수, 백업·복원 쿼리, 고지 버전·효력일·opt-out 및 철회 상태의 기기 간 복원 기록을 갖춘 별도 승인 작업이다.
-- rollback은 스키마 하위호환을 우선한다. UI rollback이 기존 앱·데이터를 읽을 수 있는 기간이 끝나기 전 컬럼·RPC를 삭제하지 않는다.
+- 일반 schema rollback은 하위호환을 우선하지만, XP·둥지·만회 전용 표면은 구 APK 호환을 삭제 게이트로 사용하지 않는다. 앱·DB rollback 단위를 release receipt에 분리 기록한다.
 
 ### 0.3 단일 release receipt와 완료 증거
 
