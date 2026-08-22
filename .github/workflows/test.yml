@@ -71,6 +71,7 @@ jobs:
           node tests/book-upsert-auth.test.mjs
           node tests/aladin-upstream-errors.test.mjs
           node tests/ota-native-gate.test.mjs
+          node tests/release-version-contract.test.mjs
           node tests/workflow-pins.test.mjs
           node tests/ceremony-sentence-action.test.mjs
           node tests/companion-turn-limit.test.mjs
