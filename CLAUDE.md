@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a course project folder for **BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습** (KAIST IMMS, Spring 2026, instructor: 이지수).
 
-The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가고, 책과 문장이 쌓인 모습을 한 그루 책나무로 보여주는 독서 습관 앱. v17 목표는 사용자당 나무 1그루·책당 가지 1개·저장 문장당 잎 1장이며, XP·둥지 진화·스트릭 상실 UX는 신규 제품 계약에서 폐기한다. 2026-08-22 Hyu 결정에 따라 구 APK 호환은 유지하지 않고 앱·DataStore·DB·분석의 XP·둥지·만회 전용 표면을 단계 삭제한다. 활성 정본은 `docs/readinggo/specs/README.md`, 데모 엔트리포인트는 `docs/readinggo/index.html`이다.
+The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가고, 책과 문장이 쌓인 모습을 한 그루 책나무로 보여주는 독서 습관 앱. v17 목표는 사용자당 나무 1그루·책당 가지 1개·저장 문장당 잎 1장이며, XP·둥지 진화·스트릭 상실 UX는 신규 제품 계약에서 폐기한다. 2026-08-22 Hyu 결정에 따라 **Phase 4의 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않고 앱·DataStore·DB·분석에서 단계 삭제한다. friend-tree/RLS·공개범위·재독 등 별도 구버전 안전 게이트는 유지한다. 활성 정본은 `docs/readinggo/specs/README.md`, 데모 엔트리포인트는 `docs/readinggo/index.html`이다.
 
 ## Governance — MANDATORY
 
