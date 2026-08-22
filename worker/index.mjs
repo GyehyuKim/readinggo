@@ -1167,6 +1167,155 @@ async function relatedProxy(request, env) {
 const OCR_URL = 'https://api.upstage.ai/v1/document-digitization';
 const OCR_MAX_BYTES = 8 * 1024 * 1024;   // 8MB
 const OCR_CORRECT_SYSTEM = '너는 책 사진 OCR 결과를 다듬는 교정기다. 책의 좌우 단·줄바꿈 때문에 생긴 불필요한 줄바꿈과 띄어쓰기 오류만 자연스럽게 이어 붙여라. 절대 원문 단어를 바꾸거나 추가·삭제·요약·번역하지 마라. 맞춤법 교정도 하지 마라. 오직 줄바꿈·띄어쓰기 정리만. 결과 텍스트만 출력(설명·따옴표 금지).';
+const OCR_SENTENCE_END = /[.!?。！？…]["'”’」』）》】]*$/u;
+
+function stripOcrWhitespace(value) {
+  return String(value || '').replace(/\s/gu, '');
+}
+
+function ocrWordGeometry(word) {
+  const vertices = word && word.boundingBox && word.boundingBox.vertices;
+  if (!Array.isArray(vertices) || vertices.length < 4) return null;
+  const xs = vertices.map((vertex) => Number(vertex && vertex.x));
+  const ys = vertices.map((vertex) => Number(vertex && vertex.y));
+  if (xs.some((x) => !Number.isFinite(x)) || ys.some((y) => !Number.isFinite(y))) return null;
+  const left = Math.min(...xs), right = Math.max(...xs);
+  const top = Math.min(...ys), bottom = Math.max(...ys);
+  if (right <= left || bottom <= top) return null;
+  return { left, right, height: bottom - top };
+}
+
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function dominantLeftBaseline(lines, tolerance) {
+  const groups = [];
+  for (const left of lines.map((line) => line.left).sort((a, b) => a - b)) {
+    const group = groups.find((candidate) => Math.abs(left - median(candidate)) <= tolerance);
+    if (group) group.push(left);
+    else groups.push([left]);
+  }
+  groups.sort((a, b) => b.length - a.length || median(a) - median(b));
+  return groups.length ? median(groups[0]) : null;
+}
+
+function fallbackOcrLayout(text) {
+  const forcedSpaces = new Set(), paragraphStarts = new Set();
+  let offset = 0, sawLine = false, blankSinceLine = false;
+  for (const line of String(text || '').split(/\r?\n/u)) {
+    const length = Array.from(stripOcrWhitespace(line)).length;
+    if (!length) {
+      if (sawLine) blankSinceLine = true;
+      continue;
+    }
+    if (sawLine) {
+      forcedSpaces.add(offset);
+      if (blankSinceLine) paragraphStarts.add(offset);
+    }
+    offset += length;
+    sawLine = true;
+    blankSinceLine = false;
+  }
+  return { forcedSpaces, paragraphStarts };
+}
+
+function coordinateOcrLayout(raw, pages) {
+  if (!Array.isArray(pages) || !pages.length) return null;
+  const pageTexts = pages.map((page) => String((page && page.text) || ''));
+  if (pageTexts.some((text) => !stripOcrWhitespace(text))
+    || pageTexts.map(stripOcrWhitespace).join('') !== stripOcrWhitespace(raw)) return null;
+
+  const forcedSpaces = new Set(), paragraphStarts = new Set();
+  let globalOffset = 0, hasPreviousLine = false;
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+    const page = pages[pageIndex];
+    const words = Array.isArray(page.words) ? page.words : [];
+    if (!words.length) return null;
+    const geometries = words.map(ocrWordGeometry);
+    const wordTexts = words.map((word) => stripOcrWhitespace(word && (word.text ?? word.content)));
+    if (geometries.some((geometry) => !geometry) || wordTexts.some((text) => !text)) return null;
+
+    const lines = [];
+    let wordIndex = 0, blankSinceLine = false;
+    for (const rawLine of pageTexts[pageIndex].split(/\r?\n/u)) {
+      const target = stripOcrWhitespace(rawLine);
+      if (!target) {
+        if (lines.length || hasPreviousLine) blankSinceLine = true;
+        continue;
+      }
+      let joined = '', startWord = wordIndex;
+      while (wordIndex < words.length && Array.from(joined).length < Array.from(target).length) {
+        joined += wordTexts[wordIndex];
+        wordIndex += 1;
+      }
+      if (joined !== target || startWord === wordIndex) return null;
+      const lineGeometry = geometries.slice(startWord, wordIndex);
+      const line = {
+        text: rawLine.trim(),
+        left: Math.min(...lineGeometry.map((geometry) => geometry.left)),
+        height: median(lineGeometry.map((geometry) => geometry.height)),
+        start: globalOffset,
+        blankBefore: blankSinceLine,
+      };
+      if (hasPreviousLine || lines.length) forcedSpaces.add(globalOffset);
+      globalOffset += Array.from(target).length;
+      lines.push(line);
+      hasPreviousLine = true;
+      blankSinceLine = false;
+    }
+    if (wordIndex !== words.length || !lines.length) return null;
+
+    const heights = lines.map((line) => line.height);
+    const representativeHeight = median(heights);
+    const maxRight = Math.max(...geometries.map((geometry) => geometry.right));
+    const declaredWidth = Number(page.width || (page.size && page.size.width) || (page.dimension && page.dimension.width));
+    const pageWidth = Number.isFinite(declaredWidth) && declaredWidth > 0 ? declaredWidth : maxRight;
+    if (!Number.isFinite(representativeHeight) || representativeHeight <= 0 || !Number.isFinite(pageWidth) || pageWidth <= 0) return null;
+    const baselineTolerance = Math.max(pageWidth * 0.008, representativeHeight * 0.35);
+    const indentThreshold = Math.max(pageWidth * 0.02, representativeHeight * 0.75);
+    const baseline = dominantLeftBaseline(lines, baselineTolerance);
+    if (!Number.isFinite(baseline)) return null;
+
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      const line = lines[lineIndex];
+      if (line.blankBefore) paragraphStarts.add(line.start);
+      if (lineIndex > 0 && OCR_SENTENCE_END.test(lines[lineIndex - 1].text)
+        && line.left - baseline >= indentThreshold) paragraphStarts.add(line.start);
+    }
+  }
+  return { forcedSpaces, paragraphStarts };
+}
+
+function renderOcrLayout(text, layout) {
+  const output = [];
+  let offset = 0, pendingWhitespace = false;
+  for (const char of Array.from(String(text || ''))) {
+    if (/\s/u.test(char)) {
+      pendingWhitespace = output.length > 0;
+      continue;
+    }
+    if (output.length > 0) {
+      if (layout.paragraphStarts.has(offset)) {
+        while (output[output.length - 1] === ' ') output.pop();
+        output.push('\n\n');
+      } else if (layout.forcedSpaces.has(offset) || pendingWhitespace) {
+        if (output[output.length - 1] !== ' ' && output[output.length - 1] !== '\n\n') output.push(' ');
+      }
+    }
+    output.push(char);
+    offset += 1;
+    pendingWhitespace = false;
+  }
+  return output.join('').trim();
+}
+
+function normalizeOcrLayout(text, pages, rawForCoordinates = text) {
+  const layout = coordinateOcrLayout(rawForCoordinates, pages) || fallbackOcrLayout(rawForCoordinates);
+  return { text: renderOcrLayout(text, layout), layout };
+}
 
 function ocrFailure({ code, stage, status, error, demo = false }) {
   // 운영 로그는 단계·안전한 코드·HTTP 상태만 남긴다. 이미지·OCR 원문·인증 헤더는 절대 기록하지 않는다.
@@ -1184,7 +1333,7 @@ async function ocrProxy(request, env) {
   if (file.size && file.size > OCR_MAX_BYTES) return ocrFailure({ error: '이미지가 너무 큽니다(최대 8MB)', code: 'ocr_image_too_large', stage: 'request', status: 413 });
   const doCorrect = String(form.get('correct') || 'true') !== 'false';   // 기본 LLM 보정 on
   // 1) Upstage Document OCR (model=ocr) — { text, confidence, pages }.
-  let raw = '';
+  let raw = '', pages = [];
   try {
     const up = new FormData();
     up.append('document', file, (file.name || 'page.jpg'));
@@ -1198,25 +1347,32 @@ async function ocrProxy(request, env) {
     }
     const d = await r.json();
     raw = String((d && d.text) || '').trim();
+    pages = Array.isArray(d && d.pages) ? d.pages : [];
   } catch (e) {
     return ocrFailure({ error: 'OCR upstream failed', code: 'ocr_transport_failure', stage: 'upstage', status: 502 });
   }
   if (!raw) return json({ text: '', empty: true, code: 'ocr_empty', stage: 'result' }, 200);
-  // 2) solar-pro3 보정 — 컬럼 끊김·띄어쓰기만(temperature 0.1, 원문 충실). 실패 시 raw 폴백(무중단).
-  let text = raw;
+
+  // 물리 행은 Solar 성공 여부와 무관하게 먼저 정규화한다. 좌표가 불완전하면 기존 빈 줄만 문단으로 보존한다.
+  const deterministic = normalizeOcrLayout(raw, pages);
+  let text = deterministic.text;
   let correctedApplied = false;
   if (doCorrect && env.LLM_BASE_URL && env.LLM_MODEL) {
     try {
       const corrected = await callLLM({
         messages: [
           { role: 'system', content: OCR_CORRECT_SYSTEM },
-          { role: 'user', content: '다음 OCR 텍스트의 줄바꿈·띄어쓰기만 정리:\n' + raw.slice(0, 2000) },
+          { role: 'user', content: '다음 OCR 텍스트의 줄바꿈·띄어쓰기만 정리:\n' + deterministic.text.slice(0, 2000) },
         ], env, maxTokens: 600, temperature: 0.1,
       });
-      if (corrected) { text = corrected.trim(); correctedApplied = true; }
-    } catch (e) { /* raw 폴백 */ }
+      // Solar는 공백 외 모든 문자가 raw와 정확히 같을 때만 채택한다. 채택 후에도 같은 물리 행/문단 경계를 재적용한다.
+      if (corrected && stripOcrWhitespace(corrected) === stripOcrWhitespace(raw)) {
+        text = renderOcrLayout(corrected, deterministic.layout);
+        correctedApplied = true;
+      }
+    } catch (e) { /* 결정론적 결과 폴백 */ }
   }
-  // OCR 원문은 별도 필드로 중복 반환하지 않는다(업로드 콘텐츠 최소화).
+  // OCR 원문·단어 좌표는 응답/로그에 추가하지 않는다(업로드 콘텐츠 최소화).
   return json({ text, corrected: correctedApplied, stage: 'result' }, 200);
 }
 
