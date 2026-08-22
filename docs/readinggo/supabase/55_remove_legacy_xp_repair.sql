@@ -264,15 +264,24 @@ begin
   ) then
     raise exception 'readback failed: a legacy XP/repair column still exists';
   end if;
-  if to_regclass('public.users_public') is null
-    or exists (
-      select 1 from information_schema.columns
-      where table_schema = 'public' and table_name = 'users_public' and column_name = 'xp'
-    )
-    or not has_table_privilege('authenticated', 'public.users_public', 'select')
-    or has_table_privilege('anon', 'public.users_public', 'select')
-  then
-    raise exception 'readback failed: users_public XP-free visibility contract is missing';
+  if to_regclass('public.users_public') is null then
+    raise exception 'readback failed: public.users_public is missing';
+  end if;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users_public' and column_name = 'xp'
+  ) then
+    raise exception 'readback failed: public.users_public still exposes xp';
+  end if;
+  if not has_table_privilege('authenticated', 'public.users_public', 'select') then
+    raise exception 'readback failed: authenticated cannot select public.users_public (owner=%, relacl=%)',
+      (select pg_get_userbyid(relowner) from pg_class where oid = 'public.users_public'::regclass),
+      (select relacl::text from pg_class where oid = 'public.users_public'::regclass);
+  end if;
+  if has_table_privilege('anon', 'public.users_public', 'select') then
+    raise exception 'readback failed: anon can select public.users_public (owner=%, relacl=%)',
+      (select pg_get_userbyid(relowner) from pg_class where oid = 'public.users_public'::regclass),
+      (select relacl::text from pg_class where oid = 'public.users_public'::regclass);
   end if;
   if to_regclass('public.books') is null
     or to_regclass('public.user_books') is null
