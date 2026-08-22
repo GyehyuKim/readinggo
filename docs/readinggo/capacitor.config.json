@@ -7,7 +7,8 @@
       "updateUrl": "https://readinggo.hyuniverse.workers.dev/api/ota",
       "autoUpdate": true,
       "directUpdate": false,
-      "resetWhenUpdate": true
+      "resetWhenUpdate": true,
+      "defaultChannel": "production"
     }
   }
 }

@@ -2707,15 +2707,28 @@ async function devReviewPersonaProxy(request, env, url) {
 
 // OTA Live Updates (#876) — Capgo capacitor-updater protocol v7. KV 기반 채널 매니페스트.
 // 업데이트면 {version,url,checksum}, 없으면 {} 반환(Capgo 규약: url 생략 = no update).
-// custom_id 로 채널(beta|production) 선택. version_code(셸 versionCode)로 minNative 게이트 —
-// 구 셸에 새 네이티브 API 쓰는 번들이 내려가 크래시하는 것 방지(spec ota.md §1·§5).
+// 채널(beta|production)은 defaultChannel 필드로 선택한다 — capacitor.config.json
+// plugins.CapacitorUpdater.defaultChannel(네이티브 CapgoUpdater.createInfoObject)이
+// 앱의 *첫* 체크 요청부터 매번 싣는 필드라, 런타임 JS 호출(setChannel) 없이도 빌드 시점에
+// 결정적으로 고정된다. custom_id는 별개 필드(계정 타게팅용, Phase 2 OUT — spec ota.md §3④)라
+// 채널 선택에 쓰지 않는다(#1489 — 이전엔 custom_id를 오독해 미설정 시 production으로 샜다).
+// #1489 fail-closed: defaultChannel이 beta/production 둘 다 아니면(미설정·빈 값·미상 값)
+// production으로 넘기지 않고 즉시 no-update — 안전한 기본값은 "아무것도 안 주는 것"이다.
+// version_code(셸 versionCode)로 minNative 게이트 — 구 셸에 새 네이티브 API 쓰는 번들이
+// 내려가 크래시하는 것 방지(spec ota.md §1·§5).
 // 번들 바이너리 호스팅은 매니페스트 url 에 위임(R2/GitHub Releases, 페이즈 C). 워커는 매니페스트만 본다.
 async function otaCheck(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   let b = {};
   try { b = await request.json(); } catch (e) {}
   const platform = (b.platform === 'ios' || b.platform === 'electron') ? b.platform : 'android';
-  const channel = b.custom_id === 'beta' ? 'beta' : 'production';
+  const requestedChannel = typeof b.defaultChannel === 'string' ? b.defaultChannel : '';
+  const explicitChannel = requestedChannel === 'beta' || requestedChannel === 'production';
+  // #1489 이전 release 셸은 defaultChannel 없이 is_prod:true만 보낸다. 이 경우에만
+  // production 호환을 유지한다. DEV(is_prod:false), 필드 누락, 명시적 미상 채널은 no-update다.
+  const legacyProduction = requestedChannel === '' && b.is_prod === true;
+  if (!explicitChannel && !legacyProduction) return json({}); // fail closed
+  const channel = legacyProduction ? 'production' : requestedChannel;
   const cur = b.version_name || 'builtin';                       // 현재 깔린 번들 버전
   const nativeCode = parseInt(b.version_code || b.version_build || '0', 10) || 0; // 네이티브 versionCode
   if (!env.OTA_KV) return json({});                              // KV 미바인딩 → no update

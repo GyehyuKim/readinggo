@@ -85,6 +85,18 @@ async function boot() {
       if (Capacitor?.isNativePlatform?.()) {
         const { CapacitorUpdater } = await import('@capgo/capacitor-updater');
         await CapacitorUpdater.notifyAppReady();
+
+        // OTA QA 진단 (#1489): 활성/빌트인/다운로드 번들의 id·버전만 노출.
+        // 토큰·유저·문장 데이터는 절대 다루지 않음 — 기기 콘솔에서 수동 호출용.
+        window.RG_otaDiagnostics = async () => {
+          const [cur, list] = await Promise.all([CapacitorUpdater.current(), CapacitorUpdater.list()]);
+          const bundles = (list.bundles || []).map((b) => ({ id: b.id, version: b.version }));
+          return {
+            active: { id: cur.bundle.id, version: cur.bundle.version },
+            builtin: bundles.find((b) => b.id === 'builtin') || null,
+            downloaded: bundles.filter((b) => b.id !== 'builtin'),
+          };
+        };
       }
     } catch (e) { console.warn('[OTA] notifyAppReady 실패', e); }
 
