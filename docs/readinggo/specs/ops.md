@@ -11,7 +11,7 @@
 
 1. **결정 정합**: `meta/decisions.md`와 기능 SSOT가 구현 사실·목표 계약·미결정을 분리한다.
 2. **스펙 승인·머지**: spec-only PR의 CI, 리뷰, 미해결 대화 0을 확인하고 main에 머지한다.
-3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, analytics, fixture, 백업·rollback을 작업 순서와 함께 승인한다. 구 APK 호환은 요구하지 않는다.
+3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, analytics, fixture, 백업·rollback을 작업 순서와 함께 승인한다. **Phase 4의 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않으며, friend-tree/RLS·공개범위·재독의 별도 구버전 안전 게이트는 유지한다.
 4. **코드·DB 구현**: 앱·DataStore·분석의 XP·둥지·성·하루 만회 전용 표면을 제거하고, DEV migration에 백업 생성·RPC/컬럼 삭제·schema readback 검증을 포함한다. 친구 공개 확대는 별도 범위다.
 5. **DEV 배포·QA**: 자동 회귀와 DEV 전용 합성 fixture로 책·문장·세션·최근 14일 리듬·누적 성장일 보존과 legacy 참조 0을 검증한다. Hyu에게는 자동 판정할 수 없는 화면·사용감만 최소 항목으로 요청한다. Production 실사용자 데이터를 fixture로 쓰지 않는다.
 6. **동일 SHA Production 승격**: DEV에서 승인한 commit SHA와 migration digest만 승격한다. 환경 차이·백업·적용 migration을 기록한다.
@@ -49,7 +49,7 @@
 - Play versionCode·AAB checksum·서명/출처·내부/Production 트랙·설치 기기 QA
 - owner·friend·nonfriend·blocked·anonymous 직접 API와 UI 허용·거부 결과
 - 공개 1,000자 승격은 문장 길이·공개범위·출처표기·삭제 후 비노출 회귀를 검증하되, 후순위 #1463 전용 takedown 시스템을 선행 게이트로 두지 않는다. 크롤 seed 확대·상용화·반복 권리요청이 발생하면 실제 접수 링크, 책임자, 임시 숨김→삭제→이의·기록 SOP와 전 표면 비노출 E2E를 별도 승인한다.
-- XP 신규 획득 경로의 DB 값 변화 0, app version별 legacy 호출량, 분석 격리
+- XP 신규 획득 경로의 DB 값 변화 0, Production module graph·DataStore의 XP/둥지/성/만회 참조 0, DEV migration의 backup manifest·삭제 컬럼/RPC·`users_public` 권한 readback
 
 모든 검증 항목은 `PASS | FAIL | BLOCKED | NOT_RUN` 중 하나다. skip·unknown·secret 부재·"workflow success"만으로 PASS를 만들지 않는다.
 

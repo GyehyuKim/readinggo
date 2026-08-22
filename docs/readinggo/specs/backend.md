@@ -82,7 +82,7 @@
 
 #### 7.0.5 XP·만회 레거시 삭제 경계
 
-2026-08-22 Hyu 결정으로 구 APK는 책나무 전환 이후 지원하지 않는다. `increment_xp(int)`·기존 XP/성 DataStore 표면·`streak.repair*`를 앱에서 제거한 뒤, DEV migration은 Production rollback용 백업을 먼저 만들고 `increment_xp(int)`→`reading_sessions.xp_earned`→`users.xp`→`streak.last_repair_date` 순으로 물리 삭제한다. 책·문장·진도·독서 세션과 `reading_sessions.session_date`는 최근 14일 리듬·누적 성장일의 권위 데이터이므로 보존한다. DEV schema readback과 동일 SHA 검증 전에는 Production migration을 실행하지 않으며, Production은 Hyu 승인 대상이다. 자세한 수용기준은 [systems.md §6.0](./systems.md)을 따른다.
+2026-08-22 Hyu 결정은 **Phase 4의 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않는다는 뜻이다. friend-tree/RLS·공개범위·재독의 별도 구버전 안전 게이트는 이 결정의 대상이 아니다. `increment_xp(int)`·기존 XP/성 DataStore 표면·`streak.repair*`를 앱에서 제거한 뒤, DEV migration은 Production rollback용 백업을 먼저 만들고 `increment_xp(int)`→`reading_sessions.xp_earned`→`users.xp`→`streak.last_repair_date` 순으로 물리 삭제한다. 책·문장·진도·독서 세션과 `reading_sessions.session_date`는 최근 14일 리듬·누적 성장일의 권위 데이터이므로 보존한다. DEV schema readback과 동일 SHA 검증 전에는 Production migration을 실행하지 않으며, Production은 Hyu 승인 대상이다. 자세한 수용기준은 [systems.md §6.0](./systems.md)을 따른다.
 
 ### 7.1 플랫폼
 
@@ -191,7 +191,7 @@ activeBook.get()                           → UserBook | null
 activeBook.set(userBookId)                                  // = users.active_user_book_id UPDATE
 
 // 일일 기록 (세션 + 한 문장)
-sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 세션 생성 + 스트릭/XP. duration_sec(#430): 읽기 세션 시간(초) 누적. **Supabase: 원자 RPC `checkin_atomic(p_user_book_id, p_page, p_duration, p_today)`(#1161, 43_checkin_atomic.sql)** — user_books.current_page + reading_sessions upsert + 스트릭 bump 를 한 트랜잭션으로(구 순차 3-write 부분상태 제거). 스트릭 규칙은 `_nextStreak`(systems.md §6.1) 복제 → **SQL·JS 동기화 유지 필수**. p_today=클라 로컬 날짜(서버 UTC 어긋남 방지). XP(increment_xp)·sentences.add 는 트랜잭션 밖 별도 콜
+sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 진도 + 독서 세션 + 내부 리듬 카운터. duration_sec(#430): 읽기 세션 시간(초) 누적. **Supabase: 원자 RPC `checkin_atomic(p_user_book_id, p_page, p_duration, p_today)`(#1161, 43_checkin_atomic.sql)** — user_books.current_page + reading_sessions upsert + streak bump를 한 트랜잭션으로 묶어 구 순차 3-write 부분상태를 막는다. 내부 카운터 규칙은 `_nextStreak`과 SQL을 동기화하며, p_today는 클라이언트 로컬 날짜를 사용한다. XP 호출은 없고 문장 저장은 별도 `sentences.add` 계약이다.
 sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
 //   ↳ #1474 신규 문장은 저장 시점의 settings.default_sentence_visibility를 단일 정본으로 사용한다.
@@ -211,8 +211,8 @@ sentences.listMine()                       → Sentence[]
 sentences.random()                         → Sentence        // 무작위 회상 — 내 과거 한 문장 1개 (§profile 5.8.7)
 
 // 독서 리듬·완독
-streak.get()                               → Streak          // 전환 중 legacy 연속일 필드는 읽지 않으며 세션 날짜 기반 리듬으로 대체
-streak.bumpOnCheckIn()                                      // 현재 addToday 원자 RPC 내부의 세션 날짜 기록과 함께 동작; Phase 4 DB migration에서 legacy 연속일 필드 의존 제거 대상
+streak.get()                               → Streak          // 현행 마일스톤·리마인더용 내부 연속일 보조 상태. 책나무 성장·최근 14일 리듬의 권위 데이터가 아님
+streak.bumpOnCheckIn()                                      // 현재 addToday 원자 RPC 안에서 갱신. `repair*`와 last_repair_date만 Phase 4 삭제 대상이며, 최근 14일·누적 성장일은 reading_sessions.session_date에서 계산
 books.complete(userBookId, {rating?, review_text?})         // 완독 상태·별점·소감 저장
 
 // 일일 기록 (추가)
