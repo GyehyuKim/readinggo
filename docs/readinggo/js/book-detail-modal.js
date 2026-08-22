@@ -60,7 +60,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     } catch (e) { showToast('저장 실패 — 잠시 후 다시'); }
     finally { setAddBusy(false); }
   };
-  // #848 여러 문장 일괄 담기 — saveNewQuote 패턴 재사용. sentences.add 반복 + xp.add(+20) 1회.
+  // #848 여러 문장 일괄 담기 — saveNewQuote 패턴 재사용. 문장만 저장하고 XP는 적립하지 않는다.
   // 각 문장 rg:sentence-added 로 app myQuotes·목록 자동 반영. page 미상=null, 빈 값/중복은 컴포넌트에서 거름.
   const saveBatchQuotes = async (quotes) => {
     const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim() })).filter((x) => x.text);
@@ -79,10 +79,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       } } }));
       return row;
     });
-    if (result.saved > 0) {
-      try { await Promise.resolve(DataStore.xp.add(20, 'batch')); } catch (e) {}
-      if (window.rgTrack) window.rgTrack('text_import_saved', { book_id: book.id, saved: result.saved });
-    }
+    if (result.saved > 0 && window.rgTrack) window.rgTrack('text_import_saved', { book_id: book.id, saved: result.saved });
     return result;
   };
   // #844 배치 OCR — 앨범 N장 → 각 장 Gemini vision 강조 추출(순차+지연, 무료 10 RPM) → 추출 문장 → BatchQuoteImport(initialItems) 검토.
@@ -282,7 +279,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
         if (window.rgTrack) window.rgTrack('book_completed', { book_id: book.id || '', rating_present: !!savedRating, review_present: !!String(savedReview || '').trim() });
         window.dispatchEvent(new CustomEvent('rg:wish-changed'));
         onClose();
-        showToast('🏰 완독으로 표시했어요');
+        showToast('완독으로 표시했어요');
       })
       .catch(() => showToast('완독 처리 실패 — 다시 시도'));
   };

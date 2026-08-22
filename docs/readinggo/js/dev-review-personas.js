@@ -197,7 +197,7 @@ const DEFINITIONS = [
     displayName: 'Jerome 스타일 QA',
     bio: '실제 Jerome 기록이 아닌 회귀·누적 상태 검수용 합성 페르소나',
     role: '진도와 성취를 꼼꼼히 쌓는 개발형 독자',
-    description: '긴 스트릭, 높은 XP, 여러 완독과 촘촘한 세션을 검수해요.',
+    description: '여러 완독과 촘촘한 독서 기록의 누적 상태를 검수해요.',
     xp: 7460,
     streak: 47,
     longest: 63,

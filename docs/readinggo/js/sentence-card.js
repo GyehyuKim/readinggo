@@ -48,12 +48,7 @@ function SentenceCard({ item, bookId, noBlind }) {
     if (!canReact) return;
     Promise.resolve(DataStore.claps.toggle(sentenceId)).then((isLiked) => {
       setLiked(isLiked);
-      // 반응(engagement) XP — 새로 켤 때만, 일일 상한. 해제 시 차감 없음(v7).
-      // #641: self-clap(자기 문장 저장)은 XP 비부여 — 타인 문장 좋아요만 engagement XP.
-      if (isLiked && !isMine) {
-        const xp = reactionXpFor(_rgReactToday);
-        if (xp > 0) { _rgReactToday += 1; grantXp(xp, 'reaction'); }
-      }
+      // 좋아요는 반응 상태만 바꾸며 신규 XP를 적립하지 않는다(v17).
     }).catch(() => {});
   };
   const mineStyle = !canReact ? { opacity: 0.4, pointerEvents: 'none' } : undefined;

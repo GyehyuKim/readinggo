@@ -256,8 +256,6 @@ INVARIANTS = [
         ["datastore.js"], r"repairStatus\(\)[\s\S]*repair\(\)|repair\(\)[\s\S]*repairStatus\(\)"),
     ("D", "present", "스트릭 복구 계약 — supabase 어댑터 대칭 (#938 A1)",
         ["datastore-supabase.js"], r"async repair\(\)[\s\S]*last_repair_date|last_repair_date[\s\S]*async repair\(\)"),
-    ("D", "present", "홈 '하루 만회' 복구 카드 — repairStatus 게이트 + 만회 액션 (#938 A1)",
-        ["nest.js"], r"repairStatus[\s\S]*doRepairStreak|doRepairStreak[\s\S]*streak\.repair"),
     # A2 — 마일스톤 회고: 빈도 게이트 + 회고 모달 + nest 트리거.
     ("D", "present", "마일스톤 회고 빈도 게이트 — milestone.shouldShow/markShown (#938 A2)",
         ["datastore.js"], r"shouldShow\(key\)[\s\S]*markShown|markShown[\s\S]*shouldShow\(key\)"),

@@ -39,10 +39,10 @@ window._stageProg = _stageProg; window._cycleXp = _cycleXp; window._absPct = _ab
 // 마일스톤 회고 선택 (#938, A2) — 이번 체크인이 어떤 마일스톤에 닿았는지 1개만 고른다(절제).
 // 우선순위: 완독 > 둥지 성(주기 완료) > 연속 30일 > 연속 7일. value/ubId/bookTitle 은 회고 헤더·타임라인 소스.
 // 실제 노출 여부(마일스톤별 1회 + 하루 1회)는 DataStore.milestone.shouldShow 가 결정 — 여기서는 후보 descriptor 만 만든다.
-function _pickMilestone({ isComplete, castleGained, newCastles, newStreak, book }) {
+function _pickMilestone({ isComplete, newStreak, book }) {
   const bk = book || {};
   if (isComplete) return { type: 'complete', ubId: bk.ubId || null, bookId: bk.id || null, bookTitle: bk.title || '', key: 'complete:' + (bk.ubId || bk.id || bk.title || '?') };
-  if (castleGained) return { type: 'castle', value: newCastles, key: 'castle:' + newCastles };
+
   if (newStreak === 30) return { type: 'streak', value: 30, key: 'streak:30' };
   if (newStreak === 7) return { type: 'streak', value: 7, key: 'streak:7' };
   return null;
@@ -388,76 +388,6 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     setResurfaceCard(null); // 오늘 하루 숨김 — markToday 는 노출 시 이미 기록
   };
 
-  // 스트릭 복구·유예 (#938/#1440) — 마운트뿐 아니라 자정·앱 resume·웹 focus 때
-  // 오늘 기록 여부와 복구 상태를 다시 읽는다. lifecycle 정리가 리스너·자정 타이머 누적을 막는다.
-  const [repairCard, setRepairCard] = _useState(null); // { lostStreak, brokenDays }
-  const _repairDismissedDateRef = _useRef(null);
-  const _repairShownKeyRef = _useRef(null);
-  const _repairLifecycleRef = _useRef(null);
-  _useEffect(() => {
-    if (!(DataStore.streak && DataStore.streak.repairStatus) || !window.RG_createStreakRepairLifecycle) return undefined;
-    const lifecycle = window.RG_createStreakRepairLifecycle({
-      read: async () => {
-        const [status, current] = await Promise.all([
-          Promise.resolve(DataStore.streak.repairStatus()),
-          DataStore.streak.get ? Promise.resolve(DataStore.streak.get()) : Promise.resolve(null),
-        ]);
-        return { status, current };
-      },
-      getToday: () => (window._today ? _today() : new Date().toISOString().slice(0, 10)),
-      onState: ({ checkedToday: nextCheckedToday, repairCard: nextRepairCard }) => {
-        const today = window._today ? _today() : new Date().toISOString().slice(0, 10);
-        const visibleCard = _repairDismissedDateRef.current === today ? null : nextRepairCard;
-        setCheckedToday(nextCheckedToday);
-        setRepairCard(visibleCard);
-        if (visibleCard) {
-          const shownKey = `${today}:${visibleCard.lostStreak}:${visibleCard.brokenDays}`;
-          if (_repairShownKeyRef.current !== shownKey) {
-            _repairShownKeyRef.current = shownKey;
-            rgTrack('streak_repair_shown', { lost: visibleCard.lostStreak, broken_days: visibleCard.brokenDays });
-          }
-        }
-      },
-      windowTarget: window,
-      documentTarget: document,
-      capApp: window.CapApp,
-    });
-    _repairLifecycleRef.current = lifecycle;
-    return () => {
-      if (_repairLifecycleRef.current === lifecycle) _repairLifecycleRef.current = null;
-      lifecycle();
-    };
-  }, []);
-  const doRepairStreak = async () => {
-    if (!repairCard) return;
-    const lifecycle = _repairLifecycleRef.current;
-    const finishLifecycleMutation = lifecycle && lifecycle.beginMutation ? lifecycle.beginMutation() : null;
-    try {
-      const res = await Promise.resolve(DataStore.streak.repair());
-      if (res && res.ok) {
-        const restored = res.lostStreak || repairCard.lostStreak || 0;
-        // 낙관적 표시 갱신 + 상위(app)·캘린더 정합 신호. 오늘 한 줄 기록하면 +1 로 자연스럽게 이어진다.
-        setNestState((ns) => ({ ...ns, streak: restored }));
-        try { window.dispatchEvent(new CustomEvent('rg:streak-repaired', { detail: { streak: restored } })); } catch (e) {}
-        rgTrack('streak_repaired', { restored });
-        showToast(`${restored}일 연속을 되살렸어요 — 오늘 한 줄로 이어가요`);
-      } else {
-        const days = (res && res.cooldownDays) || 0;
-        showToast(days > 0 ? `이번 주 만회는 이미 썼어요 — ${days}일 뒤 다시 가능해요` : '지금은 만회할 수 없어요');
-      }
-    } catch (e) {
-      showToast('만회에 실패했어요 — 잠시 후 다시 시도해요');
-    }
-    if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation();
-    setRepairCard(null);
-  };
-  const dismissRepair = () => {
-    if (repairCard) rgTrack('streak_repair_skipped', { lost: repairCard.lostStreak });
-    if (_repairLifecycleRef.current && _repairLifecycleRef.current.invalidate) _repairLifecycleRef.current.invalidate();
-    _repairDismissedDateRef.current = window._today ? _today() : new Date().toISOString().slice(0, 10);
-    setRepairCard(null); // 이번 진입 동안만 숨김 — 다음 진입 때 아직 복구 가능하면 다시 권유(주 1회는 datastore가 강제)
-  };
-
   const handleCheckin = async ({ page, sentence, kind, sentPage, sentences, awaitPersistence }) => {
     const settings = await Promise.resolve(window.DataStore.settings.get());
     const configuredVisibility = settings && settings.default_sentence_visibility;
@@ -483,10 +413,8 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         throw new Error('ugc_terms_required');
       }
     }
-    const lifecycle = _repairLifecycleRef.current;
-    const finishLifecycleMutation = lifecycle && lifecycle.beginMutation ? lifecycle.beginMutation() : null;
     setModalOpen(false);
-    setCheckedToday(true); // 오늘의 짹 완료 — 만회 카드도 즉시 숨김 (#203/#1429)
+    setCheckedToday(true);
     const previousNestState = nestState;
     const ns = { ...nestState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
@@ -506,7 +434,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     const prevPct = _pctOf(ns.book);            // 책 진척(완독 판정용)
     const prevXp = ns.xp;
     const prevLv = getNestStageByXp(prevXp).lv; // 둥지 단계 = 현재 주기 XP (#520)
-    const prevCastles = nestCastleCount(prevXp); // 성 개수 = floor(totalXp/1600) (#520/#521)
+
 
     ns.book = { ...ns.book, cur: page };
     ns.streak = newStreak;
@@ -516,15 +444,12 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     // 완독: 마지막 장 도달 (이번 체크인에 100% 처음 도달).
     const isComplete = newPct >= 100 && prevPct < 100;
 
-    // XP — systems.md §6.3 SSOT. 둥지 단계도 이 XP 누적에 연동(#313). 차감 없음.
-    const xpReward = computeCheckinXp({ isNewDay: true, isComplete, newStreak: ns.streak });
-    const xpGain = xpReward.total;
-    ns.xp += xpGain;
+    // v17 신규 클라이언트는 XP를 적립하지 않는다. 기존 값은 호환 read state로만 보존한다.
+    const xpGain = 0;
 
     const newLv = getNestStageByXp(ns.xp).lv;   // XP 증가 후 둥지 단계
     const nestUp = newLv > prevLv;
-    const newCastles = nestCastleCount(ns.xp);
-    const castleGained = newCastles > prevCastles; // 1,600 XP 경계 통과 → 성 획득(#520/#521)
+
 
     // #1202: 흔적은 문장 고유 페이지(sentPage)를 그대로 — 현재 진도(cur)보다 낮아도 입력값 그대로.
     const quotePage = (typeof sentPage === 'number') ? sentPage : page;
@@ -554,7 +479,6 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     try {
       checkinResult = onCheckin(ns, newLv, xpGain, savedSentence, kind, quotePage, batch, defaultVisibility, completion, pagesAdded, isComplete); // batch 있으면 app 이 N개 문장 영속(#1198)
     } catch (error) {
-      if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation();
       throw error;
     }
 
@@ -562,18 +486,14 @@ function NestView({ state, onCheckin, onOpenSearch }) {
 
     // 마일스톤 회고 (#938, A2) — 완독·연속 7/30일·둥지 성에서만, 절제해서. 세리머니가 닫힌 뒤 1개만 띄운다(겹침 방지).
     // 빈도 게이트(마일스톤별 1회 + 하루 1회)는 DataStore.milestone 이 강제. 점수·미션 아님 — 기존 한 문장 자산으로 서사 증폭.
-    pendingMilestoneRef.current = _pickMilestone({ isComplete, castleGained: false, newCastles, newStreak: ns.streak, book: ns.book });
+    pendingMilestoneRef.current = _pickMilestone({ isComplete, newStreak: ns.streak, book: ns.book });
 
     // 이 책에서 모은 한 문장 수 (#549) — 세리머니가 거짓 '저장됨' 대신 정직한 누적/독려 표시.
     const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
-    setCeremony({ xpGain, xpParts: xpReward.parts, streak: ns.streak, sentence: savedSentence, sentenceCount, bookQuoteCount, nestUp, castleGained, castleCount: newCastles, prevLv, newLv, prevXp, newXp: ns.xp, pagesAdded, isNewDay: true, wasReset, isComplete });
+    setCeremony({ streak: ns.streak, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
     const persistenceResult = completionPromise || checkinResult;
-    Promise.resolve(persistenceResult).then(
-      () => { if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation(); },
-      () => { if (typeof finishLifecycleMutation === 'function') finishLifecycleMutation(); },
-    );
     return persistenceResult;
   };
 
@@ -906,7 +826,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             <div style={{ fontWeight: 900, fontSize: 19, color: 'var(--ink)', marginBottom: 14 }}>하루 한 쪽, 한 문장이면 돼요</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', maxWidth: 290, margin: '0 auto 20px' }}>
               {[
-                { icon: 'pen', text: <>오늘 읽은 자리의 한 줄을 남기면<br /><b>둥지가 자라요</b></> },
+                { icon: 'pen', text: <>오늘 읽은 자리의 한 줄을<br /><b>문장으로 남겨요</b></> },
                 { icon: 'chat', text: <>문장마다 <b>재키</b>가 말을 걸어요<br />— AI 독서 파트너</> },
                 { icon: 'users', text: <>같은 책을 읽는 사람의 <b>한 문장</b>을 만나요</> },
               ].map((f, i) => (
@@ -985,33 +905,6 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       {/* 둥지 시어터(NestTheatre)는 프로필 상단으로 이동 (#428) — 홈은 책읽기 중심 */}
 
       {/* 데모 '하루 거르기' 제거 (#481) */}
-
-      {/* 스트릭 복구·유예 — '하루 만회' (#938, A1). 깨진 스트릭이 복구 가능할 때만. 좌절 이탈 방지(고양감 보호).
-          버튼 위계(DESIGN.md): 1차 솔리드(만회) 1개 + 3차 텍스트(괜찮아요). 점수·미션 아님 — 기존 스트릭 관용. */}
-      {repairCard && !checkedToday && (
-        <div style={{ marginTop: 10, background: 'var(--brand-tint)', border: '1.5px solid var(--brand-soft)', borderRadius: 'var(--r-md)', padding: '16px 16px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <span style={{ fontSize: 22, lineHeight: 1 }}>🔥</span>
-            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--ink)' }}>
-              {window.RG_streakContinuationCopy
-                ? window.RG_streakContinuationCopy(repairCard.lostStreak)
-                : `하루 만회 후 오늘 읽으면 ${repairCard.lostStreak + 1}일째로 이어져요`}
-            </div>
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55, marginBottom: 12 }}>
-            {repairCard.brokenDays >= 2 ? `${repairCard.brokenDays}일 쉬어갔지만 ` : '하루 놓쳤지만 '}
-            괜찮아요. 한 번 만회해서 그동안 쌓은 흐름을 이어가요. <span style={{ color: 'var(--ink-3)' }}>(주 1회)</span>
-          </div>
-          <button className="checkin-cta" onClick={doRepairStreak}
-            style={{ width: '100%', marginBottom: 6 }}>
-            🔥 하루 만회하고 이어가기
-          </button>
-          <button onClick={dismissRepair}
-            style={{ display: 'block', width: '100%', padding: '8px 0', background: 'none', border: 'none', color: 'var(--ink-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-            괜찮아요, 새로 시작할게요
-          </button>
-        </div>
-      )}
 
       {/* 진도 섹션 */}
       <div style={{ marginTop: 10, background: 'var(--card)', border: '1.5px solid var(--line)', borderRadius: 'var(--r-md)', padding: '14px 16px' }}>

@@ -65,7 +65,7 @@ function AdminDashboardModal({ onClose }) {
     ['👤 가입자', stats && stats.users],
     ['🙋 실사용자', stats && stats.realUsers],   // NPC 제외 (#190 A)
     ['📝 한 문장', stats && stats.sentences],
-    ['🏰 완독', stats && stats.completed],
+    ['📚 완독', stats && stats.completed],
     ['⚡ 오늘 체크인', stats && stats.todaySessions],
   ];
   const trend = (stats && stats.trend) || [];
