@@ -25,21 +25,20 @@ function check(name, cond) {
 let result = merge(
   [{ text: '직접 쓴 초안', visibility: 'private' }, { text: '', visibility: 'public' }],
   ['첫 추출', '둘째 추출', '첫 추출', '', '가'.repeat(1000), '나'.repeat(1001)],
-  'public',
 );
-check('기존 사용자 초안과 공개범위를 보존', result[0].text === '직접 쓴 초안' && result[0].visibility === 'private');
+check('기존 사용자 초안 본문을 보존하고 레거시 공개범위는 제거', result[0].text === '직접 쓴 초안' && !('visibility' in result[0]));
 check('기존 빈 행부터 채우고 선택 순서대로 누적', result[1].text === '첫 추출' && result[2].text === '둘째 추출');
 check('중복·빈 값만 제외하고 1000·1001자 모두 검토 초안에 보존', result.length === 5 && result[3].text.length === 1000 && result[4].text.length === 1001);
 
-result = merge([{ text: '', visibility: null }], [], 'private');
-check('추출 결과가 없으면 기존 초안을 그대로 유지', result.length === 1 && result[0].text === '' && result[0].visibility === null);
+result = merge([{ text: '', visibility: null }], []);
+check('추출 결과가 없으면 빈 본문 초안만 유지', result.length === 1 && result[0].text === '' && !('visibility' in result[0]));
 
 const albumInput = src.match(/<input ref=\{_quickAlbumInputRef\}[^>]+>/)?.[0] || '';
 check('홈 앨범 input은 multiple이며 capture가 없음', /\bmultiple\b/.test(albumInput) && !/\bcapture=/.test(albumInput));
 check('한 장은 기존 단발 크롭, 여러 장은 배치로 분기', /files\.length === 1[\s\S]{0,180}setQuickOcrFile\(files\[0\]\)/.test(src)
   && /runOcrAlbumBatch\(files\)/.test(src));
 check('배치는 기존 강조 추출 API를 순차 호출', /const runOcrAlbumBatch = async[\s\S]+for \(let i = 0; i < files\.length; i\+\+\)[\s\S]+\/api\/extract-highlights/.test(src));
-check('부분 성공 결과를 drafts에 누적', /setDrafts\(\(current\) => _mergeOcrDrafts\(current, extracted, visibility\)\)/.test(src));
+check('부분 성공 결과를 본문-only drafts에 누적', /setDrafts\(\(current\) => _mergeOcrDrafts\(current, extracted\)\)/.test(src));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

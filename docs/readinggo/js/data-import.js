@@ -93,17 +93,17 @@ function DataImport({ onClose }) {
 
   // 검토 확정 → 선택 책에 일괄 담기. page=null, kind='quote'. book-detail-modal.saveBatchQuotes 패턴.
   const commit = async (quotes) => {
-    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim(), visibility: window.normalizeSentenceVisibility(x.visibility) })).filter((x) => x.text);
+    const list = (quotes || []).map((x) => ({ text: String(x.text || x || '').trim() })).filter((x) => x.text);
     if (!list.length) return { saved: 0, failedIndices: [] };
     if (!ubId) { showToast('가져올 책을 다시 선택해 주세요'); return { saved: 0, failedIndices: list.map((_, i) => i) }; }
     setBusy(true);
     const result = await window.RG_saveSentenceBatch(list, async (item) => {
       const text = item.text;
-      const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: null, text, kind: 'quote', visibility: item.visibility }));
+      const row = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: null, text, kind: 'quote' }));
       if (!row || !row.id) return null;
       window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
         id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
-        page: 0, when: '방금', createdAt: row.created_at || '', note: '', kind: 'quote', visibility: row.visibility || 'public',
+        page: 0, when: '방금', createdAt: row.created_at || '', note: '', kind: 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(row.visibility),
       } } }));
       return row;
     });

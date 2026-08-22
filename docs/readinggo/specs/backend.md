@@ -166,9 +166,10 @@ auth.signInWithEmail(email)                → {data,error}    // 이메일 매�
 profile.get(userId?)                       → User
 profile.update({display_name, avatar_url, bio})
 settings.get() / settings.update({reminder_hour, default_sentence_visibility, ...})
-//   ↳ #1261 default_sentence_visibility ∈ {'public','private'}. 키 없음·알 수 없는 값은 'public'.
+//   ↳ #1261·#1474 default_sentence_visibility ∈ {'public','followers','private'}. 키 없음은 기존 호환 'public',
+//      레거시 'friends'는 'followers', 그 밖의 알 수 없는 값은 'private'로 fail-closed한다.
 //      localStorageAdapter는 rg_v41 사용자 상태, supabaseAdapter는 users.settings JSONB에 저장한다.
-//      설정은 이후 신규 문장의 초기값일 뿐 기존 sentences 행이나 열린 초안을 갱신하지 않는다.
+//      설정은 이후 신규 문장의 저장값 정본이며 기존 sentences 행이나 열린 초안 본문을 갱신하지 않는다.
 
 // 책 / 검색
 books.search(query)                        → Book[]          // DB ilike(즉시) — 클라에서 데모 Fuse + 알라딘 결과와 병합·중복제거(isbn13). 외국 작가 표기변이는 알라딘 위임 (QA3 #148). 클라 `fuzzySearch`(data.js)는 **토큰 기반**(#1118) — 질의를 단어로 쪼개 제목+저자+출판사 합본에 모든 토큰 AND 매칭(예: "민음사 시지프 신화" = 출판사+제목 가로질러 매칭. 구버전 통짜 substring 은 0건)
@@ -192,12 +193,13 @@ activeBook.set(userBookId)                                  // = users.active_us
 // 일일 기록 (세션 + 한 문장)
 sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 세션 생성 + 스트릭/XP. duration_sec(#430): 읽기 세션 시간(초) 누적. **Supabase: 원자 RPC `checkin_atomic(p_user_book_id, p_page, p_duration, p_today)`(#1161, 43_checkin_atomic.sql)** — user_books.current_page + reading_sessions upsert + 스트릭 bump 를 한 트랜잭션으로(구 순차 3-write 부분상태 제거). 스트릭 규칙은 `_nextStreak`(systems.md §6.1) 복제 → **SQL·JS 동기화 유지 필수**. p_today=클라 로컬 날짜(서버 UTC 어긋남 방지). XP(increment_xp)·sentences.add 는 트랜잭션 밖 별도 콜
 sessions.list(userBookId)                  → Session[]
-sentences.add({userBookId, sessionId, page, text, my_note?, kind?, visibility?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
-//   ↳ #1261 visibility는 신규 문장별 명시값(public|followers|private). 호출부는 제출 시 개별 선택값을 우선하고,
-//      없으면 settings.default_sentence_visibility(public|private), 설정도 없거나 무효면 'public'을 전달한다.
-//   ↳ 현행(#1424): private 1~1,000자, public|followers 1~200자. 단발 OCR 201~1,000자는 private 강제,
-//      Worker·배치/import 일부 경로는 200자 초과를 제외한다. v17 목표 #1457은 §7.0.2를 따른다.
-//      어댑터는 허용값만 저장하고 무효값은 'public'으로 정규화한다. DB DEFAULT 'public'은 방어선으로 유지한다.
+sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
+//   ↳ #1474 신규 문장은 저장 시점의 settings.default_sentence_visibility를 단일 정본으로 사용한다.
+//      작성 UI는 문장별 selector를 노출하지 않고 호출부 visibility override는 adapter가 무시한다.
+//      키 없음='public', friends='followers', unknown='private'. DB DEFAULT 'public'은 레거시 방어선으로 유지한다.
+sentences.importExisting({userBookId, sessionId, page, text, my_note?, kind?, visibility}) → Sentence
+//   ↳ 가입 전 이미 저장된 게스트 문장 이관 전용. 당시 visibility를 보존하고 unknown은 private로 축소한다.
+//      신규 생성에 이 API를 사용하지 않으며 add와 importExisting의 호출부를 계약 테스트로 분리한다.
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
 sentences.listByBook(userBookId)           → Sentence[]      // 내 책(user_book) 한 문장
 sentences.byBook(bookId, {limit?, sort?})  → Sentence[]      // 그 책(books.id)의 *타인* 공개 한 문장(#11). 본인 제외(neq user_id), 비-UUID id → []. sort='likes'(#594): 좋아요 많은 순 Top N(clap_count embed), 기본 'recent'(최신순). 각 행에 clapCount 부착
@@ -604,7 +606,7 @@ inquiries                                   -- v7.2 신설 (09_inquiries.sql) �
 > **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md` 계약이 합의된 후속 이슈에서 확정된 뒤 `pause_log` 류 테이블을 본 절에 추가.
 
 JSONB 사용:
-- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public"}`. 공개 범위 키는 `public|private`만 허용하며 키 없음·무효값은 `public`으로 해석한다. 설정 변경은 신규 `sentences.add` 초기값에만 적용하고 기존 문장을 갱신하지 않는다(#1261). 알림은 Phase 2 PWA 이후 실동작.
+- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public"}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). 알림은 Phase 2 PWA 이후 실동작.
 - 그 외 관계형 컬럼. JSON 남발 금지.
 
 ### 7.4 인덱스

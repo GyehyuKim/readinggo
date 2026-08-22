@@ -20,8 +20,9 @@ const ds = sandbox.window.DataStore;
 const ub = ds.myBooks.add({ book: { id: 'book-1', title: '테스트 책' }, status: 'reading' });
 const scopes = ['public', 'followers', 'private'];
 for (const visibility of scopes) {
+  ds.settings.update({ default_sentence_visibility: visibility });
   for (const length of [200, 201, 1000]) {
-    const row = ds.sentences.add({ userBookId: ub.id, text: `  ${'가'.repeat(length)}  `, visibility });
+    const row = ds.sentences.add({ userBookId: ub.id, text: `  ${'가'.repeat(length)}  `, visibility: visibility === 'private' ? 'public' : 'private' });
     assert.equal(Array.from(row.text).length, length, `${visibility} ${length}자 저장`);
     assert.equal(row.visibility, visibility, `${visibility} 공개범위 보존`);
   }
@@ -31,6 +32,7 @@ for (const visibility of scopes) {
   assert.equal(Array.from(ds.sentences.add({ userBookId: ub.id, text: '😀'.repeat(1000), visibility }).text).length, 1000, `${visibility} 이모지 1000자 저장`);
   assert.equal(Array.from(ds.sentences.add({ userBookId: ub.id, text: '😀'.repeat(1001), visibility }).text).length, 1000, `${visibility} 이모지 1001자는 surrogate pair를 깨지 않고 절단`);
 }
+ds.settings.update({ default_sentence_visibility: 'private' });
 const private1000 = ds.sentences.add({ userBookId: ub.id, text: '가'.repeat(1000), visibility: 'private' });
 assert.equal(ds.sentences.setVisibility(private1000.id, { visibility: 'followers' }).visibility, 'followers', '1000자 공개범위 변경 허용');
 assert.equal(Array.from(ds.sentences.updateText(private1000.id, '가'.repeat(1001)).text).length, 1000, '본문 편집도 앞 1000자로 정규화');
@@ -74,6 +76,6 @@ assert.match(app, /RG_saveSentenceBatch\(batch[\s\S]+result\.failedIndices\.leng
 assert.match(companion, /wasTruncated = Array\.from\(v\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '기존 문장 편집은 Unicode 절단 후 실제 저장값과 알림을 반영한다');
 assert.match(sentenceCard, /wasTruncated = Array\.from\(text\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '공용 인라인 편집도 Unicode 절단 후 실제 저장값과 알림을 반영한다');
 assert.match(nest, /hadTruncation[\s\S]+앞부분만 저장했어요/, '홈 직접입력은 저장 성공 후 절단 알림을 표시한다');
-assert.match(nest, /const savedSentence = sentence \? normalizeText\(sentence, visibility\)[\s\S]+const savedSentences = Array\.isArray\(sentences\)[\s\S]+ns\.myQuotes = \[\{ text: savedSentence[\s\S]+onCheckin\(ns, newLv, xpGain, savedSentence/, '홈 낙관 UI·게스트 pending·영속 payload는 같은 절단값을 쓴다');
+assert.match(nest, /const savedSentence = sentence \? normalizeText\(sentence, defaultVisibility\)[\s\S]+const savedSentences = Array\.isArray\(sentences\)[\s\S]+ns\.myQuotes = \[\{ text: savedSentence[\s\S]+onCheckin\(ns, newLv, xpGain, savedSentence/, '홈 낙관 UI·게스트 pending·영속 payload는 계정 기본값과 같은 절단값을 쓴다');
 
 console.log('sentence visibility limits: ok');
