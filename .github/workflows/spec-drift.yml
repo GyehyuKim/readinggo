@@ -36,11 +36,11 @@ jobs:
       - name: 관련 도서 ISBN 환각 필터 (#496)
         run: node tests/related-filter.test.mjs
 
-      - name: 레거시 XP 호환 + 신규 XP write 차단 (#1453 Phase 3-B)
+      - name: XP·둥지·성·하루 만회 물리 삭제 (#1453 Phase 4)
         run: |
-          node tests/nest-cycle.test.mjs
           node tests/user-facing-book-tree-copy.test.mjs
-          node tests/phase3b-xp-write.test.mjs
+          node tests/phase4-legacy-absence.test.mjs
+          node tests/phase4-db-migration.test.mjs
 
       - name: books Supabase canonical + isbn13 매칭 (#490)
         run: node tests/supabase-books.test.mjs
