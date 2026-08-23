@@ -223,9 +223,13 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     setRecapLoading(false);
   };
   const saveRating = () => {
-    if (!book.ubId || !(DataStore.books && DataStore.books.complete)) { setEditMeta(false); return; }
-    Promise.resolve(DataStore.books.complete(book.ubId, { rating: rt || null }))
-      .then(() => { setSavedRating(rt || null); setEditMeta(false); showToast('별점을 저장했어요'); })
+    if (!book.ubId || !(DataStore.books && DataStore.books.updateRating)) { setEditMeta(false); return; }
+    Promise.resolve(DataStore.books.updateRating(book.ubId, rt || null))
+      .then(() => {
+        setSavedRating(rt || null); setEditMeta(false);
+        window.dispatchEvent(new CustomEvent('rg:book-rating-saved', { detail: { ubId: book.ubId, bookId: book.id, rating: rt || null } }));
+        showToast('별점을 저장했어요');
+      })
       .catch(() => showToast('별점 저장 실패 — 다시 시도해 주세요'));
   };
   const openReview = () => {
@@ -239,12 +243,13 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     window.setTimeout(() => reviewTriggerRef.current && reviewTriggerRef.current.focus(), 0);
   };
   const saveReview = async () => {
-    if (reviewBusy || !book.ubId || !(DataStore.books && DataStore.books.complete)) return;
+    if (reviewBusy || !book.ubId || !(DataStore.books && DataStore.books.updateReview)) return;
     setReviewBusy(true); setReviewFeedback('저장 중…');
     try {
       const next = (rv || '').trim();
-      await Promise.resolve(DataStore.books.complete(book.ubId, { review_text: next || null }));
+      await Promise.resolve(DataStore.books.updateReview(book.ubId, next || null));
       setSavedReview(next); setReviewInitial(next); setReviewFeedback('소감을 저장했어요.');
+      window.dispatchEvent(new CustomEvent('rg:book-review-saved', { detail: { ubId: book.ubId, bookId: book.id, review: next } }));
       showToast('완독 소감을 저장했어요');
       setReviewOpen(false);
       window.setTimeout(() => reviewTriggerRef.current && reviewTriggerRef.current.focus(), 0);

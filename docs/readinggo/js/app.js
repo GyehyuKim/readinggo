@@ -536,6 +536,23 @@ function App() {
     };
     return () => { window.RG_openBook = null; };
   }, []);
+  // 피드·프로필 등 app-level 상세도 완독 메타데이터 저장 성공을 즉시 반영한다 (#1402).
+  useEffect(() => {
+    const onReview = (e) => {
+      const d = e && e.detail; if (!d) return;
+      setBookDetailItem((prev) => prev && (prev.ubId === d.ubId || prev.id === d.bookId) ? { ...prev, comment: d.review } : prev);
+    };
+    const onRating = (e) => {
+      const d = e && e.detail; if (!d) return;
+      setBookDetailItem((prev) => prev && (prev.ubId === d.ubId || prev.id === d.bookId) ? { ...prev, rating: d.rating } : prev);
+    };
+    window.addEventListener('rg:book-review-saved', onReview);
+    window.addEventListener('rg:book-rating-saved', onRating);
+    return () => {
+      window.removeEventListener('rg:book-review-saved', onReview);
+      window.removeEventListener('rg:book-rating-saved', onRating);
+    };
+  }, []);
   // 검색 모달 전역 오픈 (#403) — 서재 위시리스트 '+찜하기' 등에서 호출.
   useEffect(() => { window.RG_openSearch = () => setIsSearchOpen(true); return () => { window.RG_openSearch = null; }; }, []);
   // 검색 프리필 오픈 (#943) — 바코드 스캔이 책을 못 찾았을 때 ISBN 을 검색창에 채워 수동 확인.

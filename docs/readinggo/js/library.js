@@ -147,6 +147,24 @@ function LibraryView({ state, onActivateUserBook }) {
     return () => window.removeEventListener('rg:recap-saved', onRecap);
   }, []);
 
+  // 완독 메타데이터 저장 성공 시 목록 projection도 즉시 갱신한다 (#1402).
+  _useEffect(() => {
+    const onReview = (e) => {
+      const d = e && e.detail; if (!d) return;
+      setMyBooks((prev) => (prev || []).map((b) => (b.ubId === d.ubId || b.id === d.bookId) ? { ...b, comment: d.review } : b));
+    };
+    const onRating = (e) => {
+      const d = e && e.detail; if (!d) return;
+      setMyBooks((prev) => (prev || []).map((b) => (b.ubId === d.ubId || b.id === d.bookId) ? { ...b, rating: d.rating } : b));
+    };
+    window.addEventListener('rg:book-review-saved', onReview);
+    window.addEventListener('rg:book-rating-saved', onRating);
+    return () => {
+      window.removeEventListener('rg:book-review-saved', onReview);
+      window.removeEventListener('rg:book-rating-saved', onRating);
+    };
+  }, []);
+
   // 위시리스트/완독 변경(검색 책장 선택·찜 삭제·완독 추가, #403/#409) → 목록 즉시 갱신.
   _useEffect(() => {
     const reload = () => {

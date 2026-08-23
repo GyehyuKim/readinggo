@@ -901,6 +901,22 @@ const DataStore = {
         return ub;
       });
     },
+    updateReview(userBookId, reviewText) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub || ub.status !== 'completed') throw new Error('completed_book_not_found');
+        ub.review_text = reviewText || null;
+        return ub;
+      });
+    },
+    updateRating(userBookId, rating) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub || ub.status !== 'completed') throw new Error('completed_book_not_found');
+        ub.rating = rating || null;
+        return ub;
+      });
+    },
     // 참새 완독 회고 캐시 (#352) — Supabase 어댑터와 표면 일치(§7.2)
     saveRecap(userBookId, recap) {
       return localStorageAdapter.mutate(s => {
