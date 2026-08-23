@@ -78,9 +78,11 @@ jobs:
         working-directory: docs/readinggo
         env:
           VERSION: 1.0.${{ github.run_number }}
+          OTA_PRIVATE_KEY: ${{ secrets.OTA_PRIVATE_KEY }}
         run: |
           set -o pipefail
-          OUT=$(npx -y @capgo/cli@latest bundle zip com.readinggo.app --path dist --bundle "$VERSION" --json)
+          test -n "$OTA_PRIVATE_KEY"
+          OUT=$(npx -y @capgo/cli@8.41.4 bundle zip com.readinggo.app --path dist --bundle "$VERSION" --json)
           echo "$OUT"
           FILENAME=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/\{[\s\S]*\}/);process.stdout.write(JSON.parse(m[0]).filename)})')
           CHECKSUM=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/\{[\s\S]*\}/);process.stdout.write(JSON.parse(m[0]).checksum)})')
@@ -92,12 +94,23 @@ jobs:
             echo "::error::zip 파일이 없음: $FILENAME (cwd=$(pwd))"
             exit 1
           fi
+          # Capgo v2 envelope: private key로 bundle/checksum을 보호한다. 앱 셸에 내장된 publicKey만
+          # sessionKey/checksum을 검증·복호화할 수 있어 R2/KV 쓰기 권한만 탈취한 공격자는 실행 가능한
+          # OTA를 만들 수 없다. 평문 zip은 암호화 직후 삭제한다.
+          ENCRYPTED=$(npx -y @capgo/cli@8.41.4 bundle encrypt "$FILENAME" "$CHECKSUM" --key-data "$OTA_PRIVATE_KEY" --json)
+          ENCRYPTED_FILENAME=$(printf '%s' "$ENCRYPTED" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/\{[\s\S]*\}/);process.stdout.write(JSON.parse(m[0]).filename)})')
+          ENCRYPTED_CHECKSUM=$(printf '%s' "$ENCRYPTED" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/\{[\s\S]*\}/);process.stdout.write(JSON.parse(m[0]).checksum)})')
+          SESSION_KEY=$(printf '%s' "$ENCRYPTED" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/\{[\s\S]*\}/);process.stdout.write(JSON.parse(m[0]).ivSessionKey)})')
+          test -n "$ENCRYPTED_FILENAME" && test -f "$ENCRYPTED_FILENAME"
+          test -n "$ENCRYPTED_CHECKSUM" && test -n "$SESSION_KEY"
+          rm -f "$FILENAME"
           {
             echo "version=$VERSION"
-            echo "filename=$FILENAME"
-            echo "checksum=$CHECKSUM"
+            echo "filename=$ENCRYPTED_FILENAME"
+            echo "checksum=$ENCRYPTED_CHECKSUM"
+            echo "session-key=$SESSION_KEY"
           } >> "$GITHUB_OUTPUT"
-          echo "✅ bundled $FILENAME (sha256=$CHECKSUM)"
+          echo "✅ encrypted OTA bundle created: $ENCRYPTED_FILENAME"
 
       # OTA 네이티브 하한의 단일 원천은 실제 Android 셸 versionCode다.
       # Gradle 값이 없거나 중복되면 publish 전에 실패해 stale 하드코딩을 차단한다(#1441).
@@ -141,17 +154,19 @@ jobs:
           VERSION: ${{ steps.bundle.outputs.version }}
           FILENAME: ${{ steps.bundle.outputs.filename }}
           CHECKSUM: ${{ steps.bundle.outputs.checksum }}
+          SESSION_KEY: ${{ steps.bundle.outputs.session-key }}
           GIT_SHA: ${{ github.sha }}
           MIN_NATIVE: ${{ steps.native.outputs.version-code }}
         run: |
           DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           URL="https://pub-6a6b161169dd4882a91d87901685fa58.r2.dev/${FILENAME}"
           # JSON 은 node 로 안전하게 직렬화(따옴표/이스케이프 사고 방지).
-          MANIFEST=$(VERSION="$VERSION" URL="$URL" CHECKSUM="$CHECKSUM" GIT_SHA="$GIT_SHA" DATE="$DATE" node -e '
+          MANIFEST=$(VERSION="$VERSION" URL="$URL" CHECKSUM="$CHECKSUM" SESSION_KEY="$SESSION_KEY" GIT_SHA="$GIT_SHA" DATE="$DATE" node -e '
             const o = {
               version: process.env.VERSION,
               url: process.env.URL,
               checksum: process.env.CHECKSUM,
+              sessionKey: process.env.SESSION_KEY,
               minNative: Number(process.env.MIN_NATIVE),
               sha: process.env.GIT_SHA,
               date: process.env.DATE,

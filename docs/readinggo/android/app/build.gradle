@@ -49,8 +49,9 @@ android {
             resValue "string", "custom_url_scheme", "com.readinggo.app.dev"
         }
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // 키스토어가 있을 때만 release 서명 연결. 없으면 미설정(assembleDebug·CI 무영향).
             if (hasReleaseKeystore) {
                 signingConfig signingConfigs.release
@@ -71,6 +72,9 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // @capacitor/barcode-scanner가 ionbarcode AAR을 @aar로 가져와 전이 Gson을 누락한다.
+    // upstream ionbarcode-android 2.1.0 runtime metadata와 같은 버전을 명시해 R8/runtime 역직렬화를 보장한다 (#1398).
+    implementation "com.google.code.gson:gson:2.10.1"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

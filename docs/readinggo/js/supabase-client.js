@@ -11,7 +11,22 @@
 
   // 네이티브 OAuth 딥링크(#968). 네이티브 WebView 안에서 redirectTo=origin 은 https://localhost 라
   // 구글 콜백이 앱으로 못 돌아오고 외부 브라우저에 멈춘다. 네이티브일 때만 커스텀 스킴으로 복귀.
-  const NATIVE_REDIRECT = 'com.readinggo.app://login-callback';
+  const NATIVE_REDIRECT_SCHEME = import.meta.env.VITE_NATIVE_REDIRECT_SCHEME || 'com.readinggo.app';
+  const NATIVE_REDIRECT_PROTOCOL = NATIVE_REDIRECT_SCHEME + ':';
+  const NATIVE_REDIRECT_HOST = 'login-callback';
+  const NATIVE_REDIRECT = NATIVE_REDIRECT_SCHEME + '://' + NATIVE_REDIRECT_HOST;
+
+  // appUrlOpen은 다른 앱도 임의 URL로 호출할 수 있다. callback 문자열 포함 여부가 아니라
+  // 빌드별 scheme + 정확한 host/path를 모두 확인한 뒤에만 PKCE/OTP 교환을 시작한다.
+  function isTrustedNativeCallback(raw) {
+    try {
+      const url = new URL(raw);
+      return url.protocol === NATIVE_REDIRECT_PROTOCOL &&
+        url.hostname === NATIVE_REDIRECT_HOST &&
+        (url.pathname === '' || url.pathname === '/') &&
+        !url.username && !url.password && !url.port;
+    } catch (e) { return false; }
+  }
   function isNative() {
     // #1009: setup-globals 가 로드 시점에 확정한 RG_NATIVE 플래그를 1순위로 신뢰
     //   (window.Capacitor 가 번들 인스턴스로 덮여 isNativePlatform()=false 가 되는 케이스 차단).
@@ -166,7 +181,7 @@
     const param = (url, key) => { const m = url.match(new RegExp('[?&#]' + key + '=([^&]+)')); return m ? decodeURIComponent(m[1]) : null; };
     window.CapApp.addListener('appUrlOpen', async (event) => {
       const url = (event && event.url) || '';
-      if (url.indexOf('login-callback') === -1) return;
+      if (!isTrustedNativeCallback(url)) return;
       const c = client();
       try {
         const code = param(url, 'code');

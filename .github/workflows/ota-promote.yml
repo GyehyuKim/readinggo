@@ -32,7 +32,9 @@ jobs:
   ota-promote:
     name: promote beta → production
     runs-on: ubuntu-latest
-    environment: production
+    # Repository environment는 required reviewers + prevent self-review를 켜서
+    # beta 발행자와 production 승인자를 분리한다(실제 설정은 외부 운영 게이트).
+    environment: ota-production
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -89,7 +91,7 @@ jobs:
             exit 1
           fi
           # 유효한 JSON·필수 필드 검증(빈 prod·깨진 매니페스트 승격 방지).
-          echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);if(!m.version||!m.url){console.error("invalid manifest: version/url 누락");process.exit(1)}})'
+          echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);if(!m.version||!m.url||!m.checksum||!m.sessionKey){console.error("invalid encrypted manifest: version/url/checksum/sessionKey 누락");process.exit(1)}})'
           test "$(printf '%s' "$BETA" | jq -r .sha)" = "${{ inputs.sha }}"
           echo "promoting beta manifest: $BETA"
           # --remote 필수: 없으면 로컬 KV 에만 써서 prod 가 실제로 안 바뀐다(#990).

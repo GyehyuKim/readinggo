@@ -37,6 +37,15 @@ name = "RATE_LIMITER"
 namespace_id = "1398"
 simple = { limit = 30, period = 60 }
 
+# 도서 provider cache miss의 per-IP 분당 상한·provider 일일 예산을 원자 예약한다(#1398).
+[[durable_objects.bindings]]
+name = "BOOK_PROVIDER_GUARD"
+class_name = "BookProviderGuard"
+
+[[migrations]]
+tag = "book-provider-guard-v1"
+new_sqlite_classes = ["BookProviderGuard"]
+
 # 비밀 아님(클라에도 공개). service_role·UPSTAGE 키만 `wrangler secret put` 로.
 [vars]
 ENVIRONMENT = "production"
