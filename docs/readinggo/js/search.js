@@ -13,6 +13,44 @@
 function _rgSquash(t) {
   return String(t || '').toLowerCase().replace(/[\s·,.:;!?'"“”‘’()\[\]<>「」『』、~\-_]/g, '');
 }
+
+// 작품명이 번역·음역·관용 오타로 갈리는 확인 사례(#1388). 일반 질의를 추측해 확장하지 않고,
+// 검증된 같은 작품 표기만 작은 데이터 그룹으로 관리한다. 원격 요청 수는 늘리지 않으며 이미
+// 로드한 canonical books Fuse 인덱스에서만 함께 찾는다.
+const RG_SEARCH_ALIAS_GROUPS = Object.freeze([
+  Object.freeze(['오뒷세이아', '오디세이', '오뒷세이', 'oddesay']),
+]);
+function rgExpandSearchQueries(query) {
+  const original = String(query || '').trim();
+  if (!original) return [];
+  const normalized = _rgSquash(original);
+  const group = RG_SEARCH_ALIAS_GROUPS.find((aliases) => aliases.some((alias) => _rgSquash(alias) === normalized));
+  if (!group) return [original];
+  return [original, ...group.filter((alias) => _rgSquash(alias) !== normalized)];
+}
+
+// alias별 Fuse 슬롯을 균등 배분하고 ISBN(없으면 id·제목+저자)으로 합친다. 같은 책이 여러
+// 표기에서 잡히면 가장 낮은 Fuse score(강한 일치)를 보존해 후단 통합 정렬이 신뢰도를 쓸 수 있다.
+function rgFuseSearchBooks(fuse, query, limit = 10) {
+  if (!fuse) return [];
+  const queries = rgExpandSearchQueries(query);
+  if (!queries.length) return [];
+  const perQuery = Math.max(1, Math.floor(limit / queries.length));
+  const merged = new Map();
+  for (const alias of queries) {
+    const expandedAlias = _rgSquash(alias) !== _rgSquash(query);
+    for (const result of fuse.search(alias).slice(0, perQuery)) {
+      const item = result.item || {};
+      // 확장 표기는 같은 작품의 판만 찾는다. "오디세이" 확장으로 "2010 스페이스
+      // 오디세이" 같은 별도 작품을 끌어오지 않는다. 원래 사용자가 입력한 질의는 기존 fuzzy 유지.
+      if (expandedAlias && _rgSquash(_rgCoreTitle(item.title)) !== _rgSquash(alias)) continue;
+      const key = item.isbn13 || item.isbn || item.id || `${_rgSquash(item.title)}|${_rgAuthorKey(item.author)}`;
+      const previous = merged.get(key);
+      if (!previous || Number(result.score) < Number(previous.score)) merged.set(key, result);
+    }
+  }
+  return [...merged.values()].slice(0, limit);
+}
 // 핵심 제목 — 부제·괄호 이후 컷(worker seedSearchTitle #805 와 같은 구분자 규칙)
 // + 괄호 없는 에디션 꼬리("데미안 리커버"류) 제거. 과소 그룹핑은 안전(과대 병합 방지 우선).
 const _RG_EDITION_TAIL = /(\s+(벚꽃|단풍|봄|여름|가을|겨울|리미티드|스페셜)?\s*(에디션|리커버|양장본|양장|합본|특별판|한정판|기념판|개정판|증보판|초판본|미니북|큰글자도서|큰글자|중문판|영문판|세트))+\s*$/;
@@ -48,6 +86,11 @@ function _rgScore(b, nq, tokens) {
       const hayTA = (title + ' ' + (b.author || '') + ' ' + (b.publisher || b.pub || '')).toLowerCase();
       if (tokens.length && tokens.every((t) => hayTA.indexOf(t) >= 0)) tier = 100;
     }
+  }
+  // Fuse가 이미 threshold 안에서 승인한 로컬 후보를 tier 0으로 다시 제거하지 않는다(#1388).
+  // exact/prefix/substring(200+)보다 낮고 단순 토큰 일치(100)보다 높은 범위만 사용한다.
+  if (!tier && Number.isFinite(b._fuzzyScore) && b._fuzzyScore <= 0.3) {
+    tier = 100 + Math.round((1 - b._fuzzyScore) * 90);
   }
   return tier
     + (b._source === 'db' ? 30 : b._source === 'aladin' ? 0 : 20)
@@ -139,6 +182,7 @@ const SearchModal = ({
         threshold: 0.3,
         minMatchCharLength: 1,
         ignoreLocation: true,
+        includeScore: true,
       });
       setFuse(fuseInstance);
     }
@@ -151,8 +195,7 @@ const SearchModal = ({
     if (query.trim() === '') {
       setResults([]);
     } else {
-      const searchResults = fuse.search(query);
-      setResults(searchResults.slice(0, 10)); // 최대 10개 결과
+      setResults(rgFuseSearchBooks(fuse, query, 10)); // alias 포함 최대 10개 결과
     }
   }, [query, fuse]);
 
@@ -218,7 +261,7 @@ const SearchModal = ({
 
   // 병합: 우리 DB(즉시) → 로컬(데모) → 알라딘(외부), isbn/제목 기준 중복 제거 후
   // 관련성 정렬 + 판 그룹핑 + 표지 폴백 (#1223) — 소스 순서가 아니라 질의 관련성이 1순위.
-  const localItems = results.map((r) => r.item);
+  const localItems = results.map((r) => ({ ...r.item, _source: 'local', _fuzzyScore: r.score }));
   const _seen = new Set();
   const _dedup = (arr) => arr.filter((b) => {
     const k = b.isbn13 || b.isbn || b.title;
