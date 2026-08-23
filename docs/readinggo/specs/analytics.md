@@ -137,12 +137,12 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 
 ### 3.1.3 책나무·성장 리듬 측정 계약 (v17, 단계 구현)
 
-#1454 확장 단계에서 친구 책나무 조회·가지 열기 이벤트를 stable DEV에 구현한다. 나머지 내 책나무·리듬 이벤트명·property명·bucket명·대시보드명은 후속 후보이며 제품·개인정보 승인 전 활성 계약이 아니다. XP·스트릭·둥지 이벤트는 신규 KPI에 섞지 않는다.
+이슈 #1454 확장 단계에서 친구 책나무 조회·가지 열기 이벤트를 stable DEV에 구현한다. 나머지 내 책나무·리듬 이벤트명·property명·bucket명·대시보드명은 후속 후보이며 제품·개인정보 승인 전 활성 계약이 아니다. XP·스트릭·둥지 이벤트는 신규 KPI에 섞지 않는다.
 
 | 상태 | 이벤트 | 발화 시점 | 허용 속성 | 금지 속성 |
 |---|---|---|---|---|
-| DEV 구현 | `friend_book_tree_viewed` | 제한 RPC 성공 후 친구 책나무가 렌더될 때 1회 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point=profile|feed` | 사용자 ID·핸들, 정확한 개수, 책 ID·제목, 문장 원문, 공개범위 판정 이유 |
-| DEV 구현 | `friend_book_tree_branch_opened` | 친구 책나무 가지를 열 때 | `book_status`, `leaf_count_bucket`, `entry_point=profile|feed` | 책 ID·제목, 사용자 ID, 문장 원문·개수 |
+| DEV 구현 | `friend_book_tree_viewed` | 제한 RPC 성공 후 친구 책나무가 렌더될 때 1회 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point=profile\|feed` | 사용자 ID·핸들, 정확한 개수, 책 ID·제목, 문장 원문, 공개범위 판정 이유 |
+| DEV 구현 | `friend_book_tree_branch_opened` | 친구 책나무 가지를 열 때 | `book_status`, `leaf_count_bucket`, `entry_point=profile\|feed` | 책 ID·제목, 사용자 ID, 문장 원문·개수 |
 | 후보 | `book_tree_viewed` | 내 책나무 목적지 진입 후 데이터 렌더 성공 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point` | 정확한 문장 수, 책 제목, 문장 원문 |
 | 후보 | `book_tree_branch_opened` | 내 책나무 가지 목록에서 책 상세를 열 때 | `book_id`, `book_status`, `leaf_count_bucket` | 문장 원문, 개인 메모 |
 | 후보 | `book_tree_filter_used` | 검색·상태 필터 결과가 적용될 때 | `filter_type`, `result_count_bucket` | 검색어 원문 |
