@@ -26,11 +26,33 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
+  deployments: read
 
 jobs:
+  verify-ota-production-environment:
+    name: verify protected ota-production environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require independent OTA approval protection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/environments/ota-production" > /tmp/ota-production.json
+          node -e '
+            const fs = require("fs");
+            const environment = JSON.parse(fs.readFileSync("/tmp/ota-production.json", "utf8"));
+            const rule = (environment.protection_rules || []).find((item) => item.type === "required_reviewers");
+            if (!rule || !Array.isArray(rule.reviewers) || rule.reviewers.length < 1 || rule.prevent_self_review !== true) {
+              console.error("ota-production must require at least one reviewer and prevent self-review");
+              process.exit(1);
+            }
+          '
+
   ota-promote:
     name: promote beta → production
+    needs: verify-ota-production-environment
     runs-on: ubuntu-latest
     # Repository environment는 required reviewers + prevent self-review를 켜서
     # beta 발행자와 production 승인자를 분리한다(실제 설정은 외부 운영 게이트).
@@ -70,7 +92,8 @@ jobs:
           if [ -z "$CUR" ]; then
             echo "ℹ️ 현재 production 매니페스트 없음(최초 승격) — :prev 백업 스킵."
           else
-            echo "backing up current production manifest → :prev: $CUR"
+            PREV_SESSION_KEY=$(printf '%s' "$CUR" | jq -r '.sessionKey // empty')
+            if [ -n "$PREV_SESSION_KEY" ]; then echo "::add-mask::$PREV_SESSION_KEY"; fi
             # --remote 필수: 없으면 로컬 KV 에만 써서 실제 백업이 안 됨(#990).
             npx -y wrangler@4.118.0 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
               "ota:android:production:prev" "$CUR"
@@ -90,10 +113,11 @@ jobs:
             echo "::error::beta 채널이 비어 있음(ota:android:beta). 먼저 main 머지로 beta 를 publish 하세요(ota-release.yml)."
             exit 1
           fi
-          # 유효한 JSON·필수 필드 검증(빈 prod·깨진 매니페스트 승격 방지).
-          echo "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);if(!m.version||!m.url||!m.checksum||!m.sessionKey){console.error("invalid encrypted manifest: version/url/checksum/sessionKey 누락");process.exit(1)}})'
+          # 유효한 encrypted JSON·필수 필드 검증(빈 prod·깨진 매니페스트 승격 방지).
+          printf '%s' "$BETA" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);const validString=v=>typeof v==="string"&&v.length>0&&v===v.trim();let validUrl=false;if(validString(m.url)){try{const u=new URL(m.url);validUrl=u.protocol==="https:"&&!u.username&&!u.password}catch{}}const validChecksum=typeof m.checksum==="string"&&/^[a-f0-9]{64}$/i.test(m.checksum);const validKey=validString(m.sessionKey);const validMin=Number.isSafeInteger(m.minNative)&&m.minNative>=5;if(!validString(m.version)||!validUrl||!validChecksum||!validKey||!validMin){console.error("invalid encrypted manifest: version/url/checksum/sessionKey/minNative");process.exit(1)}})'
+          SESSION_KEY=$(printf '%s' "$BETA" | jq -r '.sessionKey')
+          echo "::add-mask::$SESSION_KEY"
           test "$(printf '%s' "$BETA" | jq -r .sha)" = "${{ inputs.sha }}"
-          echo "promoting beta manifest: $BETA"
           # --remote 필수: 없으면 로컬 KV 에만 써서 prod 가 실제로 안 바뀐다(#990).
           npx -y wrangler@4.118.0 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
             "ota:android:production" "$BETA"

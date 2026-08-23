@@ -102,7 +102,12 @@ jobs:
           ENCRYPTED_CHECKSUM=$(printf '%s' "$ENCRYPTED" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/\{[\s\S]*\}/);process.stdout.write(JSON.parse(m[0]).checksum)})')
           SESSION_KEY=$(printf '%s' "$ENCRYPTED" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/\{[\s\S]*\}/);process.stdout.write(JSON.parse(m[0]).ivSessionKey)})')
           test -n "$ENCRYPTED_FILENAME" && test -f "$ENCRYPTED_FILENAME"
-          test -n "$ENCRYPTED_CHECKSUM" && test -n "$SESSION_KEY"
+          test -n "$ENCRYPTED_CHECKSUM"
+          if [ -z "$SESSION_KEY" ] || [ "$SESSION_KEY" != "$(printf '%s' "$SESSION_KEY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(s.trim()))')" ]; then
+            echo "::error::Capgo encrypted session key가 비었거나 앞뒤 공백을 포함함"
+            exit 1
+          fi
+          echo "::add-mask::$SESSION_KEY"
           rm -f "$FILENAME"
           {
             echo "version=$VERSION"
@@ -122,7 +127,9 @@ jobs:
             const source = require("node:fs").readFileSync("android/app/build.gradle", "utf8");
             const matches = [...source.matchAll(/^\s*versionCode\s+(\d+)\s*$/gm)];
             if (matches.length !== 1) throw new Error("expected one Android versionCode, found " + matches.length);
-            process.stdout.write(matches[0][1]);
+            const versionCode = Number(matches[0][1]);
+            if (!Number.isSafeInteger(versionCode) || versionCode < 5) throw new Error("encrypted OTA requires Android versionCode >= 5");
+            process.stdout.write(String(versionCode));
           ')
           echo "version-code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "✅ Android native versionCode: $VERSION_CODE"
@@ -142,7 +149,7 @@ jobs:
             --content-type application/zip \
             --remote
 
-      # beta 채널 매니페스트 갱신. 워커는 version·url·checksum·minNative 를 사용.
+      # beta 채널 매니페스트 갱신. 워커는 version·url·checksum·sessionKey·minNative 를 사용.
       # minNative 는 위에서 Android build.gradle versionCode 를 읽어 자동 설정한다. 새 네이티브 API를
       # 쓰는 번들은 구 셸에서 스킵된다(spec §1·§5, 크래시 원천 차단).
       # sha/date: 운영 추적용 메타데이터(워커 무시). semver 가 git sha 를 못 담으므로 여기 별도 기록.
@@ -173,7 +180,7 @@ jobs:
             };
             process.stdout.write(JSON.stringify(o));
           ')
-          echo "manifest: $MANIFEST"
+          printf '%s' "$MANIFEST" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);const validString=v=>typeof v==="string"&&v.length>0&&v===v.trim();let validUrl=false;if(validString(m.url)){try{const u=new URL(m.url);validUrl=u.protocol==="https:"&&!u.username&&!u.password}catch{}}const validChecksum=typeof m.checksum==="string"&&/^[a-f0-9]{64}$/i.test(m.checksum);const validMin=Number.isSafeInteger(m.minNative)&&m.minNative>=5;if(!validString(m.version)||!validUrl||!validChecksum||!validString(m.sessionKey)||!validMin){console.error("invalid encrypted manifest: version/url/checksum/sessionKey/minNative");process.exit(1)}})'
           # --remote 필수: 없으면 로컬 KV 에만 쓰여 실제 매니페스트가 안 올라간다(#990).
           npx -y wrangler@4.118.0 kv key put --remote --namespace-id e22049c87f9d44139242316c3c445bf9 \
             "ota:android:beta" "$MANIFEST"

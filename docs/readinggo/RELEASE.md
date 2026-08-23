@@ -38,7 +38,7 @@ OTA 매니페스트는 Workers KV 에 **채널별**로 저장된다: `ota:androi
 [main 머지 → stable DEV 자동 배포·QA]
    │  승인 SHA로 ota-release.yml (workflow_dispatch + production environment)
    ▼
-vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = {version,url,checksum,minNative,sha}
+vite build → dist zip → private-key encrypt → SHA-256 → R2 업로드 → KV: ota:android:beta = {version,encrypted url,encrypted checksum,sessionKey,minNative,sha}
    │  = beta 채널 수동 publish
    ▼
 [베타 앱(채널=beta)]  다음 시작 시 수신 → checksum 검증 → 적용. 운영자/베타테스터가 확인.
@@ -51,6 +51,7 @@ vite build → dist zip → SHA-256 → R2 업로드 → KV: ota:android:beta = 
 ```
 
 - **왜 수동 발행·승격인가**: main push는 stable DEV까지만 자동이다. 승인 SHA로 beta를 발행하고 운영자가 확인한 *같은 manifest·바이너리·체크섬*만 production으로 복사한다. 웹 Worker production도 같은 stable DEV SHA gate를 사용한다. (`specs/ota.md` §3③)
+- **최초 encrypted OTA 전환 순서**: `sessionKey` 전달 코드가 포함된 Worker를 별도 승인으로 Production에 먼저 승격하고 exact SHA를 확인한다. 그 다음 같은 public key가 내장된 v5 beta APK를 설치한 뒤 encrypted beta를 발행·실기기 복호화 QA한다. 마지막으로 보호된 `ota-production` 승인을 거쳐 같은 manifest를 승격한다. stable DEV receipt만으로 Production Worker 반영을 간주하지 않는다.
 - **앱이 채널을 어떻게 아는가**: Capgo `defaultChannel` / 런타임 `setChannel`. 베타테스터 빌드 = `beta`, 스토어 배포 빌드 = `production`. (현재 `capacitor.config.json` 의 `updateUrl` 은 `…/api/ota`; 워커가 `?channel=` 로 분기.)
 
 ### 1.2 무엇이 OTA 로 가고 무엇이 네이티브 빌드인가 (★ 안전의 핵심)
@@ -139,8 +140,8 @@ git tag v1.2.0 && git push origin v1.2.0
 | 역할 | 파일/생성 위치 | 키·형식 | 현재값 | 계약 |
 |---|---|---|---|---|
 | npm·웹 패키지 메타데이터 | `docs/readinggo/package.json` | `version` | `0.1.0` | 내부 웹 패키지·빌드 메타데이터. Android/iOS 출시 버전의 SSOT가 아니다. |
-| Android 마케팅 버전 | `docs/readinggo/android/app/build.gradle` | `versionName` | `"1.0.3"` | Play 사용자에게 노출되는 Android native release 정본. |
-| Android 빌드 번호 | 같은 파일 | `versionCode` | `4` | Play 업로드 순서를 판단하는 Android 독립 정수. Android 스토어 업로드마다 단조 증가한다. |
+| Android 마케팅 버전 | `docs/readinggo/android/app/build.gradle` | `versionName` | `"1.0.4"` | Play 사용자에게 노출되는 Android native release 정본. |
+| Android 빌드 번호 | 같은 파일 | `versionCode` | `5` | Play 업로드 순서를 판단하는 Android 독립 정수. Android 스토어 업로드마다 단조 증가한다. |
 | OTA 번들 버전 | `.github/workflows/ota-release.yml` | `1.0.<github.run_number>` | 실행별 자동 생성 | 웹 번들의 단조 증가 식별자. npm·Android·iOS 마케팅 버전과 동기화하지 않는다. |
 | OTA native 하한 | 같은 workflow가 Android Gradle에서 읽음 | `minNative` | 현재 `versionCode`에서 파생 | 기존 Android 셸 호환성 게이트. 별도 숫자나 npm/iOS 버전에서 파생하지 않는다. |
 | iOS 마케팅 버전 | `docs/readinggo/ios/App/App.xcodeproj/project.pbxproj` | `MARKETING_VERSION` | `1.0` | iOS native 출시 시 App Store 사용자에게 노출되는 독립 정본. |
@@ -234,27 +235,31 @@ production 을 직전 양호 매니페스트로 되돌리는 법(서버 측). �
 ```bash
 NS=e22049c87f9d44139242316c3c445bf9   # OTA_KV namespace id (wrangler.toml)
 
-# A) ★ 원클릭 롤백 — 직전 prod 매니페스트(:prev)를 production 으로 복원.
+# A) ★ 표준 수동 롤백 — 직전 prod encrypted 매니페스트(:prev)를 검증 후 production 으로 복원.
 #    ota-promote.yml 이 승격 직전 현재 prod 를 ota:android:production:prev 로 백업해 둔다(#1029).
 #    = 직전 1세대로 즉시 되돌리기. 가장 흔한 롤백(방금 승격이 나빴다).
 #    --remote 필수: 없으면 로컬 KV 만 건드려 실제 prod 가 안 바뀐다(#990).
-PREV=$(npx -y wrangler@4 kv key get --remote --namespace-id "$NS" "ota:android:production:prev")
-[ -z "$PREV" ] && echo "백업 없음(:prev). 최초 승격이거나 백업 전 — B/C 로." || \
-  npx -y wrangler@4 kv key put --remote --namespace-id "$NS" "ota:android:production" "$PREV"
+PREV=$(npx -y wrangler@4.118.0 kv key get --remote --namespace-id "$NS" "ota:android:production:prev")
+if [ -z "$PREV" ]; then
+  echo "백업 없음(:prev). 최초 승격이거나 백업 전 — Production 변경 중단."
+  exit 1
+fi
+printf '%s' "$PREV" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);const v=x=>typeof x==="string"&&x.length>0&&x===x.trim();let u=false;if(v(m.url)){try{const x=new URL(m.url);u=x.protocol==="https:"&&!x.username&&!x.password}catch{}}if(!v(m.version)||!u||typeof m.checksum!=="string"||!/^[a-f0-9]{64}$/i.test(m.checksum)||!v(m.sessionKey)||!Number.isSafeInteger(m.minNative)||m.minNative<5)process.exit(1)})'
+npx -y wrangler@4.118.0 kv key put --remote --namespace-id "$NS" "ota:android:production" "$PREV"
 
-# B) beta 가 아직 양호하면: 현재 beta 를 prod 로 다시 승격 (재승격으로 덮기).
-#    → 단, beta 도 이미 나쁜 번들이면 쓰지 말 것. (:prev 가 있으면 보통 A 가 더 안전.)
+# B) beta 가 아직 양호하면: ota-promote.yml의 보호된 승인·검증 경로로 재승격한다.
+#    beta 도 이미 나쁜 번들이면 쓰지 않는다. (:prev 가 있으면 A가 기본이다.)
 
-# C) 특정 이전 버전으로 되돌리기 — 그 버전 매니페스트를 prod 키에 다시 쓴다(2세대+ 이전).
-#    이전 양호 번들의 url/checksum 을 알면(Action 로그/R2) 직접 구성해 put.
-GOOD='{"version":"1.0.NN","url":"https://pub-….r2.dev/com.readinggo.app_1.0.NN.zip","checksum":"<sha256>","minNative":<required-version-code>}'
-npx -y wrangler@4 kv key put --remote --namespace-id "$NS" "ota:android:production" "$GOOD"
+# C) 2세대 이상 이전의 임의 버전 수동 재구성은 현재 지원하지 않는다.
+#    encrypted manifest는 원본 sessionKey까지 완전하게 보존해야 하며, URL/checksum만으로
+#    새 JSON을 만들면 v5 앱이 복호화할 수 없다. 검증된 다세대 manifest archive가 도입되기
+#    전에는 불완전한 값을 production KV에 직접 쓰지 않는다.
 ```
 
 - **핵심**: prod 매니페스트만 이전 버전을 가리키게 하면, prod 앱은 다음 체크에서 그 이전 번들을 받아 복귀한다(번들 바이너리는 R2 에 그대로 남아 있으므로 재빌드 불필요).
-- 현재 매니페스트 확인: `npx -y wrangler@4 kv key get --remote --namespace-id "$NS" "ota:android:production"`.
-- 백업 확인(롤백 전 무엇으로 돌아가는지): `npx -y wrangler@4 kv key get --remote --namespace-id "$NS" "ota:android:production:prev"`.
-- **`:prev` 범위·주의**: `:prev` 는 **직전 1세대만** 보관한다(매 승격이 직전 값으로 덮어씀). 두 세대 이상 이전으로 가려면 C)(Action 로그/R2 로 매니페스트 재구성). 롤백(A) 직후 곧장 또 승격하면 그 롤백 값이 다시 `:prev` 가 되니, 연속 롤백은 매번 현재 prod 를 먼저 확인하고 진행한다.
+- 현재 매니페스트 확인: `npx -y wrangler@4.118.0 kv key get --remote --namespace-id "$NS" "ota:android:production"`.
+- 백업 확인(롤백 전 무엇으로 돌아가는지): `npx -y wrangler@4.118.0 kv key get --remote --namespace-id "$NS" "ota:android:production:prev"`.
+- **`:prev` 범위·주의**: `:prev` 는 **직전 1세대만** 보관한다(매 승격이 직전 값으로 덮어씀). 롤백(A) 직후 곧장 또 승격하면 그 롤백 값이 다시 `:prev` 가 되므로, 연속 작업은 매번 현재 prod 를 먼저 확인한다. 2세대 이상 이전 복원은 원본 encrypted manifest 전체를 검증·보존하는 다세대 archive가 생기기 전까지 지원하지 않는다.
 
 ### 4.2 네이티브 롤백 — 스토어 한계
 
