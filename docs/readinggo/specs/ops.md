@@ -130,3 +130,21 @@ DEV 빌드는 `VITE_SUPABASE_URL`·`VITE_SUPABASE_PUBLISHABLE_KEY`·`VITE_API_OR
 - dev Worker에 prod KV/R2 ID, production secret, cron이 없어야 한다.
 - production 관련 workflow는 `main` push로 실행되면 안 되며 `production` environment 승인을 요구한다.
 - 이 중 하나라도 증명할 수 없으면 prod 승격을 중단하고 rollback이 아니라 pause/report한다.
+
+## 4. Android 셸·OTA 출시 보안 계약 (#1398)
+
+### 4.1 Android 셸
+
+- 인증·독서 데이터는 Android cloud backup과 device transfer에서 모두 제외한다. `allowBackup=false`와 API 31+ `dataExtractionRules`를 함께 유지하며 root·file·database·sharedpref·external domain을 전부 제외한다.
+- `FileProvider`는 공유가 필요한 앱 cache의 `shared-images/` 하위만 노출한다. 외부 저장소·files·cache 루트(`path="."`)는 공유하지 않는다.
+- release build는 R8 minification과 resource shrinking을 활성화하고 `proguard-android-optimize.txt`를 사용한다. barcode AAR처럼 전이 runtime dependency가 누락된 경우 경고 억제로 숨기지 않고 upstream metadata와 맞는 dependency를 명시하며 `lintRelease`와 `assembleRelease`를 통과해야 한다.
+- native OAuth callback은 [backend.md §7.1](./backend.md)의 빌드별 exact scheme·host/path 계약을 사용한다. development APK는 `com.readinggo.app.dev`, Production APK는 `com.readinggo.app`으로 분리한다.
+
+### 4.2 OTA artifact·승격
+
+- privileged OTA CLI는 exact semantic version으로 고정한다. `latest` 또는 floating major를 release·promote workflow에서 사용하지 않는다.
+- beta bundle은 private key로 암호화한 파일만 업로드한다. 평문 zip은 암호화 직후 삭제하며 manifest는 `version`, encrypted `url`, encrypted `checksum`, `sessionKey`, `minNative`, source `sha`, UTC `date`를 포함한다.
+- Android release 셸은 대응 public key가 없으면 build를 중단한다. public key는 secret이 아니지만, key 없는 셸이나 plaintext OTA를 fallback으로 만들지 않는다.
+- beta→Production 승격은 동일 manifest SHA와 필수 암호화 field를 검증하고 `ota-production` environment의 required reviewers와 prevent self-review를 통과해야 한다. workflow 이름만으로 2인 승인이 증명되지 않으므로 repository environment 설정을 readback하기 전에는 운영 게이트 완료로 보지 않는다.
+- OTA key 생성·회전, `ota-production` reviewer 설정, 실제 beta 기기 복호화·checksum·`minNative` 수신 검증, Production 승격은 코드 PR과 분리된 운영 승인 대상이다. secret이나 private key를 로그·artifact·manifest·PR에 남기지 않는다.
+- release receipt는 Android versionCode·AAB checksum·내장 public key fingerprint, Capgo CLI version, encrypted bundle checksum·sessionKey 존재, beta/Production manifest SHA, 승인자, 기기 수신 결과를 연결한다.

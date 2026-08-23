@@ -25,9 +25,17 @@ simple = { limit = 30, period = 60 }
 name = "PROMPT_EXPERIMENT_LIMITER"
 class_name = "PromptExperimentLimiter"
 
+[[durable_objects.bindings]]
+name = "BOOK_PROVIDER_GUARD"
+class_name = "BookProviderGuard"
+
 [[migrations]]
 tag = "prompt-experiment-limiter-v1"
 new_sqlite_classes = ["PromptExperimentLimiter"]
+
+[[migrations]]
+tag = "book-provider-guard-v1"
+new_sqlite_classes = ["BookProviderGuard"]
 
 [vars]
 ENVIRONMENT = "development"

@@ -65,6 +65,48 @@ export class PromptExperimentLimiter {
   }
 }
 
+// 도서 provider 요청을 한 Durable Object에서 원자적으로 예약한다(#1398).
+// Cache hit은 이 객체를 거치지 않으며, miss만 per-IP 분당 상한과 provider 일일 예산을 함께 소비한다.
+export class BookProviderGuard {
+  constructor(state) { this.storage = state.storage; }
+
+  async fetch(request) {
+    if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+    let body;
+    try { body = await request.json(); } catch (e) { return json({ error: 'invalid request' }, 400); }
+    const provider = String(body && body.provider || '');
+    const ip = String(body && body.ip || '').slice(0, 128);
+    const minuteBucket = String(body && body.minuteBucket || '');
+    const day = String(body && body.day || '');
+    if (!['aladin', 'kakao', 'nlk'].includes(provider) || !ip || !minuteBucket || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      return json({ error: 'invalid request' }, 400);
+    }
+    const minuteLimit = boundedInt(body.minuteLimit, 30, 1, 1000);
+    const dailyLimit = boundedInt(body.dailyLimit, 3000, 1, 1000000);
+    const minuteKey = `minute:${provider}:${ip}`;
+    const dayKey = `day:${provider}`;
+
+    return this.storage.transaction(async (txn) => {
+      const minuteState = await txn.get(minuteKey);
+      const dayState = await txn.get(dayKey);
+      const minuteUsed = minuteState && minuteState.bucket === minuteBucket ? minuteState.used : 0;
+      const dailyUsed = dayState && dayState.day === day ? dayState.used : 0;
+      if (minuteUsed >= minuteLimit) return json({ code: 'MINUTE_LIMIT_EXCEEDED' }, 429);
+      if (dailyUsed >= dailyLimit) return json({ code: 'DAILY_BUDGET_EXCEEDED' }, 429);
+      await txn.put({
+        [minuteKey]: { bucket: minuteBucket, used: minuteUsed + 1 },
+        [dayKey]: { day, used: dailyUsed + 1 },
+      });
+      return json({ ok: true });
+    });
+  }
+}
+
+function boundedInt(value, fallback, min, max) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+}
+
 export default {
   // ── HTTP: CORS 래퍼 (#1230) — 앱 오리진의 교차출처 API 호출에 preflight/ACAO 응답 ──
   async fetch(request, env, ctx) {
@@ -108,7 +150,7 @@ export default {
       // 동일출처 GET은 Origin 헤더 미전송 → 통과. 다른 출처면 Origin이 우리 도메인과 달라 403.
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
-      return aladinProxy(url.searchParams, env, ctx);
+      return bookProviderRequest(request, url.searchParams, env, ctx);
     }
     // LLM 독서 파트너 — 참새 질문 생성 (#287). 키는 서버에서만 사용(클라 노출 금지).
     if (p === '/api/companion') {
@@ -2062,6 +2104,67 @@ async function imgProxy(searchParams) {
       'X-Content-Type-Options': 'nosniff',   // 콘텐츠 스니핑 차단
     },
   });
+}
+
+/* ── 도서 provider 캐시·원자 예산 가드 (#1398) ───────────────
+   canonical cache hit은 provider 예산을 쓰지 않는다. miss만 Durable Object에서 per-IP 분당
+   상한과 provider 일일 예산을 원자 예약한 뒤 기존 디스패처로 보낸다. */
+async function bookProviderRequest(request, q, env, ctx) {
+  const isbn = (q.get('isbn') || '').trim();
+  const provider = isbn && nlkReady(env) ? 'nlk' : (!isbn && kakaoReady(env) ? 'kakao' : 'aladin');
+  const cacheUrl = new URL('https://book-provider-cache.internal/aladin');
+  cacheUrl.searchParams.set('provider', provider);
+  for (const [key, value] of [...q.entries()].sort(([ak, av], [bk, bv]) => ak.localeCompare(bk) || av.localeCompare(bv))) {
+    cacheUrl.searchParams.append(key, value);
+  }
+  const cacheRequest = new Request(cacheUrl.toString(), { method: 'GET' });
+  const cache = globalThis.caches && globalThis.caches.default;
+  if (cache) {
+    try {
+      const hit = await cache.match(cacheRequest);
+      if (hit) {
+        const headers = new Headers(hit.headers);
+        headers.set('x-readinggo-cache', 'hit');
+        return new Response(hit.body, { status: hit.status, statusText: hit.statusText, headers });
+      }
+    } catch (e) { /* cache 장애는 provider 경로를 막지 않는다 */ }
+  }
+
+  if (!env.BOOK_PROVIDER_GUARD) {
+    if (env.ENVIRONMENT === 'production') return json({ error: 'provider guard unavailable' }, 503);
+  } else {
+    const now = new Date();
+    const ip = String(request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown').split(',')[0].trim().slice(0, 128);
+    const dailyLimit = boundedInt(env[`${provider.toUpperCase()}_DAILY_BUDGET`], 3000, 1, 1000000);
+    let reserved;
+    try {
+      const id = env.BOOK_PROVIDER_GUARD.idFromName('global');
+      reserved = await env.BOOK_PROVIDER_GUARD.get(id).fetch('https://book-provider-guard.internal/reserve', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider,
+          ip,
+          minuteBucket: now.toISOString().slice(0, 16),
+          day: now.toISOString().slice(0, 10),
+          minuteLimit: boundedInt(env.BOOK_PROVIDER_MINUTE_LIMIT, 30, 1, 1000),
+          dailyLimit,
+        }),
+      });
+    } catch (e) {
+      if (env.ENVIRONMENT === 'production') return json({ error: 'provider guard unavailable' }, 503);
+    }
+    if (reserved && !reserved.ok) {
+      if (reserved.status === 429) return json({ error: 'provider budget exceeded', retryAfter: 60 }, 429);
+      if (env.ENVIRONMENT === 'production') return json({ error: 'provider guard unavailable' }, 503);
+    }
+  }
+
+  const response = await aladinProxy(q, env, ctx);
+  if (cache && response.status === 200) {
+    try { await cache.put(cacheRequest, response.clone()); } catch (e) { /* best-effort */ }
+  }
+  return response;
 }
 
 /* ── 도서 프록시 디스패처 (#1044 소스 이전) ──────────────────

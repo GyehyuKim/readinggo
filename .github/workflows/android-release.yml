@@ -65,6 +65,17 @@ jobs:
           npm ci
           npm run build
 
+      # OTA private key와 짝인 public key를 release 셸에 내장한다. public key는 비밀이 아니지만
+      # 값이 없으면 검증 불가능한 셸을 만들지 않도록 fail-closed 한다.
+      - name: Embed OTA verification public key
+        working-directory: docs/readinggo
+        env:
+          OTA_PUBLIC_KEY: ${{ vars.OTA_PUBLIC_KEY }}
+        run: |
+          test -n "$OTA_PUBLIC_KEY"
+          npx -y @capgo/cli@8.41.4 key save --key-data "$OTA_PUBLIC_KEY"
+          node -e "const c=require('./capacitor.config.json');if(!c.plugins?.CapacitorUpdater?.publicKey)process.exit(1)"
+
       # dist → android 동기화 + 플러그인(capgo 등) 반영.
       - name: Capacitor sync (android)
         working-directory: docs/readinggo

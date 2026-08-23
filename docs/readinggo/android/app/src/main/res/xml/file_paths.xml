@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <!-- 공유가 필요한 임시 이미지만 노출한다. 외부 저장소/cache 루트 전체 공유 금지. -->
+    <cache-path name="shared_images" path="shared-images/" />
 </paths>

@@ -39,6 +39,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.DEV_SUPABASE_PUBLISHABLE_KEY }}
           VITE_API_ORIGIN: https://readinggo-dev.hyuniverse.workers.dev
+          VITE_NATIVE_REDIRECT_SCHEME: com.readinggo.app.dev
         run: |
           test -n "$VITE_SUPABASE_URL"
           test -n "$VITE_SUPABASE_PUBLISHABLE_KEY"

@@ -78,6 +78,7 @@ jobs:
           node tests/phase4-db-migration.test.mjs
           node tests/barcode-focus.test.mjs
           node tests/book-upsert-auth.test.mjs
+          node --test tests/security-residuals.test.mjs tests/book-provider-guard.test.mjs
           node tests/aladin-upstream-errors.test.mjs
           node tests/ota-native-gate.test.mjs
           node tests/release-version-contract.test.mjs
