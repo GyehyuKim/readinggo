@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22   # Capacitor 8 CLI 는 Node >=22 요구(cap sync). #1003
+          node-version: 22 # Capacitor 8 CLI 는 Node >=22 요구(cap sync). #1003
 
       # Capacitor 8 / AGP 8 = JDK 17+. 21 사용(안전).
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
@@ -58,6 +58,17 @@ jobs:
           node -e "const fs=require('fs');const p='capacitor.config.json';const c=JSON.parse(fs.readFileSync(p));c.appName='ReadingGo DEV';c.plugins.CapacitorUpdater.defaultChannel='beta';fs.writeFileSync(p,JSON.stringify(c,null,2)+'\\n')"
           grep -q 'readinggo.hyuniverse.workers.dev/api/ota' capacitor.config.json
           grep -q '"defaultChannel": "beta"' capacitor.config.json
+
+      # encrypted beta bundle을 실기기에서 검증할 수 있도록 release 셸과 같은 public key를
+      # DEV APK에도 내장한다. key가 없거나 저장 뒤 beta 채널이 유실되면 fail-closed 한다.
+      - name: Embed OTA verification public key for beta
+        working-directory: docs/readinggo
+        env:
+          OTA_PUBLIC_KEY: ${{ vars.OTA_PUBLIC_KEY }}
+        run: |
+          test -n "$OTA_PUBLIC_KEY"
+          npx -y @capgo/cli@8.41.4 key save --key-data "$OTA_PUBLIC_KEY"
+          node -e "const c=require('./capacitor.config.json');if(!c.plugins?.CapacitorUpdater?.publicKey||c.plugins.CapacitorUpdater.defaultChannel!=='beta')process.exit(1)"
 
       # dist → android 동기화 + 플러그인(capgo 등) 반영.
       - name: Capacitor sync (android)

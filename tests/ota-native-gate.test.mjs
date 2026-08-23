@@ -11,8 +11,8 @@ const mainJs = await readFile(new URL('../docs/readinggo/main.js', import.meta.u
 const versionCodes = [...gradle.matchAll(/^\s*versionCode\s+(\d+)\s*$/gm)];
 assert.equal(versionCodes.length, 1, 'Android versionCode는 정확히 한 곳에서 선언해야 한다');
 const nativeVersionCode = Number(versionCodes[0][1]);
-assert.equal(nativeVersionCode, 4, '#1419 네이티브 스캐너 셸은 versionCode 4여야 한다');
-assert.match(gradle, /^\s*versionName\s+"1\.0\.3"\s*$/m, 'versionCode 3의 다음 Android 셸은 1.0.3으로 올린다');
+assert.equal(nativeVersionCode, 5, 'OTA public key가 내장된 최초 Android 셸은 versionCode 5여야 한다');
+assert.match(gradle, /^\s*versionName\s+"1\.0\.4"\s*$/m, 'OTA public key 네이티브 경계는 1.0.4로 올린다');
 
 assert.match(workflow, /readFileSync\("android\/app\/build\.gradle"/);
 assert.match(workflow, /MIN_NATIVE: \$\{\{ steps\.native\.outputs\.version-code \}\}/);
@@ -41,10 +41,12 @@ assert.match(mainJs, /active:\s*\{ id: cur\.bundle\.id, version: cur\.bundle\.ve
 assert.match(mainJs, /builtin:\s*bundles\.find\(\(b\) => b\.id === 'builtin'\) \|\| null/);
 assert.match(mainJs, /downloaded:\s*bundles\.filter\(\(b\) => b\.id !== 'builtin'\)/);
 
+const encryptedChecksum = 'a'.repeat(64);
 const manifest = (version) => JSON.stringify({
   version,
   url: `https://example.test/com.readinggo.app_${version}.zip`,
-  checksum: 'checksum-test',
+  checksum: encryptedChecksum,
+  sessionKey: 'session-key-test',
   minNative: nativeVersionCode,
 });
 const kvEntries = {
@@ -60,40 +62,129 @@ const otaRequest = (body) => new Request('https://readinggo.example/api/ota', {
   body: JSON.stringify(body),
 });
 
-// minNative 게이트(기존 계약 유지) — beta 채널.
-let response = await worker.fetch(otaRequest({ platform: 'android', defaultChannel: 'beta', version_name: 'builtin', version_code: '3' }), env, {});
+// OTA public key가 없는 v4 이하 셸에는 encrypted manifest를 반환하지 않는다.
+let response = await worker.fetch(otaRequest({ platform: 'android', defaultChannel: 'beta', version_name: 'builtin', version_code: '4' }), env, {});
 assert.equal(response.status, 200);
 const blocked = await response.json();
-assert.deepEqual(blocked, { message: 'min native 4 > 3' });
-assert.equal(blocked.url, undefined, 'v3 셸에는 v4 번들 URL을 반환하면 안 된다');
-assert.equal(blocked.version, undefined, 'v3 셸 응답은 no-update 계약이어야 한다');
+assert.deepEqual(blocked, { message: 'min native 5 > 4' });
+assert.equal(blocked.url, undefined, 'public key가 없는 v4 셸에는 encrypted 번들 URL을 반환하면 안 된다');
+assert.equal(blocked.version, undefined, 'v4 셸 응답은 no-update 계약이어야 한다');
 
-response = await worker.fetch(otaRequest({ platform: 'android', defaultChannel: 'beta', version_name: 'builtin', version_code: '4' }), env, {});
+response = await worker.fetch(otaRequest({ platform: 'android', defaultChannel: 'beta', version_name: 'builtin', version_code: '5' }), env, {});
 assert.equal(response.status, 200);
 assert.deepEqual(await response.json(), {
   version: '1.0.1441',
   url: 'https://example.test/com.readinggo.app_1.0.1441.zip',
-  checksum: 'checksum-test',
+  checksum: encryptedChecksum,
+  sessionKey: 'session-key-test',
 });
 
 // production 채널은 별도 manifest — beta와 섞이지 않는다.
-response = await worker.fetch(otaRequest({ platform: 'android', defaultChannel: 'production', version_name: 'builtin', version_code: '4' }), env, {});
+response = await worker.fetch(otaRequest({ platform: 'android', defaultChannel: 'production', version_name: 'builtin', version_code: '5' }), env, {});
 assert.equal(response.status, 200);
 assert.deepEqual(await response.json(), {
   version: '1.0.1440',
   url: 'https://example.test/com.readinggo.app_1.0.1440.zip',
-  checksum: 'checksum-test',
+  checksum: encryptedChecksum,
+  sessionKey: 'session-key-test',
 });
 
-// #1489 이전 release 셸은 defaultChannel 없이 native is_prod:true만 보냈다.
-// 새 release가 보급되기 전에도 기존 Production 설치자의 OTA 경로를 끊지 않는다.
-response = await worker.fetch(otaRequest({ platform: 'android', is_prod: true, version_name: 'builtin', version_code: '4' }), env, {});
+const envForManifest = (value) => ({ OTA_KV: { async get() { return JSON.stringify(value); } } });
+const encryptedBase = {
+  version: '1.0.1442',
+  url: 'https://example.test/com.readinggo.app_1.0.1442.zip',
+  checksum: encryptedChecksum,
+  sessionKey: 'session-key-test',
+  minNative: 5,
+};
+for (const { name, manifest: invalidManifest } of [
+  { name: 'encrypted manifest minNative 누락 차단', manifest: { ...encryptedBase, minNative: undefined } },
+  { name: 'encrypted manifest 문자열 minNative 차단', manifest: { ...encryptedBase, minNative: '5' } },
+  { name: 'encrypted manifest 부분 숫자 minNative 차단', manifest: { ...encryptedBase, minNative: '5junk' } },
+  { name: 'encrypted manifest v5 미만 minNative 차단', manifest: { ...encryptedBase, minNative: 4 } },
+  { name: '공백 sessionKey 차단', manifest: { ...encryptedBase, sessionKey: ' ' } },
+  { name: '빈 sessionKey 차단', manifest: { ...encryptedBase, sessionKey: '' } },
+  { name: 'null sessionKey 차단', manifest: { ...encryptedBase, sessionKey: null } },
+  { name: 'encrypted manifest checksum 누락 차단', manifest: { ...encryptedBase, checksum: undefined } },
+  { name: 'encrypted manifest 객체 checksum 차단', manifest: { ...encryptedBase, checksum: {} } },
+  { name: 'encrypted manifest non-SHA-256 checksum 차단', manifest: { ...encryptedBase, checksum: 'not-a-sha256' } },
+  { name: 'HTTP bundle URL 차단', manifest: { ...encryptedBase, url: 'http://example.test/update.zip' } },
+  { name: 'javascript URL 차단', manifest: { ...encryptedBase, url: 'javascript:alert(1)' } },
+  { name: '객체 URL 차단', manifest: { ...encryptedBase, url: {} } },
+  { name: '공백 포함 URL 차단', manifest: { ...encryptedBase, url: ' https://example.test/update.zip ' } },
+  { name: '객체 version 차단', manifest: { ...encryptedBase, version: {} } },
+]) {
+  response = await worker.fetch(
+    otaRequest({ platform: 'android', defaultChannel: 'beta', version_name: 'builtin', version_code: '5' }),
+    envForManifest(invalidManifest),
+    {},
+  );
+  assert.equal(response.status, 200, name);
+  assert.deepEqual(await response.json(), {}, name);
+}
+
+// encrypted Production 최초 승격 전 KV에 남아 있는 기존 plaintext manifest는 읽기 호환만
+// 유지한다. 신규 workflow는 plaintext를 발행하지 않지만 기존 v4 설치자의 경로를 즉시 끊지 않는다.
+const legacyPlaintextEnv = { OTA_KV: { async get(key) {
+  if (key !== 'ota:android:production' && key !== 'ota:android:beta') return null;
+  return JSON.stringify({
+    version: '1.0.1439',
+    url: 'https://example.test/com.readinggo.app_1.0.1439.zip',
+    checksum: 'legacy-checksum',
+    minNative: 4,
+  });
+} } };
+response = await worker.fetch(otaRequest({ platform: 'android', is_prod: true, version_name: 'builtin', version_code: '4' }), legacyPlaintextEnv, {});
 assert.equal(response.status, 200);
 assert.deepEqual(await response.json(), {
-  version: '1.0.1440',
-  url: 'https://example.test/com.readinggo.app_1.0.1440.zip',
-  checksum: 'checksum-test',
+  version: '1.0.1439',
+  url: 'https://example.test/com.readinggo.app_1.0.1439.zip',
+  checksum: 'legacy-checksum',
 });
+response = await worker.fetch(otaRequest({ platform: 'android', is_prod: true, version_name: 'builtin', version_code: 4 }), legacyPlaintextEnv, {});
+assert.equal(response.status, 200);
+assert.equal((await response.json()).version, '1.0.1439', '숫자형 정상 v4 legacy 요청도 read compatibility 유지');
+response = await worker.fetch(
+  otaRequest({ platform: 'android', is_prod: true, version_name: 'builtin', version_code: '4' }),
+  envForManifest({ version: '1.0.1438', url: 'https://example.test/plaintext.zip', checksum: 'legacy-checksum' }),
+  {},
+);
+assert.equal((await response.json()).version, '1.0.1438', 'minNative가 없던 실제 legacy plaintext manifest도 호환');
+for (const { name, manifest: invalidLegacyManifest } of [
+  { name: 'legacy v4도 공백 sessionKey를 plaintext로 폴백하지 않음', manifest: { ...encryptedBase, sessionKey: ' ' } },
+  { name: 'legacy v4도 malformed minNative를 허용하지 않음', manifest: { version: '1.0.1438', url: 'https://example.test/plaintext.zip', checksum: 'legacy-checksum', minNative: '4junk' } },
+]) {
+  response = await worker.fetch(
+    otaRequest({ platform: 'android', is_prod: true, version_name: 'builtin', version_code: '4' }),
+    envForManifest(invalidLegacyManifest),
+    {},
+  );
+  assert.deepEqual(await response.json(), {}, name);
+}
+
+for (const { name, body } of [
+  { name: 'v5 legacy Production 셸은 평문 manifest 차단', body: { platform: 'android', is_prod: true, version_name: 'builtin', version_code: '5' } },
+  { name: '명시적 Production 채널은 v4여도 평문 manifest 차단', body: { platform: 'android', defaultChannel: 'production', version_name: 'builtin', version_code: '4' } },
+  { name: 'beta 채널은 평문 manifest 차단', body: { platform: 'android', defaultChannel: 'beta', version_name: 'builtin', version_code: '5' } },
+  { name: 'null 채널은 필드 부재로 정규화하지 않음', body: { platform: 'android', defaultChannel: null, is_prod: true, version_name: 'builtin', version_code: '4' } },
+  { name: '객체 채널은 필드 부재로 정규화하지 않음', body: { platform: 'android', defaultChannel: {}, is_prod: true, version_name: 'builtin', version_code: '4' } },
+  { name: '빈 채널은 필드 부재로 정규화하지 않음', body: { platform: 'android', defaultChannel: '', is_prod: true, version_name: 'builtin', version_code: '4' } },
+  { name: '부분 숫자 versionCode는 legacy 예외 차단', body: { platform: 'android', is_prod: true, version_name: 'builtin', version_code: '4junk' } },
+  { name: '소수 versionCode는 legacy 예외 차단', body: { platform: 'android', is_prod: true, version_name: 'builtin', version_code: 4.5 } },
+  { name: '누락 versionCode는 legacy 예외 차단', body: { platform: 'android', is_prod: true, version_name: 'builtin' } },
+  { name: 'null JSON 본문은 fail-closed', body: null },
+  { name: '배열 JSON 본문은 fail-closed', body: [] },
+]) {
+  response = await worker.fetch(otaRequest(body), legacyPlaintextEnv, {});
+  assert.equal(response.status, 200, name);
+  assert.deepEqual(await response.json(), {}, name);
+}
+
+// #1489 이전 release 셸은 defaultChannel 없이 native is_prod:true만 보냈다.
+// 공개키가 없는 기존 v4 Production 셸도 encrypted manifest는 받지 않는다.
+response = await worker.fetch(otaRequest({ platform: 'android', is_prod: true, version_name: 'builtin', version_code: '4' }), env, {});
+assert.equal(response.status, 200);
+assert.deepEqual(await response.json(), { message: 'min native 5 > 4' });
 
 // #1489 fail-closed 계약 — defaultChannel이 없거나 beta/production이 아니면 절대 production으로
 // 새지 않는다(옛 custom_id 기반 로직은 미설정 시 production을 내려줬다 — 그 회귀 재발 방지).

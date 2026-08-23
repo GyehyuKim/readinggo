@@ -2111,6 +2111,11 @@ async function imgProxy(searchParams) {
    상한과 provider 일일 예산을 원자 예약한 뒤 기존 디스패처로 보낸다. */
 async function bookProviderRequest(request, q, env, ctx) {
   const isbn = (q.get('isbn') || '').trim();
+  const query = (q.get('query') || q.get('q') || '').trim().slice(0, 100);
+  // Provider 호출이 필요 없는 잘못된 입력은 cache key 생성과 원자 예산 예약보다 먼저 거부한다.
+  // 그렇지 않으면 공격자가 빈 query/잘못된 ISBN만으로 전역 일일 예산을 소진할 수 있다.
+  if (isbn && !/^\d{10,13}$/.test(isbn)) return json({ error: 'isbn 형식 오류' }, 400);
+  if (!isbn && !query) return json({ error: 'query 또는 isbn 필요' }, 400);
   const provider = isbn && nlkReady(env) ? 'nlk' : (!isbn && kakaoReady(env) ? 'kakao' : 'aladin');
   const cacheUrl = new URL('https://book-provider-cache.internal/aladin');
   cacheUrl.searchParams.set('provider', provider);
@@ -2809,7 +2814,7 @@ async function devReviewPersonaProxy(request, env, url) {
 }
 
 // OTA Live Updates (#876) — Capgo capacitor-updater protocol v7. KV 기반 채널 매니페스트.
-// 업데이트면 {version,url,checksum}, 없으면 {} 반환(Capgo 규약: url 생략 = no update).
+// 업데이트면 {version,url,checksum,sessionKey?}, 없으면 {} 반환(Capgo 규약: url 생략 = no update).
 // 채널(beta|production)은 defaultChannel 필드로 선택한다 — capacitor.config.json
 // plugins.CapacitorUpdater.defaultChannel(네이티브 CapgoUpdater.createInfoObject)이
 // 앱의 *첫* 체크 요청부터 매번 싣는 필드라, 런타임 JS 호출(setChannel) 없이도 빌드 시점에
@@ -2823,25 +2828,58 @@ async function devReviewPersonaProxy(request, env, url) {
 async function otaCheck(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   let b = {};
-  try { b = await request.json(); } catch (e) {}
+  try {
+    const parsed = await request.json();
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) b = parsed;
+  } catch (e) {}
   const platform = (b.platform === 'ios' || b.platform === 'electron') ? b.platform : 'android';
+  const hasDefaultChannel = Object.prototype.hasOwnProperty.call(b, 'defaultChannel');
   const requestedChannel = typeof b.defaultChannel === 'string' ? b.defaultChannel : '';
   const explicitChannel = requestedChannel === 'beta' || requestedChannel === 'production';
-  // #1489 이전 release 셸은 defaultChannel 없이 is_prod:true만 보낸다. 이 경우에만
-  // production 호환을 유지한다. DEV(is_prod:false), 필드 누락, 명시적 미상 채널은 no-update다.
-  const legacyProduction = requestedChannel === '' && b.is_prod === true;
+  // #1489 이전 release 셸은 defaultChannel 필드 자체가 없이 is_prod:true만 보낸다. 이 경우에만
+  // production 호환을 유지한다. null·객체·빈 문자열·미상 채널은 legacy로 정규화하지 않는다.
+  const legacyProduction = !hasDefaultChannel && b.is_prod === true;
   if (!explicitChannel && !legacyProduction) return json({}); // fail closed
   const channel = legacyProduction ? 'production' : requestedChannel;
   const cur = b.version_name || 'builtin';                       // 현재 깔린 번들 버전
-  const nativeCode = parseInt(b.version_code || b.version_build || '0', 10) || 0; // 네이티브 versionCode
+  const rawNativeCode = Object.prototype.hasOwnProperty.call(b, 'version_code') ? b.version_code : b.version_build;
+  const nativeCodeText = typeof rawNativeCode === 'number' ? String(rawNativeCode) : rawNativeCode;
+  const validNativeCode = typeof nativeCodeText === 'string' && /^[1-9]\d*$/.test(nativeCodeText)
+    && Number.isSafeInteger(Number(nativeCodeText));
+  const nativeCode = validNativeCode ? Number(nativeCodeText) : 0;
+  if (!validNativeCode) return json({}); // malformed/누락은 KV 조회·legacy plaintext 예외 모두 불가
   if (!env.OTA_KV) return json({});                              // KV 미바인딩 → no update
   const raw = await env.OTA_KV.get(`ota:${platform}:${channel}`);
   if (!raw) return json({});                                     // 채널 비어있음 → no update
   let m; try { m = JSON.parse(raw); } catch (e) { return json({}); }
-  if (!m || !m.version || !m.url) return json({});
+  const validVersion = typeof m?.version === 'string' && m.version.length > 0
+    && m.version === m.version.trim();
+  let validUrl = false;
+  if (typeof m?.url === 'string' && m.url.length > 0 && m.url === m.url.trim()) {
+    try {
+      const parsedUrl = new URL(m.url);
+      validUrl = parsedUrl.protocol === 'https:' && !parsedUrl.username && !parsedUrl.password;
+    } catch (e) { /* malformed URL → no update */ }
+  }
+  if (!validVersion || !validUrl) return json({});
   if (m.version === cur) return json({});                        // 이미 최신
-  if ((m.minNative || 0) > nativeCode) return json({ message: `min native ${m.minNative} > ${nativeCode}` }); // 구 셸 → 스킵(스토어 업데이트 유도)
-  return json({ version: m.version, url: m.url, checksum: m.checksum || '' });
+  const hasSessionKey = Object.prototype.hasOwnProperty.call(m, 'sessionKey');
+  const validSessionKey = typeof m.sessionKey === 'string' && m.sessionKey.length > 0
+    && m.sessionKey === m.sessionKey.trim();
+  if (hasSessionKey && !validSessionKey) return json({});         // invalid encrypted manifest는 plaintext로 폴백 금지
+  const hasMinNative = Object.prototype.hasOwnProperty.call(m, 'minNative');
+  const validMinNative = Number.isSafeInteger(m.minNative) && m.minNative > 0;
+  if (hasMinNative && !validMinNative) return json({});           // malformed 하한은 비교 우회 금지
+  const validChecksum = typeof m.checksum === 'string' && /^[a-f0-9]{64}$/i.test(m.checksum);
+  if (validSessionKey && (!validMinNative || m.minNative < 5 || !validChecksum)) return json({}); // encrypted v5+SHA-256 필수
+  if (validMinNative && m.minNative > nativeCode) return json({ message: `min native ${m.minNative} > ${nativeCode}` }); // 구 셸 → 스킵(스토어 업데이트 유도)
+  // 평문 read compatibility는 defaultChannel이 없던 구 Production 셸(v4 이하)에만 허용한다.
+  // v5 또는 명시적 beta/production 요청은 sessionKey가 없으면 public-key 보호를 우회할 수
+  // 있으므로 fail-closed no-update다. 신규 workflow는 평문 manifest를 발행하지 않는다.
+  if (!hasSessionKey && !(legacyProduction && validNativeCode && nativeCode <= 4)) return json({});
+  const update = { version: m.version, url: m.url, checksum: m.checksum || '' };
+  if (validSessionKey) update.sessionKey = m.sessionKey;
+  return json(update);
 }
 
 function json(obj, status, maxAge) {

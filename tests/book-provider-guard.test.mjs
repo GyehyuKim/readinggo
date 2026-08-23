@@ -79,6 +79,18 @@ try {
   assert.equal(upstreamCalls, 1, '정규화된 동일 검색은 upstream을 다시 호출하면 안 된다');
   assert.equal(guardCalls, 1, 'cache hit은 provider budget을 다시 소비하면 안 된다');
 
+  for (const invalidUrl of [
+    'https://readinggo.example/aladin?query=',
+    'https://readinggo.example/aladin?isbn=not-an-isbn',
+  ]) {
+    const invalid = await worker.fetch(new Request(invalidUrl, {
+      headers: { 'CF-Connecting-IP': '203.0.113.10' },
+    }), env, ctx);
+    assert.equal(invalid.status, 400);
+  }
+  assert.equal(guardCalls, 1, '잘못된 입력은 provider 일일 예산을 소비하면 안 된다');
+  assert.equal(upstreamCalls, 1, '잘못된 입력은 provider를 호출하면 안 된다');
+
   const blockedEnv = {
     ...env,
     BOOK_PROVIDER_GUARD: {
