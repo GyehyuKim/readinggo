@@ -816,6 +816,30 @@
         return !!row;
       },
     },
+
+    /* 친구 책나무 (#1454) — base table을 조합하지 않고 필드 제한 RPC만 사용. */
+    friendBookTree: {
+      async get(ownerId) {
+        if (!ownerId) throw new Error('friend_tree_forbidden');
+        return unwrap(await sb().rpc('friend_book_tree', { p_owner_id: ownerId }));
+      },
+      async leaves(ownerId, bookId, offset, limit) {
+        if (!ownerId || !bookId) throw new Error('friend_tree_forbidden');
+        return unwrap(await sb().rpc('friend_book_tree_leaves', {
+          p_owner_id: ownerId,
+          p_book_id: bookId,
+          p_offset: Math.max(0, Number(offset) || 0),
+          p_limit: Math.min(50, Math.max(1, Number(limit) || 20)),
+        })) || [];
+      },
+      async getSharing() {
+        return unwrap(await sb().rpc('friend_book_tree_sharing_status'));
+      },
+      async setSharing(enabled) {
+        return unwrap(await sb().rpc('friend_book_tree_set_sharing', { p_enabled: enabled === true }));
+      },
+    },
+
     users: {
       async search(query) {
         if (!query) return [];

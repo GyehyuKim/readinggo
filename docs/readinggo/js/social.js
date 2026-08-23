@@ -147,6 +147,7 @@ function DiscoverLayer({ state }) {
           bookAuthor: bk.author || '',
           isMine: !!(myId && s.user_id === myId),
           userId: s.user_id || (u && u.id) || null,
+          friendTreeSentence: true,
         };
       }));
     }).catch(() => { if (alive) setItems([]); });
@@ -263,7 +264,18 @@ function DiscoverLayer({ state }) {
             : (<>추천할 한 문장이 아직 없어요.<br />책을 등록하면 같은 책 독자의 문장을 추천해드려요.</>)}
         </div>
       ) : (
-        <div style={{ padding: '0 16px' }}>{items.map((it, i) => (<SentenceCard key={it.id || i} item={it} bookId={it.bookId} />))}</div>
+        <div style={{ padding: '0 16px' }}>{items.map((it, i) => (
+          <div key={it.id || i}>
+            <SentenceCard item={it} bookId={it.bookId} />
+            {!it.isMine && it.userId && window.RG_flag && window.RG_flag('friendBookTree') && (
+              <button type="button" onClick={() => window.RG_openFriendTree && window.RG_openFriendTree(it.nick)}
+                aria-label={`${it.nick}님의 책나무 보기`}
+                style={{ margin: '0 0 10px 10px', border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-tint)', color: 'var(--brand-3)', padding: '5px 11px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
+                책나무 보기
+              </button>
+            )}
+          </div>
+        ))}</div>
       )}
     </React.Fragment>
   );

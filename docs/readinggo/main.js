@@ -18,6 +18,7 @@ import './js/components.js';
 import './js/moderation.js'; // #1392 UGC 약관·신고·차단 공용 UI
 import './js/sentence-card.js';
 import './js/book-info-modal.js';
+import './js/friend-book-tree-view.js';
 import './js/user-profile-modal.js';
 import './js/sentence-collection-modal.js';
 import './js/share-card.js';
