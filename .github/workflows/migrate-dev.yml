@@ -120,7 +120,8 @@ jobs:
           from pathlib import Path
 
           sql = Path('tests/sql/friend-book-tree.sql').read_text()
-          if not re.search(r'(?is)^\s*begin;.*rollback;\s*$', sql):
+          executable_sql = re.sub(r'(?m)^\s*--.*$', '', sql)
+          if not re.search(r'(?is)^\s*begin;.*rollback;\s*$', executable_sql):
               raise SystemExit('friend tree role matrix must be transaction-scoped and end in rollback')
           dev_url = os.environ['DEV_SUPABASE_URL'].rstrip('/')
           match = re.fullmatch(r'https://([a-z0-9]+)\.supabase\.co', dev_url)
