@@ -135,18 +135,20 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - 완료된 조회 구간의 핵심 이벤트가 0건이면 `dataQuality: ok`로 두지 않고 `collection_silence` critical anomaly로 판정한다. 이는 “사용자 행동 0”을 자동 확정하는 값이 아니라 수집 중단 가능성을 운영자가 확인해야 하는 fail-visible 신호다.
 - PostHog Personal API key는 읽기 전용 GitHub Secret으로만 보관한다. 미설정이면 workflow는 명시적으로 실패하되 앱 배포를 막지 않는다.
 
-### 3.1.3 책나무·성장 리듬 측정 계약 (v17, 구현 후속)
+### 3.1.3 책나무·성장 리듬 측정 계약 (v17, 단계 구현)
 
-이 계약은 v17 코드 전환 뒤에만 활성화한다. `origin/main@39248ef`에서 발화 중인 XP·스트릭·둥지 이벤트는 구현 사실로 보존하되 신규 KPI에 섞지 않는다. 아래 이벤트명·property명·bucket명·대시보드명은 구현 논의를 위한 **후보**이며 제품·개인정보 승인 전 활성 계약이 아니다. 정본은 이름이 아니라 아래 결과를 재현 가능하게 측정하는 것이다.
+#1454 확장 단계에서 친구 책나무 조회·가지 열기 이벤트를 stable DEV에 구현한다. 나머지 내 책나무·리듬 이벤트명·property명·bucket명·대시보드명은 후속 후보이며 제품·개인정보 승인 전 활성 계약이 아니다. XP·스트릭·둥지 이벤트는 신규 KPI에 섞지 않는다.
 
-| 후보 이벤트 | 후보 발화 시점 | 후보 속성 | 금지 속성 |
-|---|---|---|---|
-| `book_tree_viewed` | 책나무 목적지 진입 후 데이터 렌더 성공 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point` | 정확한 문장 수, 책 제목, 문장 원문 |
-| `book_tree_branch_opened` | 가지 목록에서 책 상세를 열 때 | `book_id`, `book_status`, `leaf_count_bucket` | 문장 원문, 개인 메모 |
-| `book_tree_filter_used` | 검색·상태 필터 결과가 적용될 때 | `filter_type`, `result_count_bucket` | 검색어 원문 |
-| `reading_rhythm_viewed` | 최근 14일 리듬이 렌더될 때 | `active_day_count`, `cumulative_growth_days_bucket` | 날짜별 원문 기록 |
-| `book_candidate_added` | 관심 책 저장 성공 뒤 | `book_id`, `source` | 책 검색어 원문 |
-| `book_paused` | 사용자가 명시적으로 중단 상태로 전환한 뒤 | `book_id`, `previous_status` | 미독서 기간을 실패값으로 해석한 속성 |
+| 상태 | 이벤트 | 발화 시점 | 허용 속성 | 금지 속성 |
+|---|---|---|---|---|
+| DEV 구현 | `friend_book_tree_viewed` | 제한 RPC 성공 후 친구 책나무가 렌더될 때 1회 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point=profile|feed` | 사용자 ID·핸들, 정확한 개수, 책 ID·제목, 문장 원문, 공개범위 판정 이유 |
+| DEV 구현 | `friend_book_tree_branch_opened` | 친구 책나무 가지를 열 때 | `book_status`, `leaf_count_bucket`, `entry_point=profile|feed` | 책 ID·제목, 사용자 ID, 문장 원문·개수 |
+| 후보 | `book_tree_viewed` | 내 책나무 목적지 진입 후 데이터 렌더 성공 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point` | 정확한 문장 수, 책 제목, 문장 원문 |
+| 후보 | `book_tree_branch_opened` | 내 책나무 가지 목록에서 책 상세를 열 때 | `book_id`, `book_status`, `leaf_count_bucket` | 문장 원문, 개인 메모 |
+| 후보 | `book_tree_filter_used` | 검색·상태 필터 결과가 적용될 때 | `filter_type`, `result_count_bucket` | 검색어 원문 |
+| 후보 | `reading_rhythm_viewed` | 최근 14일 리듬이 렌더될 때 | `active_day_count`, `cumulative_growth_days_bucket` | 날짜별 원문 기록 |
+| 후보 | `book_candidate_added` | 관심 책 저장 성공 뒤 | `book_id`, `source` | 책 검색어 원문 |
+| 후보 | `book_paused` | 사용자가 명시적으로 중단 상태로 전환한 뒤 | `book_id`, `previous_status` | 미독서 기간을 실패값으로 해석한 속성 |
 
 - 정확한 가지·잎 수는 제품 화면의 사용자 소유 데이터이며, PostHog에는 구간값만 보낸다. Admin 운영 집계가 필요하면 Supabase의 권한 제한 집계를 사용한다.
 - `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`는 과거 데이터에서만 legacy로 취급한다. 새 번들의 이벤트 상수·호출·속성 정의는 제거하고 WAU·리텐션·책나무 퍼널의 분자·분모에 포함하지 않는다.

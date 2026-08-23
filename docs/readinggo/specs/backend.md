@@ -47,6 +47,14 @@
 - 친구의 잎 본문과 개수는 해당 viewer가 `sentences_public`을 통해 실제로 읽을 수 있는 문장만 포함한다. `private` 문장의 존재·개수·본문과 `my_note`는 어떤 집계·빈 상태·차이 계산으로도 누출하지 않는다.
 - 내부 테이블 직접 조회를 피처 계약으로 삼지 않는다. 친구 책나무는 필드가 제한된 view 또는 `SECURITY INVOKER/DEFINER` RPC와 테스트 가능한 RLS 경계를 사용한다.
 
+**확장 단계 구현 (#1454, DEV 선배포):** migration `56_friend_book_tree.sql`은 다음 SECURITY DEFINER RPC를 추가한다.
+
+- `friend_book_tree(uuid)` — owner와 `book_id`, 허용된 책 메타데이터, `reading|completed|aborted|wish`, viewer-visible `visible_leaf_count`만 반환한다. `user_books`/`wish_books` 내부 행 UUID, 활동 시점, 문장 본문은 반환하지 않는다.
+- `friend_book_tree_leaves(owner_id, book_id, offset, limit)` — 선택한 canonical `book_id`의 viewer-visible 문장을 최신순으로 페이지 조회한다. 기본 20개, 요청당 최대 50개이며 owner·상호 팔로우·moderation·공유 설정을 요약 RPC와 동일하게 다시 검사한다.
+- `friend_book_tree_sharing_status()`·`friend_book_tree_set_sharing(boolean)` — owner의 공개 상태를 조회·즉시 철회한다.
+
+설정 정본은 `users.settings.friend_tree_sharing={policy_version:'2026-08-23', opted_out:boolean, revoked_at}`이며, 코드 선배포 동안 키 없음·손상 값은 `enabled=false`로 fail-closed한다. `friendBookTree` UI 플래그는 `VITE_READINGGO_ENV=development`에서만 켜고 Production에서는 off다. 기존 사용자 자동 활성화는 사전 고지·효력일 이후 별도 migration으로 수행하며, 이 단계에서는 broad base RLS를 축소하지 않는다.
+
 **문장 저장 목표 (#1457)**: OCR·직접입력·배치/import와 `public|followers|private` 모두 공백 제거 후 최대 1,000자를 저장한다. 200자 초과를 제외하거나 `private`로 강제하지 않고 사용자가 선택한 공개범위를 보존한다. 1,001자 이상은 클라이언트 저장 경계에서 `Array.from(trimmed).slice(0, 1000).join('')`과 동등한 Unicode 문자 기준으로 앞 1,000자를 저장하고, 절단 사실을 화면의 비차단 경고로 알린다. DB CHECK와 직접 API는 잘못된 우회 입력을 막기 위해 최종값 1~1,000자를 계속 강제하며 1,001자 원문을 그대로 수용하지 않는다. 아래 §7.2·§7.3의 200/1,000 조건부 경계는 `origin/main@39248ef`의 현행 as-built이며 #1457 구현 전까지 목표 완료로 해석하지 않는다.
 
 #### 7.0.3 현재 보안 갭과 전환 게이트

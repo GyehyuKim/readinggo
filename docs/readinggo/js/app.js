@@ -477,7 +477,12 @@ function App() {
   useEffect(() => { if (window.RG_applyConsent) window.RG_applyConsent(window.RG_consent && window.RG_consent.get()); }, []);
   // 타인 프로필 모달(§5.8.2) — @핸들 탭으로 열림. SentenceCard 가 window.RG_openProfile 호출.
   const [profileHandle, setProfileHandle] = useState(null);
-  useEffect(() => { window.RG_openProfile = (h) => setProfileHandle(h); return () => { window.RG_openProfile = null; }; }, []);
+  const [profileTreeStart, setProfileTreeStart] = useState(null);
+  useEffect(() => {
+    window.RG_openProfile = (h) => { setProfileTreeStart(null); setProfileHandle(h); };
+    window.RG_openFriendTree = (h) => { setProfileTreeStart('feed'); setProfileHandle(h); };
+    return () => { window.RG_openProfile = null; window.RG_openFriendTree = null; };
+  }, []);
   // 설정 탭 진입 — 이전 모달 방식에서 탭 전환으로 변경 (#library-tab-ux).
   useEffect(() => { window.RG_openSettings = () => switchTab('settings'); return () => { window.RG_openSettings = null; }; }, []);
   // 같이읽기 방 모달(co-reading.md §5.3) — 방 카드·badge·미리보기에서 window.RG_openRoom(roomId) 로 열림.
@@ -1354,7 +1359,7 @@ function App() {
 
         {/* 타인 프로필 모달 (§5.8.2) — @핸들 탭으로 열림 */}
         {profileHandle && ReactDOM.createPortal(
-          <UserProfileModal handle={profileHandle} onClose={() => setProfileHandle(null)} />,
+          <UserProfileModal handle={profileHandle} initialFriendTree={profileTreeStart} onClose={() => { setProfileHandle(null); setProfileTreeStart(null); }} />,
           document.body
         )}
 

@@ -84,6 +84,7 @@ jobs:
           node tests/ceremony-sentence-action.test.mjs
           node tests/companion-turn-limit.test.mjs
           node tests/forest-like-count.test.mjs
+          node --test tests/friend-book-tree.test.mjs
           node tests/liked-sentence-consistency.test.mjs
           node tests/library-reading-highlight.test.mjs
           node tests/topbar-nest-count.test.mjs
