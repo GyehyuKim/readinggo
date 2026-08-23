@@ -72,6 +72,7 @@ jobs:
           node tests/book-tree-selector.test.mjs
           node tests/book-tree-home-ui.test.mjs
           node tests/book-tree-surface.test.mjs
+          node --test tests/completed-review-save.test.mjs
           node tests/user-facing-book-tree-copy.test.mjs
           node tests/phase4-legacy-absence.test.mjs
           node tests/phase4-db-migration.test.mjs

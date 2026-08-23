@@ -194,6 +194,17 @@
         }
         return row;
       },
+      // 이미 완독한 행의 메타데이터 편집 — 완독 시점/status를 다시 쓰지 않는다 (#1402).
+      async updateReview(userBookId, reviewText) {
+        const id = await uid();
+        return unwrap(await sb().from('user_books').update({ review_text: reviewText || null })
+          .eq('id', userBookId).eq('user_id', id).eq('status', 'completed').select().single());
+      },
+      async updateRating(userBookId, rating) {
+        const id = await uid();
+        return unwrap(await sb().from('user_books').update({ rating: rating || null })
+          .eq('id', userBookId).eq('user_id', id).eq('status', 'completed').select().single());
+      },
       // 참새 완독 회고 캐시 (#352) — user_books.companion_recap. 본인 행만(RLS ub_mod).
       async saveRecap(userBookId, recap) {
         const id = await uid();
