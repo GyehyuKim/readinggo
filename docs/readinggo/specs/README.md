@@ -1,6 +1,7 @@
 # ReadingGo 스펙 — 인덱스
 
 > **기준**: 이 디렉터리는 ReadingGo의 살아있는 SSOT다. 충돌 시 `meta/decisions.md`의 가장 최신 활성 결정 → 해당 기능 스펙 → 현재 구현·검증 증거 순으로 정합하며, 과거 v5~v16 설명은 감사 이력이지 현재 계약이 아니다.
+> **문서 분류**: 저장소 전체 문서 지도는 [`docs/README.md`](../../README.md)를 따른다. `specs/`는 활성 계약, `architecture-asbuilt.md`는 현재 구현 사실, `docs/2. specifications/`는 archive, 연구·강의·피치는 reference다.
 > **구현 사실 기준**: 현재 런타임은 [architecture-asbuilt.md](./architecture-asbuilt.md), 기능별 구현 상태와 갭은 [_traceability.md](./_traceability.md)를 따른다.
 > **원본**: `docs/2. specifications/_archive/readinggo-spec.md` 단일 문서를 2026-05-28 피처별로 분할했다. 아카이브는 현재 계약으로 사용하지 않는다.
 > **편집 정책**: 변경은 해당 피처 파일의 spec-only PR로 먼저 승인·머지한다. 코드·DEV·Production·스토어 작업은 승인된 스펙 이후에만 진행한다.

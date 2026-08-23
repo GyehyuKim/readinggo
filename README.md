@@ -56,6 +56,7 @@
 
 ```
 docs/
+  README.md                 ★ 전체 문서 지도·SSOT/archive/reference 규칙
   readinggo/                 ← ReadingGo (현재 메인 프로젝트)
     index.html               HTML 셸 (CSS 토큰·부트) — main.js 로드
     main.js                   Vite 진입 (#871) — js/* import + 마운트
@@ -64,7 +65,7 @@ docs/
     specs/                    ★ 스펙 (정본) — README.md가 인덱스
     ROADMAP.md                Phase 매트릭스 + 북모리 채택 결정
     COMPETITIVE-ANALYSIS.md   경쟁자 분석 (북모리·Bookly·Fable·리더스…)
-  0~4. */                    피치·리서치·스펙 원본·피어 피드백·유저 인터뷰
+  0~2. */                    피치·리서치·과거 통합 스펙(archive/reference)
 tests/spec-align/            스펙 ↔ 코드 정합 verifier (align_v7.py)
 loop/                        Ralph 자동화 하니스
 old/                         초기 아이디어 아카이브 (트렌드 패치노트·찍먹·GosiOps)
