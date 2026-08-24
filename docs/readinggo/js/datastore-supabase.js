@@ -232,9 +232,16 @@
           .eq('user_id', id).order('started_at', { ascending: false }));
         return (rows || []).map(_applyBookOverrides);
       },
-      async add({ book, current_page, status, rating, activate }) {
+      async add({ book, current_page, status, rating, activate, migrationId }) {
         const id = await uid();
         const bk = book && book.id ? book : await A.books.upsert(book);
+        const migrationUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(migrationId || ''))
+          ? String(migrationId) : null;
+        if (migrationUuid) {
+          const existing = unwrap(await sb().from('user_books').select('*, book:books(*)')
+            .eq('id', migrationUuid).eq('user_id', id).maybeSingle());
+          if (existing) return _applyBookOverrides(existing);
+        }
         // #772 서가 복원: status='completed'면 완독으로(completed_at·진척 100%). 기본 'reading'.
         const st = (status === 'completed') ? 'completed' : 'reading';
         const tp = (bk && bk.total_pages) || (book && book.total_pages) || 0;
@@ -242,6 +249,7 @@
           user_id: id, book_id: bk.id, status: st,
           current_page: st === 'completed' ? (tp || current_page || 0) : (current_page || 0),
         };
+        if (migrationUuid) ins.id = migrationUuid;
         if (st === 'completed') ins.completed_at = new Date().toISOString();
         // 별점(#1042 스샷 비전 추출) — 0.5~5.0, 0.5 단위로 스냅(ub_rating_range CHECK 준수). local 어댑터와 표면 일치.
         const rn = Number(rating);
@@ -400,9 +408,16 @@
         }).select().single());
       },
       // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
-      async importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
+      async importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility, migrationId }) {
         if (!userBookId) throw new Error('sentences.importExisting: userBookId 필요');
         const id = await uid();
+        const migrationUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(migrationId || ''))
+          ? String(migrationId) : null;
+        if (migrationUuid) {
+          const existing = unwrap(await sb().from('sentences').select('*')
+            .eq('id', migrationUuid).eq('user_id', id).maybeSingle());
+          if (existing) return existing;
+        }
         const sentenceVisibility = storedSentenceVisibility(visibility);
         const checked = validateSentenceText(text, sentenceVisibility);
         const settings = await A.settings.get();
@@ -411,11 +426,21 @@
           window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
           throw new Error('ugc_terms_required');
         }
-        return unwrap(await sb().from('sentences').insert({
+        const payload = {
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
           page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
           kind: 'quote', visibility: sentenceVisibility,
-        }).select().single());
+        };
+        if (migrationUuid) payload.id = migrationUuid;
+        try {
+          return unwrap(await sb().from('sentences').insert(payload).select().single());
+        } catch (error) {
+          if (!migrationUuid) throw error;
+          const existing = unwrap(await sb().from('sentences').select('*')
+            .eq('id', migrationUuid).eq('user_id', id).maybeSingle());
+          if (existing) return existing;
+          throw error;
+        }
       },
       // 사후 감상 추가·편집 (작성 시점 무관) — profile §5.8.4
       async setNote(sentenceId, my_note) {
