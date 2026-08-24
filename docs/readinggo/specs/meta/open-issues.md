@@ -90,7 +90,7 @@ v18은 책나무 사용자 표면만 보류하고 v17의 기록 비손실·XP/�
 
 | 항목 | v18 상태 | 남은 결정·증거 | 차단 범위 |
 |---|---|---|---|
-| 3번째 서재 탭 (#1515) | **확정**: 책나무 대신 서재. 네 상태를 하나의 연속 흐름에서 보고 포함·제외 필터와 정렬을 적용 | 상태 기본 포함값, 정렬 기준, 유한/순환 carousel, preload window, bounded rendering, `library` canonical route와 `nest-grow` alias, web/Android back·접근성 | 서재 UI 구현·출시 |
+| 3번째 서재 탭 (#1515) | **확정**: 책나무 대신 서재. 네 상태를 하나의 연속 흐름에서 보고 포함·제외 필터와 정렬을 적용. 0권은 검색·등록 빈 상태, 1권은 이동·loop 없는 단일 카드, 2권 이상은 유한한 실제 권수·시작·끝을 보존 | 상태 기본 포함값, 정렬 기준, 2권 이상 carousel 기술, preload window, bounded rendering, `library` canonical route와 `nest-grow` alias, web/Android back·접근성 | 서재 UI 구현·출시 |
 | 4번째 개인 활동 탭 | **방향만 합의**: 그날 읽은 책을 달력에서 보는 방향. `내활동`은 working label | 최종 명칭, 프로필 정체성·팔로우·관리자 진입 위치, 스트릭 채택, 활동일·다중 책·월간 완독·재독·로컬 날짜 규칙. Bookmory 참고 화면 검토 | 4번째 탭 정식 구현 |
 | 게스트 서재 이관 | 문장 있는 책과 `pending.book` 중심의 현행 이관을 전체 상태·위시리스트로 확대 필요 | 빈/혼합 상태, 문장 없는 책, 멱등 재시도, 부분 실패, active ID 치환, 성공 전 로컬 원본 보존 테스트 | 서재 탭 전환 |
 | 책나무 탭 아이콘 (#1453) | **보류**. Lucide `book-open`·`sprout`·`tree-deciduous` 시안과 논의 이력 보존 | 책나무 재검토 시 20px·24px, 활성/비활성·light/dark·Android 조건에서 재개 | 현재 서재 IA·데이터 구현을 차단하지 않음 |
