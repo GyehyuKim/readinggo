@@ -157,6 +157,14 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - 성장일은 분석 이벤트 합계가 아니라 권위 DB의 distinct local date에서 계산한다. 4번째 탭 명칭·달력 셀·대표 책·스트릭 규칙이 승인되기 전에는 새 활동 KPI를 확정하지 않는다.
 - Production 적용은 검증된 동일 SHA와 migration digest를 제시한 뒤 Hyu 승인을 받는다.
 
+#### v17 친구 책나무 이벤트 — 보류 이력
+
+아래 이름은 이미 구현된 DEV 이벤트와 과거 분석 재현을 위해 문서에 남긴다. v18 신규 KPI·퍼널에는 포함하지 않고, 친구 책나무 UI가 보류된 동안 새 호출을 추가하지 않는다.
+
+- `friend_book_tree_viewed`: 제한 RPC 성공 후 렌더 1회. 과거 허용 속성은 `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point`였다.
+- `friend_book_tree_branch_opened`: 가지 열기. 과거 허용 속성은 `book_status`, `leaf_count_bucket`, `entry_point`였다.
+- 두 이벤트 모두 사용자 ID·핸들·정확한 개수·책 제목·문장 원문·비공개 문장 존재·공개범위 판정 이유를 보내지 않는다.
+
 ### 3.1.4 과거 둥지 측정 이력 (#1308, superseded)
 
 `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`와 XP 기반 단계 속성은 v17이 대체한다. 아직 구현되지 않은 과거 제안이므로 신규 구현하지 않는다. 기존 코드나 저장된 분석 데이터가 발견되면 legacy로만 보존한다.
