@@ -11,12 +11,22 @@
 > **v12 갱신 (2026-07-03, #1044 코드 PR)**: §7.2.1 P1 **구현** — worker 에 provider 스위치(`KAKAO_REST_KEY`/`NLK_CERT_KEY` 자동 감지, 미설치 시 알라딘 폴백 = 무중단). 검색→카카오(영구 적재는 ISBN 국중도 재조회분만)·ISBN→국중도(+OpenLibrary 외서 폴백)·Google 영구 경로 2건 제거(검색 upsert·backfillPages PATCH)·imgProxy 화이트리스트 확장·archive 시드 게이트 격리(재설계 P2). 상세 §7.2.1 구현 상태.
 > **v13 갱신 (2026-07-28, #1350)**: DEV 소셜 로그인 provider에 의존하지 않는 합성 검수 환경 신설(§7.1.1). 브라우저 local-first 상태와 DEV 전용 Supabase 저장소를 분리하고, Production·실사용자 Auth/DataStore 경로는 fail-closed 한다.
 > **v14 갱신 (2026-08-01, #1392)**: 공개 UGC 신고·사용자 차단·운영자 검토 데이터 모델과 DataStore 계약을 신설. 상세 UX·정책 동의·출시 게이트는 [feed.md §5.7.4](./feed.md)가 SSOT다.
-> **v17 목표 결정 (2026-08-19, #1452·#1454·#1456)**: 책나무는 기존 `user_books`·`wish_books`·`sentences`의 읽기 모델이며, XP와 별도다. 친구 책나무 공개는 UI 필터가 아니라 서버 권한에서 강제한다. 아래 §7.0이 목표 계약이고, 기존 DataStore·스키마 설명은 `origin/main@39248ef`의 현행 구현이다.
+> **v18 목표 결정 (2026-08-25, #1515)**: 서재는 기존 `user_books`·`wish_books`·`sentences`와 canonical `books`의 읽기 모델이다. 책나무·친구 책나무 사용자 표면은 보류하지만 공개범위·제한 RPC/RLS·fail-closed·base RLS 축소 안전 계약은 유지한다. 아래 §7.0이 활성 데이터 계약이며 §7.0-v17은 보류 이력이다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
 
-### 7.0 책나무·성장·공개범위 목표 계약 (v17)
+### 7.0 v18 데이터·권한 경계 (#1515)
+
+1. 서재는 기존 canonical `books`, `user_books`, `wish_books`, `sentences`를 우선 재사용하는 방향이다. 별도 tree·shelf·cache 구조의 필요 여부는 구현 설계와 측정 뒤 별도 승인하며 이번 PR에서 확정하지 않는다.
+2. 기존 검색 프록시·미등록 책 등록·canonical ID/ISBN 중복 방지 계약을 유지한다.
+3. 로그인 시 게스트의 네 상태와 문장 없는 책까지 누락 없이 이관해야 한다. 정확한 migration 설계는 후속 이슈에서 결정하되 부분 실패·재시도에서 중복 행을 만들지 않고 원격 저장 성공 검증 전 로컬 원본을 지우지 않는 안전 기준은 유지한다.
+4. carousel의 preload/decode·bounded rendering은 클라이언트 성능 요구다. window·cache 수치와 권위 데이터 변경 여부는 구현 측정 전 확정하지 않는다.
+5. 4번째 탭의 활동일·대표 책·달력 계산과 데이터 원천은 미정이다. 기존 세션 데이터로 충족 가능한지 먼저 검증하고, 새 테이블·컬럼은 부족하다는 증거와 별도 제품·데이터 승인이 있을 때만 결정한다.
+6. 친구 책나무 UI와 기존 사용자 자동 활성화는 보류한다. 제한 RPC migration은 저장소에 존재하고 DEV에 선배포됐지만 Production 정책·함수·grant 적용 상태와 broad base RLS 축소는 미검증이다. private 문장의 본문·존재·개수·오류 차이를 숨기는 fail-closed 목표는 유지하되 Production 활성화 완료로 간주하지 않는다.
+7. XP·둥지·성·방패·하루 만회 전용 데이터 제거는 계속 진행하되 책·문장·진도·세션·위시·공개범위·재독 데이터를 함께 삭제하지 않는다.
+
+### 7.0-v17 책나무·성장·공개범위 계약 — 보류 이력
 
 #### 7.0.1 권위 데이터와 투영
 
