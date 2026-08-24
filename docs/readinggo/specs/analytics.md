@@ -135,28 +135,27 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - 완료된 조회 구간의 핵심 이벤트가 0건이면 `dataQuality: ok`로 두지 않고 `collection_silence` critical anomaly로 판정한다. 이는 “사용자 행동 0”을 자동 확정하는 값이 아니라 수집 중단 가능성을 운영자가 확인해야 하는 fail-visible 신호다.
 - PostHog Personal API key는 읽기 전용 GitHub Secret으로만 보관한다. 미설정이면 workflow는 명시적으로 실패하되 앱 배포를 막지 않는다.
 
-### 3.1.3 책나무·성장 리듬 측정 계약 (v17, 단계 구현)
+### 3.1.3 서재·개인 활동 측정 계약 (v18, 후보)
 
-이슈 #1454 확장 단계에서 친구 책나무 조회·가지 열기 이벤트를 stable DEV에 구현한다. 나머지 내 책나무·리듬 이벤트명·property명·bucket명·대시보드명은 후속 후보이며 제품·개인정보 승인 전 활성 계약이 아니다. XP·스트릭·둥지 이벤트는 신규 KPI에 섞지 않는다.
+책나무·친구 책나무 이벤트는 신규 활성 계약이 아니다. 서재 이벤트명·property·bucket·대시보드명도 구현 이슈에서 개인정보·표본·운영 필요를 다시 승인하기 전에는 **후보**다. 검색어·책 제목·문장 원문·개인 메모·정확한 활동 날짜를 분석에 보내지 않는다.
 
-| 상태 | 이벤트 | 발화 시점 | 허용 속성 | 금지 속성 |
+| 상태 | 이벤트 후보 | 발화 시점 | 허용 속성 | 금지 속성 |
 |---|---|---|---|---|
-| DEV 구현 | `friend_book_tree_viewed` | 제한 RPC 성공 후 친구 책나무가 렌더될 때 1회 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point=profile\|feed` | 사용자 ID·핸들, 정확한 개수, 책 ID·제목, 문장 원문, 공개범위 판정 이유 |
-| DEV 구현 | `friend_book_tree_branch_opened` | 친구 책나무 가지를 열 때 | `book_status`, `leaf_count_bucket`, `entry_point=profile\|feed` | 책 ID·제목, 사용자 ID, 문장 원문·개수 |
-| 후보 | `book_tree_viewed` | 내 책나무 목적지 진입 후 데이터 렌더 성공 | `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point` | 정확한 문장 수, 책 제목, 문장 원문 |
-| 후보 | `book_tree_branch_opened` | 내 책나무 가지 목록에서 책 상세를 열 때 | `book_id`, `book_status`, `leaf_count_bucket` | 문장 원문, 개인 메모 |
-| 후보 | `book_tree_filter_used` | 검색·상태 필터 결과가 적용될 때 | `filter_type`, `result_count_bucket` | 검색어 원문 |
-| 후보 | `reading_rhythm_viewed` | 최근 14일 리듬이 렌더될 때 | `active_day_count`, `cumulative_growth_days_bucket` | 날짜별 원문 기록 |
-| 후보 | `book_candidate_added` | 관심 책 저장 성공 뒤 | `book_id`, `source` | 책 검색어 원문 |
-| 후보 | `book_paused` | 사용자가 명시적으로 중단 상태로 전환한 뒤 | `book_id`, `previous_status` | 미독서 기간을 실패값으로 해석한 속성 |
+| 후보 | `library_viewed` | 3번째 서재 목적지 데이터 렌더 성공 후 1회 | `book_count_bucket`, `status_coverage`, `entry_point` | 사용자 ID·핸들, 정확한 책 수, 책 ID·제목, 문장 원문 |
+| 후보 | `library_carousel_navigated` | 한 번의 확정된 이전/다음 이동 뒤 | `direction`, `input=touch\|pointer\|button\|keyboard`, `cover_cache=hit\|miss\|unknown` | 책 ID·제목, swipe 좌표·속도 원문, 장치 식별자 |
+| 후보 | `library_filter_changed` | 포함/제외·정렬 결과가 적용될 때 | `included_statuses`, `excluded_statuses`, `sort_key`, `sort_direction`, `result_count_bucket` | 검색어 원문, 정확한 결과 수 |
+| 후보 | `library_search_completed` | 검색 결과가 렌더될 때 | `source`, `result_count_bucket`, `latency_bucket`, `outcome` | 검색어 원문, 책 제목·저자·ISBN 원문 |
+| 후보 | `library_book_action` | 상세 열기 또는 명시적 홈 active book 변경 성공 뒤 | `action=open_detail\|set_home_active`, `book_status`, `entry_point` | 책 제목, 문장·감상 원문 |
+| 후보 | `reading_rhythm_viewed` | 승인된 개인 활동 화면이 렌더될 때 | `active_day_count_bucket`, `cumulative_growth_days_bucket` | 정확한 날짜별 기록, 그날 읽은 책 제목 |
+| 현행 유지 | `reading_session_end` | 실제 독서 세션 저장 성공 뒤 | 기존 승인 속성 | 문장·감상 원문 |
+| 현행 유지 | `sentence_added` | 문장 영속 성공 뒤 | 기존 승인 속성 | 문장 원문·개인 메모 |
 
-- 정확한 가지·잎 수는 제품 화면의 사용자 소유 데이터이며, PostHog에는 구간값만 보낸다. Admin 운영 집계가 필요하면 Supabase의 권한 제한 집계를 사용한다.
-- `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`는 과거 데이터에서만 legacy로 취급한다. 새 번들의 이벤트 상수·호출·속성 정의는 제거하고 WAU·리텐션·책나무 퍼널의 분자·분모에 포함하지 않는다.
+- `library_carousel_navigated`는 성능 telemetry가 아니라 사용자 상호작용 후보 이벤트다. frame drop·decode·메모리는 실기기 성능 프로파일과 집계 가능한 기술 지표로 별도 검증하며 원시 pointer/touch 로그를 수집하지 않는다.
+- `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`, `book_tree_*`, `friend_book_tree_*`는 과거 데이터에서만 legacy로 취급한다. 새 번들의 이벤트 상수·호출·속성 정의와 WAU·리텐션·v18 퍼널에서 제외한다.
 - 기존 저장 이벤트 이름을 소급 변경하지 않는다. 과거 리포트는 `release_sha`·`schema_version`·컷오버 시각으로 재현한다.
 - XP 물리 삭제는 구 APK 버전 분포나 legacy 호출 소멸 telemetry를 기다리지 않는다. Production module graph·운영 쿼리에서 참조 0, DEV 백업·drop migration·schema readback 성공을 증거로 삼는다.
+- 성장일은 분석 이벤트 합계가 아니라 권위 DB의 distinct local date에서 계산한다. 4번째 탭 명칭·달력 셀·대표 책·스트릭 규칙이 승인되기 전에는 새 활동 KPI를 확정하지 않는다.
 - Production 적용은 검증된 동일 SHA와 migration digest를 제시한 뒤 Hyu 승인을 받는다.
-- `reading_session_end`와 `sentence_added`는 현행 실제 독서·기록 성공 이벤트로 보존한다. 성장일은 이벤트 합계가 아니라 권위 DB의 distinct local date를 사용한다.
-- 친구 책나무 분석에는 비공개 문장의 존재·개수나 공개범위 판정 이유를 보내지 않는다.
 
 ### 3.1.4 과거 둥지 측정 이력 (#1308, superseded)
 

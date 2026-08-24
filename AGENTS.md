@@ -15,7 +15,7 @@
 1. **[`CONTRIBUTING.md`](./CONTRIBUTING.md)** — 브랜치 네이밍, PR 규칙, 커밋 메시지, 금지 사항,
    LLM 행동 규칙(§9). **이것이 단일 진실 소스.**
 2. **[`CLAUDE.md`](./CLAUDE.md)** — Claude Code 전용 보조 지침 + Stack Lock + Pages. 다른 에이전트도 참고.
-3. **[`docs/readinggo/specs/README.md`](./docs/readinggo/specs/README.md)** — ReadingGo 스펙 인덱스 (v17). 용어 사전(§0.5)·Phase(§3)·파일 변경 조율.
+3. **[`docs/readinggo/specs/README.md`](./docs/readinggo/specs/README.md)** — ReadingGo 스펙 인덱스 (v18). 용어 사전(§0.5)·Phase(§3)·파일 변경 조율.
 
 우선순위 (모순이 있을 때): `CONTRIBUTING.md` > `CLAUDE.md` > `AGENTS.md` > `specs/README.md` > `DESIGN.md` > `ROADMAP.md` > 기타 문서.
 
@@ -24,12 +24,12 @@
 ## 프로젝트 개요 (1분 요약)
 
 - **코스**: KAIST IMMS BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습 (2026 Spring, 이지수 교수)
-- **프로젝트**: **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가고, 책과 문장이 쌓인 모습을 한 그루 **책나무**로 보여주는 독서 습관 앱. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
-- **v17 목표**: 사용자당 나무 1그루, 책당 가지 1개, 저장 문장당 잎 1장. XP·둥지 진화·스트릭 상실 UX는 신규 노출·적립에서 폐기하고, 최근 14일 독서 리듬과 누적 성장일을 사용한다. 친구 공개는 상호 팔로우 친구에게 제한하며, 4-B 결정에 따라 기존 사용자에게 사전 고지 후 자동 활성화하되 언제든 전체 opt-out할 수 있어야 한다.
-- **현행 구현 경계**: 코드에는 XP·둥지·스트릭 레거시가 남아 있으나, **Phase 4에서 제거하는 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않는다(2026-08-22 Hyu 결정). friend-tree/RLS·공개범위·재독 등 별도 구버전 안전 게이트는 이 결정의 대상이 아니다. 책·문장·세션·최근 14일 리듬·누적 성장일을 보존하면서 앱·DataStore·DB·분석의 전용 표면을 단계 삭제한다.
+- **프로젝트**: **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가는 독서 습관 앱. 타겟: *읽고 싶은데 이어가지 못하는 사람*.
+- **v18 목표**: 3번째 탭은 네 책 상태를 하나의 연속 흐름에서 검색·필터·정렬하는 **서재**다. 빠른 flick은 인접 표지 preload와 bounded rendering을 포함한다. 4번째 탭은 그날 읽은 책 중심의 개인 활동 방향이지만 명칭·스트릭·달력 집계는 미정이다.
+- **보류·유지 경계**: 책=가지·문장=잎과 친구 책나무 사용자 표면은 보류한다. XP·둥지·성·방패·하루 만회는 복원하지 않는다. 책·문장·진도·세션·위시·최근 14일 리듬·누적 성장일·공개범위·RLS 안전 계약은 유지한다.
 - **형태**: **Capacitor 채택**(런칭 결정, 2026-06) — 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드 = **Vite 전환 완료**(#871). Phase 0 데모(현행) → Phase 1 Supabase. *이전 web-first·Capacitor Phase 3 보류는 해제* (`CLAUDE.md` Stack Lock · `iOS-PLAN.md`).
 - **협업자 (dev 3인)**: maintainer 김계휴(`gyehyu`), contributor 이승원(`seungwon`)·정윤지(`jyj23-jeong`, actor slug `yunji`). 파일·기능별 고정 담당은 없으며, 세 사람은 사전에 합의된 이슈 범위에서 자기 actor slug 브랜치로 구현·PR한다. 감독 게이트를 통과한 PR은 승인 contributor·Hermes도 `main`/DEV까지 merge할 수 있고, Production 승격은 김계휴만 수행한다.
-- **주요 산출물**: `docs/readinggo/` (현행 데모), `docs/readinggo/specs/` (피처별 spec, v17 목표와 레거시 as-built 분리).
+- **주요 산출물**: `docs/readinggo/` (현행 데모), `docs/readinggo/specs/` (피처별 spec, v18 목표와 레거시 as-built 분리).
 - **언어**: 모든 커뮤니케이션과 문서는 **한국어**가 기본. 코드 식별자만 영어.
 
 ---
@@ -40,9 +40,10 @@
 |---|---|
 | 스펙 전체 지도 | `docs/readinggo/specs/README.md` |
 | 데이터 모델 · DataStore 계약 | `docs/readinggo/specs/backend.md` |
-| 책나무·성장 리듬과 레거시 XP·스트릭 경계 | `docs/readinggo/specs/nest.md`, `systems.md` |
+| 서재·개인 활동 방향 | `docs/readinggo/specs/profile.md` |
+| 홈·보류된 책나무 이력과 레거시 XP·스트릭 경계 | `docs/readinggo/specs/nest.md`, `systems.md` |
 | 같이읽기 | `docs/readinggo/specs/co-reading.md` |
-| 소셜·내서재 | `docs/readinggo/specs/social.md`, `profile.md` |
+| 소셜·공개범위 | `docs/readinggo/specs/social.md`, `feed.md`, `profile.md` |
 | 데모 코드 | `docs/readinggo/index.html` + `docs/readinggo/js/*` |
 | 도서 데이터 | **canonical = Supabase `books`** (#490). `loadBooks()` Supabase 1순위·게스트 anon RLS read. 구 정적 `books.tsv`는 제거됨(#972) — 폴백은 인라인 `RG_BOOKS`(12) 최소치. 어느 단계든 책 정보 하드코딩 금지 |
 | 결정 이력 | `docs/readinggo/specs/meta/decisions.md` |
@@ -100,7 +101,7 @@ gh pr create --title "..." --body "..."
 
 - **과분할 금지**: 관련된 변경을 과도하게 쪼개 PR 여러 개를 만들지 말 것. 1 PR = 1 논리 단위.
 - **단정하지 말 것**: 프로젝트 맥락이 불충분하면 사용자에게 묻는다. 특히 제품 의사결정,
-  책나무 시각화·레거시 삭제 순서·페르소나·숫자 추산은 임의로 채우지 않는다.
+  서재 preload/window 수치·4번째 탭 명칭·달력 집계·레거시 삭제 순서·페르소나·숫자 추산은 임의로 채우지 않는다.
 - **SLC > MVP**: 새 기능은 *Simple·Lovable·Complete* 기준. "다듬은 한 기능 > 반쯤 만든 다섯 개."
 - **한국어 응답**: 사용자가 영어로 쓰지 않는 한 한국어로 답한다.
 
