@@ -85,87 +85,280 @@ function hasPendingPublicUgc() {
   } catch (e) { return false; }
 }
 
-// 게스트(로그아웃) 상태에서 남긴 책·문장·대화(my_note)를 로그인 직후 Supabase 로 흡수
-// (backend.md §7.7). 데모 시드(_seed)는 제외 — 게스트가 직접 남긴 문장(_guest 태그, #370)을
-// 가진 책만 백필한다. 해자("축적되는 대화 데이터")가 가입 시 유실되던 구조 수정.
+// 게스트(로그아웃) 서재를 로그인 직후 Supabase 로 흡수한다(backend.md §7.7).
+// 로컬 원본은 보존하고, 원격 성공이 확인된 문장의 _guest/pending 표식만 제거한다.
 async function syncPendingToSupabase({ allowPublic = false } = {}) {
   const la = window.localStorageAdapter;
   const DS = window.SupabaseDataStore;
   if (!la || !DS) return;
   let local = {};
   try { local = la.read() || {}; } catch (e) { return; }
+  const initialBooks = Array.isArray(local.user_books) ? local.user_books : [];
+  const initialWishes = Array.isArray(local.wish_books) ? local.wish_books : [];
+  const initialPending = local.pending || {};
+  if (!initialBooks.length && !initialWishes.length && !(initialPending.book && initialPending.book.title)) return;
+
+  const norm = (v) => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const isbn = (v) => String(v || '').replace(/[^0-9x]/gi, '').toLowerCase();
+  const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v || ''));
+  const newMigrationId = () => {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.floor(Math.random() * 16);
+      return (c === 'x' ? r : ((r & 3) | 8)).toString(16);
+    });
+  };
+  const meta = (value) => {
+    const nested = value && value.book;
+    const b = nested || value || {};
+    return {
+      id: (nested ? (isUuid(value.book_id) ? value.book_id : (b.id || value.book_id)) : (b.book_id || b.id)) || '', isbn13: b.isbn13 || b.isbn || '',
+      title: b.title || '', author: b.author || '', publisher: b.publisher || b.pub || '',
+      total_pages: b.total_pages || b.total || 0, cover_url: b.cover_url || b.cover || '',
+    };
+  };
+
+  // 원격 write 전에 client UUID를 로컬에 먼저 보존한다. 응답 유실/앱 종료 뒤에도 같은 PK로 재시도한다.
+  la.mutate((state) => {
+    const userBooks = (Array.isArray(state.user_books) ? state.user_books : []).map((ub) => ({
+      ...ub,
+      _migration_user_book_id: ub._remote_user_book_id || ub._migration_user_book_id || newMigrationId(),
+      sentences: (Array.isArray(ub.sentences) ? ub.sentences : []).map((se) => (
+        se && se._guest && !se._migration_sentence_id ? { ...se, _migration_sentence_id: newMigrationId() } : se
+      )),
+    }));
+    const pending = { ...(state.pending || {}) };
+    if (pending.book && pending.book.title && !pending.book.remote_user_book_id && !pending.book._migration_user_book_id) {
+      pending.book = { ...pending.book, _migration_user_book_id: newMigrationId() };
+    }
+    if (pending.sentence && pending.sentence.text && !pending.sentence._migration_sentence_id) {
+      pending.sentence = { ...pending.sentence, _migration_sentence_id: newMigrationId() };
+    }
+    return { ...state, user_books: userBooks, pending };
+  });
+  local = la.read() || {};
   const ubs = Array.isArray(local.user_books) ? local.user_books : [];
+  const wishes = Array.isArray(local.wish_books) ? local.wish_books : [];
   const pend = local.pending || {};
-  // 게스트가 직접 남긴 문장(_guest)을 가진 책 = 백필 대상(시드 제외).
-  const guestBooks = ubs.filter(ub => (ub.sentences || []).some(se => se && se._guest));
-  // pending.book: 문장 없이 등록만 한 활성 책(체크인 전 등록) — guestBooks 에 없으면 책만 이전.
   const pb = (pend.book && pend.book.title) ? pend.book : null;
-  if (!guestBooks.length && !pb) return;
-  try {
-    let lastUbId = null, activeNewId = null;
-    const syncedSentenceKeys = new Set();
-    const sentenceKey = (se) => se && (se.id || [se.text || '', se.page ?? '', se.created_at || '', se.visibility || 'public'].join('\u001f'));
-    let pendingBookSynced = false, pendingSentenceSynced = false;
-    let pendingBookRemoteId = pb && pb.remote_user_book_id ? pb.remote_user_book_id : null;
-    for (const ub of guestBooks) {
-      const bk = ub.book || {};
-      const newUb = await DS.myBooks.add({
-        book: {
-          isbn13: bk.isbn13 || '', title: bk.title || '', author: bk.author || '',
-          publisher: bk.publisher || '', total_pages: bk.total_pages || bk.total || 0, cover_url: bk.cover_url || bk.cover || '',
-        },
-        current_page: ub.current_page || 0,
-      });
-      if (!newUb || !newUb.id) continue;
-      lastUbId = newUb.id;
-      if (ub.id && ub.id === local.active_user_book_id) activeNewId = newUb.id;
-      try { await DS.sessions.addToday({ userBookId: newUb.id, page: ub.current_page || 0 }); } catch (e) {}
-      // _guest 문장만 — my_note(대화)·kind 보존(모트 핵심). add 가 my_note 직접 수용.
+
+  const matches = (localBook, remote) => {
+    const a = meta(localBook), b = meta(remote);
+    const aId = isUuid(a.id) ? String(a.id) : '';
+    const bId = isUuid(b.id) ? String(b.id) : '';
+    if (aId && bId) return aId === bId;
+    const aIsbn = isbn(a.isbn13), bIsbn = isbn(b.isbn13);
+    if (aIsbn && bIsbn) return aIsbn === bIsbn;
+    if (aId || bId || aIsbn || bIsbn) return false;
+    return !!(norm(a.title) && norm(a.title) === norm(b.title) && norm(a.author) === norm(b.author));
+  };
+
+  let remoteBooks = [];
+  try { remoteBooks = await DS.myBooks.list(); } catch (e) {
+    console.warn('[ReadingGo] 게스트 서재 원격 책 목록 확인 실패:', e);
+    return;
+  }
+  let remoteWishes = [];
+  try { remoteWishes = DS.wishBooks && DS.wishBooks.list ? await DS.wishBooks.list() : []; }
+  catch (e) { console.warn('[ReadingGo] 게스트 찜 원격 목록 확인 실패:', e); }
+  remoteBooks = Array.isArray(remoteBooks) ? remoteBooks : [];
+  remoteWishes = Array.isArray(remoteWishes) ? remoteWishes : [];
+
+  const localToRemote = new Map();
+  const migrationResults = new Map();
+  const syncedSentenceIds = new Set();
+  const completedWishIds = new Set(Array.isArray(local._migration_completed_wish_ids) ? local._migration_completed_wish_ids.map(String) : []);
+  const syncedWishIds = new Set();
+  let pendingBookSynced = false, pendingSentenceSynced = false, pendingMigrationOwned = false;
+  let pendingActiveComplete = !!(pb && pb._migration_active_complete);
+  let pendingBookRemoteId = pb && (pb._migration_target_user_book_id || pb.remote_user_book_id || pb._migration_user_book_id);
+
+  for (let i = 0; i < ubs.length; i++) {
+    const ub = ubs[i] || {};
+    const bk = meta(ub);
+    const bookKey = ub.id || ('book-' + i);
+    if (ub._migration_complete) continue;
+    try {
+      const persistedTargetId = ub._migration_target_user_book_id || ub._remote_user_book_id || '';
+      const lookupId = persistedTargetId || ub._migration_user_book_id || '';
+      let remote = lookupId ? remoteBooks.find(row => row && String(row.id) === String(lookupId)) : null;
+      if (remote && !matches(ub, remote)) throw new Error('migration marker book mismatch');
+      if (persistedTargetId && !remote) throw new Error('previously migrated remote book not found');
+      if (!remote) remote = remoteBooks.find(row => matches(ub, row));
+      let migrationOwned = ub._migration_owned === true
+        || !!(remote && !persistedTargetId && ub._migration_user_book_id
+          && String(remote.id) === String(ub._migration_user_book_id));
+      if (!remote) {
+        const status = ub.status === 'completed' ? 'completed' : 'reading';
+        const canonicalBook = isUuid(bk.id) ? bk : { ...bk, id: '' };
+        remote = await DS.myBooks.add({
+          book: canonicalBook, status, current_page: ub.current_page || 0, rating: ub.rating,
+          activate: false, migrationId: ub._migration_user_book_id,
+        });
+        if (!remote || !remote.id) throw new Error('remote user_book id missing');
+        remote = { ...remote, status: remote.status || status, book: remote.book || bk };
+        remoteBooks.push(remote);
+        migrationOwned = true;
+      }
+      let migrationComplete = true;
+      localToRemote.set(bookKey, remote);
+      if (migrationOwned && ub.status === 'aborted' && remote.status !== 'aborted') {
+        try {
+          const aborted = await DS.myBooks.abort(remote.id);
+          remote = { ...remote, ...(aborted || {}), status: 'aborted' };
+          localToRemote.set(bookKey, remote);
+        } catch (e) {
+          migrationComplete = false;
+          console.warn('[ReadingGo] 게스트 중단 상태 백필 보류:', e.message);
+        }
+      }
+      if (migrationOwned && ub.status === 'completed' && ub.review_text && !remote.review_text && DS.books && DS.books.updateReview) {
+        try {
+          await DS.books.updateReview(remote.id, ub.review_text);
+          remote.review_text = ub.review_text;
+        } catch (e) {
+          migrationComplete = false;
+          console.warn('[ReadingGo] 게스트 완독 소감 백필 보류:', e.message);
+        }
+      }
       const gsents = (ub.sentences || []).filter(se => se && se._guest)
         .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
       for (const se of gsents) {
-        if (window.RG_normalizeStoredSentenceVisibility(se.visibility) !== 'private' && !allowPublic) continue;
-        try {
-          await DS.sentences.importExisting({ userBookId: newUb.id, page: se.page, text: se.text, my_note: se.my_note || null, kind: se.kind, visibility: se.visibility });
-          syncedSentenceKeys.add(sentenceKey(se));
-        } catch (e) { console.warn('[ReadingGo] 게스트 문장 1건 백필 보류:', e.message); }
-      }
-    }
-    // 문장 없이 등록만 한 활성 책(레거시 pending) — 중복 아니면 책만 이전.
-    if (pb && !guestBooks.some(ub => ub.book && ub.book.title === pb.title)) {
-      try {
-        const newUb = pendingBookRemoteId ? { id: pendingBookRemoteId } : await DS.myBooks.add({
-          book: { isbn13: pb.isbn13 || '', title: pb.title, author: pb.author || '', publisher: pb.publisher || '', total_pages: pb.total_pages || 0, cover_url: pb.cover_url || '' },
-          current_page: pb.current_page || 0,
-        });
-        if (newUb && newUb.id) {
-          pendingBookRemoteId = newUb.id;
-          lastUbId = activeNewId = newUb.id;
-          pendingBookSynced = true;
-          try { await DS.sessions.addToday({ userBookId: newUb.id, page: pb.current_page || 0 }); } catch (e) {}
-          if (pend.sentence && pend.sentence.text && (window.RG_normalizeStoredSentenceVisibility(pend.sentence.visibility) === 'private' || allowPublic)) {
-            try {
-              await DS.sentences.importExisting({ userBookId: newUb.id, page: pend.sentence.page, text: pend.sentence.text, visibility: pend.sentence.visibility });
-              pendingSentenceSynced = true;
-            } catch (e) { console.warn('[ReadingGo] pending 문장 백필 보류:', e.message); }
-          }
+        if (window.RG_normalizeStoredSentenceVisibility(se.visibility) !== 'private' && !allowPublic) {
+          migrationComplete = false;
+          continue;
         }
-      } catch (e) {}
+        if (!se._migration_sentence_id) {
+          migrationComplete = false;
+          continue;
+        }
+        try {
+          await DS.sentences.importExisting({
+            userBookId: remote.id, page: se.page, text: se.text, my_note: se.my_note || null,
+            kind: se.kind, visibility: se.visibility, migrationId: se._migration_sentence_id,
+          });
+          syncedSentenceIds.add(se._migration_sentence_id);
+        } catch (e) {
+          migrationComplete = false;
+          console.warn('[ReadingGo] 게스트 문장 1건 백필 보류:', e.message);
+        }
+      }
+      migrationResults.set(bookKey, {
+        targetId: remote.id, owned: migrationOwned, complete: migrationComplete,
+        activeComplete: ub._migration_active_complete === true,
+      });
+    } catch (e) { console.warn('[ReadingGo] 게스트 책 1권 백필 보류:', e.message); }
+  }
+
+  if (DS.wishBooks && DS.wishBooks.add) for (const localId of wishes) {
+    if (completedWishIds.has(String(localId))) continue;
+    try {
+      const bk = window.getBook && window.getBook(localId);
+      if (!bk || String(bk.id || '') !== String(localId)) throw new Error('local wish book not found');
+      if (remoteWishes.some(row => matches(bk, row))) {
+        syncedWishIds.add(String(localId));
+        continue;
+      }
+      const known = remoteBooks.find(row => matches(bk, row));
+      let canonical = known ? meta(known) : meta(bk);
+      if (!known && !isUuid(canonical.id) && canonical.isbn13) {
+        canonical = DS.books && DS.books.upsert ? await DS.books.upsert(meta(bk)) : null;
+      }
+      if (!canonical || !isUuid(canonical.id)) throw new Error('canonical wish book id missing');
+      await DS.wishBooks.add(canonical.id);
+      remoteWishes.push({ book_id: canonical.id, book: canonical });
+      syncedWishIds.add(String(localId));
+    } catch (e) { console.warn('[ReadingGo] 게스트 찜 1권 백필 보류:', e.message); }
+  }
+
+  if (pb) {
+    try {
+      const persistedTargetId = pb._migration_target_user_book_id || pb.remote_user_book_id || '';
+      const lookupId = persistedTargetId || pb._migration_user_book_id || '';
+      let remote = lookupId && remoteBooks.find(row => String(row.id) === String(lookupId));
+      if (remote && !matches(pb, remote)) throw new Error('pending migration marker book mismatch');
+      if (persistedTargetId && !remote) throw new Error('previously migrated pending book not found');
+      if (!remote) remote = remoteBooks.find(row => matches(pb, row));
+      pendingMigrationOwned = pb._migration_owned === true
+        || !!(remote && !persistedTargetId && pb._migration_user_book_id
+          && String(remote.id) === String(pb._migration_user_book_id));
+      if (!remote) {
+        const pendingMeta = meta(pb);
+        remote = await DS.myBooks.add({
+          book: isUuid(pendingMeta.id) ? pendingMeta : { ...pendingMeta, id: '' },
+          status: 'reading', current_page: pb.current_page || 0, activate: false,
+          migrationId: pb._migration_user_book_id,
+        });
+        if (remote && remote.id) remoteBooks.push(remote);
+        pendingMigrationOwned = true;
+      }
+      if (remote && remote.id) {
+        pendingBookRemoteId = remote.id;
+        pendingBookSynced = true;
+        if (pend.sentence && pend.sentence.text && (window.RG_normalizeStoredSentenceVisibility(pend.sentence.visibility) === 'private' || allowPublic)) {
+          try {
+            await DS.sentences.importExisting({
+              userBookId: remote.id, page: pend.sentence.page, text: pend.sentence.text,
+              visibility: pend.sentence.visibility, migrationId: pend.sentence._migration_sentence_id,
+            });
+            pendingSentenceSynced = true;
+          } catch (e) { console.warn('[ReadingGo] pending 문장 백필 보류:', e.message); }
+        }
+      }
+    } catch (e) { console.warn('[ReadingGo] pending 책 백필 보류:', e.message); }
+  }
+
+  const activeLocal = ubs.find(ub => ub && ub.id === local.active_user_book_id);
+  const activeRemote = activeLocal && localToRemote.get(activeLocal.id);
+  const activeResult = activeLocal && migrationResults.get(activeLocal.id);
+  if (activeLocal && activeLocal.status === 'reading' && activeRemote && activeRemote.status === 'reading'
+    && activeResult && activeResult.owned && !activeResult.activeComplete) {
+    try {
+      await DS.activeBook.set(activeRemote.id);
+      activeResult.activeComplete = true;
     }
-    if (activeNewId || lastUbId) { try { await DS.activeBook.set(activeNewId || lastUbId); } catch (e) {} }
-    // 성공한 항목만 표식을 제거한다. 동의/네트워크 오류 항목은 다음 로그인에서 재시도할 수 있게 보존.
-    la.mutate(s => {
-      s.pending = s.pending || {};
-      if (pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)) delete s.pending.book;
-      else if (s.pending.book && pendingBookRemoteId) s.pending.book.remote_user_book_id = pendingBookRemoteId;
-      if (pendingSentenceSynced) delete s.pending.sentence;
-      (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se => {
-        if (se && syncedSentenceKeys.has(sentenceKey(se))) delete se._guest;
-      }));
-      return s;
+    catch (e) { activeResult.complete = false; }
+  } else if (!activeLocal && pendingBookSynced && pendingBookRemoteId && pendingMigrationOwned
+    && !pendingActiveComplete
+    && remoteBooks.some(row => String(row.id) === String(pendingBookRemoteId) && row.status === 'reading')) {
+    try {
+      await DS.activeBook.set(pendingBookRemoteId);
+      pendingActiveComplete = true;
+    }
+    catch (e) { pendingBookSynced = false; }
+  }
+
+  la.mutate(s => {
+    s.pending = s.pending || {};
+    if (pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)) delete s.pending.book;
+    else if (s.pending.book && pendingBookRemoteId) {
+      s.pending.book._migration_target_user_book_id = pendingBookRemoteId;
+      s.pending.book._migration_owned = pendingMigrationOwned;
+      s.pending.book._migration_active_complete = pendingActiveComplete;
+      if (pendingMigrationOwned) s.pending.book.remote_user_book_id = pendingBookRemoteId;
+    }
+    if (pendingSentenceSynced) delete s.pending.sentence;
+    (s.user_books || []).forEach((ub, i) => {
+      const bookKey = ub.id || ('book-' + i);
+      const result = migrationResults.get(bookKey);
+      if (result) {
+        ub._migration_target_user_book_id = result.targetId;
+        ub._migration_owned = result.owned;
+        ub._migration_complete = result.complete;
+        ub._migration_active_complete = result.activeComplete;
+        if (result.owned) ub._remote_user_book_id = result.targetId;
+      }
+      (ub.sentences || []).forEach(se => {
+        if (se && syncedSentenceIds.has(se._migration_sentence_id)) delete se._guest;
+      });
     });
-    console.log('[ReadingGo] ✅ 성공한 게스트 책·문장·대화(my_note) → Supabase 백필 반영 (#370/#1392)');
-  } catch (e) { console.warn('[ReadingGo] 게스트 백필 실패:', e); }
+    s._migration_completed_wish_ids = Array.from(new Set([
+      ...(Array.isArray(s._migration_completed_wish_ids) ? s._migration_completed_wish_ids.map(String) : []),
+      ...syncedWishIds,
+    ]));
+    return s;
+  });
+  console.log('[ReadingGo] ✅ 성공한 게스트 서재 항목 → Supabase 백필 반영 (#1515)');
 }
 
 // my_note("Q. ...\nA. ...\n\n…") → [{q,a}] 파싱. companion_sessions backfill용 (#394). 관대하게.

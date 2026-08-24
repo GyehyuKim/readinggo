@@ -52,7 +52,7 @@ assert.ok(moderation.includes('rg:moderation-hidden'), 'immediate hide event mis
 assert.ok(card.includes('RG_openReport'), 'SentenceCard report entry missing');
 assert.ok(profile.includes('프로필 신고') && profile.includes('사용자 차단'), 'profile safety actions missing');
 assert.ok(app.includes('await syncPendingToSupabase({ allowPublic: ugcAccepted })'), 'private guest sync must run before UGC acceptance');
-assert.ok(app.includes('syncedSentenceKeys.has'), 'guest sync must clear only successful rows');
+assert.ok(app.includes('syncedSentenceIds.has'), 'guest sync must clear only successfully persisted migration UUIDs');
 const ugcPreflight = nest.indexOf('if (window.DataStore === window.SupabaseDataStore');
 const ugcRequired = nest.indexOf("window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'))", ugcPreflight);
 const checkinPersistence = nest.indexOf('checkinResult = onCheckin(', ugcPreflight);
@@ -70,6 +70,8 @@ assert.ok(hardening.includes("on conflict (reporter_id, target_type, target_id) 
 assert.ok(app.includes("RG_normalizeStoredSentenceVisibility(se.visibility) !== 'private' && !allowPublic"), 'public guest sentences must remain local until consent');
 assert.ok(app.includes("pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)"), 'pending book marker must survive sentence failure');
 assert.ok(app.includes('pb.remote_user_book_id'), 'partial retry must reuse the already-created remote book');
-assert.ok(app.includes('syncedSentenceKeys.has(sentenceKey(se))'), 'guest sentences without local ids must still clear after success');
+assert.ok(app.includes('syncedSentenceIds.has(se._migration_sentence_id)'), 'guest sentences without local ids must clear only after their migration UUID succeeds');
+assert.ok(supa.includes('if (migrationUuid) ins.id = migrationUuid'), 'guest user_books retries must reuse a client-persisted UUID');
+assert.ok(supa.includes('if (migrationUuid) payload.id = migrationUuid'), 'guest sentence retries must reuse a client-persisted UUID');
 
 console.log('✅ UGC moderation contract passed');
