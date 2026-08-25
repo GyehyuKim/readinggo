@@ -522,7 +522,11 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   // 공유 헬퍼 window.ocrExtractSentence(data.js) 로 OCR 호출(#939). 토스트·busy·tracking 은 여기서.
   const runOcrQuick = (file) => {
     if (!file || quickOcrBusy) return;
-    if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('이미지가 너무 커요(최대 8MB)');
+      rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_single', code: 'ocr_image_too_large', stage: 'client' }));
+      return;
+    }
     setQuickOcrBusy(true); // 스피너 오버레이(#1201)가 진행 피드백 — 시작 토스트 불필요(중복 제거)
     Promise.resolve((window.ocrExtractSentence ? window.ocrExtractSentence(file) : Promise.resolve({ text: '', error: 'unavailable' })))
       .then((d) => {

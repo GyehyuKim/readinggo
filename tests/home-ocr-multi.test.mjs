@@ -71,6 +71,8 @@ check('페이지 index를 보존해 분리한 부분 성공 결과를 본문-onl
   && /setDrafts\(\(current\) => _mergeOcrDrafts\(current, extracted\)\)/.test(batchSource));
 check('단발 OCR 성공은 source·book_id·Unicode 글자 수를 기록',
   /rgTrack\('ocr_extracted', \{ source: 'home_single', book_id: nestState\.book\.id, chars: Array\.from\(String\(d\.text\)\)\.length \}\)/.test(quickSource));
+check('단발 8MB 초과는 client failure로 기록',
+  /file\.size > 8 \* 1024 \* 1024[\s\S]{0,220}RG_createOcrFailureProps\(\{ source: 'home_single', code: 'ocr_image_too_large', stage: 'client' \}\)/.test(quickSource));
 check('홈 배치 시작은 canonical count를 기록',
   /rgTrack\('ocr_batch_started', \{ source: 'home_album', count: files\.length \}\)/.test(batchSource));
 check('홈 배치 성공은 이미지마다 source·page_idx·Unicode chars를 기록',
