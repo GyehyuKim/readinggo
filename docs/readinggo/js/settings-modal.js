@@ -20,6 +20,9 @@ function normalizeDefaultSentenceVisibility(settings) {
    한 줄 소개 편집 → 프로필 헤더 인라인 (#515). */
 function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes'); // 데이터 활용 동의 (#294)
+  const personalizationAvailable = !!(window.RG_CONFIG && window.RG_CONFIG.PERSONALIZATION_ENABLED && window.RG_personalization);
+  const [personalizationOn, setPersonalizationOn] = useState(false);
+  const [personalizationBusy, setPersonalizationBusy] = useState(personalizationAvailable);
   const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'); // 참새 질문 결 (#375)
   // 한 문장 기본 공개 범위 (#1261) — 저장 완료 후에만 선택 상태를 확정한다.
   const [sentenceVisibility, setSentenceVisibility] = useState('public');
@@ -36,6 +39,23 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
     }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
     return () => { alive = false; };
   }, []);
+  useEffect(() => {
+    let alive = true;
+    if (!personalizationAvailable) return () => { alive = false; };
+    window.RG_personalization.readControl().then((row) => { if (alive) setPersonalizationOn(!!(row && row.enabled)); })
+      .catch(() => { if (alive) setPersonalizationOn(false); })
+      .finally(() => { if (alive) setPersonalizationBusy(false); });
+    return () => { alive = false; };
+  }, []);
+  const togglePersonalization = async () => {
+    if (!personalizationAvailable || personalizationBusy) return;
+    setPersonalizationBusy(true);
+    try {
+      if (personalizationOn) { await window.RG_personalization.revoke(); setPersonalizationOn(false); showToast('내 기록 참고를 껐어요'); }
+      else { const row = await window.RG_personalization.optIn(); if (!(row && row.enabled)) throw new Error('readback failed'); setPersonalizationOn(true); showToast('내 기록을 참고한 대화를 켰어요', { sparrow: true }); }
+    } catch (e) { showToast(e && e.code === 'revoke_pending' ? '철회 처리 중이에요. 잠시 후 다시 확인해 주세요.' : '설정을 저장하지 못했어요. 다시 시도해 주세요.'); }
+    finally { setPersonalizationBusy(false); }
+  };
   const saveSentenceVisibility = (next) => {
     if (sentenceVisibilityBusy || next === sentenceVisibility) return;
     const settingsApi = window.DataStore && window.DataStore.settings;
@@ -199,6 +219,18 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
+          {personalizationAvailable && (
+            <div style={{ marginTop: 8, padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>내 기록을 참고한 대화</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>관련된 내 기록을 요청마다 최대 5개 참고해요. 꺼도 현재 문장 대화는 그대로 쓸 수 있어요.</div>
+              </div>
+              <button onClick={togglePersonalization} disabled={personalizationBusy} aria-label="내 기록 참고 토글" aria-pressed={personalizationOn}
+                style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 999, border: 'none', cursor: personalizationBusy ? 'default' : 'pointer', opacity: personalizationBusy ? 0.55 : 1, background: personalizationOn ? 'var(--brand)' : 'var(--ink-3)', position: 'relative' }}>
+                <span style={{ position: 'absolute', top: 3, left: personalizationOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
+              </button>
+            </div>
+          )}
           <fieldset disabled={sentenceVisibilityBusy} style={{ margin: '8px 0 0', padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)' }}>
             <legend style={{ padding: '0 4px', fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>한 문장 기본 공개 범위</legend>
             <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
@@ -352,6 +384,9 @@ window.SettingsModal = SettingsModal;
 function SettingsView({ spoilerReveal, setSpoilerReveal }) {
   const [subPage, setSubPage] = useState(null); // null | 'export'
   const [consentOn, setConsentOn] = useState(window.RG_consent && window.RG_consent.get() === 'yes');
+  const personalizationAvailable = !!(window.RG_CONFIG && window.RG_CONFIG.PERSONALIZATION_ENABLED && window.RG_personalization);
+  const [personalizationOn, setPersonalizationOn] = useState(false);
+  const [personalizationBusy, setPersonalizationBusy] = useState(personalizationAvailable);
   const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced');
   const [sentenceVisibility, setSentenceVisibility] = useState('public');
   const [sentenceVisibilityBusy, setSentenceVisibilityBusy] = useState(true);
@@ -367,6 +402,22 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
     }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
     return () => { alive = false; };
   }, []);
+  useEffect(() => {
+    let alive = true;
+    if (!personalizationAvailable) return () => { alive = false; };
+    window.RG_personalization.readControl().then((row) => { if (alive) setPersonalizationOn(!!(row && row.enabled)); })
+      .catch(() => { if (alive) setPersonalizationOn(false); }).finally(() => { if (alive) setPersonalizationBusy(false); });
+    return () => { alive = false; };
+  }, []);
+  const togglePersonalization = async () => {
+    if (!personalizationAvailable || personalizationBusy) return;
+    setPersonalizationBusy(true);
+    try {
+      if (personalizationOn) { await window.RG_personalization.revoke(); setPersonalizationOn(false); showToast('내 기록 참고를 껐어요'); }
+      else { const row = await window.RG_personalization.optIn(); if (!(row && row.enabled)) throw new Error('readback failed'); setPersonalizationOn(true); showToast('내 기록을 참고한 대화를 켰어요', { sparrow: true }); }
+    } catch (e) { showToast(e && e.code === 'revoke_pending' ? '철회 처리 중이에요. 잠시 후 다시 확인해 주세요.' : '설정을 저장하지 못했어요.'); }
+    finally { setPersonalizationBusy(false); }
+  };
   const saveSentenceVisibility = (next) => {
     if (sentenceVisibilityBusy || next === sentenceVisibility) return;
     const settingsApi = window.DataStore && window.DataStore.settings;
@@ -603,6 +654,16 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
           </div>
           <Toggle on={consentOn} onToggle={() => { const nv = consentOn ? 'no' : 'yes'; if (window.RG_consent) window.RG_consent.set(nv); if (window.RG_applyConsent) window.RG_applyConsent(nv); setConsentOn(nv === 'yes'); showToast(nv === 'yes' ? '선택 활용에 동의했어요' : '선택 활용을 껐어요', { sparrow: nv === 'yes' }); }} />
         </div>
+        {personalizationAvailable && <>
+          <div style={{ height: 1, background: 'var(--line)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)' }}>내 기록을 참고한 대화</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>관련된 내 기록을 요청마다 최대 5개 참고해요. 꺼도 현재 문장 대화는 그대로예요.</div>
+            </div>
+            <Toggle on={personalizationOn} onToggle={togglePersonalization} disabled={personalizationBusy} />
+          </div>
+        </>}
         <div style={{ height: 1, background: 'var(--line)' }} />
         <fieldset disabled={sentenceVisibilityBusy} style={{ margin: 0, padding: '14px', border: 'none' }}>
           <legend style={{ float: 'left', width: '100%', padding: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', marginBottom: 10 }}>한 문장 기본 공개 범위</legend>

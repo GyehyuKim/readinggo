@@ -22,7 +22,15 @@ function pickCompanionQ(text) {
   return COMPANION_QS[i];
 }
 // 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 목 질문 폴백 — 데모 무중단.
-async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid) {
+async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid, record) {
+  if (record && record.id && record.bookId && window.RG_personalization && window.RG_personalization.isEnabled()) {
+    const proof = await window.RG_personalization.requestQuestion({
+      sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote', avoid: avoid || '',
+      current_sentence_id: record.id, book_id: record.bookId, query_text: String(sentence || ''),
+      preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : ''),
+    }).catch(() => null);
+    if (proof) return { personalizationProof: proof };
+  }
   try {
     const r = await window.RG_apiFetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -33,7 +41,16 @@ async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid) {
   return pickCompanionQ(sentence);
 }
 // 멀티턴 후속 질문 (#327) — 이전 대화(exchanges) 전달 → 한 걸음 더 깊은 되물음. 실패 시 목 폴백. avoid(#372) 재생성용.
-async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind, avoid) {
+async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind, avoid, record) {
+  if (record && record.id && record.bookId && window.RG_personalization && window.RG_personalization.isEnabled()) {
+    const last = exchanges && exchanges.length ? exchanges[exchanges.length - 1].a : '';
+    const proof = await window.RG_personalization.requestQuestion({
+      sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote', avoid: avoid || '',
+      current_sentence_id: record.id, book_id: record.bookId, query_text: `${sentence || ''}\n${last || ''}`,
+      preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : ''),
+    }).catch(() => null);
+    if (proof) return { personalizationProof: proof };
+  }
   try {
     const r = await window.RG_apiFetch('/api/companion', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -42,6 +59,17 @@ async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind
     if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
   } catch (e) { /* 폴백 */ }
   return '그 답에서 한 걸음 더 들어가면, 무엇이 떠오르나요?';
+}
+function commitCompanionQuestion(value, setter, setSources) {
+  if (value && value.personalizationProof && window.RG_personalization) {
+    return window.RG_personalization.commit(value.personalizationProof, {
+      display: (data) => { setter(data.question); if (setSources) setSources(Array.isArray(data.sources) ? data.sources : []); },
+      analytics: (data) => { if (window.rgTrack && data.sources && data.sources.length) window.rgTrack('personalized_context_applied', { source_count_bucket: data.sources.length === 1 ? '1' : data.sources.length <= 3 ? '2_3' : '4_5', source_type_set: [...new Set(data.sources.map((s) => s.type))], preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'), outcome: 'applied' }); },
+    });
+  }
+  if (setSources) setSources([]);
+  setter(value);
+  return true;
 }
 // 대화 1턴(Q/A)을 서버 아카이브 (#295) — 동의 유저만. 로컬/게스트는 어댑터가 no-op.
 function archiveCompanion(bookId, sentenceText, q, a) {
@@ -111,6 +139,7 @@ function CompanionModal({ sentence, onClose }) {
   const initiallyAtCap = initialExchanges.length >= COMPANION_MAX_TURNS;
   const [exchanges, setExchanges] = _useState(initialExchanges);
   const [question, setQuestion] = _useState(null);
+  const [personalizationSources, setPersonalizationSources] = _useState([]);
   const [loading, setLoading] = _useState(_startMode !== 'note' && !initiallyAtCap);   // 감상 모드·캡 도달 진입 시 스피너 숨김
   const [answer, setAnswer] = _useState('');
   const [done, setDone] = _useState(initiallyAtCap);
@@ -167,9 +196,9 @@ function CompanionModal({ sentence, onClose }) {
     // 질문 생성은 사용자가 요청한 핵심 서비스 처리다. 선택 동의는 아래 archiveCompanion과
     // 리플레이·식별 분석만 제어하며, 미동의자도 최소 문장/책/해당 대화만 전송해 같은 추론을 받는다.
     const gen = past.length
-      ? genCompanionFollowup(sentence.text, past, bt, au, sentence.kind)
-      : genCompanionQuestion(sentence.text, bt, au, sentence.kind);
-    gen.then((q) => { if (alive) { setQuestion(q); setLoading(false); } });
+      ? genCompanionFollowup(sentence.text, past, bt, au, sentence.kind, '', sentence)
+      : genCompanionQuestion(sentence.text, bt, au, sentence.kind, '', sentence);
+    gen.then((q) => { if (alive) { commitCompanionQuestion(q, setQuestion, setPersonalizationSources); setLoading(false); } });
     return () => { alive = false; };
   }, [mode]);
   // 새 질문·답변·로딩 변화 시 대화 말단을 view로 — 답변 생성에 의한 화면 점프·오탭 방지 (#407)
@@ -225,7 +254,7 @@ function CompanionModal({ sentence, onClose }) {
     // 저장된 Q/A 포함 누적 10턴 도달 시 종료. 선택 동의 여부는 이용 가능 턴 수와 무관하다(#1409).
     if (ex.length >= COMPANION_MAX_TURNS) { setQuestion(null); setDone(true); return; }
     setLoading(true); setQuestion(null); setRated(null);
-    genCompanionFollowup(sentence.text, ex, bt, au, sentence.kind).then((q) => { setQuestion(q); setLoading(false); });
+    genCompanionFollowup(sentence.text, ex, bt, au, sentence.kind, '', sentence).then((q) => { commitCompanionQuestion(q, setQuestion, setPersonalizationSources); setLoading(false); });
   };
   // 질문 재생성 (#372) / 평가 (#371)
   const regen = () => {
@@ -233,14 +262,37 @@ function CompanionModal({ sentence, onClose }) {
     const cur = question;
     if (consent === 'yes') rgTrack('companion_q_regen', { book_id: sentence.bookId || '' });
     setLoading(true); setQuestion(null); setRated(null);
-    const gen = exchanges.length ? genCompanionFollowup(sentence.text, exchanges, bt, au, sentence.kind, cur)
-      : genCompanionQuestion(sentence.text, bt, au, sentence.kind, cur);
-    gen.then((q) => { setQuestion(q); setLoading(false); });
+    const gen = exchanges.length ? genCompanionFollowup(sentence.text, exchanges, bt, au, sentence.kind, cur, sentence)
+      : genCompanionQuestion(sentence.text, bt, au, sentence.kind, cur, sentence);
+    gen.then((q) => { commitCompanionQuestion(q, setQuestion, setPersonalizationSources); setLoading(false); });
   };
   const rate = (val) => { if (consent === 'yes') rgTrack('companion_q_rated', { book_id: sentence.bookId || '', value: val }); setRated(val); };
   const openConversationRecord = () => {
     onClose();
     if (sentence.bookId && window.RG_openBookshelfRecord) window.RG_openBookshelfRecord(sentence.bookId, sentence.id);
+  };
+  const openPersonalizationSource = (source) => {
+    onClose();
+    if (source && source.book_id && window.RG_openBookshelfRecord) window.RG_openBookshelfRecord(source.book_id, source.id);
+  };
+  const excludePersonalizationSource = async (source) => {
+    if (!(source && window.RG_personalization)) return;
+    try {
+      const ok = await window.RG_personalization.setSourceExcluded(source.type, source.id, true);
+      if (ok !== true) throw new Error('exclude failed');
+      setPersonalizationSources((items) => items.filter((item) => !(item.id === source.id && item.type === source.type)));
+      showToast('다음 대화부터 이 기록을 제외해요');
+    } catch (e) { showToast('기록 제외 설정을 저장하지 못했어요'); }
+  };
+  const deletePersonalizationSource = async (source) => {
+    if (!(source && source.id && DataStore.sentences && DataStore.sentences.remove)) return;
+    if (!window.confirm('이 문장과 연결된 감상·Q/A 기록을 모두 삭제할까요? 되돌릴 수 없어요.')) return;
+    try {
+      await Promise.resolve(DataStore.sentences.remove(source.id));
+      setPersonalizationSources((items) => items.filter((item) => item.id !== source.id));
+      window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id: source.id } }));
+      showToast('기록을 삭제했어요');
+    } catch (e) { showToast('기록을 삭제하지 못했어요'); }
   };
   const _JackAvatar = ({ size = 28 }) => (
     <div style={{ width: size, height: size, borderRadius: '50%', background: 'rgba(63,209,127,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -425,6 +477,24 @@ function CompanionModal({ sentence, onClose }) {
                     </button>
                   </div>
                 </div>
+                {personalizationSources.length > 0 && (
+                  <details style={{ marginTop: 8, borderTop: '1px solid var(--brand-soft)', paddingTop: 7 }}>
+                    <summary style={{ cursor: 'pointer', color: 'var(--brand-3)', fontSize: 11.5, fontWeight: 900 }}>참고한 내 기록 {personalizationSources.length}개</summary>
+                    <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                      {personalizationSources.map((source) => (
+                        <div key={`${source.type}:${source.id}`} style={{ padding: 8, borderRadius: 'var(--r-sm)', background: 'var(--paper-2)' }}>
+                          <div style={{ color: 'var(--ink)', fontSize: 11.5, fontWeight: 800 }}>{source.title || '내 기록'}{source.page != null ? ` · ${source.page}쪽` : ''}</div>
+                          <div style={{ marginTop: 3, color: 'var(--ink-2)', fontSize: 11, lineHeight: 1.45 }}>{source.preview || source.text || ''}</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                            <button onClick={() => openPersonalizationSource(source)} style={{ border: 0, background: 'var(--brand-soft)', color: 'var(--brand-3)', borderRadius: 999, padding: '5px 8px', fontSize: 10.5, fontWeight: 800, cursor: 'pointer' }}>기록으로 이동</button>
+                            <button onClick={() => excludePersonalizationSource(source)} style={{ border: 0, background: 'transparent', color: 'var(--ink-2)', borderRadius: 999, padding: '5px 8px', fontSize: 10.5, fontWeight: 800, cursor: 'pointer' }}>이 기록 제외</button>
+                            <button onClick={() => deletePersonalizationSource(source)} style={{ border: 0, background: 'transparent', color: 'var(--danger, #E5484D)', borderRadius: 999, padding: '5px 8px', fontSize: 10.5, fontWeight: 800, cursor: 'pointer' }}>기록 삭제</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
             </div>
           ) : null}

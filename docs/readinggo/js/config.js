@@ -16,6 +16,7 @@ window.RG_CONFIG = {
   SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://cttllwwkaddghqttyhkg.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_R-f42NFOGq3dxqMlootNlQ_Us4AdUd-',
   API_ORIGIN: RG_API_ORIGIN,                    // RG_apiFetch·raw /api/* 호출 prefix (#1230)
+  PERSONALIZATION_ENABLED: RG_BUILD_ENV === 'development', // #1309: #1373 전 Production fail-closed
   ALADIN_PROXY: RG_API_ORIGIN + '/.netlify/functions/aladin',   // 서버리스 프록시 (TTBKey 서버에만)
   // Cloudflare Turnstile 봇 검증 (#1158/#1159) — Site Key 는 공개 안전(공개용). Secret 은 워커에만.
   // 이 키로 클라가 invisible 위젯을 렌더·execute 해 토큰을 얻고, 고비용 호출에 헤더로 실어 보낸다(js/turnstile.js).

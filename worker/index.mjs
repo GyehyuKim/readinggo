@@ -12,6 +12,8 @@
    배포: npx wrangler deploy
    ========================================================= */
 
+import { personalizationContextProxy, personalizedCompanion } from './personalization.mjs';
+
 const ALADIN = 'https://aladin.co.kr/ttb/api/';
 
 /* ── 도서 데이터 provider 스위치 (#1044, spec backend.md §7.2.1) ──────────
@@ -159,6 +161,14 @@ export default {
       { const rl = await rateLimited(request, env, 'companion'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return companionProxy(request, env);
+    }
+    // #1309 내 기록 retrieval은 DEV-only. Production에서는 인증/입력보다 먼저 존재를 숨긴다.
+    if (p === '/api/companion/context') {
+      if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'companion-context'); if (rl) return rl; }
+      return personalizationContextProxy(request, env);
     }
     // Prompt Lab (#1304) — 합성 fixture만 쓰는 인증·역할 보호 실험 경로.
     // candidate는 이 명시적 경로에서만 로드하며 일반 /api/companion에는 절대 전달하지 않는다.
@@ -1078,6 +1088,11 @@ async function companionProxy(request, env) {
   // 완독 회고 모드 (#259) — 내가 남긴 한 문장들을 참새가 엮어 따뜻한 회고 한 단락.
   if (body && body.mode === 'recap') return companionRecap(body, env);
   const prompt = await getActiveCompanionPrompt(env); // active만. candidate 조회 금지.
+  if (body && body.personalization === true) {
+    if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
+    return personalizedCompanion(request, body, env,
+      (contextBlock) => generateCompanionQuestion(body, env, prompt, false, contextBlock));
+  }
   try {
     const result = await generateCompanionQuestion(body, env, prompt, false);
     return json(result, 200);
@@ -1090,7 +1105,7 @@ async function companionProxy(request, env) {
   }
 }
 
-async function generateCompanionQuestion(body, env, systemPrompt, strictLab) {
+async function generateCompanionQuestion(body, env, systemPrompt, strictLab, personalizationBlock = '') {
   const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
   const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
   const author = String((body && body.author) || '').slice(0, 120).trim();
@@ -1126,6 +1141,7 @@ async function generateCompanionQuestion(body, env, systemPrompt, strictLab) {
     + (brief ? `\n이 책에 대해 당신(진행자)이 같이 읽으며 아는 것(주제·작가·시대·톤 — 단정 말고 자연스럽게 한 조각만 녹이세요): ${brief}` : '')
     + `\n${kind === 'thought' ? `읽다가 든 내 생각(감상): "${sentence}" — 이것은 책의 인용이 아니라 독자 본인의 생각입니다. 작품 맥락을 단정하지 말고 이 생각 자체를 더 깊이 여는 질문을 하세요.` : `책에서 옮겨 적은 한 문장(인용): "${sentence}"`}${comment ? `\n내 메모(감상): ${comment}` : ''}`
     + (strictLab && body && body.userStyle ? `\n합성 사용자 스타일(실제 개인정보 아님): ${String(body.userStyle).slice(0, 300)}` : '') });
+  if (personalizationBlock) messages.push({ role: 'user', content: `사용자가 별도 동의한 과거 내 기록입니다. 아래 기록을 현재 문장과 관련 있을 때만 자연스럽게 참고하고, 관련 없으면 언급하지 마세요.\n\n${personalizationBlock}` });
   for (const e of exchanges) {
     if (e && e.q) messages.push({ role: 'assistant', content: String(e.q).slice(0, 500) });
     if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
