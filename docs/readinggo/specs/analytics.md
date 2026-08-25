@@ -123,7 +123,7 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 
 오류는 공통 allowlist `source`, `stage`, `code`, `endpoint_or_rpc`, `status`, `app_version`, `correlation_id`, `retry_count`, `item_count`만 전송한다. OCR 홈 앨범 실패에 한해 `page_idx`를 추가로 허용한다. 로그인 사용자의 PostHog distinct ID는 Supabase UUID만 쓰되 선택 동의자에 한하고, email person property는 전송하지 않는다.
 
-### 3.1.2 OCR 이벤트 계약 (#1498)
+### 3.1.1.1 OCR 이벤트 계약 (#1498)
 
 OCR 분석은 원문을 수집하지 않고 성공·실패와 surface 수준의 비민감 메타데이터만 기록한다. `chars`는 Unicode 문자 수이며 `page_idx`는 사용자가 선택한 홈 앨범 안의 0-based 위치일 뿐 책의 실제 페이지 번호가 아니다.
 
@@ -143,7 +143,7 @@ OCR 분석은 원문을 수집하지 않고 성공·실패와 surface 수준의 
 - `ocr_failed`에는 `book_id`를 넣지 않는다. 실패 원인 진단에는 `source`·`stage`·`code`와 선택 `page_idx`·`status`면 충분하다.
 - OCR 원문·이미지·파일명·MIME 원문·provider 응답·자유형 오류 메시지·실제 책 페이지 번호는 성공·실패 이벤트 모두 금지한다.
 
-### 3.1.3 WAU·리텐션·주간 리포트
+### 3.1.2 WAU·리텐션·주간 리포트
 
 - **시간대/주 경계**: KST 월요일 00:00~일요일 23:59:59.
 - **WAU**: production에서 `book_opened`, `reading_session_end`, `sentence_added`, `book_completed`, `answer_saved` 중 하나 이상을 수행한 고유 PostHog `distinct_id` 수. 계정과 익명 기기가 섞일 수 있으므로 UI에는 **활성 ID**라고 표시한다.
@@ -155,7 +155,7 @@ OCR 분석은 원문을 수집하지 않고 성공·실패와 surface 수준의 
 - 완료된 조회 구간의 핵심 이벤트가 0건이면 `dataQuality: ok`로 두지 않고 `collection_silence` critical anomaly로 판정한다. 이는 “사용자 행동 0”을 자동 확정하는 값이 아니라 수집 중단 가능성을 운영자가 확인해야 하는 fail-visible 신호다.
 - PostHog Personal API key는 읽기 전용 GitHub Secret으로만 보관한다. 미설정이면 workflow는 명시적으로 실패하되 앱 배포를 막지 않는다.
 
-### 3.1.4 서재·개인 활동 측정 계약 (v18, 후보)
+### 3.1.3 서재·개인 활동 측정 계약 (v18, 후보)
 
 책나무·친구 책나무 이벤트는 신규 활성 계약이 아니다. 서재 이벤트명·property·bucket·대시보드명도 구현 이슈에서 개인정보·표본·운영 필요를 다시 승인하기 전에는 **후보**다. 검색어·책 제목·문장 원문·개인 메모·정확한 활동 날짜를 분석에 보내지 않는다.
 
@@ -185,7 +185,7 @@ OCR 분석은 원문을 수집하지 않고 성공·실패와 surface 수준의 
 - `friend_book_tree_branch_opened`: 가지 열기. 과거 허용 속성은 `book_status`, `leaf_count_bucket`, `entry_point`였다.
 - 두 이벤트 모두 사용자 ID·핸들·정확한 개수·책 제목·문장 원문·비공개 문장 존재·공개범위 판정 이유를 보내지 않는다.
 
-### 3.1.5 과거 둥지 측정 이력 (#1308, superseded)
+### 3.1.4 과거 둥지 측정 이력 (#1308, superseded)
 
 `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`와 XP 기반 단계 속성은 v17이 대체한다. 아직 구현되지 않은 과거 제안이므로 신규 구현하지 않는다. 기존 코드나 저장된 분석 데이터가 발견되면 legacy로만 보존한다.
 
