@@ -814,14 +814,14 @@ Phase 0 (localStorage, `rg_v41`):
 
 - 요청은 `Authorization: Bearer <Supabase access token>`이 필수다. Worker는 Supabase Auth로 토큰을 검증해 얻은 `auth.uid()`만 owner identity로 사용한다. body/query의 `user_id`, owner ID, 임의 source ID 목록은 받지 않으며 보내도 400으로 거부한다. 쿠키·IP·PostHog ID·DEV persona ID를 사용자 identity로 대체하지 않는다.
 - 입력은 현재 대화의 검색 단서와 현재 source 식별자만 허용한다: `{current_sentence_id, book_id, query_text, preset}`. 각 ID는 현재 bearer 소유/접근을 다시 검증한다. `query_text`는 현재 문장·메모·직전 답에서 만든 최대 2,000 Unicode 문자이며 요청 처리 외에 저장·로그하지 않는다.
-- 응답은 `{sources:[{type,id,book_id,page,created_at,preview,text}], total_chars}` 형태의 owner-verified manifest다. `sources.length<=5`, 각 `text` 합계와 `total_chars<=2000`을 Worker가 최종 강제한다. preview도 text에서 파생한 응답용 일부이며 별도 저장하지 않는다. 0건은 정상 `sources:[]`다.
-- retrieval 후 일반 companion 호출로 넘길 때도 서버 내부에서 같은 bearer와 active consent를 재검증한다. 클라이언트가 manifest를 바꿔 다른 ID/본문을 삽입할 수 없도록 opaque request nonce 또는 한 번의 서버 조립으로 결합한다. API 응답·오류·로그에는 다른 계정 record 존재 여부를 구분할 단서를 주지 않는다.
+- 응답은 `{sources:[{type,id,book_id,page,created_at,preview,text}], total_chars}` 형태의 owner-verified manifest다. `sources.length<=5`다. `total_chars`는 `text`만의 합이 아니라 LLM에 넣는 canonical retrieval context block 전체를 Unicode code point로 직렬화한 값이다. 고정 label·separator와 제목·저자·쪽수·날짜·상태·preview·본문 등 provider에 전달되는 모든 source-derived 문자열을 포함해 **2,000자 이하**를 Worker가 최종 강제한다. 안정 정렬 뒤 마지막 source의 본문/preview를 줄이고, metadata만으로 남은 예산을 넘으면 그 source를 제외한다. 0건은 정상 `sources:[]`다.
+- retrieval 후 일반 companion 호출로 넘길 때도 서버 내부에서 같은 bearer와 active consent를 재검증하고, 클라이언트가 manifest를 바꿔 다른 ID/본문을 삽입할 수 없도록 한 번의 서버 조립으로 결합한다. provider 전송 직전에는 active consent generation에 묶인 server dispatch lease를 원자 획득한 요청만 진행한다. lease에는 `user_id`·generation·opaque request ID·시각만 두고 prompt/source/응답은 저장하지 않으며, provider 호출 완료·실패·취소의 `finally`에서 해제한다. API 응답·오류·로그에는 다른 계정 record 존재 여부를 구분할 단서를 주지 않는다.
 
 **동의·계정 동기화**
 
 - `users.settings.personalized_context.policy_version='2026-08-25'`이고 `enabled=true`, `accepted_at`이 server timestamp이며 `revoked_at=null`일 때만 active다. 키 없음·형식 오류·버전 불일치·동의 저장 실패는 OFF다. 기존 `RG_consent=yes`, 대화 아카이브, 공개 문장 또는 프리셋 선택으로 채우지 않는다.
-- 최초 opt-in과 재동의는 `accepted_at=server_now`, `revoked_at=null`; 철회는 **먼저** `enabled=false`, `revoked_at=server_now`를 원자 저장한 뒤 성공을 UI에 알린다. 재동의는 새 `accepted_at`을 기록한다. 과거 동의/철회 감사 이력이 법무상 필요하면 별도 최소 audit 설계 승인을 받으며, 이번 기능이 원문·prompt·retrieval 결과 이력을 만들지는 않는다.
-- 로그인 시 server settings가 모든 기기의 정본이다. 새 기기·재설치도 계정 값을 복원하고, 오프라인에서 임의로 ON으로 전환하지 않는다. 철회 수신 후 메모리 manifest·진행 중 결과를 폐기한다. 로그아웃 시 로컬 동의 cache·source manifest를 지우며 다른 계정으로 승계하지 않는다. 게스트는 기능 설명과 로그인 경로만 제공하고 opt-in 상태를 로컬에 저장하지 않는다.
+- 최초 opt-in과 재동의는 `accepted_at=server_now`, `revoked_at=null`과 새 단조 증가 consent generation을 기록한다. 철회는 **먼저** `enabled=false`, `revoked_at=server_now`, generation 증가를 원자 저장해 신규 dispatch lease를 차단한 뒤, 이전 generation의 lease를 취소 요청하고 모두 해제될 때까지 서버에서 drain한다. active lease가 0임을 확인한 뒤에만 철회 성공을 응답한다. timeout·worker 장애·lease 해제 불확실 상태는 완료가 아니라 `pending`/실패로 응답하되 OFF 상태와 신규 lease 차단은 유지한다. lease를 TTL만으로 성공 처리하지 않는다. 과거 동의/철회 감사가 법무상 필요하면 별도 최소 audit 승인을 받으며 원문·prompt·retrieval 결과 이력은 만들지 않는다.
+- 로그인 시 server settings가 모든 기기의 정본이다. 새 기기·재설치도 계정 값을 복원하고, 오프라인에서 임의로 ON으로 전환하지 않는다. 철회 시작 즉시 메모리 manifest·진행 중 결과를 폐기하고, UI는 drain 성공 전 `철회 처리 중`으로 표시하며 완료로 단정하지 않는다. 로그아웃 시 로컬 동의 cache·source manifest를 지우며 다른 계정으로 승계하지 않는다. 게스트는 기능 설명과 로그인 경로만 제공하고 opt-in 상태를 로컬에 저장하지 않는다.
 
 **조회·RLS/권한**
 
@@ -831,7 +831,7 @@ Phase 0 (localStorage, `rg_v41`):
 
 **검증·배포 게이트**
 
-- API/DB 테스트: 무 bearer·만료/위조 bearer, body `user_id` 주입, A 사용자의 A private/public/note/Q&A, A bearer의 B record ID, 삭제/제외, missing·malformed·old policy, opt-in/철회/재동의, 두 기기 복원, 로그아웃/계정 전환, 0/1/5/6건, 1,999/2,000/2,001 Unicode 문자와 emoji/결합문자를 포함한다.
+- API/DB 테스트: 무 bearer·만료/위조 bearer, body `user_id` 주입, A 사용자의 A private/public/note/Q&A, A bearer의 B record ID, 삭제/제외, missing·malformed·old policy, opt-in/철회/재동의, 두 기기 복원, 로그아웃/계정 전환, 0/1/5/6건을 포함한다. 1,999/2,000/2,001 Unicode 경계는 본문만이 아니라 label·separator·제목·저자·쪽수·날짜·상태·preview를 포함한 canonical provider-bound block으로 emoji/결합문자까지 검증한다. 동의 확인 직후 타 기기 철회 race에서는 신규 lease가 거부되고, 이미 획득한 lease는 release 전 철회 성공 0건, drain 뒤 성공, timeout은 pending이며 성공 응답 뒤 provider 전송 0건임을 결정적으로 검증한다.
 - 보안 기대값은 타인 record가 존재/부재해도 동일한 404/빈 결과이며 본문·개수·오류 차이 누출 0이다. 테스트 로그와 fixture는 합성 데이터만 쓴다.
 - DEV route·migration·feature flag와 합성 검증은 허용한다. #1373의 OFF/ON UAT 인수 전 Production route/flag는 fail-closed OFF이며, Production migration·실사용자 opt-in·배포 승격을 실행하지 않는다.
 

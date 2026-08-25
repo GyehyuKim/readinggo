@@ -162,11 +162,11 @@
 
 - **별도 계정 opt-in, 기본 OFF**: `내 기록을 참고한 대화`는 로그인 계정별 선택 기능이다. 기존 `RG_consent`, 세션 리플레이·식별 분석·대화 아카이브/학습 동의, 문장 공개범위, 가입 또는 재키 사용 이력에서 동의를 추론하거나 일괄 승계하지 않는다. 동의 키가 없거나 손상됐거나 정책 버전이 다르면 OFF로 fail-closed한다.
 - OFF에서도 현재 문장·책 메타데이터·해당 문장의 직전 Q/A만 쓰는 §2의 10턴 핵심 대화를 동일하게 제공한다. opt-in을 거부·철회했다는 사실을 질문 문구로 압박하거나 품질 저하 카피로 사용하지 않는다.
-- 동의·철회·기기 간 복원 정본은 [backend.md §7.9.3](./backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309)의 계정 설정이다. 철회 저장이 성공한 순간부터 새 요청은 과거 기록을 조회·LLM에 전송하지 않는다. 진행 중 요청은 취소를 시도하고 그 응답은 화면·저장에 반영하지 않는다.
+- 동의·철회·기기 간 복원 정본은 [backend.md §7.9.3](./backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309)의 계정 설정이다. 철회 시작 시 서버는 먼저 OFF와 새 consent generation을 저장해 신규 provider dispatch lease를 차단하고 기존 generation 요청을 drain한다. active lease 0건을 확인한 뒤에만 `철회 완료`를 표시한다. 그 전에는 `철회 처리 중`이며 timeout/장애를 완료로 오인하지 않는다. 진행 중 결과는 즉시 화면·저장에서 폐기하고, 완료 응답 뒤 과거 기록의 신규 LLM 전송은 0건이어야 한다.
 
 #### 4.7.2 허용 source와 request-time 예산
 
-현재 대화의 입력은 retrieval 예산과 별도다. opt-in 뒤에도 서버는 **요청 시점에 본인 소유로 검증된 후보만** 관련성 순으로 골라, 아래 source를 합쳐 **최대 5건·Unicode 문자 총 2,000자**만 LLM에 추가 전송한다. 경계는 bytes/token이 아니라 Unicode code point(`Array.from(text).length`와 동등)이며, 안정된 정렬 뒤 5건을 먼저 제한하고 마지막 source 본문을 잘라 2,000자를 맞춘다.
+현재 대화의 입력은 retrieval 예산과 별도다. opt-in 뒤에도 서버는 **요청 시점에 본인 소유로 검증된 후보만** 관련성 순으로 골라, 아래 source를 합쳐 **최대 5건·Unicode 문자 총 2,000자**만 LLM에 추가 전송한다. 경계는 bytes/token이 아니라 Unicode code point다. 서버는 label·separator와 제목·저자·쪽수·작성일·상태·preview·본문 등 provider-bound retrieval block 전체를 먼저 canonical serialization하고 그 전체 길이를 2,000자로 제한한다. 안정 정렬 뒤 마지막 source의 본문/preview를 줄이며 metadata만으로 예산을 넘는 source는 제외한다.
 
 | source | 허용 필드 | 관련성 용도 |
 |---|---|---|
