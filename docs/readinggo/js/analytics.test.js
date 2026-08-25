@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createAnalyticsRuntime } from './analytics.js';
+import { createAnalyticsRuntime, createOcrFailureProps } from './analytics.js';
 
 function fakePosthog() {
   const captures = [];
@@ -73,4 +73,43 @@ test('민감 원문과 자유형 오류 속성을 중첩 객체에서도 제거�
     schema_version: 1,
     platform: 'web',
   });
+});
+
+test('OCR 실패 속성은 폐쇄형 분류와 유효한 HTTP 상태만 허용한다', () => {
+  assert.deepEqual(createOcrFailureProps({
+    source: 'home_album',
+    code: 'ocr_upstream_unavailable',
+    stage: 'upstage',
+    pageIdx: 2,
+    status: 502,
+  }), {
+    source: 'home_album',
+    code: 'ocr_upstream_unavailable',
+    stage: 'upstage',
+    page_idx: 2,
+    status: 502,
+  });
+
+  assert.deepEqual(createOcrFailureProps({
+    source: 'provider_freeform',
+    code: 'provider said: original text',
+    stage: 'internal stack',
+    pageIdx: -1,
+    status: 0,
+  }), { source: 'unknown', code: 'unknown', stage: 'unknown' });
+});
+
+test('OCR unavailable alias는 안정된 코드로 축약하고 문자열 status는 버린다', () => {
+  assert.deepEqual(createOcrFailureProps({
+    source: 'home_single',
+    code: 'unavailable',
+    stage: 'client',
+    status: '503',
+  }), { source: 'home_single', code: 'ocr_unavailable', stage: 'client' });
+
+  assert.deepEqual(createOcrFailureProps({
+    source: 'book_highlights',
+    code: 'ocr_empty',
+    stage: 'result',
+  }), { source: 'book_highlights', code: 'ocr_empty', stage: 'result' });
 });

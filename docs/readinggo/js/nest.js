@@ -522,21 +522,25 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   // 공유 헬퍼 window.ocrExtractSentence(data.js) 로 OCR 호출(#939). 토스트·busy·tracking 은 여기서.
   const runOcrQuick = (file) => {
     if (!file || quickOcrBusy) return;
-    if (file.size > 8 * 1024 * 1024) { showToast('이미지가 너무 커요(최대 8MB)'); return; }
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('이미지가 너무 커요(최대 8MB)');
+      rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_single', code: 'ocr_image_too_large', stage: 'client' }));
+      return;
+    }
     setQuickOcrBusy(true); // 스피너 오버레이(#1201)가 진행 피드백 — 시작 토스트 불필요(중복 제거)
     Promise.resolve((window.ocrExtractSentence ? window.ocrExtractSentence(file) : Promise.resolve({ text: '', error: 'unavailable' })))
       .then((d) => {
         if (d && String(d.text || '').trim()) {
           setOcrReview({ text: String(d.text), page: '', sourceBook: nestState.book.id });
           setOcrErrors({ text: '', page: '', status: '' });
-          rgTrack('ocr_extracted', { book_id: nestState.book.id, chars: d.text.length });
+          rgTrack('ocr_extracted', { source: 'home_single', book_id: nestState.book.id, chars: Array.from(String(d.text)).length });
         } else if (d && d.empty) {
           showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
-          rgTrack('ocr_failed', { book_id: nestState.book.id, code: d.code || 'ocr_empty', stage: d.stage || 'result' });
+          rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_single', code: d.code || 'ocr_empty', stage: d.stage || 'result' }));
         } else {
           const code = (d && d.error) || 'ocr_failed';
           showToast(_ocrFailureMessage(code));
-          rgTrack('ocr_failed', { book_id: nestState.book.id, code, stage: (d && d.stage) || 'unknown', http_status: (d && d.status) || 0 });
+          rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_single', code, stage: d && d.stage, status: d && d.status }));
         }
       })
       .finally(() => setQuickOcrBusy(false));
@@ -548,7 +552,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     if (!files || files.length < 2 || quickOcrBusy) return;
     setQuickOcrBusy(true);
     setQuickOcrProgress({ done: 0, total: files.length });
-    rgTrack('ocr_batch_started', { count: files.length, source: 'home_album' });
+    rgTrack('ocr_batch_started', { source: 'home_album', count: files.length });
     const pageTexts = Array(files.length).fill(null);
     let failed = 0;
     let unreadable = 0;
@@ -557,7 +561,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         const file = files[i];
         if (!file || file.size > 8 * 1024 * 1024) {
           failed++;
-          rgTrack('ocr_failed', { page_idx: i, code: 'ocr_image_too_large', stage: 'client', source: 'home_album' });
+          rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_album', code: 'ocr_image_too_large', stage: 'client', pageIdx: i }));
           setQuickOcrProgress({ done: i + 1, total: files.length });
           continue;
         }
@@ -568,22 +572,21 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           const text = String(data && data.text || '').trim();
           if (text) {
             pageTexts[i] = text;
-            rgTrack('ocr_extracted', { page_idx: i, chars: Array.from(text).length, source: 'home_album' });
+            rgTrack('ocr_extracted', { source: 'home_album', page_idx: i, chars: Array.from(text).length });
           } else if (data && data.empty) {
             unreadable++;
-            rgTrack('ocr_failed', { page_idx: i, code: data.code || 'ocr_empty', stage: data.stage || 'result', source: 'home_album' });
+            rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_album', code: data.code || 'ocr_empty', stage: data.stage || 'result', pageIdx: i }));
           } else {
             failed++;
-            rgTrack('ocr_failed', { page_idx: i, code: (data && data.error) || 'ocr_failed', stage: (data && data.stage) || 'unknown', http_status: (data && data.status) || 0, source: 'home_album' });
+            rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_album', code: (data && data.error) || 'ocr_failed', stage: data && data.stage, pageIdx: i, status: data && data.status }));
           }
         } catch (e) {
           failed++;
-          rgTrack('ocr_failed', { page_idx: i, code: 'ocr_network_failure', stage: 'client', source: 'home_album' });
+          rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_album', code: 'ocr_network_failure', stage: 'client', pageIdx: i }));
         }
         setQuickOcrProgress({ done: i + 1, total: files.length });
         if (i < files.length - 1) await new Promise((resolve) => setTimeout(resolve, 1200));
       }
-
       const extracted = _splitOcrPageTexts(pageTexts);
       const validCount = new Set(extracted.map((text) => String(text || '').trim()).filter(Boolean)).size;
       if (validCount > 0) {
