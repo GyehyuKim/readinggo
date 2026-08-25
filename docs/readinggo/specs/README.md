@@ -17,6 +17,7 @@
 |  | [`profile.md`](./profile.md) | 3번째 서재 가로 탐색·프로필 월간 활동·책 상태·문장 탐색 |
 |  | [`feed.md`](./feed.md) | 피드·공개 문장·UGC 안전. 친구 책나무 표면은 보류 |
 |  | [`co-reading.md`](./co-reading.md) | 같이읽기 기능과 읽기방 |
+|  | [`activity-inbox.md`](./activity-inbox.md) | 같이읽기 헤더의 좋아요·새 팔로워·콕찌르기 인앱 활동함 |
 |  | [`companion.md`](./companion.md) | AI 독서 동반자 대화·완독 회고 |
 |  | [`systems.md`](./systems.md) | 성장일·레거시 스트릭·XP 전환·NPC 시스템 |
 | **기록·탐색** | [`resurface.md`](./resurface.md) | 저장 문장 되감기 |
@@ -56,6 +57,7 @@
 | 가입·세계관 여정 | `onboarding.md` |
 | 성장일·레거시 XP/스트릭 전환 | `systems.md` |
 | 데이터 모델·플랫폼·RLS | `backend.md` |
+| 인앱 소셜 활동함·읽음 상태 | `activity-inbox.md` + `backend.md` |
 | 디자인 토큰·아이콘·마이크로카피 | `design.md` |
 | 한 줄·제품 약속·핵심 루프·런타임 | 이 `README.md` |
 | 새 결정 등록 | `meta/decisions.md`에 append하고 대체 관계를 명시 |

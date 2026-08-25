@@ -28,14 +28,15 @@
 | `node --test js/*.test.js` | `PASS` (4/4) | analytics·library dependency-free 테스트 통과. 현행 코드 계약의 증거일 뿐 v18 UI 구현 완료 증거는 아님 |
 | Playwright 회귀 | `BLOCKED` | 격리 worktree에 `playwright` package가 없어 미실행. PR CI로 재검증 |
 
-## 1. 33개 스펙 파일 전수 상태
+## 1. 34개 스펙 파일 전수 상태
 
 | 파일 | 현재 구현 증거 | 상태 | 감사 메모 |
 |---|---|---|---|
-| `README.md` | `architecture_current.py`; 현재 Vite·Capacitor·Cloudflare 설명 | 🔧 | 실제 33개 중 다수 파일이 지도에서 누락됐고 v7을 최상위 기준으로 오해하게 하던 문구를 이번 PR에서 보정 |
+| `README.md` | `architecture_current.py`; 현재 Vite·Capacitor·Cloudflare 설명 | 🔧 | 실제 34개 중 다수 파일이 지도에서 누락됐고 v7을 최상위 기준으로 오해하게 하던 문구를 이번 PR에서 보정 |
 | `SYNC-POLICY.md` | `.github/workflows/spec-drift.yml`, `tests/spec-align/drift.py` | ✅ | 정책과 CI 구조가 존재. 모든 조항의 의미 검증까지 자동화되지는 않음 |
-| `_traceability.md` | 본 문서 | 🔧 | 부분 기능·과거 이슈 연대기 중심 문서를 33개 전수표로 교체 |
+| `_traceability.md` | 본 문서 | 🔧 | 부분 기능·과거 이슈 연대기 중심 문서를 34개 전수표로 교체 |
 | `admin-dashboard.md` | `js/admin-dashboard.js`, `DataStore.admin.*`, admin RPC migrations | ✅ | 현행 운영 표면과 지표 계약 존재 |
+| `activity-inbox.md` | 현재 런타임·migration·RPC 증거 없음 | ⏳ | #1260 목표 계약: 같이읽기 헤더 인앱 활동함, 현재 source 파생 90일/100개, moderation, seen cursor, guest 안전. 구현 PR에서 DataStore·RPC/RLS 역할 테스트·spec-align invariant 필요 |
 | `analytics.md` | `rgTrack`, PostHog 동의 게이트, 주간 리포트 workflow | 📝 | v18 서재·활동 후보 이벤트와 legacy 책나무/XP/스트릭 격리를 반영. 신규 이벤트는 구현 전 |
 | `architecture-asbuilt.md` | `main.js`, `worker/index.mjs`, `wrangler.toml`, workflows, migrations | 🔧 | main→stable DEV 자동, Worker Production·OTA beta·OTA Production 수동 동일 SHA 승격이라는 현재 workflow trigger를 보정 |
 | `backend.md` | `datastore.js`, `datastore-supabase.js`, `schema.sql`, migrations | 🚩 | v18 서재는 기존 책 데이터를 재사용. 현행 게스트 이관 누락 가능성과 `ub_sel`의 넓은 read 범위는 별도 데이터·보안 게이트 |
@@ -88,5 +89,6 @@
 - `docs/readinggo/supabase/*.sql` 존재와 Production 적용 여부는 다르다. `migrations_applied.py`도 table 33개·column 40개 존재만 확인하고 policy·view·RPC body·grant·trigger·RLS·backfill을 보증하지 않는다. 원격 ledger와 역할별 직접 API 검증 없이 적용 완료로 단정하지 않는다.
 - 정적 감사에서 `user_books` 인증 사용자 read 범위를 확인했으나 Production의 실제 적용 정책·데이터 영향 건수는 아직 검증하지 않았다.
 - 현재 spec-align·Node 회귀 통과는 현행 as-built 계약의 증거다. v18 서재·라우팅·carousel·게스트 전체 이관·개인 활동을 검증하는 invariant는 아직 없다.
+- #1260 활동함은 spec-only 상태라 구현 존재를 요구하는 invariant를 이번 문서 PR에 넣지 않는다. 후속 구현 PR은 DataStore 양 어댑터와 UI 존재 invariant, RPC/RLS 역할·철회·moderation·watermark 계약 테스트를 함께 추가해야 한다.
 - 이번 spec-only 작업에서는 코드·DB·DEV·Production·Play Store를 변경하지 않는다.
 - 최신 제품 결정은 구현 사실과 분리해 각 기능 스펙에 `목표 계약 / 현재 갭 / 전환 게이트`로 기록한다.
