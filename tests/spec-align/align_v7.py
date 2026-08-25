@@ -37,6 +37,7 @@ FEATURE_FILES = [
     "shelf-import.js",
     "milestone-recap.js",  # #938 A2 — 마일스톤 회고 모달(직접 localStorage 금지 범위 포함)
     "co-reading.js",  # #987 같이읽기(방) — 방 UI(직접 localStorage 금지, DataStore.rooms.* 경유)
+    "activity-inbox.js",  # #1260 활동함 — DataStore.activityInbox.*만 사용
 ]
 # Adapter layer: exempt from the "no direct localStorage" rule (S1).
 ADAPTER_FILES = ["data.js", "datastore.js"]
@@ -285,6 +286,16 @@ INVARIANTS = [
         ["datastore.js"], r"out\.sort\(\(a, b\) => cnt\(b\) - cnt\(a\)\)"),
     ("F", "present", "추천 카드 CSS .rg-coread-rec (index.html, #997 — 2차 tonal, ghost 금지)",
         ["index.html"], r"\.rg-coread-rec\s*\{"),
+
+    # ── G: 활동함 — 인증 RPC/DataStore/같이읽기 헤더 표면 (#1260) ──
+    ("G", "present", "활동함 DataStore 양 어댑터 표면 (#1260)",
+        ["datastore.js", "datastore-supabase.js"], r"activityInbox\s*:\s*\{[\s\S]*markSeen"),
+    ("G", "present", "활동함 인증 RPC 호출 (#1260)",
+        ["datastore-supabase.js"], r"rpc\('activity_inbox'\)[\s\S]*rpc\('activity_inbox_unread_count'\)[\s\S]*rpc\('activity_inbox_mark_seen'"),
+    ("G", "present", "같이읽기 헤더 활동 action (#1260)",
+        ["app.js"], r"activeTab === 'social'[\s\S]*ActivityInboxButton"),
+    ("G", "present", "렌더 응답 key만 markSeen (#1260)",
+        ["activity-inbox.js"], r"requestAnimationFrame[\s\S]*result\.items\.map[\s\S]*markSeen\(keys\)"),
 ]
 
 

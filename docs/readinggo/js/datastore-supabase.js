@@ -791,6 +791,28 @@
       },
     },
 
+    activityInbox: {
+      async list() {
+        const result = unwrap(await sb().rpc('activity_inbox')) || {};
+        return {
+          items: Array.isArray(result.items) ? result.items : [],
+          unreadCount: Math.max(0, Number(result.unreadCount) || 0),
+        };
+      },
+      async unreadCount() {
+        return Math.max(0, Number(unwrap(await sb().rpc('activity_inbox_unread_count'))) || 0);
+      },
+      async markSeen(eventKeys) {
+        if (!Array.isArray(eventKeys)) throw new Error('activity_inbox_invalid_keys');
+        if (eventKeys.length > 100 || eventKeys.some((key) => typeof key !== 'string' || !key.trim())) {
+          throw new Error('activity_inbox_invalid_keys');
+        }
+        const keys = [...new Set(eventKeys.map((key) => key.trim()))];
+        const result = unwrap(await sb().rpc('activity_inbox_mark_seen', { p_event_keys: keys })) || {};
+        return { unreadCount: Math.max(0, Number(result.unreadCount) || 0) };
+      },
+    },
+
     pokes: {
       async send(toUserId) {
         const id = await uid();

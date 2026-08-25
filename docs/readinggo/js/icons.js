@@ -15,6 +15,7 @@ const RG_ICONS = {
   devices: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"><rect x="2" y="3.5" width="8" height="6" rx="1"/><path d="M1 11.5h10" strokeLinecap="round"/><rect x="10.5" y="6.5" width="3.5" height="6" rx="1"/></g>,
   bookmark: <path d="M4 2.5h8v11l-4-2.8-4 2.8z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/>,
   mail: <g stroke="currentColor" strokeWidth="1.4" fill="none"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M2.5 5L8 9l5.5-4" strokeLinecap="round" strokeLinejoin="round"/></g>,
+  bell: <g stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11.5h10l-1.2-1.8V7a3.8 3.8 0 0 0-7.6 0v2.7L3 11.5z"/><path d="M6.2 13.2a2 2 0 0 0 3.6 0"/></g>,
   chat: <path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H6l-3 2.3V10.5h-.5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round"/>,
   balance: <g><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" fill="none"/><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor"/></g>,
   deep: <g stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"><circle cx="7" cy="7" r="4"/><line x1="10" y1="10" x2="13.5" y2="13.5"/></g>,
