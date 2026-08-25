@@ -134,6 +134,7 @@ function _buildCardNode(n, coverDataUrl, format) {
     alignItems: isStory ? 'flex-start' : 'center',
     justifyContent: isStory ? 'flex-start' : 'center',
     paddingTop: isStory ? '180px' : '0',
+    minHeight: '0', overflow: 'hidden', boxSizing: 'border-box',
   });
   // 글자 수 반응형 폰트(§6 clamp 근사) — 시안(share-card.html r11=27px@340≈86px@1080) 기준 상향(#651 디자인 정합).
   const len = n.text.length;
@@ -146,7 +147,9 @@ function _buildCardNode(n, coverDataUrl, format) {
   Object.assign(sentence.style, {
     textAlign: isStory ? 'left' : 'center', fontSize: fs + 'px', lineHeight: '1.45',
     letterSpacing: '-0.3px', color: _SC.ink, position: 'relative', zIndex: '1',
-    maxWidth: '100%', wordBreak: 'keep-all', overflowWrap: 'break-word',
+    width: '100%', maxWidth: '100%', maxHeight: isStory ? 'calc(100% - 180px)' : '100%',
+    wordBreak: 'keep-all', overflowWrap: 'break-word', overflow: 'hidden',
+    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: isStory ? '13' : '7',
   });
   if (isThought) {
     const tm = document.createElement('span');
@@ -169,7 +172,7 @@ function _buildCardNode(n, coverDataUrl, format) {
 
   // ③ 출처
   const source = document.createElement('div');
-  Object.assign(source.style, { display: 'flex', alignItems: 'center', gap: '34px', marginTop: '12px' });
+  Object.assign(source.style, { display: 'flex', alignItems: 'center', gap: '34px', marginTop: '12px', flexShrink: '0' });
   const cover = document.createElement('div');
   Object.assign(cover.style, {
     width: '116px', height: '162px', borderRadius: '14px', flex: 'none',
@@ -203,13 +206,13 @@ function _buildCardNode(n, coverDataUrl, format) {
 
   // ④ 워터마크 (항상 노출)
   const divider = document.createElement('div');
-  Object.assign(divider.style, { height: '2px', background: _SC.line, margin: '36px 0 30px' });
+  Object.assign(divider.style, { height: '2px', background: _SC.line, margin: '36px 0 30px', flexShrink: '0' });
   root.appendChild(divider);
   const wm = document.createElement('div');
   Object.assign(wm.style, {
     display: 'flex', alignItems: isStory ? 'flex-start' : 'center',
     justifyContent: 'space-between', gap: isStory ? '6px' : '16px',
-    flexDirection: isStory ? 'column' : 'row',
+    flexDirection: isStory ? 'column' : 'row', flexShrink: '0',
   });
   const brand = document.createElement('span');
   Object.assign(brand.style, { display: 'flex', alignItems: 'center', gap: '14px', fontSize: '38px', color: _SC.ink });
@@ -224,7 +227,7 @@ function _buildCardNode(n, coverDataUrl, format) {
   // #921: 실제 도달 가능한 사이트 링크를 카드에도 박는다 — 이미지만 받은 사람도 ReadingGo 로 유입(spec §2 워터마크=바이럴 진입점).
   // 핸들(@readinggo.app)은 브랜드 표기, 이 줄은 지금 열리는 데모 URL. Pixel·--ink-3 으로 절제(DESIGN: 메타/라벨 = Pixel).
   const link = document.createElement('div');
-  Object.assign(link.style, { fontFamily: _SC.fontPixel, fontSize: '26px', letterSpacing: '0.8px', color: _SC.ink3, marginTop: '14px', textAlign: isStory ? 'left' : 'center' });
+  Object.assign(link.style, { fontFamily: _SC.fontPixel, fontSize: '26px', letterSpacing: '0.8px', color: _SC.ink3, marginTop: '14px', textAlign: isStory ? 'left' : 'center', flexShrink: '0' });
   link.textContent = RG_SHARE_LINK;
   root.appendChild(link);
 
@@ -373,6 +376,7 @@ let _formatPickerPromise = null;
 function shareSentenceWithFormatChoice(s) {
   if (_sentenceShareInFlight) return _sentenceShareInFlight;
   if (_formatPickerPromise) return _formatPickerPromise;
+  const trigger = document.activeElement;
   _formatPickerPromise = new Promise((resolve) => {
     const overlay = document.createElement('div');
     Object.assign(overlay.style, {
@@ -397,11 +401,13 @@ function shareSentenceWithFormatChoice(s) {
     description.textContent = '정사각형 카드나 잠금화면·스토리용 세로 이미지를 골라 주세요.';
     const actions = document.createElement('div');
     Object.assign(actions.style, { display: 'grid', gap: '8px' });
+    const focusableButtons = [];
     let settled = false;
     const cleanup = () => {
       document.removeEventListener('keydown', onKeyDown);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       _formatPickerPromise = null;
+      if (trigger && typeof trigger.focus === 'function') trigger.focus();
     };
     const finish = (format) => {
       if (settled) return;
@@ -410,7 +416,18 @@ function shareSentenceWithFormatChoice(s) {
       if (!format) { resolve(false); return; }
       Promise.resolve(shareSentence(s, { format })).then(() => resolve(true), () => resolve(false));
     };
-    const onKeyDown = (event) => { if (event.key === 'Escape') finish(null); };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); finish(null); return; }
+      if (event.key !== 'Tab') return;
+      const current = focusableButtons.indexOf(document.activeElement);
+      if (event.shiftKey && current <= 0) {
+        event.preventDefault();
+        focusableButtons.at(-1).focus();
+      } else if (!event.shiftKey && current === focusableButtons.length - 1) {
+        event.preventDefault();
+        focusableButtons[0].focus();
+      }
+    };
     const addButton = (label, format, primary) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -423,6 +440,7 @@ function shareSentenceWithFormatChoice(s) {
       });
       button.addEventListener('click', () => finish(format));
       actions.appendChild(button);
+      focusableButtons.push(button);
       return button;
     };
     const squareButton = addButton('정사각형 카드 · 1:1', '1:1', true);

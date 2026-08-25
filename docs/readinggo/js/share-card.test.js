@@ -39,13 +39,20 @@ function createHarness() {
   const documentListeners = new Map();
   const document = {
     body,
-    createElement: (tag) => { const element = new FakeElement(tag); createdElements.push(element); return element; },
+    activeElement: body,
+    createElement: (tag) => {
+      const element = new FakeElement(tag);
+      element.focus = () => { element.focused = true; document.activeElement = element; };
+      createdElements.push(element);
+      return element;
+    },
     createTextNode: (text) => ({ nodeType: 3, textContent: text, parentNode: null }),
     addEventListener: (name, listener) => documentListeners.set(name, listener),
     removeEventListener: (name, listener) => {
       if (documentListeners.get(name) === listener) documentListeners.delete(name);
     },
   };
+  body.focus = () => { body.focused = true; document.activeElement = body; };
   const renders = [];
   const shares = [];
   const tracks = [];
@@ -106,6 +113,22 @@ test('9:16 render uses wallpaper dimensions, safe areas, left alignment, and Spa
   assert.equal(harness.document.body.children.length, 0, 'temporary render node is always removed');
 });
 
+test('1,000-character wallpaper keeps source and watermark fixed while clipping only sentence content', async () => {
+  await harness.window.renderSentenceCardBlob({ ...sentence, text: '가'.repeat(1000) }, { format: '9:16' });
+  const { node } = harness.renders.at(-1);
+  const wrap = node.children[1];
+  const sentenceNode = wrap.children.at(-1);
+  assert.equal(wrap.style.minHeight, '0');
+  assert.equal(wrap.style.overflow, 'hidden');
+  assert.equal(sentenceNode.style.maxHeight, 'calc(100% - 180px)');
+  assert.equal(sentenceNode.style.overflow, 'hidden');
+  assert.equal(sentenceNode.style.WebkitLineClamp, '13');
+  assert.equal(node.children[2].style.flexShrink, '0', 'source must not be pushed beyond the canvas');
+  assert.equal(node.children[3].style.flexShrink, '0', 'divider must remain inside the canvas');
+  assert.equal(node.children[4].style.flexShrink, '0', 'watermark must remain inside the canvas');
+  assert.equal(node.children[5].style.flexShrink, '0', 'link must remain inside the canvas');
+});
+
 test('1:1 rendering remains 1080 square when format is omitted or invalid', async () => {
   await harness.window.renderSentenceCardBlob(sentence);
   assert.equal(harness.renders.at(-1).options.width, 1080);
@@ -159,6 +182,28 @@ test('format picker is single-instance, cleans up, and forwards the story choice
   await first;
   assert.equal(harness.renders.at(-1).options.height, 1920);
   assert.equal(harness.documentListeners.has('keydown'), false);
+});
+
+test('format picker traps Tab and restores focus to its trigger on Escape', async () => {
+  const local = createHarness();
+  const trigger = local.document.createElement('button');
+  local.document.body.appendChild(trigger);
+  trigger.focus();
+  const choice = local.window.shareSentenceWithFormatChoice(sentence);
+  const overlay = local.document.body.children.at(-1);
+  const buttons = overlay.children[0].children[2].children;
+  assert.equal(local.document.activeElement, buttons[0]);
+  let prevented = 0;
+  const keydown = local.documentListeners.get('keydown');
+  keydown({ key: 'Tab', shiftKey: true, preventDefault: () => { prevented += 1; } });
+  assert.equal(local.document.activeElement, buttons.at(-1));
+  keydown({ key: 'Tab', shiftKey: false, preventDefault: () => { prevented += 1; } });
+  assert.equal(local.document.activeElement, buttons[0]);
+  keydown({ key: 'Escape', shiftKey: false, preventDefault: () => { prevented += 1; } });
+  assert.equal(await choice, false);
+  assert.equal(local.document.activeElement, trigger);
+  assert.equal(local.document.body.children.length, 1, 'only the original trigger remains');
+  assert.equal(prevented, 3);
 });
 
 test('double submit reuses one in-flight render and share operation', async () => {
