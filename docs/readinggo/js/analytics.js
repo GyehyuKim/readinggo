@@ -11,6 +11,14 @@ const RG_CHECKIN_CODES = new Set([
   'session_write_failed', 'sentence_write_failed', 'batch_partial_failure', 'readback_failed', 'unknown',
 ]);
 const RG_CHECKIN_ENDPOINTS = new Set(['checkin_atomic', 'sentences', 'streak+sentences']);
+const RG_OCR_SOURCES = new Set(['home_single', 'home_album', 'book_detail_highlights']);
+const RG_OCR_STAGES = new Set(['client', 'network', 'request', 'config', 'upstage', 'result']);
+const RG_OCR_CODES = new Set([
+  'ocr_method_not_allowed', 'ocr_unconfigured', 'ocr_request_invalid', 'ocr_image_missing',
+  'ocr_image_too_large', 'ocr_upstream_auth', 'ocr_upstream_unavailable',
+  'ocr_upstream_rejected', 'ocr_transport_failure', 'ocr_network_failure', 'ocr_empty',
+  'ocr_failed', 'ocr_unavailable',
+]);
 
 // 원문·개인정보·자유형 오류를 담을 가능성이 있는 키는 값과 무관하게 폐기한다.
 // code/stage/status 같은 안정된 오류 분류만 허용한다.
@@ -38,6 +46,18 @@ function sanitizeAnalyticsValue(value) {
     clean[key] = sanitizeAnalyticsValue(nested);
   }
   return clean;
+}
+
+function createOcrFailureProps({ source, code, stage, pageIdx, status } = {}) {
+  const normalizedCode = code === 'unavailable' ? 'ocr_unavailable' : code;
+  const props = {
+    source: RG_OCR_SOURCES.has(source) ? source : 'unknown',
+    code: RG_OCR_CODES.has(normalizedCode) ? normalizedCode : 'unknown',
+    stage: RG_OCR_STAGES.has(stage) ? stage : 'unknown',
+  };
+  if (Number.isInteger(pageIdx) && pageIdx >= 0) props.page_idx = pageIdx;
+  if (Number.isInteger(status) && status >= 100 && status <= 599) props.status = status;
+  return props;
 }
 
 function createCheckinCorrelationId(cryptoImpl = globalThis.crypto) {
@@ -160,6 +180,7 @@ if (typeof window !== 'undefined') {
   window.RG_createCheckinCorrelationId = createCheckinCorrelationId;
   window.RG_normalizeCheckinFailure = normalizeCheckinFailure;
   window.RG_trackCheckinSaveFailed = trackCheckinSaveFailed;
+  window.RG_createOcrFailureProps = createOcrFailureProps;
 }
 
-export { createAnalyticsRuntime, createCheckinCorrelationId, normalizeCheckinFailure, sanitizeAnalyticsValue, trackCheckinSaveFailed };
+export { createAnalyticsRuntime, createCheckinCorrelationId, createOcrFailureProps, normalizeCheckinFailure, sanitizeAnalyticsValue, trackCheckinSaveFailed };
