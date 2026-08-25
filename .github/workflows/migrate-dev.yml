@@ -37,8 +37,8 @@ jobs:
           from pathlib import Path
 
           filename = os.environ['MIGRATION_FILE']
-          if not re.fullmatch(r'[0-9]{2}_[a-z0-9_]+\.sql', filename):
-              raise SystemExit('migration must be a basename such as 52_sentence_visibility_length.sql')
+          if not re.fullmatch(r'[0-9]{2}_[a-z0-9_]+(?:\.dev)?\.sql', filename):
+              raise SystemExit('migration must be a basename such as 52_sentence_visibility_length.sql or 58_personalization_runtime.dev.sql')
 
           path = Path('docs/readinggo/supabase') / filename
           if not path.is_file():

@@ -85,6 +85,7 @@ jobs:
           node tests/workflow-pins.test.mjs
           node tests/ceremony-sentence-action.test.mjs
           node tests/companion-turn-limit.test.mjs
+          node tests/personalization-runtime.test.mjs
           node tests/forest-like-count.test.mjs
           node --test tests/friend-book-tree.test.mjs
           node tests/liked-sentence-consistency.test.mjs
@@ -133,6 +134,7 @@ jobs:
           node tests/boot-smoke.mjs
           node tests/dev-review-mode.test.mjs
           node tests/prompt-lab-build-boundary.test.mjs
+          EXPECT_PERSONALIZATION_BUILD=0 node tests/personalization-runtime.test.mjs
 
   dev-isolation:
     name: dev-isolation (prod endpoint/write path 차단)
@@ -159,6 +161,7 @@ jobs:
           node tests/dev-isolation.test.mjs
           node tests/dev-review-mode.test.mjs
           EXPECT_PROMPT_LAB=1 node tests/prompt-lab-build-boundary.test.mjs
+          EXPECT_PERSONALIZATION_BUILD=1 node tests/personalization-runtime.test.mjs
 
   render-smoke:
     name: render-smoke (탭 런타임 렌더)

@@ -12,6 +12,8 @@
    배포: npx wrangler deploy
    ========================================================= */
 
+import { personalizationContextProxy, personalizedCompanion } from './personalization.mjs';
+
 const ALADIN = 'https://aladin.co.kr/ttb/api/';
 
 /* ── 도서 데이터 provider 스위치 (#1044, spec backend.md §7.2.1) ──────────
@@ -154,11 +156,24 @@ export default {
     }
     // LLM 독서 파트너 — 참새 질문 생성 (#287). 키는 서버에서만 사용(클라 노출 금지).
     if (p === '/api/companion') {
+      if (env.ENVIRONMENT !== 'development') {
+        let candidate = null;
+        try { candidate = await request.clone().json(); } catch { /* canonical parser handles invalid JSON */ }
+        if (candidate && candidate.personalization === true) return json({ error: 'not found' }, 404);
+      }
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       { const rl = await rateLimited(request, env, 'companion'); if (rl) return rl; }
       { const ts = await verifyTurnstile(request, env); if (ts) return ts; }
       return companionProxy(request, env);
+    }
+    // #1309 내 기록 retrieval은 DEV-only. Production에서는 인증/입력보다 먼저 존재를 숨긴다.
+    if (p === '/api/companion/context') {
+      if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
+      { const rl = await rateLimited(request, env, 'companion-context'); if (rl) return rl; }
+      return personalizationContextProxy(request, env);
     }
     // Prompt Lab (#1304) — 합성 fixture만 쓰는 인증·역할 보호 실험 경로.
     // candidate는 이 명시적 경로에서만 로드하며 일반 /api/companion에는 절대 전달하지 않는다.
@@ -348,6 +363,7 @@ async function callLLM({ messages, env, maxTokens, temperature }) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(45_000),
   });
   if (!r.ok) throw new Error('LLM HTTP ' + r.status);
   const d = await r.json();
@@ -376,7 +392,7 @@ function bookBriefKey(title, author) {
 
 // 책 문학 브리프 생성+캐시 (#656) — 모든 턴에서 호출하되 캐시 히트면 LLM 재호출 없음.
 // 알라딘 소개를 그라운딩으로 LLM 압축. 키/조회/생성 실패 시 빈 문자열(무중단).
-async function getBookBrief(title, author, env) {
+async function getBookBrief(title, author, env, beforeProviderSend) {
   if (!title) return '';
   const key = bookBriefKey(title, author);
   if (BOOK_BRIEF_CACHE.has(key)) return BOOK_BRIEF_CACHE.get(key);
@@ -392,12 +408,16 @@ async function getBookBrief(title, author, env) {
         { role: 'user', content: `제목: ${title}${author ? ` / 저자: ${author}` : ''}`
           + (grounding ? `\n출판사 소개(그라운딩 — 광고 문구는 걷어내고 사실만 참고):\n${grounding}` : '\n(출판사 소개 없음)') },
       ];
+      if (beforeProviderSend) await beforeProviderSend();
       const raw = await callLLM({ messages, env, maxTokens: 180, temperature: 0.4 });
       const d = stripMd(raw).trim();
       // 약한 환각 가드 — 너무 짧거나 "모름" 류면 버림(추측 주입 방지).
       if (d && d.length >= 20 && !/^(모르|알 수 없|정보가 없|해당 책)/.test(d)) brief = d.slice(0, 600);
     }
-  } catch (e) { /* 생성 실패 → 빈 브리프(무중단) */ }
+  } catch (e) {
+    if (e && e.code === 'stale_consent_generation') throw e;
+    /* 생성 실패 → 빈 브리프(무중단) */
+  }
   // 캐시 적재(빈 문자열도 캐시 — 같은 책 반복 미스 방지). 상한 초과 시 오래된 것부터 제거.
   if (BOOK_BRIEF_CACHE.size >= BRIEF_CACHE_MAX) {
     const oldest = BOOK_BRIEF_CACHE.keys().next().value;
@@ -1077,6 +1097,12 @@ async function companionProxy(request, env) {
   try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
   // 완독 회고 모드 (#259) — 내가 남긴 한 문장들을 참새가 엮어 따뜻한 회고 한 단락.
   if (body && body.mode === 'recap') return companionRecap(body, env);
+  if (body && body.personalization === true) {
+    if (env.ENVIRONMENT !== 'development') return json({ error: 'not found' }, 404);
+    const prompt = await getActiveCompanionPrompt(env); // active만. candidate 조회 금지.
+    return personalizedCompanion(request, body, env,
+      (contextBlock, beforeProviderSend) => generateCompanionQuestion(body, env, prompt, false, contextBlock, beforeProviderSend));
+  }
   const prompt = await getActiveCompanionPrompt(env); // active만. candidate 조회 금지.
   try {
     const result = await generateCompanionQuestion(body, env, prompt, false);
@@ -1090,7 +1116,7 @@ async function companionProxy(request, env) {
   }
 }
 
-async function generateCompanionQuestion(body, env, systemPrompt, strictLab) {
+async function generateCompanionQuestion(body, env, systemPrompt, strictLab, personalizationBlock = '', beforeProviderSend) {
   const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
   const bookTitle = String((body && body.bookTitle) || '').slice(0, 200).trim();
   const author = String((body && body.author) || '').slice(0, 120).trim();
@@ -1120,12 +1146,16 @@ async function generateCompanionQuestion(body, env, systemPrompt, strictLab) {
   // 책 문학 브리프 (#656) — "같이 읽은 진행자"용 작품 맥락. 모든 턴에 주입(첫 턴 한정 제거 —
   // 2턴부터 책 잊던 문제 해소). 책별 캐시라 첫 생성 후 후속 턴은 LLM 재호출 없음. best-effort.
   let brief = '';
-  if (bookTitle) { try { brief = await getBookBrief(bookTitle, author, env); } catch (e) { /* 무시 */ } }
+  if (bookTitle) {
+    try { brief = await getBookBrief(bookTitle, author, env, beforeProviderSend); }
+    catch (e) { if (e && e.code === 'stale_consent_generation') throw e; }
+  }
   const messages = [{ role: 'system', content: systemPrompt || COMPANION_SYSTEM }];
   messages.push({ role: 'user', content: `책: ${bookTitle || '(제목 미상)'}${author ? ` — ${author}` : ''}`
     + (brief ? `\n이 책에 대해 당신(진행자)이 같이 읽으며 아는 것(주제·작가·시대·톤 — 단정 말고 자연스럽게 한 조각만 녹이세요): ${brief}` : '')
     + `\n${kind === 'thought' ? `읽다가 든 내 생각(감상): "${sentence}" — 이것은 책의 인용이 아니라 독자 본인의 생각입니다. 작품 맥락을 단정하지 말고 이 생각 자체를 더 깊이 여는 질문을 하세요.` : `책에서 옮겨 적은 한 문장(인용): "${sentence}"`}${comment ? `\n내 메모(감상): ${comment}` : ''}`
     + (strictLab && body && body.userStyle ? `\n합성 사용자 스타일(실제 개인정보 아님): ${String(body.userStyle).slice(0, 300)}` : '') });
+  if (personalizationBlock) messages.push({ role: 'user', content: `사용자가 별도 동의한 과거 내 기록입니다. 아래 기록을 현재 문장과 관련 있을 때만 자연스럽게 참고하고, 관련 없으면 언급하지 마세요.\n\n${personalizationBlock}` });
   for (const e of exchanges) {
     if (e && e.q) messages.push({ role: 'assistant', content: String(e.q).slice(0, 500) });
     if (e && e.a) messages.push({ role: 'user', content: String(e.a).slice(0, 1000) });
@@ -1137,6 +1167,7 @@ async function generateCompanionQuestion(body, env, systemPrompt, strictLab) {
   if (presetTone) instr += ` 질문의 결(사용자 선호): ${presetTone}`;
   if (strictLab) instr += ' 이 입력은 Prompt Lab의 합성 fixture이며 실제 사용자 기록이나 장기 기억을 사용하거나 암시하지 마세요.';
   messages.push({ role: 'user', content: instr });
+  if (beforeProviderSend) await beforeProviderSend();
   const q = await callLLM({ messages, env });
   return { question: stripMd(q) || companionMock(sentence) };
 }

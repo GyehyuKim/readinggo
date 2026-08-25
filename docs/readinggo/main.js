@@ -68,6 +68,7 @@ async function boot() {
       await import('./js/supabase-client.js');
       await import('./js/datastore-supabase.js');
     }
+    if (!devReviewRestored && import.meta.env.VITE_READINGGO_ENV === 'development') await import('./js/personalization.js');
     if (!devReviewRestored && window.RG_SB && window.RG_SB.isConfigured && window.RG_SB.isConfigured()) {
       const u = await window.RG_SB.currentUser();
       if (u && window.SupabaseDataStore) {
