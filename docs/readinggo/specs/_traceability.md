@@ -1,6 +1,6 @@
 # 스펙 ↔ 구현 추적 매트릭스
 
-> **감사 기준**: `origin/main@4be9902` (2026-08-25, PR #1531 base)
+> **감사 기준**: `origin/main@38b9aafdff976759ba9ca78f2a0a53aee944a24d` (2026-08-25, PR #1531 exact base)
 > **목적**: 현재 구현 사실과 스펙의 정합 여부를 파일별로 검토한다. 제품의 미래 목표 계약은 `meta/decisions.md`와 각 기능 스펙에서 관리하며, 아직 구현되지 않은 결정은 구현 완료로 표시하지 않는다.
 
 ## 상태
@@ -18,14 +18,14 @@
 
 | 검증 | 결과 | 해석 |
 |---|---|---|
-| `python3 tests/spec-align/align_v7.py` | `PASS` (90/90) | 과거 v7~v16 기능의 존재·부재 검사. 최신 제품 결정을 검증하지는 않음 |
+| `python3 tests/spec-align/align_v7.py` | `PASS` (94/94) | 과거 v7~v16 기능과 #1260 활동함 표면의 존재·부재 검사. 최신 제품 결정을 전부 검증하지는 않음 |
 | `python3 tests/spec-align/nest.py` | `PASS` (7/7) | canonical `library` route, `nest-grow` 입력 alias, 책나무 active route 부재, XP 제거 상태 확인 |
 | `python3 tests/spec-align/architecture_current.py` | `PASS` (3/3) | Vite·Capacitor·Cloudflare·DataStore 현재 계약 확인 |
 | `python3 tests/spec-align/drift.py` | `PASS` | spec-drift workflow 구조 확인 |
 | `python3 tests/spec-align/design_lint.py` | `PASS` (0건) | 이모지·raw hex·ghost·radius·font 규칙 위반 없음 |
 | `python3 tests/spec-align/migrations_applied.py` | `BLOCKED` | worktree에 `SUPABASE_ACCESS_TOKEN`이 없어 원격 검증 보류 |
 | `npm run build` (`docs/readinggo`) | `BLOCKED` | 격리 worktree에 `vite` package가 없어 config load 전 중단. PR CI로 재검증 |
-| dependency-free Node tests | `PASS` (8/8) | analytics·library와 #1389 retirement/RLS tombstone 테스트 통과 |
+| dependency-free Node tests | `PASS` (19/19) | analytics·library·#1337 wallpaper와 #1389 retirement/RLS tombstone 테스트 통과 |
 | Playwright 회귀 | `BLOCKED` | 격리 worktree에 `playwright` package가 없어 미실행. PR CI로 재검증 |
 
 ## 1. 34개 스펙 파일 전수 상태
