@@ -65,13 +65,13 @@ language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
   if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
-  if exists (select 1 from public.personalization_controls c where c.user_id=auth.uid() and c.revoke_pending_generation is not null)
-    then raise exception 'revoke_pending' using errcode='P0001'; end if;
   insert into public.personalization_controls(user_id, policy_version, enabled, consent_generation, accepted_at, revoked_at, revoke_pending_generation, updated_at)
     values(auth.uid(), '2026-08-25', true, 1, clock_timestamp(), null, null, clock_timestamp())
   on conflict(user_id) do update set policy_version='2026-08-25', enabled=true,
     consent_generation=personalization_controls.consent_generation+1,
-    accepted_at=clock_timestamp(), revoked_at=null, revoke_pending_generation=null, updated_at=clock_timestamp();
+    accepted_at=clock_timestamp(), revoked_at=null, revoke_pending_generation=null, updated_at=clock_timestamp()
+    where personalization_controls.revoke_pending_generation is null;
+  if not found then raise exception 'revoke_pending' using errcode='P0001'; end if;
   return query select * from public.personalization_control_read();
 end $$;
 

@@ -138,6 +138,8 @@ assert.doesNotMatch(sql, /grant\s+(select|insert|update|delete).*personalization
 for (const fn of ['control_read', 'opt_in', 'revoke_start', 'revoke_finalize', 'source_set_excluded', 'context_validate', 'retrieve', 'lease_acquire', 'lease_validate', 'lease_release']) {
   assert.match(sql, new RegExp(`personalization_${fn}`), `${fn} RPC 존재`);
 }
+assert.match(sql, /personalization_opt_in[\s\S]*?on conflict\s*\(user_id\)\s*do update[\s\S]*?where personalization_controls\.revoke_pending_generation is null[\s\S]*?if not found then raise exception 'revoke_pending'/i,
+  'opt-in은 revoke pending row의 conflict lock을 획득한 뒤 원자적으로 거부');
 assert.match(sql, /personalization_lease_acquire[\s\S]*?perform 1 from public\.personalization_controls[\s\S]*?for update[\s\S]*?insert into public\.personalization_dispatch_leases/i,
   'lease acquire는 revoke와 같은 control row lock으로 직렬화한 뒤 insert');
 assert.match(sql, /revoke_pending_generation/);
