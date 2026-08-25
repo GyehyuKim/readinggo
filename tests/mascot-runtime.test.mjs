@@ -48,6 +48,13 @@ test('DEV comparison is gated and exposes equal A/B/C, 48px, auditable criteria,
   assert.match(review, /repeat\(auto-fit, minmax/);
   assert.match(review, /<button[^>]+aria-pressed=/);
   assert.match(review, /aria-labelledby="mascot-review-title"/);
+  assert.match(review, /role="dialog"[^>]+aria-modal="true"/);
+  assert.match(review, /closeRef\.current\?\.focus\(\)/, 'open 시 modal 내부 initial focus');
+  assert.match(review, /event\.key === 'Escape'[\s\S]*onClose\(\)/, 'Escape 닫기');
+  assert.match(review, /event\.key !== 'Tab'[\s\S]*querySelectorAll[\s\S]*event\.shiftKey[\s\S]*first\.focus\(\)/,
+    'Tab/Shift+Tab focus containment');
+  assert.match(review, /previousFocusRef\.current\?\.isConnected[\s\S]*previousFocusRef\.current\.focus\(\)/,
+    '닫을 때 trigger focus 복원');
 });
 
 test('retired product implementation and mascot-as-user fallbacks are absent from active JS', () => {
@@ -75,6 +82,8 @@ test('retired DEV RPCs have an idempotent cleanup migration', () => {
     'friend_book_tree_sharing_enabled(uuid)',
   ]) assert.match(cleanup, new RegExp(`drop function if exists public\\.${signature.replace(/[()]/g, '\\$&')}`, 'i'));
   assert.match(cleanup, /settings\s*=\s*settings\s*-\s*'friend_tree_sharing'/i);
+  assert.doesNotMatch(cleanup, /^\s*(?:begin|commit)\s*;/im,
+    'migrate-dev workflow가 transaction을 소유하므로 migration 자체 transaction 금지');
 });
 
 test('built bundle contains comparison only for explicit development build', { skip: !['0', '1'].includes(process.env.EXPECT_MASCOT_REVIEW) }, () => {

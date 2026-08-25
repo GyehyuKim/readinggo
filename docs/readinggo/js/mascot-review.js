@@ -23,19 +23,59 @@ const CRITERIA = [
 
 function MascotReviewScreen({ onClose }) {
   const [results, setResults] = React.useState({});
+  const dialogRef = React.useRef(null);
+  const closeRef = React.useRef(null);
+  const previousFocusRef = React.useRef(null);
+  React.useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+    closeRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus();
+    };
+  }, [onClose]);
   const setResult = (candidate, criterion, value) => {
     setResults((current) => ({ ...current, [`${candidate}:${criterion}`]: value }));
   };
   return ReactDOM.createPortal(
-    <section aria-labelledby="mascot-review-title" style={{ position: 'fixed', inset: 0, zIndex: 1500, overflowY: 'auto', background: 'var(--paper)', color: 'var(--ink)', padding: 'max(16px, var(--safe-top)) 16px max(28px, var(--safe-bottom))' }}>
+    <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="mascot-review-title" aria-describedby="mascot-review-description" tabIndex={-1} style={{ position: 'fixed', inset: 0, zIndex: 1500, overflowY: 'auto', background: 'var(--paper)', color: 'var(--ink)', padding: 'max(16px, var(--safe-top)) 16px max(28px, var(--safe-bottom))' }}>
       <div style={{ maxWidth: 1180, margin: '0 auto' }}>
         <header style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'flex-start', gap: 16, padding: '12px 0', background: 'var(--paper)', borderBottom: '1px solid var(--line)' }}>
           <div style={{ flex: 1 }}>
             <div style={{ color: 'var(--brand-3)', fontWeight: 900, fontSize: 12 }}>DEV ONLY · #1389 · CANDIDATES, NOT CANONICAL</div>
             <h1 id="mascot-review-title" style={{ margin: '3px 0 0', fontSize: 24 }}>Jacky / 재키 모델 시트 비교</h1>
-            <p style={{ margin: '5px 0 0', color: 'var(--ink-2)', fontSize: 13, lineHeight: 1.55 }}>A/B/C는 같은 참새 brief의 비교안입니다. 사람의 최종 선택 전에는 앱 아이콘·헤더·로그인·대화·공유·스토어 자산을 교체하지 않습니다.</p>
+            <p id="mascot-review-description" style={{ margin: '5px 0 0', color: 'var(--ink-2)', fontSize: 13, lineHeight: 1.55 }}>A/B/C는 같은 참새 brief의 비교안입니다. 사람의 최종 선택 전에는 앱 아이콘·헤더·로그인·대화·공유·스토어 자산을 교체하지 않습니다.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="재키 후보 비교 닫기" style={{ flexShrink: 0, border: 'none', borderRadius: 'var(--r-sm)', padding: '10px 14px', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 900, cursor: 'pointer' }}>닫기</button>
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="재키 후보 비교 닫기" style={{ flexShrink: 0, border: 'none', borderRadius: 'var(--r-sm)', padding: '10px 14px', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontWeight: 900, cursor: 'pointer' }}>닫기</button>
         </header>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 16, marginTop: 18 }}>
