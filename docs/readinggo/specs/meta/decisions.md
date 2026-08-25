@@ -608,5 +608,5 @@
 - 범위는 타인이 내 문장에 누른 non-self 좋아요, 새 팔로워, inbound 기존 콕찌르기다. 원격 푸시·기기 토큰·OS 권한 요청은 별도 결정 전 도입하지 않는다.
 - 별도 notification 원장이나 콘텐츠/프로필 snapshot 없이 현재 `claps`·`follows`·`pokes`에서 서버 시각 90일, 최신 최대 100개를 파생한다. unlike·unfollow·문장/원천 삭제는 항목을 제거한다.
 - 양방향 차단, actor 정지, 운영자 hidden 문장을 목록·미읽음 수에서 서버측으로 제외한다. 클라이언트 후처리는 권한 경계가 아니다.
-- 영속 상태는 사용자별 `seen_through` 하나이며 목록의 서버 watermark로 모두 읽음 처리한다. 게스트는 보호 RPC 없이 안전한 빈 목록·로그인 안내·미읽음 0을 본다.
+- 영속 상태는 사용자가 실제 본 opaque `seen_event_keys`의 bounded set이며, 목록 응답 key만 mark-seen RPC로 현재 projection과 교집합·원자 병합한다. timestamp cursor는 사용하지 않는다. 게스트는 보호 RPC 없이 안전한 빈 목록·로그인 안내·미읽음 0을 본다.
 - 상세 화면·DataStore·RPC/RLS·수용기준은 [activity-inbox.md](../activity-inbox.md)와 [backend.md §7.0.6](../backend.md#706-활동함-읽기-모델상태-계약-1260)이 SSOT다.

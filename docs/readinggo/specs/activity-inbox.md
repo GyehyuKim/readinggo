@@ -33,7 +33,7 @@
 | `poke` | `pokes` | `to_user_id=viewer`, `from_user_id<>viewer` | 원천 행 삭제 시 즉시 사라짐 |
 
 - 조회 시점 서버 시각 기준 **최근 90일**만 포함하고 전체 후보 중 최신 **최대 100개**만 반환한다. 클라이언트 시각은 보관 경계에 사용하지 않는다.
-- 정렬은 `occurred_at DESC`, 동률은 `kind`, `event_id`의 결정적 순서다. 목록을 다시 열어도 같은 원천 상태라면 순서가 흔들리지 않는다.
+- 정렬은 `occurred_at DESC, kind ASC, event_key ASC`다. source id가 없는 follow도 `event_key`가 최종 tie-break이므로 100개 경계와 prune 대상이 같은 원천 상태에서 흔들리지 않는다.
 - 좋아요 여러 건은 각각 한 항목이다. 같은 사용자의 unfollow→follow는 기존 행이 삭제된 뒤 새 행의 새 `created_at`으로 한 항목만 생긴다.
 - 별도 알림 row나 snapshot을 만들지 않는다. 항목의 배우·문장·책 정보는 **현재 행을 현재 이름과 내용으로 join한 projection**이다.
 - 원천이 삭제·철회되거나 현재 권한 필터를 통과하지 못하면 읽음 상태와 무관하게 목록·미읽음 수에서 사라진다. 활동함은 과거 감사 로그가 아니다.
@@ -107,7 +107,7 @@ ActivityInboxResult {
 - 목록·미읽음 수·mark-seen은 인증 사용자 전용 제한 RPC다. 클라이언트에서 `claps`·`follows`·`pokes`를 직접 합쳐 권한 필터를 대신하지 않는다.
 - 모든 종류에 양방향 사용자 차단과 actor 정지를 적용한다. 좋아요에는 운영자 hidden 문장도 추가로 제외한다. 필터는 목록, count, unread 판정에 동일하게 적용한다.
 - RPC는 `auth.uid()`만 viewer로 사용하며 임의 user id 인자를 받지 않는다. `SECURITY DEFINER`라면 고정 `search_path`, 스키마 한정 참조, 입력 상한, 명시적 `authenticated` grant와 `anon/public` revoke를 갖춘다.
-- `activity_inbox_state` base table은 RLS를 켜고 본인 행만 `SELECT/INSERT/UPDATE`한다. 다른 사용자의 state 조회·변조와 클라이언트 `DELETE`는 허용하지 않는다.
+- `activity_inbox_state` base table은 RLS를 켜고 본인 `SELECT`만 허용한다. 클라이언트 직접 `INSERT/UPDATE/DELETE` grant·policy는 두지 않고, 모든 mutation은 현재 projection 교집합·100개 상한을 강제하는 mark-seen RPC만 사용한다. 타인 state 조회·변조는 허용하지 않는다.
 - 활동함을 위해 기존 source table의 broad SELECT grant를 늘리지 않는다. source RLS 축소가 필요한 경우 [backend.md §7.0.3](./backend.md#703-현재-보안-갭과-전환-게이트)의 최소 지원 버전·컷오버 게이트를 별도로 따른다.
 
 ## 7. 수용기준과 검증 매트릭스

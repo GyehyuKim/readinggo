@@ -89,6 +89,6 @@
 - `docs/readinggo/supabase/*.sql` 존재와 Production 적용 여부는 다르다. `migrations_applied.py`도 table 33개·column 40개 존재만 확인하고 policy·view·RPC body·grant·trigger·RLS·backfill을 보증하지 않는다. 원격 ledger와 역할별 직접 API 검증 없이 적용 완료로 단정하지 않는다.
 - 정적 감사에서 `user_books` 인증 사용자 read 범위를 확인했으나 Production의 실제 적용 정책·데이터 영향 건수는 아직 검증하지 않았다.
 - 현재 spec-align·Node 회귀 통과는 현행 as-built 계약의 증거다. v18 서재·라우팅·carousel·게스트 전체 이관·개인 활동을 검증하는 invariant는 아직 없다.
-- #1260 활동함은 spec-only 상태라 구현 존재를 요구하는 invariant를 이번 문서 PR에 넣지 않는다. 후속 구현 PR은 DataStore 양 어댑터와 UI 존재 invariant, RPC/RLS 역할·철회·moderation·watermark 계약 테스트를 함께 추가해야 한다.
+- #1260 활동함은 spec-only 상태라 구현 존재를 요구하는 invariant를 이번 문서 PR에 넣지 않는다. 후속 구현 PR은 DataStore 양 어댑터와 UI 존재 invariant, RPC/RLS 역할·철회·moderation·late-commit-safe event-key·bounded mark-seen 계약 테스트를 함께 추가해야 한다.
 - 이번 spec-only 작업에서는 코드·DB·DEV·Production·Play Store를 변경하지 않는다.
 - 최신 제품 결정은 구현 사실과 분리해 각 기능 스펙에 `목표 계약 / 현재 갭 / 전환 게이트`로 기록한다.
