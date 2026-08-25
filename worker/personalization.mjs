@@ -158,14 +158,20 @@ export async function personalizedCompanion(request, body, env, generate, fetchI
       p_request_id: requestId, p_generation: manifest.consent_generation,
     }, fetchImpl) === true;
     if (!leased) return json({ error: 'stale_consent_generation' }, 409);
-    const result = await generate(manifest.block);
-    const valid = await rpc(env, actor, 'personalization_lease_validate', {
-      p_request_id: requestId, p_generation: manifest.consent_generation,
-    }, fetchImpl);
-    if (valid !== true) return json({ error: 'stale_consent_generation' }, 409);
+    const assertLeaseActive = async () => {
+      const valid = await rpc(env, actor, 'personalization_lease_validate', {
+        p_request_id: requestId, p_generation: manifest.consent_generation,
+      }, fetchImpl);
+      if (valid !== true) { const error = new Error('stale_consent_generation'); error.code = 'stale_consent_generation'; throw error; }
+    };
+    const result = await generate(manifest.block, assertLeaseActive);
+    await assertLeaseActive();
     return json({ ...result, owner_id: actor.id, consent_generation: manifest.consent_generation,
       sources: manifest.sources, total_chars: manifest.total_chars });
-  } catch { return json({ error: 'personalization unavailable' }, 503); }
+  } catch (error) {
+    if (error && error.code === 'stale_consent_generation') return json({ error: error.code }, 409);
+    return json({ error: 'personalization unavailable' }, 503);
+  }
   finally {
     if (leased) await rpc(env, actor, 'personalization_lease_release', { p_request_id: requestId }, fetchImpl).catch(() => {});
   }

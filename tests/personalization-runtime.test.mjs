@@ -70,10 +70,37 @@ const leaseFetch = async (url, init = {}) => {
   if (name === 'personalization_retrieve') return Response.json([source(1)]);
   return Response.json(true);
 };
+let providerSends = 0;
 response = await personalizedCompanion(request({ ...validBody, personalization: true, sentence: '현재 문장' }, 'token-a', '/api/companion'),
-  { ...validBody, personalization: true, sentence: '현재 문장' }, env, async (block) => ({ question: block ? '합성 질문' : '' }), leaseFetch);
+  { ...validBody, personalization: true, sentence: '현재 문장' }, env, async (block, assertLeaseActive) => {
+    await assertLeaseActive(); providerSends += 1; return { question: block ? '합성 질문' : '' };
+  }, leaseFetch);
 assert.equal(response.status, 200);
-assert.deepEqual(rpcOrder.slice(-3), ['personalization_lease_acquire', 'personalization_lease_validate', 'personalization_lease_release']);
+assert.equal(providerSends, 1);
+assert.deepEqual(rpcOrder.slice(-4), ['personalization_lease_acquire', 'personalization_lease_validate', 'personalization_lease_validate', 'personalization_lease_release']);
+
+// Revoke/TTL expiry during preliminary work must stop before the provider callback.
+let staleValidations = 0; let staleProviderSends = 0;
+const staleLeaseFetch = async (url) => {
+  if (url.endsWith('/auth/v1/user')) return Response.json({ id: A });
+  const name = url.split('/rpc/')[1];
+  if (name === 'personalization_context_validate') return Response.json(true);
+  if (name === 'personalization_control_read') return Response.json([{ owner_id: A, policy_version: '2026-08-25', enabled: true, consent_generation: 1 }]);
+  if (name === 'personalization_retrieve') return Response.json([source(1)]);
+  if (name === 'personalization_lease_acquire' || name === 'personalization_lease_release') return Response.json(true);
+  if (name === 'personalization_lease_validate') { staleValidations += 1; return Response.json(false); }
+  throw new Error(`unexpected stale lease RPC ${name}`);
+};
+response = await personalizedCompanion(request({ ...validBody, personalization: true, sentence: '현재 문장' }, 'token-a', '/api/companion'),
+  { ...validBody, personalization: true, sentence: '현재 문장' }, env, async (block, assertLeaseActive) => {
+    await Promise.resolve();
+    await assertLeaseActive();
+    staleProviderSends += 1;
+    return { question: block };
+  }, staleLeaseFetch);
+assert.equal(response.status, 409);
+assert.equal(staleValidations, 1);
+assert.equal(staleProviderSends, 0, 'pre-provider revoke/TTL 검증 실패 뒤 provider send 0');
 
 // Client A→B same-generation barrier: delayed A response cannot touch any sink.
 let session = { user: { id: A }, access_token: 'token-a' };
@@ -153,6 +180,11 @@ assert.match(sql, /personalization_source_exclusions_read[\s\S]*?x\.user_id=auth
 const clientSource = readFileSync(new URL('../docs/readinggo/js/personalization.js', import.meta.url), 'utf8');
 const companionSource = readFileSync(new URL('../docs/readinggo/js/companion.js', import.meta.url), 'utf8');
 const settingsSource = readFileSync(new URL('../docs/readinggo/js/settings-modal.js', import.meta.url), 'utf8');
+const workerSource = readFileSync(new URL('../worker/index.mjs', import.meta.url), 'utf8');
+assert.match(workerSource, /if \(p === '\/api\/companion'\)[\s\S]*?request\.clone\(\)\.json\(\)[\s\S]*?candidate\.personalization === true[\s\S]*?return json\(\{ error: 'not found' \}, 404\)[\s\S]*?rateLimited/,
+  'Production personalized mode는 rate-limit/Turnstile 전 canonical 404');
+assert.match(workerSource, /if \(beforeProviderSend\) await beforeProviderSend\(\)[\s\S]*?callLLM/,
+  'personalized provider 호출 직전 lease 검증');
 assert.match(clientSource, /window\.RG_apiFetch/, '개인화 provider 호출도 Turnstile 중앙 래퍼 사용');
 assert.match(clientSource, /listExcludedSources[\s\S]*?personalization_source_exclusions_read/,
   'client가 owner-bound 제외 목록을 read');
