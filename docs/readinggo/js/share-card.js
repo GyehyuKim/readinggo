@@ -5,9 +5,8 @@
    - 이미지 생성: html-to-image (CDN UMD, 전역 `htmlToImage`). 승인된 Stack Lock 예외.
    - 공유: Web Share API(files) 우선 → 다운로드 + 텍스트 폴백(§8) → 텍스트 복사.
 
-   재사용: prototypes/share-card.html 의 1:1(.card.r11) DOM/CSS 구조를 오프스크린
-   노드로 재현해 시안과 결과물을 일치시킨다. 이 PR 범위는 1:1 + 텍스트 폴백(§8).
-   9:16 스토리는 후속(#650 B 동반).
+   재사용: prototypes/share-card.html 의 1:1(.card.r11)·9:16(.card.r916) DOM/CSS
+   구조를 오프스크린 노드로 재현해 시안과 결과물을 일치시킨다.
 
    주의 — 책 표지 cross-origin(알라딘 CDN):
    알라딘 이미지에는 CORS 헤더가 없어 <img>를 그대로 캔버스에 그리면 tainted canvas →
@@ -21,6 +20,15 @@ const RG_SHARE_LINK = ((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || loca
   .replace(/^https?:\/\//, '').replace(/\/$/, '');
 const RG_SHARE_HANDLE = '@readinggo.app';
 const RG_SHARE_LINK_FULL = 'https://' + RG_SHARE_LINK;
+const RG_SHARE_FORMATS = Object.freeze({
+  '1:1': Object.freeze({ width: 1080, height: 1080, filename: 'readinggo-sentence.png' }),
+  '9:16': Object.freeze({ width: 1080, height: 1920, filename: 'readinggo-sentence-9x16.png' }),
+});
+
+// 외부 입력·분석 속성·파일명이 같은 allowlist를 공유한다. 알 수 없는 값은 기존 기본값(1:1)으로 복귀.
+function normalizeShareFormat(format) {
+  return Object.prototype.hasOwnProperty.call(RG_SHARE_FORMATS, format) ? format : '1:1';
+}
 
 // 브랜드 토큰 (index.html :root 발췌) — 오프스크린 노드는 :root 캐스케이드 밖일 수 있어 명시값 사용.
 const _SC = {
@@ -83,16 +91,48 @@ function _loadCoverSafe(url) {
   });
 }
 
-// 오프스크린 1:1 카드 노드 생성 (시안 .card.r11 구조 재현). coverDataUrl=null 이면 이니셜 블록.
-function _buildCardNode(n, coverDataUrl) {
-  const W = 1080, PAD = Math.round(W * 0.08);
+// 9:16 이미지는 html-to-image가 CSS line-clamp의 암묵적 말줄임표를 누락할 수 있어
+// 실제 폰트 layout 뒤 마지막 완전한 line box 안에 explicit ellipsis를 넣는다.
+function _fitStorySentence(sentence) {
+  if (!sentence || !sentence._rgStoryText) return false;
+  const full = sentence._rgStoryText;
+  const prefix = sentence._rgStoryPrefix || '';
+  const maxHeight = Number.parseInt(sentence.style.maxHeight, 10);
+  if (!Number.isFinite(maxHeight) || maxHeight <= 0) return false;
+  const points = Array.from(full);
+  const setText = (body) => { sentence.textContent = prefix + body; };
+  setText(full);
+  if (sentence.scrollHeight <= maxHeight) return false;
+
+  let low = 0;
+  let high = points.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    setText(points.slice(0, mid).join('').trimEnd() + '…');
+    if (sentence.scrollHeight <= maxHeight) low = mid;
+    else high = mid - 1;
+  }
+  setText(points.slice(0, low).join('').trimEnd() + '…');
+  return true;
+}
+
+// 오프스크린 카드 노드 생성 (시안 .card.r11/.card.r916 구조 재현). coverDataUrl=null 이면 이니셜 블록.
+function _buildCardNode(n, coverDataUrl, format) {
+  const safeFormat = normalizeShareFormat(format);
+  const layout = RG_SHARE_FORMATS[safeFormat];
+  const W = layout.width, H = layout.height, PAD_X = Math.round(W * 0.08);
+  const isStory = safeFormat === '9:16';
+  // 스토리 상단 잠금화면 시계·하단 답장/UI를 각각 10% 안전영역으로 비운다(spec §4).
+  const PAD_TOP = isStory ? Math.round(H * 0.10) : PAD_X;
+  const PAD_BOTTOM = isStory ? Math.round(H * 0.10) : PAD_X;
   const root = document.createElement('div');
   Object.assign(root.style, {
     // QA(#673, 실브라우저 확정): 오프스크린(left:-99999px)이면 html-to-image 가 foreignObject
     // 자식을 그리지 못해 카드가 빈 배경으로 나옴. 온스크린(left:0)에서 렌더해야 내용이 들어간다.
     // 사용자에게는 z-index 음수 + 불투명 paper 배경으로 가린다(렌더 ~0.35s 후 노드 제거).
     position: 'fixed', left: '0', top: '0', zIndex: '-9999', pointerEvents: 'none',
-    width: W + 'px', height: W + 'px', padding: PAD + 'px',
+    width: W + 'px', height: H + 'px',
+    padding: PAD_TOP + 'px ' + PAD_X + 'px ' + PAD_BOTTOM + 'px',
     boxSizing: 'border-box', background: _SC.paper, color: _SC.ink,
     fontFamily: _SC.fontRound, letterSpacing: '-0.2px',
     display: 'flex', flexDirection: 'column',
@@ -114,19 +154,31 @@ function _buildCardNode(n, coverDataUrl) {
 
   // ② 문장 (주역) — 글자 수 반응형 폰트(§6 clamp 근사)
   const wrap = document.createElement('div');
-  Object.assign(wrap.style, { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' });
+  Object.assign(wrap.style, {
+    flex: '1', display: 'flex', position: 'relative',
+    alignItems: isStory ? 'flex-start' : 'center',
+    justifyContent: isStory ? 'flex-start' : 'center',
+    paddingTop: isStory ? '180px' : '0',
+    minHeight: '0', overflow: 'hidden', boxSizing: 'border-box',
+  });
   // 글자 수 반응형 폰트(§6 clamp 근사) — 시안(share-card.html r11=27px@340≈86px@1080) 기준 상향(#651 디자인 정합).
   const len = n.text.length;
-  let fs = 88;
-  if (len > 18) fs = 74;
-  if (len > 32) fs = 60;
-  if (len > 52) fs = 50;
-  if (len > 80) fs = 40;
+  let fs = isStory ? 100 : 88;
+  if (len > 18) fs = isStory ? 84 : 74;
+  if (len > 32) fs = isStory ? 68 : 60;
+  if (len > 52) fs = isStory ? 56 : 50;
+  if (len > 80) fs = isStory ? 46 : 40;
+  const clampLines = isStory ? 13 : 7;
+  const lineHeightPx = Math.floor(fs * 1.45);
   const sentence = document.createElement('div');
   Object.assign(sentence.style, {
-    textAlign: 'center', fontSize: fs + 'px', lineHeight: '1.45',
+    textAlign: isStory ? 'left' : 'center', fontSize: fs + 'px', lineHeight: lineHeightPx + 'px',
     letterSpacing: '-0.3px', color: _SC.ink, position: 'relative', zIndex: '1',
-    maxWidth: '100%', wordBreak: 'keep-all', overflowWrap: 'break-word',
+    width: '100%', maxWidth: '100%', maxHeight: `${lineHeightPx * clampLines}px`,
+    wordBreak: 'keep-all', overflowWrap: 'break-word', overflow: 'hidden',
+    ...(isStory
+      ? { display: 'block' }
+      : { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: String(clampLines) }),
   });
   if (isThought) {
     const tm = document.createElement('span');
@@ -137,19 +189,24 @@ function _buildCardNode(n, coverDataUrl) {
     const qm = document.createElement('span');
     Object.assign(qm.style, {
       // #650: 좌상단 '❝ 인용' 칩과 겹치지 않게 크기 축소(210→150) + 칩 아래로 내림(top -54→0).
-      position: 'absolute', top: '0px', left: '0', fontSize: '150px', lineHeight: '1',
+      position: 'absolute', top: isStory ? '125px' : '0px', left: '0', fontSize: '150px', lineHeight: '1',
       color: _SC.brandSoft, zIndex: '0', fontFamily: 'Georgia,serif', userSelect: 'none',
     });
     qm.textContent = '“';
     wrap.appendChild(qm);
     sentence.appendChild(document.createTextNode(n.text));
   }
+  if (isStory) {
+    sentence._rgStoryText = n.text;
+    sentence._rgStoryPrefix = isThought ? '💭 ' : '';
+    root._rgStorySentence = sentence;
+  }
   wrap.appendChild(sentence);
   root.appendChild(wrap);
 
   // ③ 출처
   const source = document.createElement('div');
-  Object.assign(source.style, { display: 'flex', alignItems: 'center', gap: '34px', marginTop: '12px' });
+  Object.assign(source.style, { display: 'flex', alignItems: 'center', gap: '34px', marginTop: '12px', flexShrink: '0' });
   const cover = document.createElement('div');
   Object.assign(cover.style, {
     width: '116px', height: '162px', borderRadius: '14px', flex: 'none',
@@ -183,10 +240,14 @@ function _buildCardNode(n, coverDataUrl) {
 
   // ④ 워터마크 (항상 노출)
   const divider = document.createElement('div');
-  Object.assign(divider.style, { height: '2px', background: _SC.line, margin: '36px 0 30px' });
+  Object.assign(divider.style, { height: '2px', background: _SC.line, margin: '36px 0 30px', flexShrink: '0' });
   root.appendChild(divider);
   const wm = document.createElement('div');
-  Object.assign(wm.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' });
+  Object.assign(wm.style, {
+    display: 'flex', alignItems: isStory ? 'flex-start' : 'center',
+    justifyContent: 'space-between', gap: isStory ? '6px' : '16px',
+    flexDirection: isStory ? 'column' : 'row', flexShrink: '0',
+  });
   const brand = document.createElement('span');
   Object.assign(brand.style, { display: 'flex', alignItems: 'center', gap: '14px', fontSize: '38px', color: _SC.ink });
   // 참새 마크는 인라인 SVG(#823) — 이모지 대신 SparrowMark 실루엣을 래스터에 박는다(아이콘 리디자인·세이지 팔레트, SparrowMark 동일 path).
@@ -200,7 +261,7 @@ function _buildCardNode(n, coverDataUrl) {
   // #921: 실제 도달 가능한 사이트 링크를 카드에도 박는다 — 이미지만 받은 사람도 ReadingGo 로 유입(spec §2 워터마크=바이럴 진입점).
   // 핸들(@readinggo.app)은 브랜드 표기, 이 줄은 지금 열리는 데모 URL. Pixel·--ink-3 으로 절제(DESIGN: 메타/라벨 = Pixel).
   const link = document.createElement('div');
-  Object.assign(link.style, { fontFamily: _SC.fontPixel, fontSize: '26px', letterSpacing: '0.8px', color: _SC.ink3, marginTop: '14px', textAlign: 'center' });
+  Object.assign(link.style, { fontFamily: _SC.fontPixel, fontSize: '26px', letterSpacing: '0.8px', color: _SC.ink3, marginTop: '14px', textAlign: isStory ? 'left' : 'center', flexShrink: '0' });
   link.textContent = RG_SHARE_LINK;
   root.appendChild(link);
 
@@ -234,20 +295,24 @@ async function _fontEmbedCSS() {
 }
 
 // 카드 PNG Blob 생성. html-to-image(toBlob) 사용. 폰트 로드 완료 후 래스터.
-async function renderSentenceCardBlob(s) {
+async function renderSentenceCardBlob(s, opts) {
   if (!(window.htmlToImage && window.htmlToImage.toBlob)) {
     throw new Error('html-to-image 미로드');
   }
+  opts = opts || {};
+  const format = normalizeShareFormat(typeof opts === 'string' ? opts : opts.format);
+  const layout = RG_SHARE_FORMATS[format];
   const n = _normalizeSentence(s);
   const coverDataUrl = await _loadCoverSafe(n.cover);
-  const node = _buildCardNode(n, coverDataUrl);
+  const node = _buildCardNode(n, coverDataUrl, format);
   document.body.appendChild(node);
   try {
     // 커스텀 폰트(Moneygraphy) 글리프 누락 방지 (spec §9).
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+    if (format === '9:16' && node._rgStorySentence) _fitStorySentence(node._rgStorySentence);
     const fontCss = await _fontEmbedCSS();   // #676: Moneygraphy 임베드(브랜드 폰트). 실패 시 ''.
     const blob = await window.htmlToImage.toBlob(node, {
-      width: 1080, height: 1080, pixelRatio: 1, backgroundColor: _SC.paper,
+      width: layout.width, height: layout.height, pixelRatio: 1, backgroundColor: _SC.paper,
       cacheBust: false,  // 알라딘 표지는 위에서 data-URL 로 인라인 처리됨 → cacheBust 불필요
       // 폰트(#673·#676): fontEmbedCSS(Moneygraphy)를 주면 문서 스타일시트(크로스오리진 Google Fonts)
       // 스캔을 건너뛰어 SecurityError·~5s 지연 없이 브랜드 폰트로 래스터(~0.4s). 폰트 로드 실패 시에만
@@ -279,22 +344,24 @@ async function _copyText(text) {
   return false;
 }
 
-/* 외부 공유 진입점. 이미지 카드 생성 → Web Share(files) 우선 → 다운로드+텍스트 폴백. */
-async function shareSentence(s) {
+/* 외부 공유 실행. 이미지 카드 생성 → Web Share(files) 우선 → 다운로드+텍스트 폴백. */
+async function _shareSentenceOnce(s, format) {
+  format = normalizeShareFormat(format);
+  const layout = RG_SHARE_FORMATS[format];
   const text = buildShareText(s);
   const toast = (typeof showToast === 'function') ? showToast : ((m) => {});
-  if (window.rgTrack) { try { window.rgTrack('sentence_shared', { id: s && s.id, kind: s && s.kind === 'thought' ? 'thought' : 'quote' }); } catch (e) {} }
+  if (window.rgTrack) { try { window.rgTrack('sentence_shared', { id: s && s.id, kind: s && s.kind === 'thought' ? 'thought' : 'quote', format }); } catch (e) {} }
 
   let blob = null;
   try {
-    blob = await renderSentenceCardBlob(s);
+    blob = await renderSentenceCardBlob(s, { format });
   } catch (e) {
     console.warn('[ReadingGo] 공유 카드 생성 실패 → 텍스트 폴백:', e && e.message);
   }
 
   // 1) Web Share API + files (이미지) 우선
   if (blob && navigator.canShare && navigator.share) {
-    const file = new File([blob], 'readinggo-sentence.png', { type: 'image/png' });
+    const file = new File([blob], layout.filename, { type: 'image/png' });
     if (navigator.canShare({ files: [file] })) {
       try {
         // #650: url 동반 — 이미지와 함께 서비스 링크 전달(플랫폼이 files+url 동시 지원 시).
@@ -316,7 +383,7 @@ async function shareSentence(s) {
 
   // 3) 폴백: 이미지 다운로드 + 텍스트 클립보드 복사
   if (blob) {
-    _downloadBlob(blob, 'readinggo-sentence.png');
+    _downloadBlob(blob, layout.filename);
     const copied = await _copyText(text);
     // #921: 텍스트 복사 실패 시에도 최소한 사이트 링크만이라도 복사 — 이미지만 받은 사람도 ReadingGo 로 유입.
     const linkCopied = copied || await _copyText(RG_SHARE_LINK_FULL);
@@ -326,6 +393,103 @@ async function shareSentence(s) {
   // 4) 최후: 텍스트만 복사
   const copied = await _copyText(text);
   toast(copied ? '📋 공유 텍스트를 복사했어요' : '공유를 지원하지 않는 환경이에요');
+}
+
+// 빠른 연속 탭이 PNG 생성·공유 시트를 중복 실행하지 않도록 한 번의 실행 Promise를 재사용한다.
+let _sentenceShareInFlight = null;
+function shareSentence(s, opts) {
+  const format = normalizeShareFormat(typeof opts === 'string' ? opts : opts && opts.format);
+  if (_sentenceShareInFlight) return _sentenceShareInFlight;
+  _sentenceShareInFlight = _shareSentenceOnce(s || {}, format)
+    .finally(() => { _sentenceShareInFlight = null; });
+  return _sentenceShareInFlight;
+}
+
+// 사용자 진입점: 기존 1:1을 첫/기본 선택으로 유지하면서 9:16 배경화면을 명시적으로 고른다.
+// React 상태에 묶지 않아 피드·책 상세 어느 표면에서도 같은 선택기와 cleanup 계약을 쓴다.
+let _formatPickerPromise = null;
+function shareSentenceWithFormatChoice(s) {
+  if (_sentenceShareInFlight) return _sentenceShareInFlight;
+  if (_formatPickerPromise) return _formatPickerPromise;
+  const trigger = document.activeElement;
+  _formatPickerPromise = new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+      position: 'fixed', inset: '0', zIndex: '1000', display: 'flex', alignItems: 'flex-end',
+      justifyContent: 'center', padding: 'var(--space-md, 16px)', background: 'rgba(42,45,51,.32)',
+    });
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-labelledby', 'rg-share-format-title');
+    Object.assign(dialog.style, {
+      width: 'min(100%, 420px)', background: 'var(--card)', color: 'var(--ink)',
+      borderRadius: 'var(--r-lg)', padding: '24px', boxSizing: 'border-box',
+      boxShadow: 'var(--shadow-2)', fontFamily: "'Noto Sans KR',sans-serif",
+    });
+    const title = document.createElement('h2');
+    title.id = 'rg-share-format-title';
+    Object.assign(title.style, { margin: '0 0 8px', fontSize: '18px' });
+    title.textContent = '공유 이미지 비율';
+    const description = document.createElement('p');
+    Object.assign(description.style, { margin: '0 0 16px', color: 'var(--ink-2)', fontSize: '14px', lineHeight: '1.5' });
+    description.textContent = '정사각형 카드나 잠금화면·스토리용 세로 이미지를 골라 주세요.';
+    const actions = document.createElement('div');
+    Object.assign(actions.style, { display: 'grid', gap: '8px' });
+    const focusableButtons = [];
+    let settled = false;
+    const cleanup = () => {
+      document.removeEventListener('keydown', onKeyDown);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      _formatPickerPromise = null;
+      if (trigger && typeof trigger.focus === 'function') trigger.focus();
+    };
+    const finish = (format) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (!format) { resolve(false); return; }
+      Promise.resolve(shareSentence(s, { format })).then(() => resolve(true), () => resolve(false));
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); finish(null); return; }
+      if (event.key !== 'Tab') return;
+      const current = focusableButtons.indexOf(document.activeElement);
+      if (event.shiftKey && current <= 0) {
+        event.preventDefault();
+        focusableButtons.at(-1).focus();
+      } else if (!event.shiftKey && current === focusableButtons.length - 1) {
+        event.preventDefault();
+        focusableButtons[0].focus();
+      }
+    };
+    const addButton = (label, format, primary) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      Object.assign(button.style, {
+        minHeight: '48px', borderRadius: 'var(--r-sm)', cursor: 'pointer', font: 'inherit',
+        fontWeight: '800', border: '1px solid var(--line)',
+        background: primary ? 'var(--brand)' : 'var(--brand-soft)',
+        color: primary ? 'var(--card)' : 'var(--brand-3)',
+      });
+      button.addEventListener('click', () => finish(format));
+      actions.appendChild(button);
+      focusableButtons.push(button);
+      return button;
+    };
+    const squareButton = addButton('정사각형 카드 · 1:1', '1:1', true);
+    addButton('배경화면 · 9:16', '9:16', false);
+    const cancel = addButton('취소', null, false);
+    cancel.style.background = 'var(--card-soft)';
+    cancel.style.color = 'var(--ink-2)';
+    dialog.appendChild(title); dialog.appendChild(description); dialog.appendChild(actions);
+    overlay.appendChild(dialog); document.body.appendChild(overlay);
+    overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(null); });
+    document.addEventListener('keydown', onKeyDown);
+    squareButton.focus();
+  });
+  return _formatPickerPromise;
 }
 
 /* ── 서비스 외부 공유 (에픽 #650 B, spec: specs/referral.md) ──────────────────
@@ -373,7 +537,10 @@ async function shareService(opts) {
 }
 
 window.shareSentence = shareSentence;
+window.shareSentenceWithFormatChoice = shareSentenceWithFormatChoice;
 window.buildShareText = buildShareText;
 window.renderSentenceCardBlob = renderSentenceCardBlob;
+window.RG_SHARE_FORMATS = RG_SHARE_FORMATS;
+window.RG_normalizeShareFormat = normalizeShareFormat;
 window.shareService = shareService;
 window.buildServiceShareText = buildServiceShareText;
