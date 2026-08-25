@@ -182,6 +182,23 @@ for (const table of ['personalization_controls', 'personalization_source_exclusi
 assert.doesNotMatch(sql, /grant\s+(select|insert|update|delete).*personalization_/i, 'control table direct grants 금지');
 assert.equal((sql.match(/auth\.uid\(\) is distinct from p_expected_owner/gi) || []).length, 4,
   '모든 client control/source mutation은 expected owner와 auth.uid를 결속');
+for (const signature of [
+  'personalization_opt_in\\(\\)',
+  'personalization_revoke_start\\(\\)',
+  'personalization_revoke_finalize\\(bigint\\)',
+  'personalization_source_set_excluded\\(text,uuid,boolean\\)',
+]) assert.match(sql, new RegExp(`drop function if exists public\\.${signature}`, 'i'), `${signature} legacy overload 제거`);
+for (const signature of [
+  'personalization_opt_in\\(uuid\\)',
+  'personalization_revoke_start\\(uuid\\)',
+  'personalization_revoke_finalize\\(bigint,uuid\\)',
+  'personalization_source_set_excluded\\(text,uuid,boolean,uuid\\)',
+]) {
+  assert.match(sql, new RegExp(`revoke all on function public\\.${signature} from public, anon`, 'i'), `${signature} PUBLIC/anon revoke`);
+  assert.match(sql, new RegExp(`grant execute on function public\\.${signature} to authenticated`, 'i'), `${signature} authenticated grant`);
+}
+assert.doesNotMatch(sql, /grant execute on function public\.personalization_(?:opt_in\(\)|revoke_start\(\)|revoke_finalize\(bigint\)|source_set_excluded\(text,uuid,boolean\)) to authenticated/i,
+  'owner-unbound legacy overload grant 금지');
 for (const fn of ['control_read', 'opt_in', 'revoke_start', 'revoke_finalize', 'source_set_excluded', 'source_exclusions_read', 'context_validate', 'retrieve', 'lease_acquire', 'lease_validate', 'lease_release']) {
   assert.match(sql, new RegExp(`personalization_${fn}`), `${fn} RPC 존재`);
 }

@@ -231,11 +231,18 @@ as $$ select count(*) from public.personalization_dispatch_leases
   where user_id=auth.uid() and consent_generation < p_before_generation
     and acquired_at > now() - interval '2 minutes' $$;
 
+-- A prior DEV revision exposed owner-unbound overloads. Remove them before granting only
+-- the expected-owner signatures; IF EXISTS also keeps fresh installs deterministic.
+drop function if exists public.personalization_opt_in();
+drop function if exists public.personalization_revoke_start();
+drop function if exists public.personalization_revoke_finalize(bigint);
+drop function if exists public.personalization_source_set_excluded(text,uuid,boolean);
+
 revoke all on function public.personalization_control_read() from public, anon;
-revoke all on function public.personalization_opt_in() from public, anon;
-revoke all on function public.personalization_revoke_start() from public, anon;
-revoke all on function public.personalization_revoke_finalize(bigint) from public, anon;
-revoke all on function public.personalization_source_set_excluded(text,uuid,boolean) from public, anon;
+revoke all on function public.personalization_opt_in(uuid) from public, anon;
+revoke all on function public.personalization_revoke_start(uuid) from public, anon;
+revoke all on function public.personalization_revoke_finalize(bigint,uuid) from public, anon;
+revoke all on function public.personalization_source_set_excluded(text,uuid,boolean,uuid) from public, anon;
 revoke all on function public.personalization_source_exclusions_read() from public, anon;
 revoke all on function public.personalization_context_validate(uuid,uuid) from public, anon;
 revoke all on function public.personalization_retrieve(uuid,uuid,text,text) from public, anon;
@@ -244,10 +251,10 @@ revoke all on function public.personalization_lease_validate(uuid,bigint) from p
 revoke all on function public.personalization_lease_release(uuid) from public, anon;
 revoke all on function public.personalization_lease_count(bigint) from public, anon;
 grant execute on function public.personalization_control_read() to authenticated;
-grant execute on function public.personalization_opt_in() to authenticated;
-grant execute on function public.personalization_revoke_start() to authenticated;
-grant execute on function public.personalization_revoke_finalize(bigint) to authenticated;
-grant execute on function public.personalization_source_set_excluded(text,uuid,boolean) to authenticated;
+grant execute on function public.personalization_opt_in(uuid) to authenticated;
+grant execute on function public.personalization_revoke_start(uuid) to authenticated;
+grant execute on function public.personalization_revoke_finalize(bigint,uuid) to authenticated;
+grant execute on function public.personalization_source_set_excluded(text,uuid,boolean,uuid) to authenticated;
 grant execute on function public.personalization_source_exclusions_read() to authenticated;
 grant execute on function public.personalization_context_validate(uuid,uuid) to authenticated;
 grant execute on function public.personalization_retrieve(uuid,uuid,text,text) to authenticated;
