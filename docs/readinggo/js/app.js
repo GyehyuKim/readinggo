@@ -1367,7 +1367,7 @@ function App() {
   if (_supa && authUser && authUser !== 'local' && !dataReady) return (<BootSplash text="불러오는 중..." />);
 
   const isGuest = _supa && authUser === null;
-  const activityGuest = window.DataStore !== window.SupabaseDataStore;
+  const activityGuest = authUser === null || authUser === 'local';
 
   return (
     <div className="stage">

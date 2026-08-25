@@ -194,7 +194,6 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_requested text[];
-  v_allowed text[];
   v_seen text[] := '{}'::text[];
   v_unread integer;
 begin
@@ -208,13 +207,13 @@ begin
   select coalesce(array_agg(k order by k), '{}'::text[]) into v_requested
   from (select distinct btrim(k) as k from unnest(p_event_keys) k) deduped;
 
-  select coalesce(array_agg(p.event_key order by p.occurred_at desc, p.kind asc, p.event_key asc), '{}'::text[])
-    into v_allowed
-  from public.activity_inbox_projection(v_uid) p
-  where p.event_key = any(v_requested);
-
   insert into public.activity_inbox_state(user_id, seen_event_keys, updated_at)
-  values (v_uid, v_allowed, statement_timestamp())
+  select
+    v_uid,
+    coalesce(array_agg(p.event_key order by p.occurred_at desc, p.kind asc, p.event_key asc), '{}'::text[]),
+    statement_timestamp()
+  from public.activity_inbox_projection(v_uid) p
+  where p.event_key = any(v_requested)
   on conflict (user_id) do update set
     seen_event_keys = (
       select coalesce(array_agg(p.event_key order by p.occurred_at desc, p.kind asc, p.event_key asc), '{}'::text[])

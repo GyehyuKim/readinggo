@@ -41,7 +41,9 @@ test('mark-seen validates, intersects, atomically merges, prunes and keeps late 
   assert.match(mark, /btrim\(k\) = ''/);
   assert.match(mark, /select distinct btrim\(k\)/);
   assert.match(mark, /activity_inbox_projection\(v_uid\)[\s\S]+p\.event_key = any\(v_requested\)/);
-  assert.match(mark, /on conflict \(user_id\) do update set[\s\S]+activity_inbox_state\.seen_event_keys \|\| excluded\.seen_event_keys/);
+  assert.match(mark, /on conflict \(user_id\) do update set[\s\S]+activity_inbox_projection\(v_uid\)[\s\S]+seen_event_keys \|\| excluded\.seen_event_keys/i);
+  assert.match(mark, /insert into public\.activity_inbox_state\(user_id, seen_event_keys, updated_at\)[\s\S]+select[\s\S]+from public\.activity_inbox_projection\(v_uid\) p[\s\S]+where p\.event_key = any\(v_requested\)[\s\S]+on conflict/i);
+  assert.doesNotMatch(mark, /values \(v_uid, v_allowed,/i);
   assert.match(mark, /activity_inbox_projection\(v_uid\)[\s\S]+where p\.event_key = any/);
   for (const marker of ['top100_bound_failed', 'same_timestamp_order_failed', 'late_same_timestamp_was_marked', 'refollow_key_reused', 'arbitrary_key_persisted', 'blank_key_accepted']) {
     assert.match(sqlRegression, new RegExp(marker));
@@ -80,7 +82,8 @@ test('DataStore adapters have parity and guest adapter is empty/no-op with no RP
 test('같이읽기 header action and sheet preserve guest/error/empty/rendered-key behavior', () => {
   assert.match(main, /import '\.\/js\/activity-inbox\.js'/);
   assert.match(app, /activeTab === 'social'[\s\S]+ActivityInboxButton/);
-  assert.match(app, /activityGuest = window\.DataStore !== window\.SupabaseDataStore/);
+  assert.match(app, /activityGuest = authUser === null \|\| authUser === 'local'/);
+  assert.doesNotMatch(app, /activityGuest = window\.DataStore !== window\.SupabaseDataStore/);
   assert.match(ui, /width: 44, height: 44/);
   assert.match(ui, /읽지 않은 활동 \$\{unread\}개/);
   assert.match(ui, /useOverlayBack/);
@@ -93,7 +96,9 @@ test('같이읽기 header action and sheet preserve guest/error/empty/rendered-k
   assert.match(ui, /로그인하면 좋아요, 새 팔로워, 콕찌르기를 여기서 확인할 수 있어요/);
   assert.match(ui, /아직 새로운 활동이 없어요/);
   assert.match(ui, /활동을 불러오지 못했어요\. 다시 시도해주세요/);
-  assert.match(ui, /requestAnimationFrame[\s\S]+result\.items\.map[\s\S]+markSeen\(keys\)/);
+  assert.match(ui, /requestAnimationFrame[\s\S]+markSeen\(keys\)/);
+  assert.match(ui, /unreadRequestRef[\s\S]+request !== unreadRequestRef\.current[\s\S]+unreadRequestRef\.current \+= 1/);
+  assert.match(ui, /markedKeys\.has\(item\.eventKey\)[\s\S]+isUnread: false/);
   assert.match(ui, /DataStore\.activityInbox\.list\(\)[\s\S]+find\(\(candidate\) => candidate\.eventKey === item\.eventKey\)/);
   assert.match(ui, /지금은 볼 수 없는 활동이에요/);
   assert.match(ui, /if \(guest \|\| !\(DataStore\.activityInbox[\s\S]+setResult\(\{ items: \[\], unreadCount: 0 \}\);[\s\S]+return;/);

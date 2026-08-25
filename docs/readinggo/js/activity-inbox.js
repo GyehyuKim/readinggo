@@ -26,6 +26,7 @@ function ActivityInboxButton({ guest, onLogin }) {
   const closeRef = useRef(null);
   const markedResponseRef = useRef(null);
   const restoreFocusRef = useRef(true);
+  const unreadRequestRef = useRef(0);
   const close = () => setOpen(false);
   const openInbox = () => {
     restoreFocusRef.current = true;
@@ -40,12 +41,16 @@ function ActivityInboxButton({ guest, onLogin }) {
   overlayBack(open, close);
 
   const loadCount = () => {
+    const request = ++unreadRequestRef.current;
     if (guest || !(DataStore.activityInbox && DataStore.activityInbox.unreadCount)) {
       setResult({ items: [], unreadCount: 0 });
       return;
     }
     Promise.resolve(DataStore.activityInbox.unreadCount())
-      .then((count) => setResult((current) => ({ ...current, unreadCount: Math.max(0, Number(count) || 0) })))
+      .then((count) => {
+        if (request !== unreadRequestRef.current) return;
+        setResult((current) => ({ ...current, unreadCount: Math.max(0, Number(count) || 0) }));
+      })
       .catch(() => {});
   };
 
@@ -64,6 +69,7 @@ function ActivityInboxButton({ guest, onLogin }) {
           items: Array.isArray(next && next.items) ? next.items : [],
           unreadCount: Math.max(0, Number(next && next.unreadCount) || 0),
         };
+        unreadRequestRef.current += 1;
         markedResponseRef.current = null;
         setResult(safe);
         return safe;
@@ -75,7 +81,10 @@ function ActivityInboxButton({ guest, onLogin }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(loadCount, [guest]);
+  useEffect(() => {
+    loadCount();
+    return () => { unreadRequestRef.current += 1; };
+  }, [guest]);
   useEffect(() => {
     if (!open) return undefined;
     load().catch(() => {});
@@ -113,9 +122,12 @@ function ActivityInboxButton({ guest, onLogin }) {
     if (!keys.length || markedResponseRef.current === responseIdentity) return undefined;
     const frame = requestAnimationFrame(() => {
       markedResponseRef.current = responseIdentity;
+      unreadRequestRef.current += 1;
+      const markedKeys = new Set(keys);
       Promise.resolve(DataStore.activityInbox.markSeen(keys))
         .then((marked) => setResult((current) => ({
           ...current,
+          items: current.items.map((item) => markedKeys.has(item.eventKey) ? { ...item, isUnread: false } : item),
           unreadCount: Math.max(0, Number(marked && marked.unreadCount) || 0),
         })))
         .catch(() => { markedResponseRef.current = null; });
