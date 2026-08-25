@@ -135,7 +135,7 @@ for (const table of ['personalization_controls', 'personalization_source_exclusi
   assert.match(sql, new RegExp(`revoke all on public\\.${table} from anon, authenticated`, 'i'), `${table} 직접 권한 없음`);
 }
 assert.doesNotMatch(sql, /grant\s+(select|insert|update|delete).*personalization_/i, 'control table direct grants 금지');
-for (const fn of ['control_read', 'opt_in', 'revoke_start', 'revoke_finalize', 'source_set_excluded', 'context_validate', 'retrieve', 'lease_acquire', 'lease_validate', 'lease_release']) {
+for (const fn of ['control_read', 'opt_in', 'revoke_start', 'revoke_finalize', 'source_set_excluded', 'source_exclusions_read', 'context_validate', 'retrieve', 'lease_acquire', 'lease_validate', 'lease_release']) {
   assert.match(sql, new RegExp(`personalization_${fn}`), `${fn} RPC 존재`);
 }
 assert.match(sql, /personalization_opt_in[\s\S]*?on conflict\s*\(user_id\)\s*do update[\s\S]*?where personalization_controls\.revoke_pending_generation is null[\s\S]*?if not found then raise exception 'revoke_pending'/i,
@@ -147,10 +147,19 @@ assert.equal((sql.match(/acquired_at\s*(?:>|<=)\s*now\(\)\s*-\s*interval '2 minu
 assert.match(sql, /revoke_pending_generation/);
 assert.match(sql, /source_type[\s\S]*'sentence'[\s\S]*'qa'[\s\S]*'note'/, '문장·Q\/A·자유 감상을 한 sentence source로 분류');
 assert.doesNotMatch(sql, /embedding|profile_summary/i, 'embedding/profile summary 저장소 없음');
+assert.match(sql, /personalization_source_exclusions_read[\s\S]*?x\.user_id=auth\.uid\(\)[\s\S]*?grant execute on function public\.personalization_source_exclusions_read\(\) to authenticated/i,
+  '제외 목록은 owner-bound RPC로만 read');
 
 const clientSource = readFileSync(new URL('../docs/readinggo/js/personalization.js', import.meta.url), 'utf8');
 const companionSource = readFileSync(new URL('../docs/readinggo/js/companion.js', import.meta.url), 'utf8');
+const settingsSource = readFileSync(new URL('../docs/readinggo/js/settings-modal.js', import.meta.url), 'utf8');
 assert.match(clientSource, /window\.RG_apiFetch/, '개인화 provider 호출도 Turnstile 중앙 래퍼 사용');
+assert.match(clientSource, /listExcludedSources[\s\S]*?personalization_source_exclusions_read/,
+  'client가 owner-bound 제외 목록을 read');
+assert.match(settingsSource, /setSourceExcluded\(item\.source_type, item\.source_id, false\)/,
+  '설정 surface가 source re-include RPC를 호출');
+assert.match(settingsSource, /대화에서 제외한 내 기록/);
+assert.match(settingsSource, />다시 포함<\/button>/);
 for (const copy of ['참고한 내 기록', '기록으로 이동', '이 기록 제외', '기록 삭제']) assert.match(companionSource, new RegExp(copy));
 
 if (['0', '1'].includes(process.env.EXPECT_PERSONALIZATION_BUILD)) {

@@ -130,6 +130,20 @@ begin
   return true;
 end $$;
 
+create or replace function public.personalization_source_exclusions_read()
+returns table(source_type text, source_id uuid, book_id uuid, title text, preview text)
+language sql security definer set search_path = public, pg_temp stable
+as $$
+  select x.source_type, x.source_id, ub.book_id, b.title,
+    left(case when x.source_type='sentence' then s.text else coalesce(nullif(s.my_note,''),s.text) end,120) preview
+  from public.personalization_source_exclusions x
+  join public.sentences s on s.id=x.source_id and s.user_id=auth.uid()
+  join public.user_books ub on ub.id=s.user_book_id and ub.user_id=auth.uid()
+  join public.books b on b.id=ub.book_id
+  where x.user_id=auth.uid()
+  order by x.created_at desc, x.source_id;
+$$;
+
 create or replace function public.personalization_context_validate(p_current_sentence_id uuid, p_book_id uuid)
 returns boolean language sql security definer set search_path = public, pg_temp stable
 as $$ select exists(
@@ -217,6 +231,7 @@ revoke all on function public.personalization_opt_in() from public, anon;
 revoke all on function public.personalization_revoke_start() from public, anon;
 revoke all on function public.personalization_revoke_finalize(bigint) from public, anon;
 revoke all on function public.personalization_source_set_excluded(text,uuid,boolean) from public, anon;
+revoke all on function public.personalization_source_exclusions_read() from public, anon;
 revoke all on function public.personalization_context_validate(uuid,uuid) from public, anon;
 revoke all on function public.personalization_retrieve(uuid,uuid,text,text) from public, anon;
 revoke all on function public.personalization_lease_acquire(uuid,bigint) from public, anon;
@@ -228,6 +243,7 @@ grant execute on function public.personalization_opt_in() to authenticated;
 grant execute on function public.personalization_revoke_start() to authenticated;
 grant execute on function public.personalization_revoke_finalize(bigint) to authenticated;
 grant execute on function public.personalization_source_set_excluded(text,uuid,boolean) to authenticated;
+grant execute on function public.personalization_source_exclusions_read() to authenticated;
 grant execute on function public.personalization_context_validate(uuid,uuid) to authenticated;
 grant execute on function public.personalization_retrieve(uuid,uuid,text,text) to authenticated;
 grant execute on function public.personalization_lease_acquire(uuid,bigint) to authenticated;

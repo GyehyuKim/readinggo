@@ -70,6 +70,13 @@ export function createPersonalizationLifecycle({ auth, rpc, fetcher, apiOrigin =
     }
     const error = new Error('revoke_pending'); error.code = 'revoke_pending'; throw error;
   }
+  async function listExcludedSources() {
+    await refreshSession();
+    const captured = snapshot();
+    if (!captured.ownerId) throw new Error('auth_required');
+    const rows = await rpc('personalization_source_exclusions_read', {});
+    return same(captured, captured.ownerId) && Array.isArray(rows) ? rows : [];
+  }
   async function setSourceExcluded(type, id, excluded) {
     await refreshSession();
     if (!ownerId) throw new Error('auth_required');
@@ -113,7 +120,7 @@ export function createPersonalizationLifecycle({ auth, rpc, fetcher, apiOrigin =
     if (sinks && sinks.analytics) sinks.analytics(proof.data);
     return true;
   }
-  return { invalidate, setSession, refreshSession, readControl, optIn, revoke, setSourceExcluded,
+  return { invalidate, setSession, refreshSession, readControl, optIn, revoke, listExcludedSources, setSourceExcluded,
     requestQuestion, commit, snapshot, isEnabled: () => !!(control && control.enabled === true) };
 }
 

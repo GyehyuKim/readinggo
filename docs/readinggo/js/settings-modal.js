@@ -14,6 +14,52 @@ function normalizeDefaultSentenceVisibility(settings) {
   return configured === 'public' || configured === 'followers' || configured === 'private' ? configured : 'private';
 }
 
+function PersonalizationExclusions({ available }) {
+  const [items, setItems] = useState([]);
+  const [busyId, setBusyId] = useState('');
+  useEffect(() => {
+    let alive = true;
+    if (!available) return () => { alive = false; };
+    window.RG_personalization.listExcludedSources()
+      .then((rows) => { if (alive) setItems(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, [available]);
+  if (!available || items.length === 0) return null;
+  const restore = async (item) => {
+    const key = item.source_type + ':' + item.source_id;
+    if (busyId) return;
+    setBusyId(key);
+    try {
+      const ok = await window.RG_personalization.setSourceExcluded(item.source_type, item.source_id, false);
+      if (ok !== true) throw new Error('restore failed');
+      setItems((current) => current.filter((row) => !(row.source_type === item.source_type && row.source_id === item.source_id)));
+      showToast('이 기록을 다음 대화부터 다시 포함해요');
+    } catch (e) { showToast('기록 포함 설정을 저장하지 못했어요'); }
+    finally { setBusyId(''); }
+  };
+  return (
+    <div style={{ marginTop: 8, padding: 12, borderRadius: 'var(--r-sm)', border: '1.5px solid var(--line)', background: 'var(--card)' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>대화에서 제외한 내 기록</div>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {items.map((item) => {
+          const key = item.source_type + ':' + item.source_id;
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || '내 기록'}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.preview || '내용 없음'}</div>
+              </div>
+              <button onClick={() => restore(item)} disabled={!!busyId}
+                style={{ flexShrink: 0, padding: '6px 10px', borderRadius: 999, border: 'none', background: 'var(--brand-soft)', color: 'var(--brand-3)', fontSize: 11, fontWeight: 800, cursor: busyId ? 'default' : 'pointer', opacity: busyId && busyId !== key ? 0.5 : 1 }}>다시 포함</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ── SettingsModal: 설정 (#567 #568 재배치)
    그룹: ① 계정 ② 개인정보·데이터 ③ 읽기 환경 ④ 지원 ⑤ 정보
    닉네임 편집 → 프로필 헤더 인라인 (#568), 내보내기 → 서재 (#568),
@@ -219,7 +265,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
               <span style={{ position: 'absolute', top: 3, left: consentOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
-          {personalizationAvailable && (
+          {personalizationAvailable && <>
             <div style={{ marginTop: 8, padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>내 기록을 참고한 대화</div>
@@ -230,7 +276,8 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
                 <span style={{ position: 'absolute', top: 3, left: personalizationOn ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
               </button>
             </div>
-          )}
+            <PersonalizationExclusions available={personalizationAvailable} />
+          </>}
           <fieldset disabled={sentenceVisibilityBusy} style={{ margin: '8px 0 0', padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)' }}>
             <legend style={{ padding: '0 4px', fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>한 문장 기본 공개 범위</legend>
             <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
@@ -663,6 +710,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
             </div>
             <Toggle on={personalizationOn} onToggle={togglePersonalization} disabled={personalizationBusy} />
           </div>
+          <div style={{ padding: '0 14px 14px' }}><PersonalizationExclusions available={personalizationAvailable} /></div>
         </>}
         <div style={{ height: 1, background: 'var(--line)' }} />
         <fieldset disabled={sentenceVisibilityBusy} style={{ margin: 0, padding: '14px', border: 'none' }}>
