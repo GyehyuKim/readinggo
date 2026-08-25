@@ -162,7 +162,7 @@
 
 - **별도 계정 opt-in, 기본 OFF**: `내 기록을 참고한 대화`는 로그인 계정별 선택 기능이다. 기존 `RG_consent`, 세션 리플레이·식별 분석·대화 아카이브/학습 동의, 문장 공개범위, 가입 또는 재키 사용 이력에서 동의를 추론하거나 일괄 승계하지 않는다. 동의 키가 없거나 손상됐거나 정책 버전이 다르면 OFF로 fail-closed한다.
 - OFF에서도 현재 문장·책 메타데이터·해당 문장의 직전 Q/A만 쓰는 §2의 10턴 핵심 대화를 동일하게 제공한다. opt-in을 거부·철회했다는 사실을 질문 문구로 압박하거나 품질 저하 카피로 사용하지 않는다.
-- 동의·철회·기기 간 복원 정본은 [backend.md §7.9.3](./backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309)의 공개 프로필과 분리된 owner-only control RPC다. 철회 시작 시 서버는 먼저 OFF와 새 consent generation을 저장해 신규 provider dispatch lease를 차단하고 기존 generation 요청을 drain한다. active lease 0건을 확인한 뒤에만 `철회 완료`를 표시한다. 그 전에는 `철회 처리 중`이며 timeout/장애를 완료로 오인하지 않는다. 모든 개인화 응답은 검증된 bearer의 `owner_id`와 `consent_generation`을 포함한다. 클라이언트는 요청 시작 시 owner와 auth-session epoch를 함께 캡처하고 logout·login·token/session·account 변경 때 epoch를 증가시킨다. callback은 캡처 owner·현재 account·응답 owner와 캡처/current epoch가 모두 같은 경우에만 owner-only authoritative readback을 수행하며, 그 결과까지 같은 ON generation일 때만 화면·대화 저장·analytics에 반영한다. account-local generation 숫자가 같더라도 owner나 epoch가 다르면 즉시 폐기한다. 철회·재동의 뒤 늦게 도착한 과거 generation 결과도 즉시 폐기하고, 완료 응답 뒤 과거 기록의 신규 LLM 전송은 0건이어야 한다.
+- 동의·철회·기기 간 복원 정본은 [backend.md §7.9.3](./backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309)의 공개 프로필과 분리된 owner-only control RPC다. 철회 시작 시 서버는 먼저 OFF와 새 consent generation을 저장해 신규 provider dispatch lease를 차단하고 기존 generation 요청을 drain한다. active lease 0건을 확인한 뒤에만 `철회 완료`를 표시한다. 그 전에는 `철회 처리 중`이며 timeout/장애를 완료로 오인하지 않는다. 모든 개인화 응답은 검증된 bearer의 `owner_id`와 `consent_generation`을 포함한다. 클라이언트는 요청 시작 시 owner와 auth-session epoch를 함께 캡처하고 logout·login·token/session·account 변경 때 epoch를 증가시킨다. callback은 캡처 owner·현재 account·응답 owner와 캡처/current epoch가 모두 같은 경우에만 owner-only authoritative readback을 수행한다. readback 반환 뒤 같은 owner/epoch/response-owner를 다시 확인하고 같은 ON generation까지 일치한 상태에서 await 없는 guarded commit으로만 화면·대화 저장·analytics에 반영한다. sink 사이에 await가 있으면 각 sink 직전에 전 조건을 다시 검사한다. account-local generation 숫자가 같더라도 owner나 epoch가 다르면 즉시 폐기한다. 철회·재동의 뒤 늦게 도착한 과거 generation 결과도 즉시 폐기하고, 완료 응답 뒤 과거 기록의 신규 LLM 전송은 0건이어야 한다.
 
 #### 4.7.2 허용 source와 request-time 예산
 
@@ -191,7 +191,7 @@
 
 #### 4.7.4 평가와 출시 게이트
 
-- 합성 persona로 **OFF 기준선**, ON-관련 source 있음, ON-0건, private source, 제외·삭제·철회, 잘못된 키워드 일치, 민감 주제, 프리셋 7종을 검증한다. `A gen1 지연 응답 → logout/B 전환 및 auth-session epoch 증가 → B gen1 ON → A 응답 도착`에서는 owner/epoch mismatch로 B 화면·저장·analytics가 모두 0건이어야 한다. 다른 계정의 행·존재·개수·오류 차이는 어떤 응답에도 노출하지 않는다.
+- 합성 persona로 **OFF 기준선**, ON-관련 source 있음, ON-0건, private source, 제외·삭제·철회, 잘못된 키워드 일치, 민감 주제, 프리셋 7종을 검증한다. `A gen1 지연 응답 → logout/B 전환 및 auth-session epoch 증가 → B gen1 ON → A 응답 도착`과 `A callback pre-read gate 통과 → control readback 지연 → B 전환 → A readback 반환` 모두 post-readback owner/epoch mismatch로 B 화면·저장·analytics가 0건이어야 한다. 다른 계정의 행·존재·개수·오류 차이는 어떤 응답에도 노출하지 않는다.
 - 평가자는 관련 연결이 실제 source로 추적되는지, source 없이 기억을 꾸미지 않는지, 현재 답/프리셋을 우선하는지, 불필요한 개인화가 OFF보다 나쁘지 않은지 비교한다. prompt 전문·실사용자 원문을 Prompt Lab fixture나 평가 artifact로 복사하지 않는다.
 - **DEV 구현·합성 검증은 허용**한다. 다만 personalization OFF/ON 최종 품질 비교와 실제 UAT 인수는 Judy UAT **#1373 결과가 있어야 하며**, 그 전에는 Production feature flag·Production API·실사용자 opt-in을 열거나 Production으로 승격하지 않는다. 일반 `/api/companion`의 비개인화 기능 승격과 이 개인화 승격을 분리한다.
 
