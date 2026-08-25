@@ -11,7 +11,7 @@
 > **v12 갱신 (2026-07-03, #1044 코드 PR)**: §7.2.1 P1 **구현** — worker 에 provider 스위치(`KAKAO_REST_KEY`/`NLK_CERT_KEY` 자동 감지, 미설치 시 알라딘 폴백 = 무중단). 검색→카카오(영구 적재는 ISBN 국중도 재조회분만)·ISBN→국중도(+OpenLibrary 외서 폴백)·Google 영구 경로 2건 제거(검색 upsert·backfillPages PATCH)·imgProxy 화이트리스트 확장·archive 시드 게이트 격리(재설계 P2). 상세 §7.2.1 구현 상태.
 > **v13 갱신 (2026-07-28, #1350)**: DEV 소셜 로그인 provider에 의존하지 않는 합성 검수 환경 신설(§7.1.1). 브라우저 local-first 상태와 DEV 전용 Supabase 저장소를 분리하고, Production·실사용자 Auth/DataStore 경로는 fail-closed 한다.
 > **v14 갱신 (2026-08-01, #1392)**: 공개 UGC 신고·사용자 차단·운영자 검토 데이터 모델과 DataStore 계약을 신설. 상세 UX·정책 동의·출시 게이트는 [feed.md §5.7.4](./feed.md)가 SSOT다.
-> **v18 목표 결정 (2026-08-25, #1515)**: 서재는 기존 `user_books`·`wish_books`·`sentences`와 canonical `books`의 읽기 모델이다. 레거시·폐기 예정 친구 기능 사용자 표면은 보류하지만 공개범위·제한 RPC/RLS·fail-closed·base RLS 축소 안전 계약은 유지한다. 아래 §7.0이 활성 데이터 계약이며 §7.0-v17은 보류 이력이다.
+> **v18 목표 결정 (2026-08-25, #1515·#1389)**: 서재는 기존 `user_books`·`wish_books`·`sentences`와 canonical `books`의 읽기 모델이다. 책나무 제품의 route·flag·전용 API·analytics는 은퇴시키되 공개범위·fail-closed·base RLS 축소 안전 계약은 유지한다. 아래 §7.0이 활성 데이터 계약이다.
 > **v18.1 활동 계산 결정 (2026-08-25, #1520)**: 프로필 월간 활동일은 기존 `sessions.calendar(days)`가 주는 로컬 날짜 문자열 `reading_sessions.session_date`와, 본인 문장 `created_at` 타임스탬프만 사용자 로컬 날짜로 변환한 값의 합집합으로 클라이언트에서 재계산한다. 새 table·column·RPC·migration은 추가하지 않는다.
 > **v18.2 활동함 결정 (2026-08-25, #1260)**: 인앱 활동함은 현재 `claps`·`follows`·`pokes`에서 90일/최대 100개를 파생하고 사용자가 실제 본 opaque `seen_event_keys`만 100개 이하로 영속한다. 원격 푸시·이벤트 snapshot은 추가하지 않는다. 화면 SSOT는 [activity-inbox.md](./activity-inbox.md)다.
 > **v18.3 개인화 retrieval 결정 (2026-08-25, #1309)**: 누적 개인 기록은 별도 계정 opt-in 뒤 `/api/companion/context`가 Supabase bearer identity로 본인 기록만 요청 시 조회한다. 최대 5건·2,000 Unicode 문자, 복사본/embedding/profile summary 없음. DEV 구현은 허용하되 #1373 전 Production 승격은 차단한다.
@@ -26,8 +26,22 @@
 3. 로그인 시 게스트의 네 상태와 문장 없는 책까지 누락 없이 이관해야 한다. 정확한 migration 설계는 후속 이슈에서 결정하되 부분 실패·재시도에서 중복 행을 만들지 않고 원격 저장 성공 검증 전 로컬 원본을 지우지 않는 안전 기준은 유지한다.
 4. 서재 가로 탐색은 네 상태 포함·제외 필터가 만든 통합 projection을 기존 카드 디자인의 유한 `scroll-snap` 레일로 표현하는 클라이언트 요구다. 별도 cache·권위 데이터·무한 복제 행은 추가하지 않는다. 실제 대량 지연 증거가 생기면 window·pagination·preload 수치를 별도 승인한다.
 5. 프로필 월간 활동일은 기존 `sessions.calendar(days)`가 반환하는 사용자 로컬 `YYYY-MM-DD`인 `reading_sessions.session_date` 문자열을 그대로 사용하고, 앱 상태의 본인 `sentences.created_at` 타임스탬프만 사용자 로컬 날짜로 변환해 합친다. 같은 날 여러 원천은 하루로 중복 제거하고 원천 수정·삭제 시 다시 계산한다. 새 테이블·컬럼·RPC는 만들지 않는다.
-6. 폐기 예정 친구 기능 UI와 기존 사용자 자동 활성화는 보류한다. 제한 RPC migration은 저장소에 존재하고 DEV에 선배포됐지만 Production 정책·함수·grant 적용 상태와 broad base RLS 축소는 미검증이다. private 문장의 본문·존재·개수·오류 차이를 숨기는 fail-closed 목표는 유지하되 Production 활성화 완료로 간주하지 않는다.
+6. 책나무 제품의 UI·route·flag·전용 RPC/DataStore·analytics는 은퇴하며 mascot 명분이나 향후 실험을 위해 재활성화하지 않는다. 저장소와 DEV에 남은 전용 migration/function/grant는 활성 계약이 아니라 제거 전 inventory다. private 문장의 본문·존재·개수·오류 차이를 숨기는 fail-closed 목표와 retained surface의 최소권한은 계속 유지한다.
 7. XP·둥지·성·방패·하루 만회 전용 데이터 제거는 계속 진행하되 책·문장·진도·세션·위시·공개범위·재독 데이터를 함께 삭제하지 않는다.
+
+### 7.0.3 현재 보안 갭과 retained surface 컷오버 게이트
+
+저장소 정적 감사상 `users`, `user_books`, `reading_sessions`, `streak`, `claps`의 base SELECT 또는 연관 정책은 현재 제품 표면에 필요한 행·필드보다 넓을 수 있다. 특히 `user_books.ub_sel`은 차단되지 않은 인증 사용자에게 타인의 전체 컬럼을 줄 수 있고, UI 필터는 권한 경계가 아니다. private 문장 UUID에 대한 clap·count·FK/report 오류 차이는 본문 없이도 존재를 추론하게 할 수 있으며, 구 클라이언트가 `friends|followers` 또는 unknown visibility를 `public`으로 정규화하면 공개가 확대된다. 실제 Production 정의·grant·영향은 역할별 직접 검증 전까지 미검증으로 둔다.
+
+책나무 은퇴는 이 보안 계약을 삭제하거나 broad policy를 그대로 두는 근거가 아니다. 반대로 책나무 제한 RPC를 새 경로로 선배포하거나 feature flag로 다시 켜는 단계도 만들지 않는다. retained surface(본인 서재, 공개 문장, 같이읽기, 활동함)가 필요로 하는 최소 projection만 다음 순서로 컷오버한다.
+
+1. web, OTA 가능 Capacitor shell, store APK별 base table 직접 조회·visibility 처리와 retained surface의 실제 필드 의존성을 inventory한다. 책나무 route·flag·전용 API 호출은 migration 대상이 아니라 제거 대상으로 분리한다.
+2. retained surface가 필요한 owner/current-viewer projection을 기존 제한 RPC/RLS로 충족하거나, 별도 승인된 최소 view/RPC를 먼저 DEV에 배포한다. 활동함 때문에 source table broad SELECT를 추가하지 않는다.
+3. 신규 client 수신·호출 전환 증거와 구버전 실패 동작을 확인한 뒤 최소 지원 버전·업데이트 차단 정책을 승인한다. 정확한 버전은 관측 전에 임의 확정하지 않는다.
+4. 별도 migration release에서 base policy를 owner/minimum-field로 축소하고 owner·nonowner·blocked·anonymous와 `private|followers|public`, 유효/무효/타인 private UUID의 응답·오류 비구분을 직접 검증한다.
+5. rollback은 영향받은 retained UI/제한 경로를 비활성화하거나 승인된 최소권한 이전 정의로 되돌린다. 개인정보 노출을 되살리는 broad base SELECT 복원은 금지한다.
+6. `friends|followers`와 unknown visibility를 이해하지 못하는 client는 `public`으로 확대하지 않고 `private` fail-closed한다. 기존 작성자의 visibility와 `wishlist_public` 값은 별도 승인 없이 확대·재작성하지 않는다.
+7. #1260 활동함의 목록·count·mark는 같은 current projection과 moderation filter를 사용한다. source RLS를 줄이는 release는 위 client inventory·최소 버전·직접 역할 검증을 통과해야 하며 활동함 RPC가 base grant 확대를 대신 요구해서는 안 된다.
 
 ### 7.0.6 활동함 읽기 모델·상태 계약 (#1260)
 

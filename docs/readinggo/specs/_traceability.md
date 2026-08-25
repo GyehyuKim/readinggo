@@ -1,6 +1,6 @@
 # 스펙 ↔ 구현 추적 매트릭스
 
-> **감사 기준**: `origin/main@d1c20b8` (2026-08-25)
+> **감사 기준**: `origin/main@4be9902` (2026-08-25, PR #1531 base)
 > **목적**: 현재 구현 사실과 스펙의 정합 여부를 파일별로 검토한다. 제품의 미래 목표 계약은 `meta/decisions.md`와 각 기능 스펙에서 관리하며, 아직 구현되지 않은 결정은 구현 완료로 표시하지 않는다.
 
 ## 상태
@@ -14,18 +14,18 @@
 
 ## 검증 기준선
 
-> 2026-08-25 v18 spec-only branch의 로컬 실행 보고다. Markdown·spec-align·dependency-free Node 테스트는 실행했고, full build·Playwright는 격리 worktree에 `vite`·`playwright`가 설치되지 않아 미실행이다. 영속 receipt는 이 branch의 PR CI run URL로 확정하며, 로컬 PASS를 DEV·Production 적용 증거로 사용하지 않는다.
+> 2026-08-25 PR #1531 spec-only branch의 로컬 실행 보고다. Markdown·spec-align·dependency-free Node 테스트는 실행했고, full build·Playwright는 이 격리 worktree에 `vite`·`playwright`가 설치되지 않아 미실행이다. 영속 receipt는 이 branch의 PR CI run URL로 확정하며, 로컬 PASS를 DEV·Production 적용 증거로 사용하지 않는다.
 
 | 검증 | 결과 | 해석 |
 |---|---|---|
 | `python3 tests/spec-align/align_v7.py` | `PASS` (90/90) | 과거 v7~v16 기능의 존재·부재 검사. 최신 제품 결정을 검증하지는 않음 |
-| `python3 tests/spec-align/nest.py` | `PASS` (8/8) | 현재 `nest-grow` alias와 XP 제거 상태를 확인하는 as-built 기준선. v18 서재 구현 완료 증거는 아님 |
+| `python3 tests/spec-align/nest.py` | `PASS` (7/7) | canonical `library` route, `nest-grow` 입력 alias, 책나무 active route 부재, XP 제거 상태 확인 |
 | `python3 tests/spec-align/architecture_current.py` | `PASS` (3/3) | Vite·Capacitor·Cloudflare·DataStore 현재 계약 확인 |
 | `python3 tests/spec-align/drift.py` | `PASS` | spec-drift workflow 구조 확인 |
 | `python3 tests/spec-align/design_lint.py` | `PASS` (0건) | 이모지·raw hex·ghost·radius·font 규칙 위반 없음 |
-| `python3 tests/spec-align/migrations_applied.py` | `BLOCKED` | 기본 Python 3.9.6은 `str \| None`에서 실패. `uv` Python 3.11에서는 시작되나 worktree에 `SUPABASE_ACCESS_TOKEN`이 없어 원격 검증 보류 |
+| `python3 tests/spec-align/migrations_applied.py` | `BLOCKED` | worktree에 `SUPABASE_ACCESS_TOKEN`이 없어 원격 검증 보류 |
 | `npm run build` (`docs/readinggo`) | `BLOCKED` | 격리 worktree에 `vite` package가 없어 config load 전 중단. PR CI로 재검증 |
-| `node --test js/*.test.js` | `PASS` (4/4) | analytics·library dependency-free 테스트 통과. 현행 코드 계약의 증거일 뿐 v18 UI 구현 완료 증거는 아님 |
+| dependency-free Node tests | `PASS` (8/8) | analytics·library와 #1389 retirement/RLS tombstone 테스트 통과 |
 | Playwright 회귀 | `BLOCKED` | 격리 worktree에 `playwright` package가 없어 미실행. PR CI로 재검증 |
 
 ## 1. 34개 스펙 파일 전수 상태
@@ -44,7 +44,7 @@
 | `co-reading.md` | `co-reading.js`, `rooms.*`, villages/room migrations | 📝 | 현행 `함께/숲`을 이력으로 보존하고 목표 `같이읽기/읽기방`, 무랭킹·무XP·공개범위 계약 반영 |
 | `companion.md` | `companion.js`, `/api/companion`, `companion_sessions` | 📝 | 대화 계약은 현행과 일치. 캐릭터 최종 이름 TBD·진화 없는 2D 참새·기존 재키 임시 유지 반영 |
 | `design.md` | `index.html` tokens, `RG_ICONS`, `design_lint.py` | 📝 | 현행 토큰 린트 0건. v18 서재의 preload·bounded rendering·저모션·대체 조작 계약 반영 |
-| `feed.md` | `social.js`, `SentenceCard`, moderation migrations/tests | 📝 | 현행 인기 Top5·폐기 예정 친구 기능 진입은 레거시. 같이읽기 내 피드·무랭킹·무XP·공개범위 계약 유지 |
+| `feed.md` | `social.js`, `SentenceCard`, moderation migrations/tests | 📝 | 현행 인기 Top5는 레거시이며 책나무 진입·전용 이벤트는 제거 대상. 같이읽기 내 피드·무랭킹·무XP·공개범위 계약 유지 |
 | `flexible-import.md` | `data-import.js`, `/api/parse-books`, shelf-import core | ✅ | 구현·검수 경로 존재 |
 | `inquiry-sync.md` | 직접 대응 정책, 자동화 제거 커밋 | ✅ | 현재 자동 issue 동기화가 아니라 관리자 확인·개별 회신 |
 | `integrated-shelf.md` | `shelf-import.js`, `import_staging`, `/api/seed` | ✅ | 스크린샷 복원·검토함·시드 경로 구현 |
@@ -54,12 +54,12 @@
 | `meta/journey.md` | 역사 문서 | ✅ | v5/v6 여정으로만 사용. 현재 계약으로 사용하지 않음 |
 | `meta/open-issues.md` | GitHub #1452~#1515와 수동 대조 | 📝 | v18 서재 전환과 게스트 이관·carousel·라우팅·4번째 탭 결정, XP 삭제·재독·문장 1,000자 후속을 분리 추적 |
 | `meta/rejected.md` | 역사 문서 | 📝 | 독립적인 기각 결정만 보존 |
-| `nest.md` | `nest.js`, `nest-grow.js`, `ceremony.js` | ⚠️ | 홈 독서 루프는 유지. 현재 `nest-grow` 구현은 후속 route 정리 대상 |
+| `nest.md` | `nest.js`, `app.js`, `library.js`, `ceremony.js` | ✅ | 홈 독서 루프 유지. canonical 3번째 탭은 `library`; `nest-grow`는 입력 alias만 유지 |
 | `onboarding.md` | `onboarding.js`, `nest.js` empty state, local notifications | 📝 | 실제 책 검색·서재 축적·비손실 기록의 v18 목표 여정 반영 |
 | `ops.md` | dev/prod workflows, `wrangler.toml`, release scripts | 📝 | spec 승인→구현→DEV QA→동일 SHA PROD→Production QA→Play, 권한·XP 단계 증거와 rollback 계약 추가 |
 | `ota.md` | Capacitor updater, Worker `/api/ota`, OTA KV, release workflows | 🔧 | 실제 `ota-release`·`ota-promote`는 모두 `workflow_dispatch`+production environment. stable DEV/main 동일 SHA로 beta 수동 발행 후 같은 manifest를 prod에 수동 승격 |
-| `privacy-policy.md` | 공개 privacy URL, consent UI, account deletion | 📝 | 폐기 예정 친구 기능·자동 활성화 보류. 최소공개·fail-closed·제한 API·base RLS 안전 조건은 유지 |
-| `profile.md` | `library.js`, `settings-view.js`, `user-profile-modal.js` | 🚩 | 3번째 탭 서재·4번째 활동 방향을 반영. 폐기 예정 친구 기능 UI는 보류하고 `followers` round-trip 갭은 별도 차단 이슈로 유지 |
+| `privacy-policy.md` | 공개 privacy URL, consent UI, account deletion | 📝 | 책나무 제품·자동 활성화 종료. 최소공개·fail-closed·retained API·base RLS 안전 조건은 유지 |
+| `profile.md` | `library.js`, `settings-view.js`, `user-profile-modal.js` | 🚩 | 3번째 탭 서재·4번째 활동 방향을 반영. 책나무 UI는 제거 대상이고 `followers` round-trip 갭은 별도 차단 이슈로 유지 |
 | `prompt-lab.md` | DEV-only API/UI, promotion transaction | 📝 | 실험·승격 경계는 유지하고 최종 캐릭터 이름 TBD, 재키/jacky는 호환 식별자로 정리 |
 | `refactor-modularize.md` | `main.js` import map, 분리된 `js/*.js` | ✅ | 현재 모듈 구조와 부팅 순서가 as-built에 기록됨 |
 | `referral.md` | `shareService`, 외부 공유 동선 | ⏳ | 보상·귀속·랜딩은 초안/미구현으로 명시됨 |
@@ -73,7 +73,7 @@
 | 영역 | 구현 위치 | 현재 사실 |
 |---|---|---|
 | 홈 상단 | `js/app.js` `topbar-stats` | 책·문장 수를 중립 용어로 노출 |
-| 전용 3번째 탭 | `js/app.js`, 레거시 전용 UI 모듈 | 내부키 `nest-grow`가 남아 있으며 v18 후속에서 `서재`로 전환 대상 |
+| 전용 3번째 탭 | `js/app.js`, `js/library.js` | canonical `library`가 서재를 렌더하며 legacy `nest-grow` 입력은 `library` alias로만 정규화 |
 | XP·둥지 표면 | 앱·DataStore·migration 참조 감사 | 신규 XP 쓰기와 둥지/성/만회 계약은 제거됐으며 레거시 SQL 이력은 별도 보존 |
 | 스트릭 | `js/datastore.js`, `js/nest.js` | 현재 연속일 계산·7/30일 세리머니가 일부 남아 있다. v18 4번째 탭 결정 전 새 스트릭 상품 계약으로 해석하지 않음 |
 | 책 상태 | `user_books.status`, `wish_books`, `myBooks.abort/resume/complete` | reading/completed/aborted와 wish가 별도 구조로 존재 |

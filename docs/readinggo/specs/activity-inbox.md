@@ -108,7 +108,7 @@ ActivityInboxResult {
 - 모든 종류에 양방향 사용자 차단과 actor 정지를 적용한다. 좋아요에는 운영자 hidden 문장도 추가로 제외한다. 필터는 목록, count, unread 판정에 동일하게 적용한다.
 - RPC는 `auth.uid()`만 viewer로 사용하며 임의 user id 인자를 받지 않는다. `SECURITY DEFINER`라면 고정 `search_path`, 스키마 한정 참조, 입력 상한, 명시적 `authenticated` grant와 `anon/public` revoke를 갖춘다.
 - `activity_inbox_state` base table은 RLS를 켜고 본인 `SELECT`만 허용한다. 클라이언트 직접 `INSERT/UPDATE/DELETE` grant·policy는 두지 않고, 모든 mutation은 현재 projection 교집합·100개 상한을 강제하는 mark-seen RPC만 사용한다. 타인 state 조회·변조는 허용하지 않는다.
-- 활동함을 위해 기존 source table의 broad SELECT grant를 늘리지 않는다. source RLS 축소가 필요한 경우 [backend.md §7.0.3](./backend.md#703-현재-보안-갭과-전환-게이트)의 최소 지원 버전·컷오버 게이트를 별도로 따른다.
+- 활동함을 위해 기존 source table의 broad SELECT grant를 늘리지 않는다. source RLS 축소가 필요한 경우 [backend.md §7.0.3](./backend.md#703-현재-보안-갭과-retained-surface-컷오버-게이트)의 최소 지원 버전·컷오버 게이트를 별도로 따른다.
 
 ## 7. 수용기준과 검증 매트릭스
 
