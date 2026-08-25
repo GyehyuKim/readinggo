@@ -64,7 +64,7 @@
 | `referral.md` | `shareService`, 외부 공유 동선 | ⏳ | 보상·귀속·랜딩은 초안/미구현으로 명시됨 |
 | `resurface.md` | `resurfaceCandidate`, `markResurfaced`, UI 카드 | ✅ | 코어 되감기 구현, 확장 범위는 의도된 후속 |
 | `seed-collector.md` | `collector/`, `seed_queue`, Worker seed endpoint | ✅ | fail-closed provenance와 재시도 경계 문서화 |
-| `share.md` | `share-card.js`, `navigator.share`·clipboard fallback | ✅ | 1:1 카드 구현, 9:16은 의도된 후속 |
+| `share.md` | `share-card.js`, `share-card.test.js`, `sentence-card.js`, `navigator.share`·clipboard fallback | ✅ | #1337: 1:1 카드 보존 + 1080×1920 문장 배경화면 선택·PNG 공유/저장 구현 |
 | `systems.md` | `DataStore.streak`, `DataStore.xp`, `increment_xp`, shield schema | 📝 | 최근 14일·누적 성장일과 XP 제품폐기→쓰기동결→참조격리→물리삭제 계약 추가. 기존 수치표는 레거시 |
 
 ## 2. 현재 구현의 핵심 증거
