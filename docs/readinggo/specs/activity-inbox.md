@@ -70,20 +70,22 @@
 
 ## 4. 읽음·미읽음 계약
 
-- 활동함은 사용자별 서버 상태 `seen_through` 하나만 저장한다. 개별 원천 행에 `read`를 쓰거나 notification row를 만들지 않는다.
-- 각 현재 항목은 `occurred_at > seen_through`일 때 unread다. `seen_through IS NULL`이면 보관 범위의 현재 항목을 모두 unread로 본다.
-- 목록 응답은 서버가 조회에 사용한 `watermark`와 현재 `unread_count`를 함께 준다. 화면을 열었다는 이유만으로 즉시 읽음 처리하지 않는다.
-- 목록이 성공적으로 화면에 렌더된 뒤 `markAllSeen(watermark)`를 호출한다. 서버는 기존 값보다 뒤로만 이동시키며, 서버 현재 시각보다 미래인 값은 거부한다.
-- 마킹 중 새 활동이 생기면 전달한 watermark 이후 항목은 unread로 남아야 한다. 클라이언트의 `Date.now()` 또는 optimistic 숫자 0으로 덮지 않는다.
-- 마킹 실패 시 로컬에서 점을 지우지 않는다. 재조회한 서버 `unread_count`가 헤더와 목록의 정본이다.
-- unlike·unfollow·삭제·차단 등으로 unread 원천이 사라지면 다음 서버 재계산에서 unread 수도 감소할 수 있다. 이는 파생 목록의 의도된 동작이다.
+- 활동함은 사용자별 서버 상태 `seen_event_keys`만 저장한다. 개별 원천 행에 `read`를 쓰거나 notification row를 만들지 않는다.
+- 서버는 각 현재 항목에 opaque `event_key`를 만든다. clap·poke는 `kind + source id`, follow는 별도 id가 없으므로 `kind + follower_id + following_id + source created_at`으로 구성해 unfollow→재팔로우를 새 활동으로 구분한다. key는 문장 본문·프로필 snapshot이 아닌 최소 식별 metadata다.
+- 현재 90일·최신 100개 projection에서 `event_key`가 `seen_event_keys`에 없으면 unread다. 목록 응답은 각 `eventKey`와 같은 projection의 `unread_count`를 함께 준다.
+- 목록이 성공적으로 화면에 렌더된 뒤 클라이언트는 **그 응답에 실제 포함됐던 key만** `markSeen(eventKeys)`로 보낸다. 최대 100개·중복 제거·빈 문자열 거부를 강제한다.
+- 서버는 전달 key를 같은 transaction에서 다시 계산한 현재 허용 projection과 교집합한 뒤 기존 set에 원자적으로 합친다. 저장 set은 현재 90일·최신 100개 key와 다시 교집합해 100개 이하로 prune한다. 임의 key·다른 사용자의 key·삭제되거나 가려진 key는 저장하지 않는다.
+- 목록 조회가 시작된 뒤 늦게 commit되거나 같은 timestamp를 가진 새 활동은 이전 응답의 key 집합에 없으므로 unread로 남는다. timestamp, transaction 시작 시각, 클라이언트 `Date.now()`를 read cursor로 사용하지 않는다.
+- 마킹 중 새 활동이 생겨도 전달 key에 없으면 unread로 남아야 한다. 마킹 실패 시 로컬에서 점을 지우지 않으며, 서버가 반환한 최신 `unread_count`가 헤더와 목록의 정본이다.
+- unlike·unfollow·삭제·차단 등으로 unread 원천이 사라지면 다음 서버 재계산에서 항목과 unread 수도 감소할 수 있다. 이는 파생 목록의 의도된 동작이다.
 
 ## 5. 최소 응답 필드
 
 ```text
 ActivityItem {
   kind: 'clap' | 'follow' | 'poke'
-  eventId: uuid
+  eventId: uuid | null
+  eventKey: opaque string
   occurredAt: timestamptz
   isUnread: boolean
   actor: { id, displayName, handle, avatarUrl }
@@ -93,11 +95,10 @@ ActivityItem {
 ActivityInboxResult {
   items: ActivityItem[]       // 최신순, 최대 100
   unreadCount: integer        // 같은 필터를 적용한 현재 값
-  seenThrough: timestamptz | null
-  watermark: timestamptz      // markAllSeen에 그대로 전달
 }
 ```
 
+- `eventId`는 source id가 있는 clap·poke에서만 UUID이며 follow는 `null`이다. 클라이언트는 `eventKey`를 해석하거나 직접 만들지 않고 같은 응답의 markSeen에만 되돌려 준다.
 - `sentence`는 `clap`에서만 존재한다. `my_note`, 이메일, 팔로우 목록, 현재 페이지, 내부 `user_book_id`, 신고·차단·정지 사유는 반환하지 않는다.
 - 배우 정보와 문장/책 정보는 현재 원천 projection이며 응답 외 별도 저장·분석 payload로 복제하지 않는다.
 
@@ -114,7 +115,7 @@ ActivityInboxResult {
 1. 타인 clap, 새 follower, inbound poke만 최신순으로 나오고 self-clap·outbound 활동은 나오지 않는다.
 2. unlike·unfollow·문장/원천 삭제 후 새로고침하면 항목과 unread 수가 함께 사라진다.
 3. 90일 경계의 서버 시각, 100개 상한, 동률 정렬을 고정 시각 fixture로 검증한다.
-4. 목록 watermark를 mark한 직후의 신규 이벤트가 unread로 남고, 미래 watermark·타인 state 변경이 거부된다.
+4. 목록 응답 key를 mark한 직전·직후의 late commit과 같은 timestamp 신규 이벤트가 unread로 남고, 임의·타인·삭제된 key 저장이 거부된다.
 5. owner·actor·제3자·anonymous 역할로 목록/count/state 직접 호출을 검증한다. owner 외에는 결과 또는 존재 차이를 얻지 못한다.
 6. 차단 양방향, actor 정지, hidden 문장, 삭제된 actor/문장 조합이 목록과 count에서 동일하게 제외된다.
 7. actor 표시명·아바타·문장·책 제목 변경이 재조회에 반영되고 별도 snapshot row가 생기지 않는다.

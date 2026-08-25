@@ -109,8 +109,8 @@
 
 - `activity_inbox()` 제한 RPC는 viewer 인자를 받지 않고 `auth.uid()`의 inbound non-self clap·새 follower·inbound poke를 현재 source row에서 `UNION ALL`한다. 서버 현재 시각 기준 90일, 최신 100개 상한, `occurred_at DESC`와 결정적 tie-break를 서버에서 강제한다.
 - 목록과 미읽음 수는 양방향 `user_blocks`, `moderation_suspended_users`, clap 대상의 `moderation_hidden_sentences`를 동일하게 제외한다. actor·문장·책은 현재 허용 projection만 join하며 원천 삭제·unlike·unfollow는 다음 조회에서 항목을 제거한다.
-- 읽음 영속 데이터는 `activity_inbox_state(user_id uuid primary key, seen_through timestamptz null, updated_at timestamptz)`뿐이다. 이벤트·프로필·문장·책 snapshot과 notification row는 만들지 않는다.
-- `activity_inbox_unread_count()`는 목록과 같은 필터로 `occurred_at > seen_through`인 현재 행을 센다. `activity_inbox_mark_seen(p_through)`는 인증된 본인 state만 upsert하고 기존 값보다 뒤로만 이동하며 서버 현재보다 미래 값은 거부한다.
+- 읽음 영속 데이터는 `activity_inbox_state(user_id uuid primary key, seen_event_keys text[] not null default '{}', updated_at timestamptz)`뿐이다. opaque key 외 이벤트·프로필·문장·책 snapshot과 notification row는 만들지 않는다.
+- `activity_inbox_unread_count()`는 목록과 같은 현재 90일·최신 100개 projection에서 `event_key <> all(seen_event_keys)`인 행을 센다. `activity_inbox_mark_seen(p_event_keys text[])`는 최대 100개 key를 받아 같은 transaction에서 다시 계산한 본인 허용 projection과 교집합하고 기존 set과 원자 병합한 뒤 현재 projection으로 100개 이하 prune한다. 목록 이후 late commit·동률 timestamp 활동은 전달 set에 없으므로 unread로 남으며, 임의·타인·삭제된 key는 저장하지 않는다.
 - 제한 RPC가 `SECURITY DEFINER`를 사용하면 고정 `search_path`와 schema-qualified relation, 명시적 `authenticated` execute grant, `anon/public` revoke를 적용한다. state base table은 RLS를 켜고 본인 `SELECT/INSERT/UPDATE`만 허용하며 클라이언트 `DELETE`와 타인 접근은 금지한다.
 - source table의 기존 base SELECT를 활동함 때문에 넓히지 않는다. base RLS 축소·구버전 컷오버는 §7.0.3의 별도 게이트를 유지한다.
 
