@@ -1230,6 +1230,13 @@ const DataStore = {
     set(v) { try { localStorage.setItem('rg_data_consent', v); } catch (e) {} return v; },
   },
 
+  /* 활동함은 인증 서버 projection이다. 게스트/로컬은 네트워크·가짜 활동 없이 안전한 빈 표면. */
+  activityInbox: {
+    async list() { return { items: [], unreadCount: 0 }; },
+    async unreadCount() { return 0; },
+    async markSeen() { return { unreadCount: 0 }; },
+  },
+
   /* 콕찌르기/응원 (pokes) — 로컬/게스트는 타 사용자 부재라 no-op(표면 일치).
      숲 마일스톤 응원이 Supabase pokes.send 와 같은 표면을 쓰도록 어댑터 대칭 유지(새 테이블 없음). */
   pokes: {

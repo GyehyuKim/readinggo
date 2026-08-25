@@ -1367,6 +1367,7 @@ function App() {
   if (_supa && authUser && authUser !== 'local' && !dataReady) return (<BootSplash text="불러오는 중..." />);
 
   const isGuest = _supa && authUser === null;
+  const activityGuest = window.DataStore !== window.SupabaseDataStore;
 
   return (
     <div className="stage">
@@ -1404,6 +1405,9 @@ function App() {
                   : (topbarTree.loading ? '책과 문장 불러오는 중…' : '책 · 문장')}
               </span>
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
+              {activeTab === 'social' && window.ActivityInboxButton && (
+                <window.ActivityInboxButton guest={activityGuest} onLogin={() => setShowLogin(true)} />
+              )}
               {/* #790: 돋보기 아이콘만으론 '책 추가' 동선 발견성이 낮음 → '도서 찾기' 라벨 + 틴트 배경칩으로 강조. */}
               <button
                 onClick={() => setIsSearchOpen(true)}
