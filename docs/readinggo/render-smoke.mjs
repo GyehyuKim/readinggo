@@ -31,6 +31,53 @@ async function assertView(label) {
   console.log(`  [${label}] 에러화면:${broke ? 'FAIL' : 'ok'} 렌더:${kids > 0 ? 'ok' : 'FAIL'} 치명에러:${fatal.length}`);
 }
 
+async function assertLibrarySurface() {
+  const activityCount = await page.locator('.rg-activity').count();
+  if (activityCount !== 0) fails.push('[서재] profile 활동 캘린더가 중복 노출됨');
+  const rail = page.locator('.shelf-grid');
+  if (await rail.count()) {
+    const metrics = await rail.evaluate((el) => ({
+      overflowX: getComputedStyle(el).overflowX,
+      snap: getComputedStyle(el).scrollSnapType,
+      cards: el.querySelectorAll('.shelf-grid-item').length,
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    if (!/auto|scroll/.test(metrics.overflowX) || !/x/.test(metrics.snap)) {
+      fails.push(`[서재] 가로 rail CSS 불일치 overflow=${metrics.overflowX} snap=${metrics.snap}`);
+    }
+    if (metrics.cards > 1 && metrics.scrollWidth <= metrics.clientWidth) {
+      fails.push('[서재] 여러 책인데 유한 가로 스크롤 범위가 없음');
+    }
+    if (metrics.cards > 2) {
+      await rail.focus();
+      const before = await rail.evaluate((el) => el.scrollLeft);
+      await page.keyboard.press('ArrowRight');
+      await page.waitForTimeout(500);
+      const after = await rail.evaluate((el) => el.scrollLeft);
+      if (after <= before) fails.push('[서재] ArrowRight로 rail이 이동하지 않음');
+    }
+  }
+}
+
+async function assertProfileActivity() {
+  if (await page.locator('.shelf-grid').count()) fails.push('[프로필] 서재 rail이 중복 노출됨');
+  const activity = page.locator('.rg-activity');
+  if (await activity.count() !== 1) { fails.push('[프로필] 월간 활동 캘린더가 없음'); return; }
+  if (await activity.locator('.rg-activity-day').count() !== 42) fails.push('[프로필] 월간 캘린더가 42칸이 아님');
+  const next = activity.locator('button[aria-label="다음 달"]');
+  if (!(await next.isDisabled())) fails.push('[프로필] 현재 달에서 미래 달 이동이 활성화됨');
+  const titleBefore = await activity.locator('.rg-activity-nav strong').innerText();
+  await activity.locator('button[aria-label="이전 달"]').click();
+  await page.waitForTimeout(100);
+  const titlePrevious = await activity.locator('.rg-activity-nav strong').innerText();
+  if (titlePrevious === titleBefore) fails.push('[프로필] 이전 달 이동이 동작하지 않음');
+  if (await next.isDisabled()) fails.push('[프로필] 과거 달에서 다음 달 복귀가 비활성화됨');
+  await next.click();
+  await page.waitForTimeout(100);
+  if (await activity.locator('.rg-activity-nav strong').innerText() !== titleBefore) fails.push('[프로필] 현재 달 복귀가 동작하지 않음');
+}
+
 try {
   await page.goto(URL, { waitUntil: 'networkidle', timeout: 30000 });
   await assertView('초기로드');
@@ -42,6 +89,8 @@ try {
     }, t);
     if (!clicked) { fails.push(`[탭:${t}] 탭 버튼 못 찾음(라벨 변경?)`); console.log(`  [탭:${t}] 클릭 FAIL(못 찾음)`); continue; }
     await assertView('탭:' + t);
+    if (t === '서재') await assertLibrarySurface();
+    if (t === '프로필') await assertProfileActivity();
   }
 } catch (e) {
   fails.push('스모크 실행 오류: ' + e.message);

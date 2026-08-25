@@ -6,22 +6,161 @@ const { useState: _useState, useEffect: _useEffect } = React;
 const RG_PROMPT_LAB_ENABLED = import.meta.env.VITE_READINGGO_ENV === 'development';
 
 /* ── ProfileView ─────────────────────────────────────– */
+function _rgLocalDateKey(value) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function _rgShiftDateKey(key, delta) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
+  if (!m) return '';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + delta);
+  return _rgLocalDateKey(d);
+}
+
+function _rgActivityStats(dateValues, todayKey, year, month) {
+  const sourceDates = dateValues instanceof Set ? dateValues : new Set(dateValues || []);
+  const dates = new Set([...sourceDates].filter((key) => key <= todayKey));
+  let cursor = dates.has(todayKey) ? todayKey : _rgShiftDateKey(todayKey, -1);
+  let current = 0;
+  while (cursor && dates.has(cursor) && current < 40000) {
+    current += 1;
+    cursor = _rgShiftDateKey(cursor, -1);
+  }
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  let longest = 0;
+  let run = 0;
+  for (let day = 1; day <= lastDay; day += 1) {
+    const key = _rgLocalDateKey(new Date(year, month, day));
+    run = dates.has(key) ? run + 1 : 0;
+    if (run > longest) longest = run;
+  }
+  return { current, longest };
+}
+
+function _rgMonthCells(year, month) {
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = index - firstWeekday + 1;
+    return day >= 1 && day <= lastDay
+      ? { day, key: _rgLocalDateKey(new Date(year, month, day)) }
+      : null;
+  });
+}
+
+function ReadingActivityCalendar({ quotes }) {
+  const now = new Date();
+  const todayKey = _rgLocalDateKey(now);
+  const [month, setMonth] = _useState(() => ({ year: now.getFullYear(), month: now.getMonth() }));
+  const [sessionDates, setSessionDates] = _useState([]);
+  const [calendarState, setCalendarState] = _useState('loading');
+
+  _useEffect(() => {
+    let alive = true;
+    const selectedStart = new Date(month.year, month.month, 1);
+    const daysToSelectedMonth = Math.max(0, Math.ceil((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - selectedStart) / 86400000));
+    const days = Math.max(400, daysToSelectedMonth + 42);
+    setCalendarState('loading');
+    const effectTodayKey = _rgLocalDateKey(now);
+    const quoteDates = (quotes || []).map((q) => _rgLocalDateKey(q && (q.createdAt || q.created_at))).filter((key) => key && key <= effectTodayKey);
+    const load = (requestedDays) => Promise.resolve((DataStore.sessions && DataStore.sessions.calendar) ? DataStore.sessions.calendar(requestedDays) : { readDates: [] })
+      .then((result) => {
+        const readDates = ((result && result.readDates) || []).filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && String(value) <= effectTodayKey);
+        const boundaryStats = _rgActivityStats(new Set(readDates.concat(quoteDates)), _rgLocalDateKey(now), now.getFullYear(), now.getMonth());
+        if (boundaryStats.current >= requestedDays - 2 && requestedDays < 40000) {
+          return load(Math.min(requestedDays * 2, 40000));
+        }
+        return readDates;
+      });
+    load(days)
+      .then((readDates) => {
+        if (!alive) return;
+        // session_date는 이미 사용자 로컬 YYYY-MM-DD다. JS Date로 재파싱하지 않는다.
+        setSessionDates(Array.from(new Set(readDates)));
+        setCalendarState('ready');
+      })
+      .catch(() => {
+        if (!alive) return;
+        setSessionDates([]);
+        setCalendarState('error');
+      });
+    return () => { alive = false; };
+  }, [month.year, month.month, quotes]);
+
+  const sentenceDates = (quotes || []).map((q) => _rgLocalDateKey(q && (q.createdAt || q.created_at))).filter((key) => key && key <= todayKey);
+  const activityDates = new Set(sessionDates.concat(sentenceDates));
+  const stats = _rgActivityStats(activityDates, todayKey, month.year, month.month);
+  const cells = _rgMonthCells(month.year, month.month);
+  const currentMonthIndex = now.getFullYear() * 12 + now.getMonth();
+  const selectedMonthIndex = month.year * 12 + month.month;
+  const moveMonth = (delta) => {
+    const next = new Date(month.year, month.month + delta, 1);
+    if (next.getFullYear() * 12 + next.getMonth() > currentMonthIndex) return;
+    setMonth({ year: next.getFullYear(), month: next.getMonth() });
+  };
+  const activeCount = cells.filter((cell) => cell && activityDates.has(cell.key)).length;
+
+  return (
+    <section className="rg-activity" aria-labelledby="rg-activity-title">
+      <div className="rg-activity-head">
+        <div>
+          <h2 id="rg-activity-title">독서 리듬</h2>
+          <p>페이지를 읽거나 한 문장을 남긴 날</p>
+        </div>
+        <div className="rg-activity-nav" aria-label="활동 월 이동">
+          <button type="button" onClick={() => moveMonth(-1)} aria-label="이전 달">‹</button>
+          <strong>{month.year}년 {month.month + 1}월</strong>
+          <button type="button" onClick={() => moveMonth(1)} disabled={selectedMonthIndex >= currentMonthIndex} aria-label="다음 달">›</button>
+        </div>
+      </div>
+      {calendarState === 'error' ? (
+        <div className="rg-activity-message">활동 기록을 불러오지 못했어요</div>
+      ) : (
+        <>
+          <div className="rg-activity-summary" aria-live="polite">
+            <span><strong>{stats.current}</strong>일 현재 연속</span>
+            <span><strong>{stats.longest}</strong>일 이달 최장</span>
+            <span><strong>{activeCount}</strong>일 활동</span>
+          </div>
+          <div className="rg-activity-weekdays" aria-hidden="true">
+            {['일','월','화','수','목','금','토'].map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="rg-activity-grid" role="grid" aria-label={`${month.year}년 ${month.month + 1}월 독서 활동`} aria-busy={calendarState === 'loading'}>
+            {cells.map((cell, index) => cell ? (
+              <div key={cell.key} role="gridcell"
+                className={`rg-activity-day${activityDates.has(cell.key) ? ' on' : ''}${cell.key === todayKey ? ' today' : ''}`}
+                aria-label={`${month.month + 1}월 ${cell.day}일, 독서 활동 ${activityDates.has(cell.key) ? '있음' : '없음'}`}>
+                {cell.day}
+              </div>
+            ) : <div key={`empty-${index}`} className="rg-activity-day empty" aria-hidden="true" />)}
+          </div>
+          {calendarState === 'ready' && activeCount === 0 && <div className="rg-activity-message">이달의 첫 독서를 기다리고 있어요</div>}
+        </>
+      )}
+    </section>
+  );
+}
+
 // 위시 행 → 표시용 책 (#403). 양 어댑터 모두 {book_id, book} 객체 반환(로컬은 datastore에서 getBook 해소).
 function _mapWish(w) {
   const b = (w && w.book) || w || {};
-  return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish' };
+  return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish', updatedAt: w.updated_at || w.created_at || '' };
 }
 
 function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
   const [selectedBookId, setSelectedBookId] = _useState(null);
-  const [activeSubtab, setActiveSubtab] = _useState('reading'); // 'wishlist' | 'reading' | 'completed'
-  // 읽은 책 정렬 (#513 → #649 3단 토글). key=정렬축('recent'|'rating'|'title'), dir=방향(1=1차/내림·ㄱ→ㅎ, -1=2차/오름·ㅎ→ㄱ). key=null → 정렬 해제(원본 순서).
-  const [completedSort, setCompletedSort] = _useState({ key: 'recent', dir: 1 }); // 기본 최근순(#513 동작 보존)
-  // 같은 버튼 반복 클릭 시 3단 사이클: 1차 방향 → 2차 방향 → 해제. 다른 버튼 클릭 시 그 축 1차 방향으로.
-  const cycleSort = (key) => setCompletedSort(prev =>
+  const [includedStatuses, setIncludedStatuses] = _useState(() => new Set(['wish', 'reading', 'completed', 'aborted']));
+  // 통합 서재 정렬. key=정렬축('recent'|'rating'|'title'), dir=방향(1=최근·높은·ㄱ→ㅎ, -1=반대).
+  const [librarySort, setLibrarySort] = _useState({ key: 'recent', dir: 1 });
+  // 같은 버튼 반복 클릭 시 두 방향을 전환하고, 다른 버튼은 1차 방향으로 시작한다.
+  const cycleSort = (key) => setLibrarySort(prev =>
     prev.key !== key ? { key, dir: 1 }     // 다른 축 → 1차
-      : prev.dir === 1 ? { key, dir: -1 }  // 1차 → 2차
-        : { key: null, dir: 1 }            // 2차 → 해제
+      : { key, dir: prev.dir === 1 ? -1 : 1 }
   );
   // 읽은 책 별점 필터 (#795) — 다중선택 버킷 Set(빈 Set=전체). 'none'=무평점(OCR 임포트 등 대량 유입 대비).
   const [ratingFilter, setRatingFilter] = _useState(() => new Set());
@@ -119,6 +258,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
           total: b.total_pages || 0, isbn: b.isbn13 || '',
           cur: ub.current_page || 0, status: ub.status,
           rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at,
+          updatedAt: ub.updated_at || ub.completed_at || ub.started_at || ub.created_at || '',
           recap: ub.companion_recap || '',   // 참새 완독 회고 캐시 (#352)
           description: (b.description || '').trim(),   // 책 소개 DB 값 (#530) — 모달이 우선 사용, 없으면 알라딘 폴백
           source: b.source || '',   // 소개 출처 (#642) — 'llm'이면 AI 작성 칩
@@ -172,7 +312,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
         setWishlistBooks((rows || []).map(_mapWish));
       }).catch(() => {});
       Promise.resolve(DataStore.myBooks.list()).then(rows => {
-        setMyBooks((rows || []).map(ub => { const b = ub.book || {}; return { ubId: ub.id, id: ub.book_id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, recap: ub.companion_recap || '', description: (b.description || '').trim(), source: b.source || '' }; }));
+        setMyBooks((rows || []).map(ub => { const b = ub.book || {}; return { ubId: ub.id, id: ub.book_id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, updatedAt: ub.updated_at || ub.completed_at || ub.started_at || ub.created_at || '', recap: ub.companion_recap || '', description: (b.description || '').trim(), source: b.source || '' }; }));
       }).catch(() => {});
     };
     window.addEventListener('rg:wish-changed', reload);
@@ -193,13 +333,6 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
     return () => { alive = false; window.removeEventListener('rg:import-staged', load); };
   }, []);
 
-  // #593: 중단 탭은 책 있을 때만 노출 → 마지막 중단 책을 다시 읽기로 옮기면 탭이 사라진다.
-  // activeSubtab 이 'aborted'에 머물면 빈 화면이 되므로 '읽는 중'으로 되돌린다.
-  _useEffect(() => {
-    if (activeSubtab === 'aborted' && (myBooks || []).every(b => b.status !== 'aborted')) {
-      setActiveSubtab('reading');
-    }
-  }, [myBooks, activeSubtab]);
 
   // 찜 삭제 (#403) — 위시리스트 카드 ✕. 낙관적 제거 + 토스트.
   const removeWish = (e, bookId) => {
@@ -248,44 +381,46 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
   };
 
   const books = myBooks || [];
-  const readingBooks = books.filter(b => b.status === 'reading')
-    .sort((a, b) => (b.cur || 0) - (a.cur || 0));
-  const completedBooks = books.filter(b => b.status === 'completed');
-  const abortedBooks = books.filter(b => b.status === 'aborted');   // #593 읽다 중단한 책
-
-  const allItems = books.concat(wishlistBooks);
+  const allItems = books.concat(wishlistBooks.filter(w => !books.some(b => b.id === w.id)));
   const selectedBook = selectedBookId ? (allItems.find(x => x.id === selectedBookId) || null) : null;
-
-  // 탭 라벨 축약(#648): 상단 '📚 내 서재' 헤더가 '책' 맥락을 주므로 반복어 '책' 제거 → 가로 스크롤 방지.
-  const tabsData = [
-    { id: 'wishlist', label: '읽고 싶은 책', books: wishlistBooks },
-    { id: 'reading', label: '읽고 있는 책', books: readingBooks },
-    { id: 'completed', label: '읽은 책', books: completedBooks },
-    // 중단 탭(#593): 읽다 그만둔 책. 책이 있을 때만 노출(빈 탭 노이즈 방지).
-    ...(abortedBooks.length > 0 ? [{ id: 'aborted', label: '중단', books: abortedBooks }] : []),
+  const statusFilters = [
+    { id: 'wish', label: '읽고 싶어요' },
+    { id: 'reading', label: '읽는 중' },
+    { id: 'completed', label: '읽었어요' },
+    { id: 'aborted', label: '중단' },
   ];
-
-  const currentTab = tabsData.find(t => t.id === activeSubtab);
-  const currentBooks = currentTab?.books || [];
-
-  // 읽은 책 탭: 정렬/필터 적용 (#513 → #649). 무평점은 0점 취급(최하). 다른 탭은 원본 순서 유지.
-  // dir=1: 1차(최근순/별점 높은순/ㄱ→ㅎ), dir=-1: 2차(오래된순/별점 낮은순/ㅎ→ㄱ). key=null이면 원본 순서.
-  // 별점 버킷 (#795): 무평점→'none', 5.0→'5', 4.x→'4' … 0.5~1.x→'1' (정수 floor). 빈 Set=전체.
+  const toggleStatus = (status) => setIncludedStatuses((prev) => {
+    const next = new Set(prev);
+    if (next.has(status)) next.delete(status); else next.add(status);
+    return next;
+  });
+  // 별점 버킷 (#795): 무평점→'none', 5.0→'5', 4.x→'4' … 0.5~1.x→'1'. 빈 Set=전체.
   const ratingBucket = (r) => (r == null || r === 0) ? 'none' : (r >= 5 ? '5' : (r >= 1 ? String(Math.floor(r)) : '1'));
-  const filteredCompleted = completedBooks.filter(b => ratingFilter.size === 0 || ratingFilter.has(ratingBucket(b.rating)));
-  const displayBooks = activeSubtab === 'completed'
-    ? (completedSort.key === null
-        ? filteredCompleted // 정렬 해제 — myBooks.list() 원본 순서 유지
-        : filteredCompleted.slice().sort((a, b) => {
-            const d = completedSort.dir;
-            if (completedSort.key === 'rating') return ((b.rating || 0) - (a.rating || 0)) * d;
-            if (completedSort.key === 'title') return (a.title || '').localeCompare(b.title || '') * d;
-            return String(b.completedAt || '').localeCompare(String(a.completedAt || '')) * d; // 최근순
-          }))
-    : currentBooks;
+  const displayBooks = allItems
+    .filter((b) => includedStatuses.has(b.status))
+    .filter((b) => ratingFilter.size === 0 || ratingFilter.has(ratingBucket(b.rating)))
+    .slice()
+    .sort((a, b) => {
+      const d = librarySort.dir;
+      if (librarySort.key === 'title') {
+        const aMissing = !a.title;
+        const bMissing = !b.title;
+        if (aMissing !== bMissing) return aMissing ? 1 : -1;
+        return (a.title || '').localeCompare(b.title || '') * d;
+      }
+      if (librarySort.key === 'rating') {
+        const aMissing = a.rating == null || a.rating === 0;
+        const bMissing = b.rating == null || b.rating === 0;
+        if (aMissing !== bMissing) return aMissing ? 1 : -1;
+        return ((b.rating || 0) - (a.rating || 0)) * d;
+      }
+      const aDate = String(a.updatedAt || '');
+      const bDate = String(b.updatedAt || '');
+      if (!aDate !== !bDate) return aDate ? -1 : 1;
+      return bDate.localeCompare(aDate) * d;
+    });
 
-  // 탭에 속한 책들의 ID 목록 추출 및 문장 필터링(필터 무관 — 탭 전체 문장)
-  const currentBookIds = currentBooks.map(b => b.id);
+  const currentBookIds = displayBooks.map(b => b.id);
   const tabQuotes = (state.myQuotes || [])
     .filter(q => currentBookIds.includes(q.bookId))
     .sort((a, b) => {
@@ -387,6 +522,8 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
         </div>
       </div>}
 
+      {showProfile && <ReadingActivityCalendar quotes={state.myQuotes || []} />}
+
       {/* 독서 위키 상시 진입점 (#1274) — 활성 책 문장 수와 무관하게 책장에서 발견 가능. */}
       {showProfile && <div style={{padding:'0 16px', margin:'0 0 20px'}}>
         <button onClick={openWikiAsk} disabled={wikiOpening}
@@ -480,35 +617,30 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
           </div>
         )}
 
-        {/* 탭 버튼들 */}
-        <div style={{display:'flex', gap:8, marginBottom:16, overflowX:'auto', paddingBottom:8, scrollBehavior:'smooth'}}>
-          {tabsData.map(tab => (
+        {/* 네 상태 통합 projection의 포함·제외 filter */}
+        <div className="rg-shelf-filters" aria-label="서재 상태 필터">
+          {statusFilters.map(filter => {
+            const active = includedStatuses.has(filter.id);
+            const count = allItems.filter((book) => book.status === filter.id).length;
+            return (
             <button
-              key={tab.id}
-              onClick={() => setActiveSubtab(tab.id)}
-              style={{
-                padding:'8px 12px',   // #648 패딩 소폭 축소 — 4탭 너비 내 수용
-                background: activeSubtab === tab.id ? 'var(--brand)' : 'var(--card)',
-                color: activeSubtab === tab.id ? 'white' : 'var(--ink)',
-                border: activeSubtab === tab.id ? 'none' : '1px solid var(--line)',
-                borderRadius:'20px',
-                fontSize:11.5,   // #648 폰트 소폭 축소
-                fontWeight:700,
-                cursor:'pointer',
-                whiteSpace:'nowrap',
-                transition:'all 0.2s ease',
-              }}
+              key={filter.id}
+              type="button"
+              className={`rg-shelf-filter${active ? ' on' : ''}`}
+              aria-pressed={active}
+              onClick={() => toggleStatus(filter.id)}
             >
-              {tab.label}
+              {filter.label} {count}
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {/* 찜하기 버튼(구 #403, 위시 탭 전용)은 '내 서재' 타이틀 아래 상시 '책 찾아 담기'로 승격·이전(#1060).
             위시 전용 중복 버튼은 제거 — 같은 RG_openSearch 진입이고 이제 항상 보인다. */}
 
-        {/* 읽은 책 탭 정렬/필터 컨트롤 (#513) — 성 컬렉션 선반 대체. 완독 책이 있을 때만 노출. */}
-        {activeSubtab === 'completed' && completedBooks.length > 0 && (
+        {/* 통합 서재 정렬/별점 필터 */}
+        {allItems.length > 0 && (
           <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:16, paddingLeft:4}}>
             {/* 3단 토글 (#649): 활성 축은 방향에 따라 라벨/화살표를 바꿔 표시. 비활성은 1차 방향 라벨. */}
             {[
@@ -516,8 +648,8 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
               ['rating', { 1: '별점 ↑', '-1': '별점 ↓' }],
               ['title', { 1: '제목 ↑', '-1': '제목 ↓' }],
             ].map(([id, labels]) => {
-              const active = completedSort.key === id;
-              const label = active ? labels[completedSort.dir] : labels[1];
+              const active = librarySort.key === id;
+              const label = active ? labels[librarySort.dir] : labels[1];
               return (
                 <button key={id} onClick={() => cycleSort(id)}
                   style={{padding:'6px 12px', borderRadius:999, border:'none', fontSize:12, fontWeight:800, cursor:'pointer', background: active ? 'var(--brand)' : 'var(--card)', color: active ? '#fff' : 'var(--ink-2)', boxShadow: active ? 'none' : 'inset 0 0 0 1px var(--line)'}}>{label}</button>
@@ -562,7 +694,12 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
         {myBooks === null ? (
           <div style={{textAlign:'center', padding:'40px 20px', color:'var(--ink-3)', fontSize:13, fontWeight:700}}>불러오는 중…</div>
         ) : displayBooks.length > 0 ? (
-          <div className="shelf-grid">
+          <div className="shelf-grid" role="list" tabIndex="0" aria-label="서재 책 목록, 좌우로 넘겨보기"
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              e.currentTarget.scrollBy({ left: (e.key === 'ArrowRight' ? 1 : -1) * e.currentTarget.clientWidth * 0.72, behavior: 'smooth' });
+            }}>
             {displayBooks.map(b => {
               const isCompleted = b.status === 'completed';
               const progText = isCompleted
@@ -574,13 +711,22 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
                 <div
                   key={b.ubId || b.id}
                   className="shelf-grid-item"
+                  role="listitem"
+                  tabIndex="0"
+                  aria-label={`${b.title}, ${statusFilters.find((filter) => filter.id === b.status)?.label || '서재 책'}`}
                   onClick={() => setSelectedBookId(b.id)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+                    e.preventDefault();
+                    setSelectedBookId(b.id);
+                  }}
                 >
                   {b.status === 'wish' && (
                     <button onClick={(e) => removeWish(e, b.id)} title="찜 삭제" aria-label="찜 삭제"
                       className="shelf-grid-remove-wish">{window.rgIcon('close',14)}</button>
                   )}
                   <BookCover className="shelf-grid-cover" title={b.title} author={b.author} cover={b.cover} fb={b.fb} />
+                  <div className={`shelf-grid-status ${b.status}`}>{statusFilters.find((filter) => filter.id === b.status)?.label || ''}</div>
                   <div className="shelf-grid-title">{b.title}</div>
                   <div className="shelf-grid-prog">{b.status === 'wish' ? (b.author || '관심책') : progText}</div>
                 </div>
@@ -591,10 +737,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
           <div style={{textAlign:'center', padding:'40px 20px', color:'var(--ink-3)'}}>
             <div style={{fontSize:24, marginBottom:8}}>📭</div>
             <div style={{fontSize:13, fontWeight:700}}>
-              {activeSubtab === 'wishlist' && '찜한 책이 없어요'}
-              {activeSubtab === 'reading' && '읽고 있는 책이 없어요'}
-              {activeSubtab === 'completed' && (ratingFilter.size ? '이 별점의 완독한 책이 없어요' : '완독한 책이 없어요')}
-              {activeSubtab === 'aborted' && '중단한 책이 없어요'}
+              {allItems.length === 0 ? '아직 서재에 책이 없어요' : '선택한 필터에 맞는 책이 없어요'}
             </div>
             {/* 빈 서가 CTA — 위 '내 서재' 타이틀 하단 버튼 2개로 통합, 여기선 안내 텍스트만 */}
           </div>
@@ -715,4 +858,5 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
 }
 
 
+window.RG_LIBRARY_ACTIVITY = { localDateKey: _rgLocalDateKey, shiftDateKey: _rgShiftDateKey, activityStats: _rgActivityStats, monthCells: _rgMonthCells };
 window.LibraryView = LibraryView;

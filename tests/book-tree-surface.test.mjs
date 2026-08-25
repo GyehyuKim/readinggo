@@ -9,6 +9,7 @@ const reminder = read('docs/readinggo/js/streak-reminder.js');
 const settings = read('docs/readinggo/js/settings-modal.js');
 const nest = read('docs/readinggo/js/nest.js');
 const library = read('docs/readinggo/js/library.js');
+const indexHtml = read('docs/readinggo/index.html');
 
 const tabbar = app.slice(app.indexOf('<nav className="tabbar">'), app.indexOf('</nav>', app.indexOf('<nav className="tabbar">')));
 const bookshelfRecordStart = app.indexOf('window.RG_openBookshelfRecord = (bookId) => {');
@@ -52,6 +53,21 @@ assert.match(library, /const showProfile = mode !== 'library'/);
 assert.match(library, /const showLibrary = mode !== 'profile'/);
 assert.match(library, /data-library-mode=\{mode\}/,
   'profile과 library의 비중복 렌더 경계가 DOM에서 검증 가능해야 한다');
+assert.match(library, /new Set\(\['wish', 'reading', 'completed', 'aborted'\]\)/,
+  '서재는 네 상태를 하나의 projection에 기본 포함해야 한다');
+assert.doesNotMatch(library, /activeSubtab|setActiveSubtab/,
+  '서재에 상호배타적인 상태 탭을 다시 도입하면 안 된다');
+assert.match(indexHtml, /\.shelf-grid\s*\{[\s\S]*?overflow-x:auto[\s\S]*?scroll-snap-type:x mandatory/,
+  '서재 책 목록은 유한 가로 scroll-snap rail이어야 한다');
+assert.match(indexHtml, /\.shelf-grid-item\s*\{[\s\S]*?scroll-snap-align:start/,
+  '각 책 카드는 시작점에 snap해야 한다');
+assert.match(library, /\{showProfile && <ReadingActivityCalendar quotes=\{state\.myQuotes \|\| \[\]\} \/>\}/,
+  '월간 활동 캘린더는 profile 소유 surface에만 렌더해야 한다');
+assert.match(library, /setSessionDates\(Array\.from\(new Set\(readDates\)\)\)/,
+  'session_date 문자열은 Date 재파싱 없이 활동 key로 사용해야 한다');
+const calendarSurface = library.slice(library.indexOf('function ReadingActivityCalendar'), library.indexOf('// 위시 행'));
+assert.doesNotMatch(calendarSurface, /XP|둥지|성|방패|만회|불꽃|보상|징벌/,
+  '월간 활동에는 레거시 보상·징벌 UI를 복원하면 안 된다');
 
 const reminderLines = reminder.slice(reminder.indexOf('const RG_REMINDER_LINES'), reminder.indexOf('function _rmPickLine'));
 const deleteCopy = [...settings.matchAll(/정말 삭제할까요\?[\s\S]{0,140}?되돌릴 수 없어요\./g)].map((match) => match[0]).join('\n');
@@ -85,6 +101,19 @@ function extractFunction(source, name) {
 
 const sandbox = {};
 vm.createContext(sandbox);
+const oldTz = process.env.TZ;
+process.env.TZ = 'Asia/Seoul';
+vm.runInContext(`${extractFunction(library, '_rgLocalDateKey')}; ${extractFunction(library, '_rgShiftDateKey')}; ${extractFunction(library, '_rgActivityStats')}; ${extractFunction(library, '_rgMonthCells')}; this.activity = { _rgLocalDateKey, _rgShiftDateKey, _rgActivityStats, _rgMonthCells };`, sandbox);
+assert.equal(sandbox.activity._rgLocalDateKey('2026-08-24T16:30:00.000Z'), '2026-08-25',
+  '문장 timestamp는 사용자 로컬 날짜로 변환해야 한다');
+assert.equal(sandbox.activity._rgLocalDateKey('2026-08-25'), '2026-08-25',
+  '이미 날짜 문자열인 session_date는 그대로 보존해야 한다');
+assert.equal(JSON.stringify(sandbox.activity._rgActivityStats(new Set(['2026-08-22','2026-08-23','2026-08-24','2026-08-27']), '2026-08-25', 2026, 7)), JSON.stringify({ current: 3, longest: 3 }),
+  '오늘 활동이 없어도 어제까지 이어진 현재 연속일을 유지하고 미래 날짜는 집계하지 않아야 한다');
+const augustCells = sandbox.activity._rgMonthCells(2026, 7);
+assert.equal(augustCells.length, 42, '월간 캘린더는 일요일 시작 6주 grid를 유지해야 한다');
+assert.equal(augustCells[6].key, '2026-08-01', '2026년 8월 1일은 토요일 열에 있어야 한다');
+process.env.TZ = oldTz;
 vm.runInContext(`${extractFunction(ceremony, 'finishCeremony')}; this.finishCeremony = finishCeremony;`, sandbox);
 const calls = [];
 sandbox.finishCeremony({
