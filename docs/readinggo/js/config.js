@@ -39,8 +39,7 @@ window.RG_CONFIG = {
     // 마중물 시드 트리거 (#774) — 빈 책에서 collector(맥미니) /api/seed 큐잉+폴링.
     //   백엔드(collector) 장애·과부하 시 클라발 호출을 즉시 끈다(킬 스위치 실배선처 = book-info-modal.js).
     seedCollectorTrigger: true,
-    // #1454 friend_book_tree RPC/UI 선배포. stable DEV에서만 검증하고 Production은 자동 off.
-    friendBookTree: RG_BUILD_ENV === 'development',
+
   },
 };
 

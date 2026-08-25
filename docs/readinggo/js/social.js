@@ -138,7 +138,7 @@ function DiscoverLayer({ state }) {
           q: s.text,
           nick: u.handle ? ('@' + u.handle) : '@익명',
           // NPC 더미(#854)는 이모지 아바타·박수수·상대시간 문자열을 row 에 직접 싣는다 → 우선 사용, 실데이터는 폴백.
-          avatar: s.avatar || (u.display_name && u.display_name[0]) || <window.SparrowMark size={18} />,
+          avatar: s.avatar || (u.display_name && u.display_name[0]) || window.rgIcon('user', 18),
           claps: s.claps || 0,
           time: s.time || rgRelTime(s.created_at),
           bookTitle: bk.title || '',
@@ -234,7 +234,7 @@ function DiscoverLayer({ state }) {
             style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: '1.5px solid var(--line)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
           {fres.map(u => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid var(--line-2)' }}>
-              <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{(u.display_name && u.display_name[0]) || <window.SparrowMark size={18} />}</span>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{(u.display_name && u.display_name[0]) || window.rgIcon('user', 18)}</span>
               <button onClick={() => window.RG_openProfile && window.RG_openProfile(u.handle)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', fontSize: 14, fontWeight: 700, color: 'var(--brand-3)', cursor: 'pointer' }}>@{u.handle}</button>
               <button onClick={() => doFollow(u)} disabled={!!followed[u.id]}
                 style={{ padding: '5px 14px', borderRadius: 999, border: 'none', background: followed[u.id] ? 'var(--line-2)' : 'var(--brand)', color: followed[u.id] ? 'var(--ink-3)' : '#fff', fontSize: 12, fontWeight: 800, cursor: followed[u.id] ? 'default' : 'pointer' }}>
@@ -267,13 +267,6 @@ function DiscoverLayer({ state }) {
         <div style={{ padding: '0 16px' }}>{items.map((it, i) => (
           <div key={it.id || i}>
             <SentenceCard item={it} bookId={it.bookId} />
-            {!it.isMine && it.userId && window.RG_flag && window.RG_flag('friendBookTree') && (
-              <button type="button" onClick={() => window.RG_openFriendTree && window.RG_openFriendTree(it.nick)}
-                aria-label={`${it.nick}님의 책나무 보기`}
-                style={{ margin: '0 0 10px 10px', border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-tint)', color: 'var(--brand-3)', padding: '5px 11px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
-                책나무 보기
-              </button>
-            )}
           </div>
         ))}</div>
       )}

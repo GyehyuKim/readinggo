@@ -11,14 +11,13 @@ import './js/turnstile.js';   // #1158/#1159 Turnstile 봇 검증 — RG_apiFetc
 // 3) 데모/컴포넌트 — 기존 loadBabel 순서 그대로(주석은 index.html 의존성 메모).
 import './js/data.js';
 import './js/datastore.js';
-import './js/book-tree-selector.js'; // #1453 읽기 전용 책=가지·문장=잎 projection + 호환 shim
-import './js/book-tree-home-ui.js'; // #1453 Phase 2 책나무 요약·가지 목록·선택 상세
+
 import './js/icons.js';
 import './js/components.js';
 import './js/moderation.js'; // #1392 UGC 약관·신고·차단 공용 UI
 import './js/sentence-card.js';
 import './js/book-info-modal.js';
-import './js/friend-book-tree-view.js';
+
 import './js/user-profile-modal.js';
 import './js/sentence-collection-modal.js';
 import './js/share-card.js';
@@ -54,6 +53,8 @@ async function boot() {
     try {
       // Prompt Lab 코드와 endpoint 문자열은 production module graph에 넣지 않는다(#1372).
       await import('./js/prompt-lab.js');
+      const { MascotReviewScreen } = await import('./js/mascot-review.js');
+      window.RG_MASCOT_REVIEW = MascotReviewScreen;
       const { devReviewPersonas } = await import('./js/dev-review-personas.js');
       window.RG_DEV_REVIEW = devReviewPersonas;
       devReviewRestored = !!(await devReviewPersonas.restore());

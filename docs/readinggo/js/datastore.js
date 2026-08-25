@@ -1168,14 +1168,6 @@ const DataStore = {
     },
   },
 
-  /* 친구 책나무는 인증·상호 관계를 서버가 검증해야 한다. 로컬/게스트는 합성 데이터를
-     보여주지 않고 로그인 필요로 닫는다. */
-  friendBookTree: {
-    get() { return Promise.reject(new Error('friend_tree_login_required')); },
-    leaves() { return Promise.reject(new Error('friend_tree_login_required')); },
-    getSharing() { return Promise.reject(new Error('friend_tree_login_required')); },
-    setSharing() { return Promise.reject(new Error('friend_tree_login_required')); },
-  },
 
   /* 유저 공개 데이터 — Phase 0 로컬 어댑터 stub (표면 일치용)
      Phase 1 에서 SupabaseDataStore.users 로 실구현. */

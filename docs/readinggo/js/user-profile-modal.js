@@ -16,14 +16,11 @@ async function profileFriendRelation(DS, targetId, myId) {
   return { following: !!following, mutual: !!following && followsMe };
 }
 
-function UserProfileModal({ handle, onClose, initialFriendTree }) {
+function UserProfileModal({ handle, onClose }) {
   const [data, setData] = useState(undefined); // undefined=로딩, null=없음
   const [revealed, setRevealed] = useState({});
   const [following, setFollowing] = useState(null);
-  const [mutualFriend, setMutualFriend] = useState(false);
-  const [friendTreeNotice, setFriendTreeNotice] = useState(false);
-  const [friendTreeOpen, setFriendTreeOpen] = useState(false);
-  const [friendTreeSelectedId, setFriendTreeSelectedId] = useState(null);
+
   const [shelfOpen, setShelfOpen] = useState(false);   // 더 보기 → 전체 책장
   const [shelfFilter, setShelfFilter] = useState('completed'); // completed|reading
   const [bookView, setBookView] = useState(null);      // {bookId, title, cover} 드릴다운
@@ -50,11 +47,7 @@ function UserProfileModal({ handle, onClose, initialFriendTree }) {
           const relation = await profileFriendRelation(DS, u.id, myId);
           if (alive) {
             setFollowing(relation.following);
-            setMutualFriend(relation.mutual);
-            if (initialFriendTree && window.RG_flag && window.RG_flag('friendBookTree')) {
-              if (relation.mutual) setFriendTreeOpen(true);
-              else setFriendTreeNotice(true);
-            }
+
           }
         }
       } catch (e) { if (alive) setData(null); }
@@ -88,12 +81,7 @@ function UserProfileModal({ handle, onClose, initialFriendTree }) {
       await (following ? DS.friends.unfollow(target) : DS.friends.follow(target));
       const relation = await profileFriendRelation(DS, target, window.RG_ME && window.RG_ME.id);
       setFollowing(relation.following);
-      setMutualFriend(relation.mutual);
-      if (!relation.mutual) setFriendTreeOpen(false);
-      if (initialFriendTree && relation.mutual && window.RG_flag && window.RG_flag('friendBookTree')) {
-        setFriendTreeNotice(false);
-        setFriendTreeOpen(true);
-      }
+
     } catch (e) {}
   };
   const reportUser = () => {
@@ -112,10 +100,7 @@ function UserProfileModal({ handle, onClose, initialFriendTree }) {
   };
   const pageStyle = { position: 'fixed', inset: 0, background: 'var(--bg, #fff)', zIndex: 1000, overflowY: 'auto', WebkitOverflowScrolling: 'touch' };
   const headStyle = { position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: 'var(--bg, #fff)', borderBottom: '1px solid var(--line)' };
-  // 모바일 뒤로가기는 책 상세 → 선택한 가지 → 프로필 순으로 한 단계씩 복원한다.
-  const _profileOverlayBack = window.useOverlayBack || (() => {});
-  _profileOverlayBack(friendTreeOpen, () => setFriendTreeOpen(false));
-  _profileOverlayBack(friendTreeOpen && !!friendTreeSelectedId, () => setFriendTreeSelectedId(null));
+
   const BookCard = ({ ub }) => (
     <div onClick={() => setBookView({ bookId: ub.book_id, title: ub.book && ub.book.title, cover: ub.book && ub.book.cover_url })}
       style={{ width: 84, cursor: 'pointer' }}>
@@ -129,16 +114,6 @@ function UserProfileModal({ handle, onClose, initialFriendTree }) {
     </div>
   );
 
-  if (friendTreeOpen && data && data.user && window.FriendBookTreeView) {
-    return <window.FriendBookTreeView
-      ownerId={data.user.id}
-      entryPoint={initialFriendTree ? 'feed' : 'profile'}
-      selectedId={friendTreeSelectedId}
-      onSelectedIdChange={setFriendTreeSelectedId}
-      onBack={() => setFriendTreeOpen(false)}
-      style={pageStyle}
-    />;
-  }
 
   // 책 드릴다운 화면 (#5)
   if (bookView) {
@@ -198,7 +173,7 @@ function UserProfileModal({ handle, onClose, initialFriendTree }) {
       ) : (
         <div style={{ padding: '12px 20px 40px' }}>
           <div style={{ textAlign: 'center', marginBottom: 18 }}>
-            <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><window.SparrowMark size={26} /> {data.user.display_name || data.user.handle}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--ink)' }}>{data.user.display_name || data.user.handle}</div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 8, fontSize: 12, color: 'var(--ink-2)', fontWeight: 800 }}>
               <span>완독 {data.completed.length}</span>
               <span>읽는 중 {data.reading.length}</span>
@@ -210,17 +185,7 @@ function UserProfileModal({ handle, onClose, initialFriendTree }) {
                 {following ? '팔로잉 ✓' : '+ 팔로우'}
               </button>
             )}
-            {mutualFriend && window.RG_flag && window.RG_flag('friendBookTree') && (
-              <button onClick={() => { setFriendTreeSelectedId(null); setFriendTreeOpen(true); }}
-                style={{ marginTop: 8, marginLeft: 8, padding: '8px 18px', borderRadius: 999, border: '1px solid var(--brand)', background: 'var(--brand-tint)', color: 'var(--brand-3)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-                책나무 보기
-              </button>
-            )}
-            {friendTreeNotice && !mutualFriend && window.RG_flag && window.RG_flag('friendBookTree') && (
-              <div role="status" style={{ margin: '10px auto 0', maxWidth: 300, padding: '10px 12px', borderRadius: 12, background: 'var(--paper-2)', color: 'var(--ink-2)', fontSize: 12, lineHeight: 1.5 }}>
-                서로 팔로우한 친구만 책나무를 볼 수 있어요. 이 친구가 나를 팔로우한 상태라면 위의 팔로우 버튼을 누른 뒤 바로 열립니다.
-              </div>
-            )}
+
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
               <button onClick={reportUser} style={{ padding: '7px 12px', borderRadius: 12, border: 'none', background: 'var(--paper-2)', color: 'var(--ink-2)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>프로필 신고</button>
               <button onClick={blockUser} style={{ padding: '7px 12px', borderRadius: 12, border: 'none', background: 'var(--paper-2)', color: 'var(--danger, #E5484D)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>사용자 차단</button>

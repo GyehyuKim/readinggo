@@ -453,7 +453,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
         {hdlEditing ? (
           <div style={{marginTop:2, display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
             <div style={{display:'flex', gap:6, alignItems:'center', justifyContent:'center'}}>
-              <window.SparrowMark size={22} />
+              {window.rgIcon('user', 22)}
               <span style={{color:'var(--ink-3)', fontWeight:800, fontSize:16}}>@</span>
               <input value={hdlText} maxLength={20} autoFocus
                 onChange={e => { setHdlText(e.target.value); setHdlMsg(''); }}
@@ -470,7 +470,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
           <div onClick={() => { setHdlText((window.RG_ME && window.RG_ME.handle) || ''); setHdlEditing(true); setHdlMsg(''); }}
             title="탭하여 닉네임 편집"
             style={{fontSize:22, fontWeight:900, color:'var(--ink)', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:6}}>
-            <window.SparrowMark size={24} /> {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}
+            {window.rgIcon('user', 24)} {(window.RG_ME && (window.RG_ME.displayName || window.RG_ME.handle)) || '독자'}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>

@@ -295,13 +295,8 @@ function CompanionModal({ sentence, onClose }) {
     } catch (e) { showToast('기록을 삭제하지 못했어요'); }
   };
   const _JackAvatar = ({ size = 28 }) => (
-    <div style={{ width: size, height: size, borderRadius: '50%', background: 'rgba(63,209,127,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="10" cy="13" rx="7" ry="5.5" fill="var(--brand)" opacity="0.35"/>
-        <circle cx="13" cy="8" r="4.5" fill="var(--brand)" opacity="0.55"/>
-        <circle cx="15" cy="6.5" r="1.3" fill="var(--brand-3)"/>
-        <path d="M17 9l2.5.6-2 1.6" stroke="var(--brand-3)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
+    <div aria-label="재키, 독서 동반자" style={{ width: size, height: size, borderRadius: '50%', background: 'var(--brand-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <window.SparrowMark size={size * 0.78} />
     </div>
   );
   return ReactDOM.createPortal(

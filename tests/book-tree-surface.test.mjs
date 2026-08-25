@@ -26,12 +26,8 @@ assert.match(tabbar, /aria-label=\{t\.label\}/,
   '하단 탭 접근성 이름은 표시 라벨과 같아야 한다');
 assert.doesNotMatch(tabbar, /label:\s*'둥지'/,
   '하단 탭에 구 둥지 라벨이 남으면 안 된다');
-assert.match(app, /addEventListener\('rg:wish-changed', refresh\)/,
-  '책 추가·삭제 시 TopBar 집계를 같은 projection으로 다시 읽어야 한다');
-assert.match(app, /removeEventListener\('rg:wish-changed', refresh\)/,
-  'TopBar 책 변경 listener는 unmount 시 정리해야 한다');
-assert.match(app, /tab === 'nest-grow' \? 'library' : tab/,
-  'legacy nest-grow 입력은 canonical library route로 정규화해야 한다');
+assert.doesNotMatch(app, /nest-grow|bookTree|BookTree|책나무/,
+  '은퇴한 route·projection·사용자 카피가 app runtime에 남으면 안 된다');
 assert.match(bookshelfRecord, /setActiveTab\('library'\)/,
   '재키 책장 기록 CTA는 canonical 서재로 이동해야 한다');
 assert.match(bookshelfRecord, /if \(bookId && window\.RG_openBook\) window\.RG_openBook\(bookId\)/,
@@ -48,8 +44,7 @@ assert.match(app, /activeTab === 'library'[\s\S]*?<LibraryView[\s\S]*?mode="libr
   '3번째 route는 서재 전용 mode를 렌더해야 한다');
 assert.match(app, /activeTab === 'profile'[\s\S]*?<LibraryView[\s\S]*?mode="profile"/,
   '4번째 profile route는 프로필 전용 mode를 렌더해야 한다');
-assert.doesNotMatch(app, /activeTab === 'nest-grow'[\s\S]*BookTreeHomeView/,
-  '보류된 책나무 화면을 사용자 route로 렌더하면 안 된다');
+
 assert.match(library, /const showProfile = mode !== 'library'/);
 assert.match(library, /const showLibrary = mode !== 'profile'/);
 assert.match(library, /data-library-mode=\{mode\}/,

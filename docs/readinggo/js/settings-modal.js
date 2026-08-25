@@ -477,26 +477,6 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
   };
   const isSupabase = window.DataStore === window.SupabaseDataStore;
   const [wishPublic, setWishPublic] = useState(!!(window.RG_ME && window.RG_ME.wishlist_public));
-  const [friendTreeSharing, setFriendTreeSharing] = useState(false);
-  const [friendTreeSharingBusy, setFriendTreeSharingBusy] = useState(true);
-  useEffect(() => {
-    let alive = true;
-    const api = window.DataStore && window.DataStore.friendBookTree;
-    if (!isSupabase || !(api && api.getSharing) || !(window.RG_flag && window.RG_flag('friendBookTree'))) { setFriendTreeSharingBusy(false); return () => { alive = false; }; }
-    Promise.resolve(api.getSharing()).then((value) => { if (alive) setFriendTreeSharing(!!(value && value.enabled)); })
-      .catch(() => { if (alive) setFriendTreeSharing(false); })
-      .finally(() => { if (alive) setFriendTreeSharingBusy(false); });
-    return () => { alive = false; };
-  }, [isSupabase]);
-  const toggleFriendTreeSharing = () => {
-    if (friendTreeSharingBusy || !isSupabase) return;
-    const next = !friendTreeSharing;
-    setFriendTreeSharingBusy(true);
-    Promise.resolve(window.DataStore.friendBookTree.setSharing(next))
-      .then(() => { setFriendTreeSharing(next); showToast(next ? '상호 친구에게 책나무를 공개해요' : '책나무 공개를 즉시 중단했어요'); })
-      .catch(() => showToast('책나무 공개 설정을 저장하지 못했어요.'))
-      .finally(() => setFriendTreeSharingBusy(false));
-  };
   const toggleWishPublic = () => {
     if (!isSupabase) { showToast('로그인 후 이용할 수 있어요'); return; }
     const next = !wishPublic;
@@ -735,18 +715,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
           </div>
           <Toggle on={isSupabase && wishPublic} onToggle={toggleWishPublic} disabled={!isSupabase} />
         </div>
-        {window.RG_flag && window.RG_flag('friendBookTree') && (
-          <>
-            <div style={{ height: 1, background: 'var(--line)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)' }}>상호 친구에게 내 책나무 공개</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>끄면 친구가 보고 있던 화면도 다음 요청부터 즉시 닫혀요. 나만 보기 문장과 감상은 항상 제외돼요.</div>
-              </div>
-              <Toggle on={isSupabase && friendTreeSharing} onToggle={toggleFriendTreeSharing} disabled={!isSupabase || friendTreeSharingBusy} />
-            </div>
-          </>
-        )}
+
         <div style={{ height: 1, background: 'var(--line)' }} />
         <button onClick={() => setSubPage('export')}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>

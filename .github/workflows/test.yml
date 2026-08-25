@@ -69,8 +69,6 @@ jobs:
           node tests/forest-sentence-date.test.mjs
           node tests/inquiry-direct-response.test.mjs
           node tests/book-detail-hierarchy.test.mjs
-          node tests/book-tree-selector.test.mjs
-          node tests/book-tree-home-ui.test.mjs
           node tests/book-tree-surface.test.mjs
           node --test tests/completed-review-save.test.mjs
           node tests/user-facing-book-tree-copy.test.mjs
@@ -88,9 +86,9 @@ jobs:
           node tests/personalization-runtime.test.mjs
           node tests/forest-like-count.test.mjs
           node --test tests/friend-book-tree.test.mjs
+          node --test tests/mascot-runtime.test.mjs
           node tests/liked-sentence-consistency.test.mjs
           node tests/library-reading-highlight.test.mjs
-          node tests/topbar-nest-count.test.mjs
           node tests/ocr-response.test.mjs
           node tests/ocr-review-flow.test.mjs
           node --test tests/posthog-weekly-report.test.mjs
@@ -135,6 +133,7 @@ jobs:
           node tests/dev-review-mode.test.mjs
           node tests/prompt-lab-build-boundary.test.mjs
           EXPECT_PERSONALIZATION_BUILD=0 node tests/personalization-runtime.test.mjs
+          EXPECT_MASCOT_REVIEW=0 node --test tests/mascot-runtime.test.mjs
 
   dev-isolation:
     name: dev-isolation (prod endpoint/write path 차단)
@@ -162,6 +161,7 @@ jobs:
           node tests/dev-review-mode.test.mjs
           EXPECT_PROMPT_LAB=1 node tests/prompt-lab-build-boundary.test.mjs
           EXPECT_PERSONALIZATION_BUILD=1 node tests/personalization-runtime.test.mjs
+          EXPECT_MASCOT_REVIEW=1 node --test tests/mascot-runtime.test.mjs
 
   render-smoke:
     name: render-smoke (탭 런타임 렌더)

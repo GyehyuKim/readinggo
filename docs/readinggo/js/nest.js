@@ -1217,7 +1217,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
             const _dec = window.decodeEntities || ((x) => x); // nest.js 스코프엔 alias 없음 → window 참조(미정의 폴백)
             return (
               <window.SentenceCard key={s.id} bookId={nestState.book.id} noBlind
-                item={{ id: s.id, q: _dec(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: <window.SparrowMark size={20} />,
+                item={{ id: s.id, q: _dec(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: window.rgIcon('user', 20),
                         page: s.page, time: '', claps: s.clapCount || 0, bookId: nestState.book.id, bookTitle: '', isMine: false }} />
             );
           })}

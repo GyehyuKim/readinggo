@@ -47,7 +47,7 @@ function FollowListModal({ mode, onClose }) {
           ) : users.map(u => (
             <button key={u.id} onClick={() => openProfile(u)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderBottom: '1px solid var(--line-2)', padding: '10px 4px', cursor: 'pointer' }}>
-              <span style={{ fontSize: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>{(u.display_name && u.display_name[0]) || <window.SparrowMark size={24} />}</span>
+              <span style={{ fontSize: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>{(u.display_name && u.display_name[0]) || window.rgIcon('user', 24)}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>{u.display_name || ('@' + u.handle)}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.bio || ('@' + u.handle)}</div>
