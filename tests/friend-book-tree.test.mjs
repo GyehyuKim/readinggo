@@ -18,6 +18,7 @@ const profile = read('docs/readinggo/js/user-profile-modal.js');
 const social = read('docs/readinggo/js/social.js');
 const config = read('docs/readinggo/js/config.js');
 const analytics = read('docs/readinggo/specs/analytics.md');
+const decisions = read('docs/readinggo/specs/meta/decisions.md');
 const uiSource = read('docs/readinggo/js/friend-book-tree-view.js');
 const uiWindow = { React: { createElement() {}, useEffect() {}, useRef(v) { return { current: v }; }, useState(v) { return [v, () => {}]; } } };
 vm.runInNewContext(uiSource, { window: uiWindow, React: uiWindow.React, console });
@@ -77,7 +78,7 @@ test('friend UI is gated, reachable from profile and feed, and restores branch s
   assert.doesNotMatch(uiSource, /branch\.id/);
 });
 
-test('friend leaves reuse SentenceCard shape and analytics use only approved buckets', () => {
+test('legacy friend leaves retain their runtime shape while the product contract stays retired', () => {
   const item = friendTreeSentenceItem({ id: 's1', text: '문장', page: 3, created_at: '2026-08-23T00:00:00Z' }, { id: 'b1', title: '책 제목', author: '작가' }, { id: 'u1', handle: 'friend' });
   assert.deepEqual({ id: item.id, q: item.q, page: item.page, bookId: item.bookId, userId: item.userId }, { id: 's1', q: '문장', page: 3, bookId: 'b1', userId: 'u1' });
   assert.equal(bucketFriendTreeCount(0), '0');
@@ -89,6 +90,6 @@ test('friend leaves reuse SentenceCard shape and analytics use only approved buc
   assert.match(ui, /window\.SentenceCard/);
   assert.match(ui, /friend_book_tree_viewed/);
   assert.doesNotMatch(ui, /owner_id|user_id\s*:|book_title|sentence_text|private_count/i);
-  assert.match(analytics, /friend_book_tree_viewed/);
-  assert.match(analytics, /branch_count_bucket/);
+  assert.doesNotMatch(analytics, /friend_book_tree_viewed|branch_count_bucket/);
+  assert.match(decisions, /은퇴 tombstone:[\s\S]+책나무[\s\S]+제품에서 제외/);
 });
