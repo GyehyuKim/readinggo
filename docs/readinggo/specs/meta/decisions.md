@@ -601,3 +601,12 @@
 - 기본은 이번 달, 주 시작은 일요일, 이전·다음 달을 탐색하되 미래 달은 비활성화한다. 현재 연속일과 선택 월 최장 연속일은 비징벌적 보조 요약으로만 표시하며, 오늘 미활동 중에는 어제까지 이어진 연속일을 유지한다.
 - 이 slice에는 책 표지·대표 책·일별 상세를 넣지 않는다. XP·둥지·성·방패·만회·불꽃 보상도 복원하지 않는다.
 - 기존 `sessions.calendar(days)`와 이미 로드된 내 문장 projection을 사용하므로 DB schema·migration·RPC·workflow는 변경하지 않는다.
+
+### v18.6 — 인앱 활동함 (#1260, 2026-08-25)
+
+- `같이읽기` App Header의 안전한 trailing action으로 `활동`을 열며 기존 제목·뒤로가기·읽기방/피드 전환과 layer-local CTA를 대체하지 않는다.
+- 범위는 타인이 내 문장에 누른 non-self 좋아요, 새 팔로워, inbound 기존 콕찌르기다. 원격 푸시·기기 토큰·OS 권한 요청은 별도 결정 전 도입하지 않는다.
+- 별도 notification 원장이나 콘텐츠/프로필 snapshot 없이 현재 `claps`·`follows`·`pokes`에서 서버 시각 90일, 최신 최대 100개를 파생한다. unlike·unfollow·문장/원천 삭제는 항목을 제거한다.
+- 양방향 차단, actor 정지, 운영자 hidden 문장을 목록·미읽음 수에서 서버측으로 제외한다. 클라이언트 후처리는 권한 경계가 아니다.
+- 영속 상태는 사용자가 실제 본 opaque `seen_event_keys`의 bounded set이며, 목록 응답 key만 mark-seen RPC로 현재 projection과 교집합·원자 병합한다. timestamp cursor는 사용하지 않는다. 게스트는 보호 RPC 없이 안전한 빈 목록·로그인 안내·미읽음 0을 본다.
+- 상세 화면·DataStore·RPC/RLS·수용기준은 [activity-inbox.md](../activity-inbox.md)와 [backend.md §7.0.6](../backend.md#706-활동함-읽기-모델상태-계약-1260)이 SSOT다.

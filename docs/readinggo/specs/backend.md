@@ -13,6 +13,7 @@
 > **v14 갱신 (2026-08-01, #1392)**: 공개 UGC 신고·사용자 차단·운영자 검토 데이터 모델과 DataStore 계약을 신설. 상세 UX·정책 동의·출시 게이트는 [feed.md §5.7.4](./feed.md)가 SSOT다.
 > **v18 목표 결정 (2026-08-25, #1515)**: 서재는 기존 `user_books`·`wish_books`·`sentences`와 canonical `books`의 읽기 모델이다. 책나무·친구 책나무 사용자 표면은 보류하지만 공개범위·제한 RPC/RLS·fail-closed·base RLS 축소 안전 계약은 유지한다. 아래 §7.0이 활성 데이터 계약이며 §7.0-v17은 보류 이력이다.
 > **v18.1 활동 계산 결정 (2026-08-25, #1520)**: 프로필 월간 활동일은 기존 `sessions.calendar(days)`가 주는 로컬 날짜 문자열 `reading_sessions.session_date`와, 본인 문장 `created_at` 타임스탬프만 사용자 로컬 날짜로 변환한 값의 합집합으로 클라이언트에서 재계산한다. 새 table·column·RPC·migration은 추가하지 않는다.
+> **v18.2 활동함 결정 (2026-08-25, #1260)**: 인앱 활동함은 현재 `claps`·`follows`·`pokes`에서 90일/최대 100개를 파생하고 사용자가 실제 본 opaque `seen_event_keys`만 100개 이하로 영속한다. 원격 푸시·이벤트 snapshot은 추가하지 않는다. 화면 SSOT는 [activity-inbox.md](./activity-inbox.md)다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -26,6 +27,7 @@
 5. 프로필 월간 활동일은 기존 `sessions.calendar(days)`가 반환하는 사용자 로컬 `YYYY-MM-DD`인 `reading_sessions.session_date` 문자열을 그대로 사용하고, 앱 상태의 본인 `sentences.created_at` 타임스탬프만 사용자 로컬 날짜로 변환해 합친다. 같은 날 여러 원천은 하루로 중복 제거하고 원천 수정·삭제 시 다시 계산한다. 새 테이블·컬럼·RPC는 만들지 않는다.
 6. 친구 책나무 UI와 기존 사용자 자동 활성화는 보류한다. 제한 RPC migration은 저장소에 존재하고 DEV에 선배포됐지만 Production 정책·함수·grant 적용 상태와 broad base RLS 축소는 미검증이다. private 문장의 본문·존재·개수·오류 차이를 숨기는 fail-closed 목표는 유지하되 Production 활성화 완료로 간주하지 않는다.
 7. XP·둥지·성·방패·하루 만회 전용 데이터 제거는 계속 진행하되 책·문장·진도·세션·위시·공개범위·재독 데이터를 함께 삭제하지 않는다.
+8. 활동함은 현재 `claps`·`follows`·`pokes`의 제한된 서버 projection이다. source row 철회·삭제와 moderation 상태를 재조회 때 반영하고 notification 원장·프로필/콘텐츠 snapshot은 만들지 않는다. 상세는 §7.0.6과 [activity-inbox.md](./activity-inbox.md)를 따른다.
 
 ### 7.0-v17 책나무·성장·공개범위 계약 — 보류 이력
 
@@ -102,6 +104,15 @@
 #### 7.0.5 XP·만회 레거시 삭제 경계
 
 2026-08-22 Hyu 결정은 **Phase 4의 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않는다는 뜻이다. friend-tree/RLS·공개범위·재독의 별도 구버전 안전 게이트는 이 결정의 대상이 아니다. `increment_xp(int)`·기존 XP/성 DataStore 표면·`streak.repair*`를 앱에서 제거한 뒤, DEV migration은 Production rollback용 백업을 먼저 만들고 `increment_xp(int)`→`reading_sessions.xp_earned`→`users.xp`→`streak.last_repair_date` 순으로 물리 삭제한다. 책·문장·진도·독서 세션과 `reading_sessions.session_date`는 최근 14일 리듬·누적 성장일의 권위 데이터이므로 보존한다. DEV schema readback과 동일 SHA 검증 전에는 Production migration을 실행하지 않으며, Production은 Hyu 승인 대상이다. 자세한 수용기준은 [systems.md §6.0](./systems.md)을 따른다.
+
+#### 7.0.6 활동함 읽기 모델·상태 계약 (#1260)
+
+- `activity_inbox()` 제한 RPC는 viewer 인자를 받지 않고 `auth.uid()`의 inbound non-self clap·새 follower·inbound poke를 현재 source row에서 `UNION ALL`한다. 서버 현재 시각 기준 90일, 최신 100개 상한, `occurred_at DESC, kind ASC, event_key ASC`의 결정적 정렬을 서버에서 강제한다.
+- 목록과 미읽음 수는 양방향 `user_blocks`, `moderation_suspended_users`, clap 대상의 `moderation_hidden_sentences`를 동일하게 제외한다. actor·문장·책은 현재 허용 projection만 join하며 원천 삭제·unlike·unfollow는 다음 조회에서 항목을 제거한다.
+- 읽음 영속 데이터는 `activity_inbox_state(user_id uuid primary key, seen_event_keys text[] not null default '{}', updated_at timestamptz)`뿐이다. opaque key 외 이벤트·프로필·문장·책 snapshot과 notification row는 만들지 않는다.
+- `activity_inbox_unread_count()`는 목록과 같은 현재 90일·최신 100개 projection에서 `event_key <> all(seen_event_keys)`인 행을 센다. `activity_inbox_mark_seen(p_event_keys text[])`는 최대 100개 key를 받아 같은 transaction에서 다시 계산한 본인 허용 projection과 교집합하고 기존 set과 원자 병합한 뒤 현재 projection으로 100개 이하 prune한다. 목록 이후 late commit·동률 timestamp 활동은 전달 set에 없으므로 unread로 남으며, 임의·타인·삭제된 key는 저장하지 않는다.
+- 제한 RPC가 `SECURITY DEFINER`를 사용하면 고정 `search_path`와 schema-qualified relation, 명시적 `authenticated` execute grant, `anon/public` revoke를 적용한다. state base table은 RLS를 켜되 클라이언트 직접 `INSERT/UPDATE/DELETE` grant·policy를 두지 않고 읽음 mutation은 bounded mark-seen RPC만 허용한다. 본인 `SELECT`만 허용하며 타인 접근은 금지한다.
+- source table의 기존 base SELECT를 활동함 때문에 넓히지 않는다. base RLS 축소·구버전 컷오버는 §7.0.3의 별도 게이트를 유지한다.
 
 ### 7.1 플랫폼
 
@@ -242,6 +253,10 @@ claps.toggle(sentenceId)               → boolean            // ❤️ 좋아�
 claps.isMine(sentenceId)               → boolean            // 내가 좋아요했는지 — SentenceCard 초기 상태 로드 (#156)
 claps.list()                           → {sentence_id, sentence}[]  // #641: 내가 좋아요한 문장(sentence 임베드) — '좋아요한 문장 모아보기'(profile §5.8.8). 구 bookmarks.list 대체
 // ~~bookmarks.toggle / bookmarks.list~~ — #641 폐기(claps로 흡수, sentence_bookmarks deprecate)
+activityInbox.list({limit?})           → {items, unreadCount}                        // items에 서버 opaque eventKey 포함, 90일/최대100
+activityInbox.unreadCount()            → integer                    // 목록과 같은 moderation/현재-row 필터
+activityInbox.markSeen(eventKeys)      → {unreadCount}              // 응답에 실제 포함된 최대100 key만 서버 교집합·원자 병합
+// 게스트/local 어댑터는 items=[]·unreadCount=0, markSeen no-op. 보호 RPC나 가짜 소셜 행을 호출/생성하지 않는다.
 wishBooks.add(bookId) / wishBooks.list() / wishBooks.remove(bookId)
 // 스샷 서가 복원 검토함 (#1048, integrated-shelf.md §4.7) — 로그인 전용 임포트 스테이징(import_staging §7.3).
 // shelf-import 검수 "등록"이 책장 직행 대신 여기로 적재 → 서재 "검토함" 뷰가 항목별/일괄 이동·제외.
@@ -550,6 +565,11 @@ pokes                                       -- "콕찌르기" 🪱 (미기록 �
   day             date                 -- 일자별 1회 제한
   created_at      timestamptz
   UNIQUE(from_user_id, to_user_id, day)
+
+activity_inbox_state                       -- #1260: 파생 활동함에서 실제 본 opaque key만 영속
+  user_id       uuid PK FK users.id ON DELETE CASCADE
+  seen_event_keys text[] NOT NULL DEFAULT '{}'
+  updated_at    timestamptz
 
 npc_sentence_seeds
   id        uuid PK
