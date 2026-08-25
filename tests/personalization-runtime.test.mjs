@@ -138,6 +138,8 @@ assert.doesNotMatch(sql, /grant\s+(select|insert|update|delete).*personalization
 for (const fn of ['control_read', 'opt_in', 'revoke_start', 'revoke_finalize', 'source_set_excluded', 'context_validate', 'retrieve', 'lease_acquire', 'lease_validate', 'lease_release']) {
   assert.match(sql, new RegExp(`personalization_${fn}`), `${fn} RPC 존재`);
 }
+assert.match(sql, /personalization_lease_acquire[\s\S]*?perform 1 from public\.personalization_controls[\s\S]*?for update[\s\S]*?insert into public\.personalization_dispatch_leases/i,
+  'lease acquire는 revoke와 같은 control row lock으로 직렬화한 뒤 insert');
 assert.match(sql, /revoke_pending_generation/);
 assert.match(sql, /source_type[\s\S]*'sentence'[\s\S]*'qa'[\s\S]*'note'/, '문장·Q\/A·자유 감상을 한 sentence source로 분류');
 assert.doesNotMatch(sql, /embedding|profile_summary/i, 'embedding/profile summary 저장소 없음');

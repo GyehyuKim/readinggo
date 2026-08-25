@@ -175,9 +175,15 @@ returns boolean language plpgsql security definer set search_path = public, pg_t
 as $$
 begin
   if auth.uid() is null then return false; end if;
-  if not exists(select 1 from public.personalization_controls where user_id=auth.uid() and policy_version='2026-08-25'
-    and enabled and accepted_at is not null and revoked_at is null and revoke_pending_generation is null and consent_generation=p_generation)
-    then return false; end if;
+  -- Serialize lease insertion with revoke_start's UPDATE of the same control row.
+  -- Either the lease commits before revoke scans/cancels it, or acquire observes
+  -- the post-revoke disabled generation and fails before provider dispatch.
+  perform 1 from public.personalization_controls
+    where user_id=auth.uid() and policy_version='2026-08-25'
+      and enabled and accepted_at is not null and revoked_at is null
+      and revoke_pending_generation is null and consent_generation=p_generation
+    for update;
+  if not found then return false; end if;
   insert into public.personalization_dispatch_leases(request_id,user_id,consent_generation)
     values(p_request_id,auth.uid(),p_generation) on conflict do nothing;
   return found;
