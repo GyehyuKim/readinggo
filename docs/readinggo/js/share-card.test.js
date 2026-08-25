@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('./share-card.js', import.meta.url), 'utf8');
+const sentenceCardSource = readFileSync(new URL('./sentence-card.js', import.meta.url), 'utf8');
 
 class FakeElement {
   constructor(tagName) {
@@ -113,20 +114,27 @@ test('9:16 render uses wallpaper dimensions, safe areas, left alignment, and Spa
   assert.equal(harness.document.body.children.length, 0, 'temporary render node is always removed');
 });
 
-test('1,000-character wallpaper keeps source and watermark fixed while clipping only sentence content', async () => {
+test('1,000-character wallpaper clips on a complete line box and keeps source and watermark fixed', async () => {
   await harness.window.renderSentenceCardBlob({ ...sentence, text: '가'.repeat(1000) }, { format: '9:16' });
   const { node } = harness.renders.at(-1);
   const wrap = node.children[1];
   const sentenceNode = wrap.children.at(-1);
   assert.equal(wrap.style.minHeight, '0');
   assert.equal(wrap.style.overflow, 'hidden');
-  assert.equal(sentenceNode.style.maxHeight, 'calc(100% - 180px)');
+  assert.equal(sentenceNode.style.lineHeight, '66px');
+  assert.equal(sentenceNode.style.maxHeight, '858px');
+  assert.equal(Number.parseInt(sentenceNode.style.maxHeight, 10) % Number.parseInt(sentenceNode.style.lineHeight, 10), 0);
   assert.equal(sentenceNode.style.overflow, 'hidden');
   assert.equal(sentenceNode.style.WebkitLineClamp, '13');
   assert.equal(node.children[2].style.flexShrink, '0', 'source must not be pushed beyond the canvas');
   assert.equal(node.children[3].style.flexShrink, '0', 'divider must remain inside the canvas');
   assert.equal(node.children[4].style.flexShrink, '0', 'watermark must remain inside the canvas');
   assert.equal(node.children[5].style.flexShrink, '0', 'link must remain inside the canvas');
+});
+
+test('feed share entry point is a keyboard-focusable native button', () => {
+  assert.match(sentenceCardSource, /<button type="button" className="chip" aria-label="한 문장 공유"/);
+  assert.doesNotMatch(sentenceCardSource, /<span className="chip" onClick=\{\(\) => \(window\.shareSentenceWithFormatChoice/);
 });
 
 test('1:1 rendering remains 1080 square when format is omitted or invalid', async () => {

@@ -89,13 +89,13 @@ function SentenceCard({ item, bookId, noBlind }) {
         </span>
         {/* #650 A: 외부 공유 — 이미지 카드 + Web Share/텍스트 폴백 (share-card.js) */}
         {window.shareSentence ? (
-          <span className="chip" onClick={() => (window.shareSentenceWithFormatChoice || window.shareSentence)({ id: item.id, text: item.q, bookId: bookId, bookTitle: cardTitle, author: item.author, page: item.page, kind: item.kind })}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <button type="button" className="chip" aria-label="한 문장 공유" onClick={() => (window.shareSentenceWithFormatChoice || window.shareSentence)({ id: item.id, text: item.q, bookId: bookId, bookTitle: cardTitle, author: item.author, page: item.page, kind: item.kind })}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M8 1.5l2.5 2.5L8 6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M10.5 4H5C3.3 4 2 5.3 2 7v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
             </svg>
             공유
-          </span>
+          </button>
         ) : null}
         {!isMine && item.id && targetUserId ? (
           <button className="chip" title="이 한 문장 신고" aria-label="이 한 문장 신고"

@@ -143,13 +143,15 @@ function _buildCardNode(n, coverDataUrl, format) {
   if (len > 32) fs = isStory ? 68 : 60;
   if (len > 52) fs = isStory ? 56 : 50;
   if (len > 80) fs = isStory ? 46 : 40;
+  const clampLines = isStory ? 13 : 7;
+  const lineHeightPx = Math.floor(fs * 1.45);
   const sentence = document.createElement('div');
   Object.assign(sentence.style, {
-    textAlign: isStory ? 'left' : 'center', fontSize: fs + 'px', lineHeight: '1.45',
+    textAlign: isStory ? 'left' : 'center', fontSize: fs + 'px', lineHeight: lineHeightPx + 'px',
     letterSpacing: '-0.3px', color: _SC.ink, position: 'relative', zIndex: '1',
-    width: '100%', maxWidth: '100%', maxHeight: isStory ? 'calc(100% - 180px)' : '100%',
+    width: '100%', maxWidth: '100%', maxHeight: `${lineHeightPx * clampLines}px`,
     wordBreak: 'keep-all', overflowWrap: 'break-word', overflow: 'hidden',
-    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: isStory ? '13' : '7',
+    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: String(clampLines),
   });
   if (isThought) {
     const tm = document.createElement('span');
