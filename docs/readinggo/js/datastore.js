@@ -195,6 +195,7 @@ const localStorageAdapter = (function () {
       claps: {},      // sentenceId -> true
       bookmarks: {},  // sentenceId -> true
       wish_books: Array.isArray(window.WISHLIST) ? window.WISHLIST.slice() : [],
+      wish_book_created_at: {}, // local wish 생성 시각. legacy id 배열은 거짓 시각을 만들지 않고 결측 유지.
       settings: {},    // 사용자 설정. default_sentence_visibility 미설정은 public 으로 해석(#1261)
       pending: {},    // 가입 전 임시 (rg_pending_*)
     };
@@ -978,7 +979,11 @@ const DataStore = {
   wishBooks: {
     add(bookId) {
       return localStorageAdapter.mutate(s => {
-        if (!s.wish_books.includes(bookId)) s.wish_books.push(bookId);
+        if (!s.wish_books.includes(bookId)) {
+          s.wish_books.push(bookId);
+          s.wish_book_created_at = s.wish_book_created_at || {};
+          s.wish_book_created_at[bookId] = new Date().toISOString();
+        }
         return s.wish_books.slice();
       });
     },
@@ -1000,20 +1005,28 @@ const DataStore = {
           };
         }
       } catch (e) { /* 인덱스 시드 실패해도 등록은 진행 */ }
-      localStorageAdapter.mutate(s => { if (!s.wish_books.includes(id)) s.wish_books.push(id); return s.wish_books; });
+      const createdAt = localStorageAdapter.mutate(s => {
+        if (!s.wish_books.includes(id)) {
+          s.wish_books.push(id);
+          s.wish_book_created_at = s.wish_book_created_at || {};
+          s.wish_book_created_at[id] = new Date().toISOString();
+        }
+        return (s.wish_book_created_at || {})[id] || '';
+      });
       const bk = (typeof window.getBook === 'function') ? window.getBook(id) : null;
-      return { book_id: id, book: (bk && bk.id === id) ? { id: bk.id, title: bk.title, author: bk.author, publisher: bk.pub || bk.publisher, total_pages: bk.total, cover_url: bk.cover, isbn13: bk.isbn } : { id, title: book.title || '', author: book.author || '' } };
+      return { book_id: id, created_at: createdAt, book: (bk && bk.id === id) ? { id: bk.id, title: bk.title, author: bk.author, publisher: bk.pub || bk.publisher, total_pages: bk.total, cover_url: bk.cover, isbn13: bk.isbn } : { id, title: book.title || '', author: book.author || '' } };
     },
     list() {
-      // Supabase 어댑터와 표면 일치 — {book_id, book} 객체 배열 반환(getBook으로 해소, #403).
+      // Supabase 어댑터와 표면 일치 — {book_id, created_at, book} 객체 배열 반환(getBook으로 해소, #403).
       return localStorageAdapter.mutate(s => s.wish_books.map(id => {
         const bk = (typeof window.getBook === 'function') ? window.getBook(id) : null;
-        return { book_id: id, book: bk ? { id: bk.id, title: bk.title, author: bk.author, publisher: bk.pub || bk.publisher, total_pages: bk.total, cover_url: bk.cover, isbn13: bk.isbn } : { id } };
+        return { book_id: id, created_at: (s.wish_book_created_at || {})[id] || '', book: bk ? { id: bk.id, title: bk.title, author: bk.author, publisher: bk.pub || bk.publisher, total_pages: bk.total, cover_url: bk.cover, isbn13: bk.isbn } : { id } };
       }));
     },
     remove(bookId) {
       return localStorageAdapter.mutate(s => {
         s.wish_books = s.wish_books.filter(id => id !== bookId);
+        if (s.wish_book_created_at) delete s.wish_book_created_at[bookId];
         return s.wish_books.slice();
       });
     },

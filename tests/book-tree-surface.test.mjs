@@ -9,6 +9,7 @@ const reminder = read('docs/readinggo/js/streak-reminder.js');
 const settings = read('docs/readinggo/js/settings-modal.js');
 const nest = read('docs/readinggo/js/nest.js');
 const library = read('docs/readinggo/js/library.js');
+const datastore = read('docs/readinggo/js/datastore.js');
 const indexHtml = read('docs/readinggo/index.html');
 
 const tabbar = app.slice(app.indexOf('<nav className="tabbar">'), app.indexOf('</nav>', app.indexOf('<nav className="tabbar">')));
@@ -99,6 +100,13 @@ function extractFunction(source, name) {
   throw new Error(`${name} helper 끝을 찾을 수 없다`);
 }
 
+assert.match(datastore, /wish_book_created_at\[bookId\] = new Date\(\)\.toISOString\(\)/,
+  'local 관심 책 신규 추가는 실제 생성 시각을 기록해야 한다');
+assert.match(datastore, /created_at: \(s\.wish_book_created_at \|\| \{\}\)\[id\] \|\| ''/,
+  'local 관심 책 list는 생성 시각을 Supabase와 같은 필드로 반환해야 한다');
+assert.match(datastore, /delete s\.wish_book_created_at\[bookId\]/,
+  'local 관심 책 제거는 생성 시각 sidecar도 정리해야 한다');
+
 const sandbox = {};
 vm.createContext(sandbox);
 vm.runInContext(`${extractFunction(library, '_mapWish')}; ${extractFunction(library, '_mapUserBook')}; this.libraryMap = { _mapWish, _mapUserBook };`, sandbox);
@@ -108,6 +116,12 @@ assert.equal(sandbox.libraryMap._mapUserBook({ status: 'reading', started_at: '2
   '그 밖의 사용자 책 최근순은 실제 started_at을 사용해야 한다');
 assert.equal(sandbox.libraryMap._mapWish({ created_at: '2026-08-19T00:00:00Z', updated_at: '2099-01-01T00:00:00Z', book: {} }).updatedAt, '2026-08-19T00:00:00Z',
   '관심 책 최근순은 실제 created_at을 사용해야 한다');
+assert.equal(sandbox.libraryMap._mapUserBook({ status: 'completed', updated_at: '2099-01-01T00:00:00Z', book: {} }).updatedAt, '',
+  '완독 시각이 없으면 존재하지 않는 updated_at을 추정해 쓰면 안 된다');
+assert.equal(sandbox.libraryMap._mapUserBook({ status: 'reading', updated_at: '2099-01-01T00:00:00Z', book: {} }).updatedAt, '',
+  '시작 시각이 없으면 존재하지 않는 updated_at을 추정해 쓰면 안 된다');
+assert.equal(sandbox.libraryMap._mapWish({ updated_at: '2099-01-01T00:00:00Z', book: {} }).updatedAt, '',
+  '관심 책 생성 시각이 없으면 존재하지 않는 updated_at을 추정해 쓰면 안 된다');
 const oldTz = process.env.TZ;
 process.env.TZ = 'Asia/Seoul';
 vm.runInContext(`${extractFunction(library, '_rgLocalDateKey')}; ${extractFunction(library, '_rgShiftDateKey')}; ${extractFunction(library, '_rgActivityStats')}; ${extractFunction(library, '_rgMonthCells')}; this.activity = { _rgLocalDateKey, _rgShiftDateKey, _rgActivityStats, _rgMonthCells };`, sandbox);
