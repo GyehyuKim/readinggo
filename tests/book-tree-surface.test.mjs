@@ -8,10 +8,18 @@ const ceremony = read('docs/readinggo/js/ceremony.js');
 const reminder = read('docs/readinggo/js/streak-reminder.js');
 const settings = read('docs/readinggo/js/settings-modal.js');
 const nest = read('docs/readinggo/js/nest.js');
+const library = read('docs/readinggo/js/library.js');
 
 const tabbar = app.slice(app.indexOf('<nav className="tabbar">'), app.indexOf('</nav>', app.indexOf('<nav className="tabbar">')));
-assert.match(tabbar, /id:\s*'nest-grow',\s*label:\s*'책나무'/,
-  '호환 route key nest-grow를 유지하며 사용자 라벨을 책나무로 바꿔야 한다');
+const bookshelfRecordStart = app.indexOf('window.RG_openBookshelfRecord = (bookId) => {');
+assert.ok(bookshelfRecordStart >= 0, '재키 책장 기록 CTA handler가 있어야 한다');
+const bookshelfRecordEnd = app.indexOf('return () => { window.RG_openBookshelfRecord = null; };', bookshelfRecordStart);
+assert.ok(bookshelfRecordEnd > bookshelfRecordStart, '재키 책장 기록 CTA cleanup 경계가 있어야 한다');
+const bookshelfRecord = app.slice(bookshelfRecordStart, bookshelfRecordEnd);
+assert.match(tabbar, /id:\s*'library',\s*label:\s*'서재'/,
+  '3번째 탭은 canonical library route와 서재 라벨을 사용해야 한다');
+assert.doesNotMatch(tabbar, /id:\s*'nest-grow'|label:\s*'책나무'/,
+  'legacy nest-grow와 책나무 라벨은 사용자 탭 표면에 남으면 안 된다');
 assert.match(tabbar, /aria-label=\{t\.label\}/,
   '하단 탭 접근성 이름은 표시 라벨과 같아야 한다');
 assert.doesNotMatch(tabbar, /label:\s*'둥지'/,
@@ -20,6 +28,30 @@ assert.match(app, /addEventListener\('rg:wish-changed', refresh\)/,
   '책 추가·삭제 시 TopBar 집계를 같은 projection으로 다시 읽어야 한다');
 assert.match(app, /removeEventListener\('rg:wish-changed', refresh\)/,
   'TopBar 책 변경 listener는 unmount 시 정리해야 한다');
+assert.match(app, /tab === 'nest-grow' \? 'library' : tab/,
+  'legacy nest-grow 입력은 canonical library route로 정규화해야 한다');
+assert.match(bookshelfRecord, /setActiveTab\('library'\)/,
+  '재키 책장 기록 CTA는 canonical 서재로 이동해야 한다');
+assert.match(bookshelfRecord, /if \(bookId && window\.RG_openBook\) window\.RG_openBook\(bookId\)/,
+  '재키 책장 기록 CTA는 요청한 책 상세를 열어야 한다');
+assert.equal([...bookshelfRecord.matchAll(/setActiveTab\(/g)].length, 1,
+  '재키 책장 기록 CTA는 다른 route를 추가로 설정하면 안 된다');
+assert.ok(bookshelfRecord.indexOf("setActiveTab('library')") < bookshelfRecord.indexOf('window.RG_openBook(bookId)'),
+  '서재 route를 먼저 설정한 뒤 상세를 열어야 한다');
+assert.match(app, /BookDetailModal[\s\S]*?onClose=\{\(\) => setBookDetailItem\(null\)\}/,
+  '소유 책 상세 닫기는 modal state만 정리해 서재 route를 유지해야 한다');
+assert.match(app, /BookInfoModal bookId=\{bookDetailId\} onClose=\{\(\) => setBookDetailId\(null\)\}/,
+  '미소유 책 상세 닫기도 modal state만 정리해 서재 route를 유지해야 한다');
+assert.match(app, /activeTab === 'library'[\s\S]*?<LibraryView[\s\S]*?mode="library"/,
+  '3번째 route는 서재 전용 mode를 렌더해야 한다');
+assert.match(app, /activeTab === 'profile'[\s\S]*?<LibraryView[\s\S]*?mode="profile"/,
+  '4번째 profile route는 프로필 전용 mode를 렌더해야 한다');
+assert.doesNotMatch(app, /activeTab === 'nest-grow'[\s\S]*BookTreeHomeView/,
+  '보류된 책나무 화면을 사용자 route로 렌더하면 안 된다');
+assert.match(library, /const showProfile = mode !== 'library'/);
+assert.match(library, /const showLibrary = mode !== 'profile'/);
+assert.match(library, /data-library-mode=\{mode\}/,
+  'profile과 library의 비중복 렌더 경계가 DOM에서 검증 가능해야 한다');
 
 const reminderLines = reminder.slice(reminder.indexOf('const RG_REMINDER_LINES'), reminder.indexOf('function _rmPickLine'));
 const deleteCopy = [...settings.matchAll(/정말 삭제할까요\?[\s\S]{0,140}?되돌릴 수 없어요\./g)].map((match) => match[0]).join('\n');
@@ -81,4 +113,4 @@ assert.match(ceremony, /className="rating-stars"[\s\S]*className="review-area"/,
 assert.doesNotMatch(ceremony, /className="stat xp"|xp-breakdown|nest-progress|nest-evo|NEST_STAGES/,
   '세리머니 UI에 XP·성장 단계·둥지 진화가 남으면 안 된다');
 
-console.log('✓ #1453 탭·카피·세리머니 완료/닫기 회귀 계약');
+console.log('✓ #1518 canonical 서재 route·비중복 profile/library 회귀 계약');

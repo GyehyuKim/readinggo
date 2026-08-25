@@ -12,7 +12,7 @@ function _mapWish(w) {
   return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish' };
 }
 
-function LibraryView({ state, onActivateUserBook }) {
+function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
   const [selectedBookId, setSelectedBookId] = _useState(null);
   const [activeSubtab, setActiveSubtab] = _useState('reading'); // 'wishlist' | 'reading' | 'completed'
   // 읽은 책 정렬 (#513 → #649 3단 토글). key=정렬축('recent'|'rating'|'title'), dir=방향(1=1차/내림·ㄱ→ㅎ, -1=2차/오름·ㅎ→ㄱ). key=null → 정렬 해제(원본 순서).
@@ -294,10 +294,13 @@ function LibraryView({ state, onActivateUserBook }) {
       return dateB.localeCompare(dateA); // 최신순
     });
 
+  const showProfile = mode !== 'library';
+  const showLibrary = mode !== 'profile';
+
   return (
-    <section className="view active">
+    <section className="view active" data-library-mode={mode}>
       {/* 프로필 정보 (#508) — 닉네임·한 줄 소개·팔로잉/팔로워/저장을 최상단으로(#428 '둥지 최상단' → 재배치, SNS 표준 UX) */}
-      <div style={{padding:'16px 16px 20px', position:'relative', textAlign:'center'}}>
+      {showProfile && <div style={{padding:'16px 16px 20px', position:'relative', textAlign:'center'}}>
         <div style={{position:'absolute', top:0, right:12, display:'flex', gap:8}}>
           {/* 설정 ⚙️는 하단 '설정' 탭으로 이전 (#488). 운영 대시보드(📊)만 헤더 유지. */}
           {isAdmin && (
@@ -382,10 +385,10 @@ function LibraryView({ state, onActivateUserBook }) {
             </div>
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* 독서 위키 상시 진입점 (#1274) — 활성 책 문장 수와 무관하게 책장에서 발견 가능. */}
-      <div style={{padding:'0 16px', margin:'0 0 20px'}}>
+      {showProfile && <div style={{padding:'0 16px', margin:'0 0 20px'}}>
         <button onClick={openWikiAsk} disabled={wikiOpening}
           aria-label="내 문장에게 묻기"
           style={{width:'100%', boxSizing:'border-box', border:'1px solid var(--brand-soft)', borderRadius:16, background:'var(--brand-tint)', color:'var(--ink)', padding:'14px 16px', cursor:wikiOpening?'default':'pointer', opacity:wikiOpening?0.7:1, display:'flex', alignItems:'center', gap:12, textAlign:'left'}}>
@@ -398,7 +401,7 @@ function LibraryView({ state, onActivateUserBook }) {
           </span>
           <span aria-hidden="true" style={{color:'var(--brand-3)', fontSize:18, flexShrink:0}}>›</span>
         </button>
-      </div>
+      </div>}
 
 
       {/* 📖 독서 기록 섹션(총 독서시간·일평균) 제거 (#471). duration_sec 저장(#430)은 유지(미표시). */}
@@ -406,7 +409,7 @@ function LibraryView({ state, onActivateUserBook }) {
       {/* 내 한 문장 섹션 제거(#439) — 프로필 → 내서재 → 읽고 있는 책 클릭 → 책 상세에서 그 책의 한 문장 + 참새 대화 확인 */}
 
       {/* 내 서재 섹션 */}
-      <div style={{padding:'0 16px', marginBottom:20}}>
+      {showLibrary && <div style={{padding:'16px 16px 0', marginBottom:20}}>
         {/* 상시 임포트 진입점 — 텍스트/파일 가져오기(#1039, 1순위)와 스샷 복원(#772, #832)을 나란히.
             DESIGN 3차(텍스트·아이콘) 버튼 위계. 빈 서가 큰 CTA(아래)는 유지. 텍스트/파일을 먼저(왼쪽). */}
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
@@ -623,10 +626,10 @@ function LibraryView({ state, onActivateUserBook }) {
           </div>
         )}
 
-      </div>
+      </div>}
 
       {/* 책 상세 모달 */}
-      {selectedBook && ReactDOM.createPortal(
+      {showLibrary && selectedBook && ReactDOM.createPortal(
         <BookDetailModal
           book={selectedBook}
           allQuotes={state.myQuotes}
@@ -635,11 +638,11 @@ function LibraryView({ state, onActivateUserBook }) {
         />,
         document.body
       )}
-      {importOpen && ReactDOM.createPortal(
+      {showLibrary && importOpen && ReactDOM.createPortal(
         <DataImport onClose={() => setImportOpen(false)} />,
         document.body
       )}
-      {sentenceImportOpen && ReactDOM.createPortal(
+      {showLibrary && sentenceImportOpen && ReactDOM.createPortal(
         <>
           <div onClick={() => setSentenceImportOpen(false)}
             style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200}} />
@@ -658,19 +661,19 @@ function LibraryView({ state, onActivateUserBook }) {
         </>,
         document.body
       )}
-      {adminOpen && ReactDOM.createPortal(
+      {showProfile && adminOpen && ReactDOM.createPortal(
         <AdminDashboardModal onClose={() => setAdminOpen(false)} />,
         document.body
       )}
-      {RG_PROMPT_LAB_ENABLED && promptLabOpen && window.PromptLabModal && ReactDOM.createPortal(
+      {showProfile && RG_PROMPT_LAB_ENABLED && promptLabOpen && window.PromptLabModal && ReactDOM.createPortal(
         <window.PromptLabModal onClose={() => setPromptLabOpen(false)} />,
         document.body
       )}
-      {followModal && ReactDOM.createPortal(
+      {showProfile && followModal && ReactDOM.createPortal(
         <FollowListModal mode={followModal} onClose={() => setFollowModal(null)} />,
         document.body
       )}
-      {bulkImportOpen && ReactDOM.createPortal(
+      {showLibrary && bulkImportOpen && ReactDOM.createPortal(
         <>
           <div onClick={() => setBulkImportOpen(false)}
             style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200}} />
