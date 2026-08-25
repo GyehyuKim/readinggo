@@ -43,7 +43,7 @@ rgTrack('companion_q_regen',   { book_id })                      // 참새 질�
 rgTrack('resurface_shown',     { sentence_id, days })            // 되감기 카드 노출 (nest.js, #346)
 rgTrack('resurface_answered',  { sentence_id, days })            // 다시 대화하기 탭 (nest.js, #346)
 rgTrack('resurface_skipped',   { sentence_id })                  // 나중에 탭 (nest.js, #346)
-rgTrack('ocr_extracted',       { ... })                          // 사진 글귀 추출 (OCR)
+rgTrack('ocr_extracted',       { source, chars, book_id | page_idx }) // 홈 사진 글귀 추출 성공 (OCR)
 rgTrack('related_book_wished', { from, to })                     // 추천책 찜 (book-detail-modal.js · 드리프트 정정 2026-07-09)
 rgTrack('data_consent',        { value, source })                // 데이터 활용 동의 (app.js, #294)
 rgTrack('app_error',           { message, tab })                 // 컴포넌트 크래시 (app.js, #310)
@@ -121,9 +121,29 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - ISBN·초대 토큰·URL query/hash
 - 자유형 예외 메시지와 provider 응답 본문
 
-오류는 allowlist `source`, `stage`, `code`, `endpoint_or_rpc`, `status`, `app_version`, `correlation_id`, `retry_count`, `item_count`만 전송한다. 로그인 사용자의 PostHog distinct ID는 Supabase UUID만 쓰되 선택 동의자에 한하고, email person property는 전송하지 않는다.
+오류는 공통 allowlist `source`, `stage`, `code`, `endpoint_or_rpc`, `status`, `app_version`, `correlation_id`, `retry_count`, `item_count`만 전송한다. OCR 홈 앨범 실패에 한해 `page_idx`를 추가로 허용한다. 로그인 사용자의 PostHog distinct ID는 Supabase UUID만 쓰되 선택 동의자에 한하고, email person property는 전송하지 않는다.
 
-### 3.1.2 WAU·리텐션·주간 리포트
+### 3.1.2 OCR 이벤트 계약 (#1498)
+
+OCR 분석은 원문을 수집하지 않고 성공·실패와 surface 수준의 비민감 메타데이터만 기록한다. `chars`는 Unicode 문자 수이며 `page_idx`는 사용자가 선택한 홈 앨범 안의 0-based 위치일 뿐 책의 실제 페이지 번호가 아니다.
+
+| 상태 | 이벤트 | 발화 시점 | 필수 속성 | 선택 속성 |
+|---|---|---|---|---|
+| 활성 목표 계약 | `ocr_extracted` | 홈 단발 OCR이 비어 있지 않은 검토 초안을 연 뒤 | `source=home_single`, `book_id`, `chars` | 없음 |
+| 활성 목표 계약 | `ocr_batch_started` | 홈 앨범에서 2장 이상 일반 OCR을 시작할 때 1회 | `source=home_album`, `count` | 없음 |
+| 활성 목표 계약 | `ocr_extracted` | 홈 앨범의 한 이미지에서 비어 있지 않은 텍스트를 얻을 때 | `source=home_album`, `page_idx`, `chars` | 없음 |
+| 활성 목표 계약 | `ocr_failed` | 홈 단발 또는 홈 앨범의 한 이미지가 최종 실패·빈 결과로 확정될 때 | `source`, `stage`, `code` | 홈 앨범의 `page_idx`, 실제 HTTP 응답이 있는 경우의 `status` |
+| 미발화 계약 | `ocr_batch_started` | 책 상세 강조 문장 앨범 추출을 시작할 때 1회 | `source=book_highlights`, `count` | 없음 |
+| 미발화 계약 | `highlights_extracted` | 책 상세 이미지 한 장의 강조 문장 추출이 끝날 때 | `source=book_highlights`, `page_idx`, `n` | 없음 |
+| 미발화 계약 | `ocr_batch_saved` | 책 상세 강조 문장 검토 큐의 저장이 끝날 때 | `source=book_highlights`, `book_id`, `saved`, `skipped` | 없음 |
+
+- `source` 허용값은 `home_single | home_album | book_highlights`다. 홈 이벤트 이름은 이미 발화 중이나 속성 shape는 본 계약에 맞추는 후속 code PR 전까지 drift 상태다. 현재 코드에서 책 상세 강조 이벤트 세 개는 발화하지 않으므로 실측 카탈로그·대시보드에서 활성 이벤트로 세지 않는다.
+- 오류 HTTP 속성의 canonical 이름은 공통 계약과 같은 `status`다. `http_status` 신규 발화는 금지하고, HTTP 응답을 받지 못한 실패에 `0` 같은 가짜 상태를 만들지 않고 속성을 생략한다.
+- `ocr_failed.code`는 클라이언트·Worker가 정규화한 안정된 오류 코드만 사용한다. 자유형 예외 메시지·provider 응답 문자열을 넣지 않는다.
+- `ocr_failed`에는 `book_id`를 넣지 않는다. 실패 원인 진단에는 `source`·`stage`·`code`와 선택 `page_idx`·`status`면 충분하다.
+- OCR 원문·이미지·파일명·MIME 원문·provider 응답·자유형 오류 메시지·실제 책 페이지 번호는 성공·실패 이벤트 모두 금지한다.
+
+### 3.1.3 WAU·리텐션·주간 리포트
 
 - **시간대/주 경계**: KST 월요일 00:00~일요일 23:59:59.
 - **WAU**: production에서 `book_opened`, `reading_session_end`, `sentence_added`, `book_completed`, `answer_saved` 중 하나 이상을 수행한 고유 PostHog `distinct_id` 수. 계정과 익명 기기가 섞일 수 있으므로 UI에는 **활성 ID**라고 표시한다.
@@ -135,7 +155,7 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - 완료된 조회 구간의 핵심 이벤트가 0건이면 `dataQuality: ok`로 두지 않고 `collection_silence` critical anomaly로 판정한다. 이는 “사용자 행동 0”을 자동 확정하는 값이 아니라 수집 중단 가능성을 운영자가 확인해야 하는 fail-visible 신호다.
 - PostHog Personal API key는 읽기 전용 GitHub Secret으로만 보관한다. 미설정이면 workflow는 명시적으로 실패하되 앱 배포를 막지 않는다.
 
-### 3.1.3 서재·개인 활동 측정 계약 (v18, 후보)
+### 3.1.4 서재·개인 활동 측정 계약 (v18, 후보)
 
 책나무·친구 책나무 이벤트는 신규 활성 계약이 아니다. 서재 이벤트명·property·bucket·대시보드명도 구현 이슈에서 개인정보·표본·운영 필요를 다시 승인하기 전에는 **후보**다. 검색어·책 제목·문장 원문·개인 메모·정확한 활동 날짜를 분석에 보내지 않는다.
 
@@ -165,7 +185,7 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 - `friend_book_tree_branch_opened`: 가지 열기. 과거 허용 속성은 `book_status`, `leaf_count_bucket`, `entry_point`였다.
 - 두 이벤트 모두 사용자 ID·핸들·정확한 개수·책 제목·문장 원문·비공개 문장 존재·공개범위 판정 이유를 보내지 않는다.
 
-### 3.1.4 과거 둥지 측정 이력 (#1308, superseded)
+### 3.1.5 과거 둥지 측정 이력 (#1308, superseded)
 
 `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`와 XP 기반 단계 속성은 v17이 대체한다. 아직 구현되지 않은 과거 제안이므로 신규 구현하지 않는다. 기존 코드나 저장된 분석 데이터가 발견되면 legacy로만 보존한다.
 
