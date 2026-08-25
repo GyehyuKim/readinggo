@@ -1,11 +1,14 @@
 import candidateA from './mascot-candidates/jacky-candidate-a.svg?url';
 import candidateB from './mascot-candidates/jacky-candidate-b.svg?url';
 import candidateC from './mascot-candidates/jacky-candidate-c.svg?url';
+import candidateA48 from './mascot-candidates/jacky-candidate-a-48.svg?url';
+import candidateB48 from './mascot-candidates/jacky-candidate-b-48.svg?url';
+import candidateC48 from './mascot-candidates/jacky-candidate-c-48.svg?url';
 
 const CANDIDATES = [
-  { id: 'A', name: 'Balanced Sage', src: candidateA, variable: '둥근 면, 중간 굵기, 정본 세이지 비중 높음' },
-  { id: 'B', name: 'Editorial Line', src: candidateB, variable: '윤곽선 강조, 올리브 세이지, 여백 많은 면' },
-  { id: 'C', name: 'Quiet Geometric', src: candidateC, variable: '기하학적 단순화, 짙은 세이지, 높은 실루엣 대비' },
+  { id: 'A', name: 'Balanced Sage', src: candidateA, smallSrc: candidateA48, variable: '둥근 면, 중간 굵기, 정본 세이지 비중 높음' },
+  { id: 'B', name: 'Editorial Line', src: candidateB, smallSrc: candidateB48, variable: '윤곽선 강조, 올리브 세이지, 여백 많은 면' },
+  { id: 'C', name: 'Quiet Geometric', src: candidateC, smallSrc: candidateC48, variable: '기하학적 단순화, 짙은 세이지, 높은 실루엣 대비' },
 ];
 
 const CRITERIA = [
@@ -42,7 +45,7 @@ function MascotReviewScreen({ onClose }) {
               <p style={{ minHeight: 38, margin: '5px 0 12px', color: 'var(--ink-2)', fontSize: 12.5, lineHeight: 1.5 }}>{candidate.variable}</p>
               <img src={candidate.src} alt={`재키 후보 ${candidate.id} 모델 시트: 아이콘 얼굴, 전신 정면과 측면, 평온·반가움·궁금함·공감`} style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 'var(--r-sm)', border: '1px solid var(--line)' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0', padding: 10, borderRadius: 'var(--r-sm)', background: 'var(--paper-2)' }}>
-                <img src={candidate.src} alt="" aria-hidden="true" style={{ width: 48, height: 48, objectFit: 'cover', objectPosition: '91% 73%', borderRadius: 'var(--r-sm)' }} />
+                <img src={candidate.smallSrc} alt="" aria-hidden="true" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 'var(--r-sm)' }} />
                 <span style={{ color: 'var(--ink-2)', fontSize: 12.5, lineHeight: 1.45 }}><b style={{ color: 'var(--ink)' }}>48px 실사용 확인</b><br />얼굴 윤곽·부리·날개 분리</span>
               </div>
               <fieldset style={{ margin: 0, padding: 0, border: 0 }}>

@@ -11,10 +11,11 @@ const candidatesRoot = path.join(jsRoot, 'mascot-candidates');
 const read = (file) => fs.readFileSync(file, 'utf8');
 
 const candidateFiles = ['jacky-candidate-a.svg', 'jacky-candidate-b.svg', 'jacky-candidate-c.svg'];
+const previewFiles = ['jacky-candidate-a-48.svg', 'jacky-candidate-b-48.svg', 'jacky-candidate-c-48.svg'];
 const requiredViews = ['face-icon', 'full-body-front', 'full-body-side', 'emotion-calm', 'emotion-welcome', 'emotion-curious', 'emotion-empathy', 'preview-48'];
 
 test('three candidate SVG model sheets are complete, self-contained, and retain Jacky identity', () => {
-  assert.deepEqual(fs.readdirSync(candidatesRoot).sort(), candidateFiles);
+  assert.deepEqual(fs.readdirSync(candidatesRoot).sort(), [...candidateFiles, ...previewFiles].sort());
   candidateFiles.forEach((name, index) => {
     const svg = read(path.join(candidatesRoot, name));
     assert.match(svg, new RegExp(`data-candidate="${String.fromCharCode(65 + index)}"`));
@@ -22,6 +23,11 @@ test('three candidate SVG model sheets are complete, self-contained, and retain 
     assert.match(svg, /~2\.5 heads/);
     assert.doesNotMatch(svg, /https?:\/\/(?!www\.w3\.org\/2000\/svg)/, `${name} must not reference external assets`);
     for (const view of requiredViews) assert.match(svg, new RegExp(`id="${view}"`), `${name} is missing ${view}`);
+  });
+  previewFiles.forEach((name) => {
+    const svg = read(path.join(candidatesRoot, name));
+    assert.match(svg, /viewBox="0 0 100 160"/, `${name} must preserve the full-body aspect ratio`);
+    assert.doesNotMatch(svg, /https?:\/\/(?!www\.w3\.org\/2000\/svg)/, `${name} must be self-contained`);
   });
 });
 
@@ -34,7 +40,11 @@ test('DEV comparison is gated and exposes equal A/B/C, 48px, auditable criteria,
   assert.match(app, /재키 A\/B\/C 비교/);
   assert.equal([...review.matchAll(/id: '[ABC]'/g)].length, 3);
   assert.equal([...review.matchAll(/\['(?:small|views|emotion|brand|surface|identity|meaning)'/g)].length, 7);
+  assert.equal([...review.matchAll(/smallSrc: candidate[A-C]48/g)].length, 3);
   assert.match(review, /width: 48, height: 48/);
+  assert.match(review, /src=\{candidate\.smallSrc\}/);
+  assert.match(review, /objectFit: 'contain'/);
+  assert.doesNotMatch(review, /objectPosition|objectFit: 'cover'/);
   assert.match(review, /repeat\(auto-fit, minmax/);
   assert.match(review, /<button[^>]+aria-pressed=/);
   assert.match(review, /aria-labelledby="mascot-review-title"/);

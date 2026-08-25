@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 160" role="img" aria-labelledby="title">
+  <title id="title">재키 후보 B 48픽셀 전신 표본</title>
+  <ellipse cx="50" cy="50" rx="36" ry="39" fill="#6F9B78" stroke="#2A2D33" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="37" cy="45" r="3.8" fill="#2A2D33"/>
+  <circle cx="63" cy="45" r="3.8" fill="#2A2D33"/>
+  <path d="M40 57 L50 66 L60 57 L50 54 Z" fill="#D9A52E" stroke="#2A2D33" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M23 88 Q50 73 77 88 L72 143 Q50 160 28 143 Z" fill="#6F9B78" stroke="#2A2D33" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M30 94Q17 115 28 137Q39 128 41 96Z" fill="#196B45"/>
+  <path d="M70 94Q83 115 72 137Q61 128 59 96Z" fill="#196B45"/>
+</svg>
