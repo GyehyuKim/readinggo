@@ -529,7 +529,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         if (d && String(d.text || '').trim()) {
           setOcrReview({ text: String(d.text), page: '', sourceBook: nestState.book.id });
           setOcrErrors({ text: '', page: '', status: '' });
-          rgTrack('ocr_extracted', { source: 'home_single', chars: Array.from(String(d.text)).length });
+          rgTrack('ocr_extracted', { source: 'home_single', book_id: nestState.book.id, chars: Array.from(String(d.text)).length });
         } else if (d && d.empty) {
           showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
           rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_single', code: d.code || 'ocr_empty', stage: d.stage || 'result' }));
@@ -548,7 +548,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     if (!files || files.length < 2 || quickOcrBusy) return;
     setQuickOcrBusy(true);
     setQuickOcrProgress({ done: 0, total: files.length });
-    rgTrack('ocr_batch_started', { item_count: files.length, source: 'home_album' });
+    rgTrack('ocr_batch_started', { source: 'home_album', count: files.length });
     const pageTexts = Array(files.length).fill(null);
     let failed = 0;
     let unreadable = 0;
@@ -568,6 +568,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           const text = String(data && data.text || '').trim();
           if (text) {
             pageTexts[i] = text;
+            rgTrack('ocr_extracted', { source: 'home_album', page_idx: i, chars: Array.from(text).length });
           } else if (data && data.empty) {
             unreadable++;
             rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_album', code: data.code || 'ocr_empty', stage: data.stage || 'result', pageIdx: i }));
@@ -581,15 +582,6 @@ function NestView({ state, onCheckin, onOpenSearch }) {
         }
         setQuickOcrProgress({ done: i + 1, total: files.length });
         if (i < files.length - 1) await new Promise((resolve) => setTimeout(resolve, 1200));
-      }
-
-      const extractedItems = pageTexts.filter((text) => typeof text === 'string' && text.length > 0);
-      if (extractedItems.length > 0) {
-        rgTrack('ocr_extracted', {
-          source: 'home_album',
-          chars: extractedItems.reduce((total, text) => total + Array.from(text).length, 0),
-          item_count: extractedItems.length,
-        });
       }
       const extracted = _splitOcrPageTexts(pageTexts);
       const validCount = new Set(extracted.map((text) => String(text || '').trim()).filter(Boolean)).size;

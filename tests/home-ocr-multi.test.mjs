@@ -58,6 +58,7 @@ const quickStart = src.indexOf('const runOcrQuick');
 const quickSource = src.slice(quickStart, batchStart);
 const batchSource = src.slice(batchStart, batchEnd);
 const ocrTrackingSource = quickSource + batchSource;
+const failureCalls = ocrTrackingSource.split('\n').filter((line) => line.includes("rgTrack('ocr_failed'")).join('\n');
 check('홈 앨범 input은 multiple이며 capture가 없음', /\bmultiple\b/.test(albumInput) && !/\bcapture=/.test(albumInput));
 check('한 장은 기존 단발 크롭, 여러 장은 배치로 분기', /files\.length === 1[\s\S]{0,180}setQuickOcrFile\(files\[0\]\)/.test(src)
   && /runOcrAlbumBatch\(files\)/.test(src));
@@ -68,19 +69,18 @@ check('페이지 index를 보존해 분리한 부분 성공 결과를 본문-onl
   /const pageTexts = Array\(files\.length\)\.fill\(null\)/.test(batchSource)
   && /const extracted = _splitOcrPageTexts\(pageTexts\)/.test(batchSource)
   && /setDrafts\(\(current\) => _mergeOcrDrafts\(current, extracted\)\)/.test(batchSource));
-check('단발 OCR 성공은 source와 Unicode 글자 수만 기록',
-  /rgTrack\('ocr_extracted', \{ source: 'home_single', chars: Array\.from\(String\(d\.text\)\)\.length \}\)/.test(quickSource));
-check('홈 배치 시작은 canonical item_count를 기록',
-  /rgTrack\('ocr_batch_started', \{ item_count: files\.length, source: 'home_album' \}\)/.test(batchSource));
-check('홈 배치 성공은 페이지별이 아니라 완료 시 총 chars·성공 item_count를 한 번 기록',
-  /const extractedItems = pageTexts\.filter/.test(batchSource)
-  && /rgTrack\('ocr_extracted', \{[\s\S]+source: 'home_album',[\s\S]+chars: extractedItems\.reduce[\s\S]+item_count: extractedItems\.length/.test(batchSource)
-  && !/rgTrack\('ocr_extracted', \{ page_idx:/.test(batchSource));
+check('단발 OCR 성공은 source·book_id·Unicode 글자 수를 기록',
+  /rgTrack\('ocr_extracted', \{ source: 'home_single', book_id: nestState\.book\.id, chars: Array\.from\(String\(d\.text\)\)\.length \}\)/.test(quickSource));
+check('홈 배치 시작은 canonical count를 기록',
+  /rgTrack\('ocr_batch_started', \{ source: 'home_album', count: files\.length \}\)/.test(batchSource));
+check('홈 배치 성공은 이미지마다 source·page_idx·Unicode chars를 기록',
+  /rgTrack\('ocr_extracted', \{ source: 'home_album', page_idx: i, chars: Array\.from\(text\)\.length \}\)/.test(batchSource)
+  && !/const extractedItems =/.test(batchSource));
 check('OCR 실패는 공통 폐쇄형 helper를 사용하고 book_id·http_status를 전송하지 않음',
   /RG_createOcrFailureProps/.test(quickSource)
   && /RG_createOcrFailureProps/.test(batchSource)
-  && !/\bbook_id\s*:/.test(ocrTrackingSource)
-  && !/\bhttp_status\s*:/.test(ocrTrackingSource));
+  && !/\bbook_id\s*:/.test(failureCalls)
+  && !/\bhttp_status\s*:/.test(failureCalls));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

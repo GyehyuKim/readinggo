@@ -11,7 +11,7 @@ const RG_CHECKIN_CODES = new Set([
   'session_write_failed', 'sentence_write_failed', 'batch_partial_failure', 'readback_failed', 'unknown',
 ]);
 const RG_CHECKIN_ENDPOINTS = new Set(['checkin_atomic', 'sentences', 'streak+sentences']);
-const RG_OCR_SOURCES = new Set(['home_single', 'home_album', 'book_detail_highlights']);
+const RG_OCR_SOURCES = new Set(['home_single', 'home_album', 'book_highlights']);
 const RG_OCR_STAGES = new Set(['client', 'network', 'request', 'config', 'upstage', 'result']);
 const RG_OCR_CODES = new Set([
   'ocr_method_not_allowed', 'ocr_unconfigured', 'ocr_request_invalid', 'ocr_image_missing',

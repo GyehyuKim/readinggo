@@ -106,4 +106,10 @@ test('OCR unavailable alias는 안정된 코드로 축약하고 문자열 status
     stage: 'client',
     status: '503',
   }), { source: 'home_single', code: 'ocr_unavailable', stage: 'client' });
+
+  assert.deepEqual(createOcrFailureProps({
+    source: 'book_highlights',
+    code: 'ocr_empty',
+    stage: 'result',
+  }), { source: 'book_highlights', code: 'ocr_empty', stage: 'result' });
 });
