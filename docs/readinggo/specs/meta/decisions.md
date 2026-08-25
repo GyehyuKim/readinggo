@@ -610,3 +610,17 @@
 - 양방향 차단, actor 정지, 운영자 hidden 문장을 목록·미읽음 수에서 서버측으로 제외한다. 클라이언트 후처리는 권한 경계가 아니다.
 - 영속 상태는 사용자가 실제 본 opaque `seen_event_keys`의 bounded set이며, 목록 응답 key만 mark-seen RPC로 현재 projection과 교집합·원자 병합한다. timestamp cursor는 사용하지 않는다. 게스트는 보호 RPC 없이 안전한 빈 목록·로그인 안내·미읽음 0을 본다.
 - 상세 화면·DataStore·RPC/RLS·수용기준은 [activity-inbox.md](../activity-inbox.md)와 [backend.md §7.0.6](../backend.md#706-활동함-읽기-모델상태-계약-1260)이 SSOT다.
+
+### v18.7 — 내 기록 기반 AI 개인화 retrieval (#1309, 2026-08-25)
+
+| 항목 | 활성 결정 |
+|---|---|
+| 동의 | 기존 broad consent와 분리한 **계정 단위 명시적 opt-in**, 기본 OFF. 미설정·손상·정책 버전 불일치는 OFF이며 자동 승계·추론 금지 |
+| 허용 데이터 | 본인의 저장 문장, 연결된 책 메타데이터, 자유 감상, 저장 Q/A. owner 요청에서는 `visibility=private`도 허용하되 타인 기록은 금지 |
+| 최소화 | 요청 시 관련 source 합계 **최대 5건·2,000 Unicode 문자**. lexical retrieval만 사용하고 embedding·profile/summary·복사본·새 장기 기록은 만들지 않음 |
+| 개인화 행동 | 관련 과거 기록·사용자가 명시한 후속 주제만 연결. 민감 특성·감정·성격·취향·문체 추론 금지. 사용자가 고른 질문 프리셋과 현재 답을 우선 |
+| 설명·통제 | 실제 사용 시 `참고한 내 기록 N개`, 정확한 source 이동·source 제외/재포함·기존 기록 삭제·전체 opt-out 제공. 철회 성공 뒤 과거 기록 신규 전송 0 |
+| 인증·동기화 | Supabase bearer 검증 identity만 신뢰하고 client `user_id` 금지. 정책 버전·server 동의 시각·철회 시각·enabled 상태를 계정 정본으로 기기 간 복원 |
+| 전달 게이트 | DEV 구현·합성 검증은 허용. **#1373 전 OFF/ON 최종 품질 인수, Production route/flag·실사용자 opt-in·Production 승격 금지** |
+
+SSOT는 [companion.md §4.7](../companion.md#47-내-기록-기반-관련-맥락-retrieval-1309-목표-계약), 인증/API/RLS는 [backend.md §7.9.3](../backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309), 개인정보·분석은 [privacy-policy.md §0.1](../privacy-policy.md#01-내-기록-기반-ai-개인화-안전-계약-1309-목표)과 [analytics.md §3.1.5](../analytics.md#315-개인화-context-이벤트-allowlist-1309-목표)을 따른다.

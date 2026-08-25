@@ -14,6 +14,7 @@
 > **v18 목표 결정 (2026-08-25, #1515)**: 서재는 기존 `user_books`·`wish_books`·`sentences`와 canonical `books`의 읽기 모델이다. 책나무·친구 책나무 사용자 표면은 보류하지만 공개범위·제한 RPC/RLS·fail-closed·base RLS 축소 안전 계약은 유지한다. 아래 §7.0이 활성 데이터 계약이며 §7.0-v17은 보류 이력이다.
 > **v18.1 활동 계산 결정 (2026-08-25, #1520)**: 프로필 월간 활동일은 기존 `sessions.calendar(days)`가 주는 로컬 날짜 문자열 `reading_sessions.session_date`와, 본인 문장 `created_at` 타임스탬프만 사용자 로컬 날짜로 변환한 값의 합집합으로 클라이언트에서 재계산한다. 새 table·column·RPC·migration은 추가하지 않는다.
 > **v18.2 활동함 결정 (2026-08-25, #1260)**: 인앱 활동함은 현재 `claps`·`follows`·`pokes`에서 90일/최대 100개를 파생하고 사용자가 실제 본 opaque `seen_event_keys`만 100개 이하로 영속한다. 원격 푸시·이벤트 snapshot은 추가하지 않는다. 화면 SSOT는 [activity-inbox.md](./activity-inbox.md)다.
+> **v18.3 개인화 retrieval 결정 (2026-08-25, #1309)**: 누적 개인 기록은 별도 계정 opt-in 뒤 `/api/companion/context`가 Supabase bearer identity로 본인 기록만 요청 시 조회한다. 최대 5건·2,000 Unicode 문자, 복사본/embedding/profile summary 없음. DEV 구현은 허용하되 #1373 전 Production 승격은 차단한다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -200,6 +201,11 @@ settings.get() / settings.update({reminder_hour, default_sentence_visibility, ..
 //      레거시 'friends'는 'followers', 그 밖의 알 수 없는 값은 'private'로 fail-closed한다.
 //      localStorageAdapter는 rg_v41 사용자 상태, supabaseAdapter는 users.settings JSONB에 저장한다.
 //      설정은 이후 신규 문장의 저장값 정본이며 기존 sentences 행이나 열린 초안 본문을 갱신하지 않는다.
+personalization.getConsent()                → PersonalizationConsent
+personalization.setConsent({enabled, policyVersion}) → PersonalizationConsent
+personalization.excludeSource({type, id}) / includeSource({type, id})
+//   ↳ #1309: 로그인 계정 전용. localStorage-only 동의나 기존 RG_consent에서 승계하지 않는다.
+//      계정 settings 정본·서버 시각·source type+ID 제외 metadata만 저장하고 원문 복사본은 만들지 않는다.
 
 // 책 / 검색
 books.search(query)                        → Book[]          // DB ilike(즉시) — 클라에서 canonical books Fuse + 알라딘 결과와 병합·중복제거(isbn13). 외국 작가 표기변이는 알라딘 위임 (QA3 #148). 클라 `fuzzySearch`(data.js)는 **토큰 기반**(#1118) — 질의를 단어로 쪼개 제목+저자+출판사 합본에 모든 토큰 AND 매칭(예: "민음사 시지프 신화" = 출판사+제목 가로질러 매칭. 구버전 통짜 substring 은 0건). 확인된 동일 작품 표기군은 `RG_SEARCH_ALIAS_GROUPS`로만 확장하고 원격 요청 수는 늘리지 않는다(#1388: 오뒷세이아·오디세이·오뒷세이·oddesay).
@@ -650,7 +656,7 @@ inquiries                                   -- v7.2 신설 (09_inquiries.sql) �
 > **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md` 계약이 합의된 후속 이슈에서 확정된 뒤 `pause_log` 류 테이블을 본 절에 추가.
 
 JSONB 사용:
-- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public"}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). 알림은 Phase 2 PWA 이후 실동작.
+- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public", "personalized_context": {"policy_version": "2026-08-25", "enabled": false, "accepted_at": null, "revoked_at": null, "excluded_sources": []}}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). `personalized_context`의 동의·철회 시각은 DB/Worker server time 정본이며 제외 목록은 `{type:'sentence'|'note'|'qa', id:uuid}`만 허용한다. 이 제어 metadata는 기록 원문 복사·새 profile이 아니다. 알림은 Phase 2 PWA 이후 실동작.
 - 그 외 관계형 컬럼. JSON 남발 금지.
 
 ### 7.4 인덱스
@@ -799,5 +805,34 @@ Phase 0 (localStorage, `rg_v41`):
 - **프라이버시/저작권**: 내 문장→LLM 전송은 `/api/companion`(재키)이 이미 하는 선례와 동일 경로(키 서버 보관). **내 문장만** 보내므로 타인 발췌 수집/저작권(#1008) 위험은 낮다([legal-copyright.md] 원칙 일관).
 - **폴백**: `question` 누락 → 422, `items` 비었으면 422(`empty`). 키/설정 없으면 200 + 안내 문구(`demo:true`, 목 답 대신 "키워드 검색으로 찾아보세요"). LLM 호출 실패 → 502(`error`). 클라(`window.RG_wikiAsk`, supabase-client.js)가 로딩·에러·빈 상태를 처리.
 - **DataStore 계약 밖**: 저장 없는 stateless LLM 프록시라 어댑터(§7.2) 표면이 아니다 — companion/related 와 같이 클라 래퍼가 직접 `fetch`. (저장형 위키·소재 태깅으로 확장하면 그때 계약화.)
+
+#### 7.9.3 개인화 context retrieval — `POST /api/companion/context` (#1309)
+
+이 endpoint는 [companion.md §4.7](./companion.md#47-내-기록-기반-관련-맥락-retrieval-1309-목표-계약)의 **로그인·opt-in 전용 request-time retrieval**이다. 일반 `/api/companion`의 현재 문장·해당 history 처리는 계속 별도이며, 클라이언트가 과거 기록 배열이나 `user_id`를 조립해 보내지 않는다.
+
+**인증·요청/응답**
+
+- 요청은 `Authorization: Bearer <Supabase access token>`이 필수다. Worker는 Supabase Auth로 토큰을 검증해 얻은 `auth.uid()`만 owner identity로 사용한다. body/query의 `user_id`, owner ID, 임의 source ID 목록은 받지 않으며 보내도 400으로 거부한다. 쿠키·IP·PostHog ID·DEV persona ID를 사용자 identity로 대체하지 않는다.
+- 입력은 현재 대화의 검색 단서와 현재 source 식별자만 허용한다: `{current_sentence_id, book_id, query_text, preset}`. 각 ID는 현재 bearer 소유/접근을 다시 검증한다. `query_text`는 현재 문장·메모·직전 답에서 만든 최대 2,000 Unicode 문자이며 요청 처리 외에 저장·로그하지 않는다.
+- 응답은 `{sources:[{type,id,book_id,page,created_at,preview,text}], total_chars}` 형태의 owner-verified manifest다. `sources.length<=5`, 각 `text` 합계와 `total_chars<=2000`을 Worker가 최종 강제한다. preview도 text에서 파생한 응답용 일부이며 별도 저장하지 않는다. 0건은 정상 `sources:[]`다.
+- retrieval 후 일반 companion 호출로 넘길 때도 서버 내부에서 같은 bearer와 active consent를 재검증한다. 클라이언트가 manifest를 바꿔 다른 ID/본문을 삽입할 수 없도록 opaque request nonce 또는 한 번의 서버 조립으로 결합한다. API 응답·오류·로그에는 다른 계정 record 존재 여부를 구분할 단서를 주지 않는다.
+
+**동의·계정 동기화**
+
+- `users.settings.personalized_context.policy_version='2026-08-25'`이고 `enabled=true`, `accepted_at`이 server timestamp이며 `revoked_at=null`일 때만 active다. 키 없음·형식 오류·버전 불일치·동의 저장 실패는 OFF다. 기존 `RG_consent=yes`, 대화 아카이브, 공개 문장 또는 프리셋 선택으로 채우지 않는다.
+- 최초 opt-in과 재동의는 `accepted_at=server_now`, `revoked_at=null`; 철회는 **먼저** `enabled=false`, `revoked_at=server_now`를 원자 저장한 뒤 성공을 UI에 알린다. 재동의는 새 `accepted_at`을 기록한다. 과거 동의/철회 감사 이력이 법무상 필요하면 별도 최소 audit 설계 승인을 받으며, 이번 기능이 원문·prompt·retrieval 결과 이력을 만들지는 않는다.
+- 로그인 시 server settings가 모든 기기의 정본이다. 새 기기·재설치도 계정 값을 복원하고, 오프라인에서 임의로 ON으로 전환하지 않는다. 철회 수신 후 메모리 manifest·진행 중 결과를 폐기한다. 로그아웃 시 로컬 동의 cache·source manifest를 지우며 다른 계정으로 승계하지 않는다. 게스트는 기능 설명과 로그인 경로만 제공하고 opt-in 상태를 로컬에 저장하지 않는다.
+
+**조회·RLS/권한**
+
+- Worker의 제한 SQL/RPC는 bearer의 `auth.uid()`를 내부 owner 조건으로 다시 적용해 `sentences.user_id=auth.uid()` 및 그 owner의 `user_books`/`books` join만 읽는다. `visibility=private`과 `note_private=true`도 owner에게는 허용하지만 타인·service-role 무제한 검색 endpoint는 만들지 않는다.
+- RLS가 owner-only 읽기를 강제하고 함수는 고정 `search_path`, 최소 반환 컬럼, authenticated 실행만 허용한다. service role을 사용해야 한다면 함수 내부 owner 조건과 bearer 검증을 둘 다 통과해야 하며, 클라이언트에 service key를 노출하지 않는다.
+- 삭제·감상/Q&A 수정·source 제외는 다음 요청에 즉시 반영한다. cache가 필요하면 요청 메모리 수명 이내만 허용하고 Durable Object, KV, DB, 로그, analytics, `companion_sessions`에 결과·prompt·원문 복사본을 남기지 않는다.
+
+**검증·배포 게이트**
+
+- API/DB 테스트: 무 bearer·만료/위조 bearer, body `user_id` 주입, A 사용자의 A private/public/note/Q&A, A bearer의 B record ID, 삭제/제외, missing·malformed·old policy, opt-in/철회/재동의, 두 기기 복원, 로그아웃/계정 전환, 0/1/5/6건, 1,999/2,000/2,001 Unicode 문자와 emoji/결합문자를 포함한다.
+- 보안 기대값은 타인 record가 존재/부재해도 동일한 404/빈 결과이며 본문·개수·오류 차이 누출 0이다. 테스트 로그와 fixture는 합성 데이터만 쓴다.
+- DEV route·migration·feature flag와 합성 검증은 허용한다. #1373의 OFF/ON UAT 인수 전 Production route/flag는 fail-closed OFF이며, Production migration·실사용자 opt-in·배포 승격을 실행하지 않는다.
 
 ---
