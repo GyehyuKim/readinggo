@@ -91,6 +91,31 @@ function _loadCoverSafe(url) {
   });
 }
 
+// 9:16 이미지는 html-to-image가 CSS line-clamp의 암묵적 말줄임표를 누락할 수 있어
+// 실제 폰트 layout 뒤 마지막 완전한 line box 안에 explicit ellipsis를 넣는다.
+function _fitStorySentence(sentence) {
+  if (!sentence || !sentence._rgStoryText) return false;
+  const full = sentence._rgStoryText;
+  const prefix = sentence._rgStoryPrefix || '';
+  const maxHeight = Number.parseInt(sentence.style.maxHeight, 10);
+  if (!Number.isFinite(maxHeight) || maxHeight <= 0) return false;
+  const points = Array.from(full);
+  const setText = (body) => { sentence.textContent = prefix + body; };
+  setText(full);
+  if (sentence.scrollHeight <= maxHeight) return false;
+
+  let low = 0;
+  let high = points.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    setText(points.slice(0, mid).join('').trimEnd() + '…');
+    if (sentence.scrollHeight <= maxHeight) low = mid;
+    else high = mid - 1;
+  }
+  setText(points.slice(0, low).join('').trimEnd() + '…');
+  return true;
+}
+
 // 오프스크린 카드 노드 생성 (시안 .card.r11/.card.r916 구조 재현). coverDataUrl=null 이면 이니셜 블록.
 function _buildCardNode(n, coverDataUrl, format) {
   const safeFormat = normalizeShareFormat(format);
@@ -151,7 +176,9 @@ function _buildCardNode(n, coverDataUrl, format) {
     letterSpacing: '-0.3px', color: _SC.ink, position: 'relative', zIndex: '1',
     width: '100%', maxWidth: '100%', maxHeight: `${lineHeightPx * clampLines}px`,
     wordBreak: 'keep-all', overflowWrap: 'break-word', overflow: 'hidden',
-    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: String(clampLines),
+    ...(isStory
+      ? { display: 'block' }
+      : { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: String(clampLines) }),
   });
   if (isThought) {
     const tm = document.createElement('span');
@@ -168,6 +195,11 @@ function _buildCardNode(n, coverDataUrl, format) {
     qm.textContent = '“';
     wrap.appendChild(qm);
     sentence.appendChild(document.createTextNode(n.text));
+  }
+  if (isStory) {
+    sentence._rgStoryText = n.text;
+    sentence._rgStoryPrefix = isThought ? '💭 ' : '';
+    root._rgStorySentence = sentence;
   }
   wrap.appendChild(sentence);
   root.appendChild(wrap);
@@ -277,6 +309,7 @@ async function renderSentenceCardBlob(s, opts) {
   try {
     // 커스텀 폰트(Moneygraphy) 글리프 누락 방지 (spec §9).
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+    if (format === '9:16' && node._rgStorySentence) _fitStorySentence(node._rgStorySentence);
     const fontCss = await _fontEmbedCSS();   // #676: Moneygraphy 임베드(브랜드 폰트). 실패 시 ''.
     const blob = await window.htmlToImage.toBlob(node, {
       width: layout.width, height: layout.height, pixelRatio: 1, backgroundColor: _SC.paper,

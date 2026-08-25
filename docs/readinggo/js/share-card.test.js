@@ -18,6 +18,11 @@ class FakeElement {
     this.innerHTML = '';
   }
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  get scrollHeight() {
+    const lineHeight = Number.parseInt(this.style.lineHeight, 10) || 0;
+    if (!lineHeight) return 0;
+    return Math.ceil(Array.from(this.textContent || '').length / 20) * lineHeight;
+  }
   removeChild(child) { this.children.splice(this.children.indexOf(child), 1); child.parentNode = null; return child; }
   remove() { if (this.parentNode) this.parentNode.removeChild(this); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
@@ -125,7 +130,11 @@ test('1,000-character wallpaper clips on a complete line box and keeps source an
   assert.equal(sentenceNode.style.maxHeight, '858px');
   assert.equal(Number.parseInt(sentenceNode.style.maxHeight, 10) % Number.parseInt(sentenceNode.style.lineHeight, 10), 0);
   assert.equal(sentenceNode.style.overflow, 'hidden');
-  assert.equal(sentenceNode.style.WebkitLineClamp, '13');
+  assert.equal(sentenceNode.style.display, 'block');
+  assert.equal(sentenceNode.style.WebkitLineClamp, undefined);
+  assert.match(sentenceNode.textContent, /…$/);
+  assert.ok(Array.from(sentenceNode.textContent).length < 1000);
+  assert.ok(sentenceNode.scrollHeight <= Number.parseInt(sentenceNode.style.maxHeight, 10));
   assert.equal(node.children[2].style.flexShrink, '0', 'source must not be pushed beyond the canvas');
   assert.equal(node.children[3].style.flexShrink, '0', 'divider must remain inside the canvas');
   assert.equal(node.children[4].style.flexShrink, '0', 'watermark must remain inside the canvas');
