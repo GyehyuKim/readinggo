@@ -28,6 +28,7 @@
 5. 프로필 월간 활동일은 기존 `sessions.calendar(days)`가 반환하는 사용자 로컬 `YYYY-MM-DD`인 `reading_sessions.session_date` 문자열을 그대로 사용하고, 앱 상태의 본인 `sentences.created_at` 타임스탬프만 사용자 로컬 날짜로 변환해 합친다. 같은 날 여러 원천은 하루로 중복 제거하고 원천 수정·삭제 시 다시 계산한다. 새 테이블·컬럼·RPC는 만들지 않는다.
 6. 책나무 제품의 UI·route·flag·전용 RPC/DataStore·analytics는 은퇴하며 mascot 명분이나 향후 실험을 위해 재활성화하지 않는다. 저장소와 DEV에 남은 전용 migration/function/grant는 활성 계약이 아니라 제거 전 inventory다. private 문장의 본문·존재·개수·오류 차이를 숨기는 fail-closed 목표와 retained surface의 최소권한은 계속 유지한다.
 7. XP·둥지·성·방패·하루 만회 전용 데이터 제거는 계속 진행하되 책·문장·진도·세션·위시·공개범위·재독 데이터를 함께 삭제하지 않는다.
+8. 활동함은 현재 `claps`·`follows`·`pokes`의 제한된 서버 projection이다. source row 철회·삭제와 moderation 상태를 재조회 때 반영하고 notification 원장·프로필/콘텐츠 snapshot은 만들지 않는다. 상세는 §7.0.6과 [activity-inbox.md](./activity-inbox.md)를 따른다.
 
 ### 7.0.3 현재 보안 갭과 retained surface 컷오버 게이트
 
@@ -50,7 +51,7 @@
 - 읽음 영속 데이터는 `activity_inbox_state(user_id uuid primary key, seen_event_keys text[] not null default '{}', updated_at timestamptz)`뿐이다. opaque key 외 이벤트·프로필·문장·책 snapshot과 notification row는 만들지 않는다.
 - `activity_inbox_unread_count()`는 목록과 같은 현재 90일·최신 100개 projection에서 `event_key <> all(seen_event_keys)`인 행을 센다. `activity_inbox_mark_seen(p_event_keys text[])`는 최대 100개 key를 받아 같은 transaction에서 다시 계산한 본인 허용 projection과 교집합하고 기존 set과 원자 병합한 뒤 현재 projection으로 100개 이하 prune한다. 목록 이후 late commit·동률 timestamp 활동은 전달 set에 없으므로 unread로 남으며, 임의·타인·삭제된 key는 저장하지 않는다.
 - 제한 RPC가 `SECURITY DEFINER`를 사용하면 고정 `search_path`와 schema-qualified relation, 명시적 `authenticated` execute grant, `anon/public` revoke를 적용한다. state base table은 RLS를 켜되 클라이언트 직접 `INSERT/UPDATE/DELETE` grant·policy를 두지 않고 읽음 mutation은 bounded mark-seen RPC만 허용한다. 본인 `SELECT`만 허용하며 타인 접근은 금지한다.
-- source table의 기존 base SELECT를 활동함 때문에 넓히지 않는다. base RLS 변경이나 구버전 컷오버는 별도 제품·보안 승인 대상으로 유지한다.
+- source table의 기존 base SELECT를 활동함 때문에 넓히지 않는다. base RLS 축소·구버전 컷오버는 §7.0.3의 별도 게이트를 유지한다.
 
 ### 7.1 플랫폼
 
@@ -167,11 +168,97 @@ activeBook.set(userBookId)                                  // = users.active_us
 sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 진도 + 독서 세션 + 내부 리듬 카운터. duration_sec(#430): 읽기 세션 시간(초) 누적. **Supabase: 원자 RPC `checkin_atomic(p_user_book_id, p_page, p_duration, p_today)`(#1161, 43_checkin_atomic.sql)** — user_books.current_page + reading_sessions upsert + streak bump를 한 트랜잭션으로 묶어 구 순차 3-write 부분상태를 막는다. 내부 카운터 규칙은 `_nextStreak`과 SQL을 동기화하며, p_today는 클라이언트 로컬 날짜를 사용한다. XP 호출은 없고 문장 저장은 별도 `sentences.add` 계약이다.
 sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
-//   ↳ #1474 신규 문장은 저장 시점의 settings.default_sentence_visibility를
+//   ↳ #1474 신규 문장은 저장 시점의 settings.default_sentence_visibility를 단일 정본으로 사용한다.
+//      작성 UI는 문장별 selector를 노출하지 않고 호출부 visibility override는 adapter가 무시한다.
+//      키 없음='public', friends='followers', unknown='private'. DB DEFAULT 'public'은 레거시 방어선으로 유지한다.
+sentences.importExisting({userBookId, sessionId, page, text, my_note?, kind?, visibility}) → Sentence
+//   ↳ 가입 전 이미 저장된 게스트 문장 이관 전용. 당시 visibility를 보존하고 unknown은 private로 축소한다.
+//      신규 생성에 이 API를 사용하지 않으며 add와 importExisting의 호출부를 계약 테스트로 분리한다.
+sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
+sentences.listByBook(userBookId)           → Sentence[]      // 내 책(user_book) 한 문장
+sentences.byBook(bookId, {limit?, sort?})  → Sentence[]      // 그 책(books.id)의 *타인* 공개 한 문장(#11). 본인 제외(neq user_id), 비-UUID id → []. sort='likes'(#594): 좋아요 많은 순 Top N(clap_count embed), 기본 'recent'(최신순). 각 행에 clapCount 부착
+sentences.feed({cursor})                   → Sentence[]      // 최근(전체 공개) 피드 (§social)
+sentences.feedFollowing({limit})           → Sentence[]      // v7.1: 팔로우 피드
+sentences.feedRecommended({limit})         → Sentence[]      // v7.1: 추천(공유 책 유사도, 비면 최근 폴백)
+sentences.setVisibility(id, {visibility?, note_private?})    // v7.2: visibility 3단계(public|followers|private) + 감상 note_private
+sentences.listMine()                       → Sentence[]
+sentences.random()                         → Sentence        // 무작위 회상 — 내 과거 한 문장 1개 (§profile 5.8.7)
 
-... [OUTPUT TRUNCATED - 6,656 chars omitted out of 56,584 total] ...
+// 독서 리듬·완독
+streak.get()                               → Streak          // 현행 마일스톤·리마인더용 내부 연속일 보조 상태. 책나무 성장·최근 14일 리듬의 권위 데이터가 아님
+streak.bumpOnCheckIn()                                      // 현재 addToday 원자 RPC 안에서 갱신. `repair*`와 last_repair_date만 Phase 4 삭제 대상이며, 최근 14일·누적 성장일은 reading_sessions.session_date에서 계산
+books.complete(userBookId, {rating?, review_text?})         // 완독 상태·별점·소감 저장
 
-completionStats`/`cohortRetention`/`contentResonance` 가 존재한다(상세 문서화는 생략 — 표면만 명시).
+// 일일 기록 (추가)
+sessions.calendar(days?)               → {readDates, shieldDates}  // 스트릭 캘린더 — 최근 N일(기본 35) 읽은/방패 날짜
+
+// 소셜 (좋아요 / 관심책 / 콕찌르기 / 팔로우)
+claps.toggle(sentenceId)               → boolean            // ❤️ 좋아요 = 한 문장 반응+저장 단일화 (#641, true=liked). 자기 문장도 허용(self=저장, XP 비부여)
+claps.isMine(sentenceId)               → boolean            // 내가 좋아요했는지 — SentenceCard 초기 상태 로드 (#156)
+claps.list()                           → {sentence_id, sentence}[]  // #641: 내가 좋아요한 문장(sentence 임베드) — '좋아요한 문장 모아보기'(profile §5.8.8). 구 bookmarks.list 대체
+// ~~bookmarks.toggle / bookmarks.list~~ — #641 폐기(claps로 흡수, sentence_bookmarks deprecate)
+activityInbox.list({limit?})           → {items, unreadCount}                        // items에 서버 opaque eventKey 포함, 90일/최대100
+activityInbox.unreadCount()            → integer                    // 목록과 같은 moderation/현재-row 필터
+activityInbox.markSeen(eventKeys)      → {unreadCount}              // 응답에 실제 포함된 최대100 key만 서버 교집합·원자 병합
+// 게스트/local 어댑터는 items=[]·unreadCount=0, markSeen no-op. 보호 RPC나 가짜 소셜 행을 호출/생성하지 않는다.
+wishBooks.add(bookId) / wishBooks.list() / wishBooks.remove(bookId)
+// 스샷 서가 복원 검토함 (#1048, integrated-shelf.md §4.7) — 로그인 전용 임포트 스테이징(import_staging §7.3).
+// shelf-import 검수 "등록"이 책장 직행 대신 여기로 적재 → 서재 "검토함" 뷰가 항목별/일괄 이동·제외.
+// local 어댑터(datastore.js)는 게이트라 **no-op**(게스트 도달 안 함) — 계약 표면 패리티만 유지.
+importStaging.add(items)                   → StagingRow[]       // `items=[{book, status, rating?}]`(addBatch 표면) → 행 평탄화 적재(매칭 메타·별점 보존)
+importStaging.list()                       → StagingRow[]       // 본인 검토함(최신순). local=[] → 서재 검토함 섹션 미노출
+importStaging.remove(id)                   → StagingRow[]       // 제외(영구 삭제), 갱신된 목록 반환
+importStaging.commit(id, status?)          → UserBook           // 책장 이동: status(없으면 suggested_status)로 myBooks.addBatch 라우팅(별점 보존) 후 staging row 삭제
+pokes.send(toUserId) / pokes.listReceived()                 // 콕찌르기 🪱 (일 1회)
+friends.list() / friends.follow(userId) / friends.unfollow(userId) / friends.isFollowing(userId)  // 팔로우
+
+// 유저 (공개 데이터)
+users.search(query)                    → User[]
+users.getByHandle(handle)              → User | null
+users.publicBooks(userId)              → UserBook[]          // 완독 책장 (status='completed', 전체 공개)
+users.publicSentences(userId)          → Sentence[]          // 공개 한 문장 (visibility='public', RLS가 followers/private 필터)
+users.publicStreak(userId)             → number              // 타인 스트릭 카운트 (공개)
+users.isHandleAvailable(handle)        → boolean             // 닉네임 중복 검사 (본인 제외)
+users.publicShelf(userId)              → UserBook[]          // v7.2: 타인 책장 — 읽는 중+완독(status 포함) (#4)
+users.publicWishlist(userId)           → WishBook[]          // v8.2: 타인 위시리스트 — wishlist_public=true인 경우만 반환, 아니면 [] (#558)
+moderation.report({targetType, targetId, reason, detail?}) → ModerationReport
+moderation.blockUser(userId)            → void
+moderation.unblockUser(userId)          → void
+moderation.listBlockedUsers()            → User[]
+moderation.isBlocked(userId)             → boolean
+// targetType ∈ {'sentence','user'}, reason ∈ {'sexual','violence','hate_or_harassment','spam','illegal','other'}.
+// 게스트는 서버 신고·차단 불가: 로그인 유도 후 재시도한다. Supabase 어댑터는 RPC를 사용해
+// 대상 존재·자기대상 금지·멱등·팔로우 해제를 한 트랜잭션에서 강제한다. local 어댑터는 DEV/fixture
+// 표면 일치를 위한 로컬 숨김만 제공하고 Play 정책 충족 근거로 간주하지 않는다.
+users.bookContrib(userId, bookId)      → {userBook, sentences[]}  // v7.2: 그 사람의 그 책 평점·후기·한 문장 (#5)
+
+// 운영 대시보드 — is_admin=true 전용 (#161, Phase 2 기본)
+admin.stats()                          → {users, realUsers, sentences, completed, todaySessions, trend[]}  // v7.2: 실사용자(NPC제외)·최근7일 추세 추가(#190 A+B)
+admin.inquiries()                      → Inquiry[]           // v7.2: 문의 목록 (RLS: is_admin)
+
+// 문의 (설정 → 운영자) v7.2
+inquiries.create({message, email?})    → Inquiry             // 09_inquiries.sql + app_version(10) + response/answered_at(11_inquiry_response.sql, #208)
+// 답변: inquiries.response/answered_at 컬럼 존재. LLM(Hermes/Gemini) 자동응답·기록은 Phase 2 — 현재 admin UI는 스캐폴드(#208)
+
+// 스포일러 (read-side 계산, 저장 컬럼 없음)
+spoiler.myCurrentPage(bookId)              → int             // 블라인드 판정용 (§social)
+
+// 같이읽기(숲) — DataStore.rooms.* (계약 SSOT = co-reading.md §6.2). 같은 villages/village_members
+//   테이블·RLS 재사용하되 비번/정원은 **서버측 SECURITY DEFINER RPC**(room_join·room_create_membership·
+//   room_set_password)로 강제(#1022). 구 villages.* 어댑터(비번·정원 서버검증 없는 직접 upsert)는
+//   호출처 0 으로 삭제됨(#1035 정리) — 재호출 시 #1022 입장 우회 부활 위험 제거.
+rooms.create({bookId, name, visibility, capacity?, password?}) → Room   // co-reading.md §6.2
+rooms.join(roomId, {password?}) / rooms.leave(roomId)
+rooms.byBook(bookId, {limit?}) / rooms.myRooms() / rooms.get(roomId)
+rooms.members(roomId)                       → RoomMember[]
+rooms.findByCode(code) / rooms.findByToken(token) / rooms.listParts / rooms.setParts
+
+// AI (Phase 0 하드코딩 / Phase 1+ Gemini 프록시 §7.9)
+ai.recommendBooks(book)                    → {title, reason}[]   // 나↔책 fit. 드리프트 정정 2026-07-09: 인자는 userBookId 아닌 book 객체
+ai.extractBook(book, quotes)               → 추출 책 요약        // 드리프트 정정 2026-07-09: 인자는 userBookId 아닌 (book, quotes)
+```
+
+**추가 메서드(계약 표면에 미열거, 코드 실재 — 드리프트 정정 2026-07-09)**: 위 목록 외에도 어댑터에 `sentences.updateText`/`setPage`/`setKind`/`remove`/`resurfaceCandidate`/`markResurfaced`, `books.saveRecap`, `admin.popularBooks`/`activeUsers`/`completionStats`/`cohortRetention`/`contentResonance` 가 존재한다(상세 문서화는 생략 — 표면만 명시).
 
 > 휴식코스(Pause) 관련 메서드(`pause.start(days)` 등)는 **상세 미정** — `systems.md`의 기간·빈도·스트릭 동결 규칙이 합의된 후속 이슈에서 확정된 뒤 본 계약에 추가.
 
@@ -422,6 +509,11 @@ pokes                                       -- "콕찌르기" 🪱 (미기록 �
   day             date                 -- 일자별 1회 제한
   created_at      timestamptz
   UNIQUE(from_user_id, to_user_id, day)
+
+activity_inbox_state                       -- #1260: 파생 활동함에서 실제 본 opaque key만 영속
+  user_id       uuid PK FK users.id ON DELETE CASCADE
+  seen_event_keys text[] NOT NULL DEFAULT '{}'
+  updated_at    timestamptz
 
 npc_sentence_seeds
   id        uuid PK

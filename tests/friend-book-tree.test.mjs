@@ -29,5 +29,15 @@ test('retirement preserves active minimum-privilege and activity-inbox security 
   assert.match(backend, /broad base SELECT 복원은 금지/);
   assert.match(backend, /#1260 활동함의 목록·count·mark는 같은 current projection과 moderation filter/);
   assert.match(backend, /### 7\.0\.6 활동함 읽기 모델·상태 계약 \(#1260\)/);
+  assert.match(backend, /activity_inbox_state\s+-- #1260/);
   assert.match(ops, /#1260 source grant를 넓히지 않는다/);
+});
+
+test('retirement keeps the retained DataStore SSOT complete and structurally valid', () => {
+  assert.doesNotMatch(backend, /OUTPUT TRUNCATED|chars omitted out of/);
+  assert.match(backend, /sentences\.importExisting\(\{userBookId/);
+  assert.match(backend, /activityInbox\.markSeen\(eventKeys\)/);
+  assert.match(backend, /moderation\.report\(\{targetType/);
+  assert.match(backend, /rooms\.create\(\{bookId/);
+  assert.equal((backend.match(/```/g) || []).length % 2, 0);
 });
