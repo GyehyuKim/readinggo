@@ -4,37 +4,37 @@
 > 런칭 후 개발 중 **'머지 = 즉시 100% 프로덕션'** 사고를 줄이는 두 장치를 정의한다: **피처 플래그/킬 스위치**(#960)와 **카나리(점진 배포)**(#901).
 > **2026-07-22 #1303 갱신**: [decisions.md §8.16](./meta/decisions.md)이 §8.13의 별도 환경 기각을 supersede한다.
 > 카나리·플래그는 prod 내부 안전망으로 남고, 기본 릴리스 경로는 별도 dev 검증 → 동일 SHA prod 승격이다.
-> **v17 전환 게이트 (2026-08-19, #1410·#1452·#1454·#1456)**: 책나무·XP 동결·친구 공개범위는 아래 §0의 순서를 건너뛰지 않는다. spec-only PR 승인·머지 전 구현을 시작하지 않으며, DEV에서 검증하지 않은 SHA를 Production이나 Play Store로 승격하지 않는다.
+> **v17 전환 게이트 (2026-08-19, #1410·#1452·#1454·#1456)**: 레거시·XP 동결·친구 공개범위는 아래 §0의 순서를 건너뛰지 않는다. spec-only PR 승인·머지 전 구현을 시작하지 않으며, DEV에서 검증하지 않은 SHA를 Production이나 Play Store로 승격하지 않는다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-first(코드 PR 동반 시 사유 PR 본문).
 
-## 0. 책나무 전환 전달 게이트 (v17)
+## 0. 레거시 전환 전달 게이트 (v17)
 
 1. **결정 정합**: `meta/decisions.md`와 기능 SSOT가 구현 사실·목표 계약·미결정을 분리한다.
 2. **스펙 승인·머지**: spec-only PR의 CI, 리뷰, 미해결 대화 0을 확인하고 main에 머지한다.
-3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, analytics, fixture, 백업·rollback을 작업 순서와 함께 승인한다. **Phase 4의 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않으며, friend-tree/RLS·공개범위·재독의 별도 구버전 안전 게이트는 유지한다.
+3. **구현 계획 승인**: UI, DataStore, RLS/RPC, migration, analytics, fixture, 백업·rollback을 작업 순서와 함께 승인한다. **Phase 4의 XP·둥지·성·하루 만회 전용 표면에 한해** 구 APK 호환을 요구하지 않으며, 폐기 예정 전용/RLS·공개범위·재독의 별도 구버전 안전 게이트는 유지한다.
 4. **코드·DB 구현**: 앱·DataStore·분석의 XP·둥지·성·하루 만회 전용 표면을 제거하고, DEV migration에 백업 생성·RPC/컬럼 삭제·schema readback 검증을 포함한다. 친구 공개 확대는 별도 범위다.
 5. **DEV 배포·QA**: 자동 회귀와 DEV 전용 합성 fixture로 책·문장·세션·최근 14일 리듬·누적 성장일 보존과 legacy 참조 0을 검증한다. Hyu에게는 자동 판정할 수 없는 화면·사용감만 최소 항목으로 요청한다. Production 실사용자 데이터를 fixture로 쓰지 않는다.
 6. **동일 SHA Production 승격**: DEV에서 승인한 commit SHA와 migration digest만 승격한다. 환경 차이·백업·적용 migration을 기록한다.
-7. **Production QA**: 실제 Production에서 읽기·문장 저장·책나무·독서 리듬과 legacy 표면 부재·rollback 경로를 직접 검증한다. CI·배포 성공만으로 완료 처리하지 않는다.
+7. **Production QA**: 실제 Production에서 읽기·문장 저장·레거시·독서 리듬과 legacy 표면 부재·rollback 경로를 직접 검증한다. CI·배포 성공만으로 완료 처리하지 않는다.
 8. **Play Store**: Production QA와 네이티브 빌드 검증 뒤에만 스토어 빌드를 제출한다.
 
 ### 0.1 구 클라이언트·RLS 컷오버 순서
 
-친구 책나무 권한 변경은 한 번의 배포로 처리하지 않는다. 각 release는 위 1~8 게이트를 독립적으로 통과한다.
+폐기 예정 친구 기능 권한 변경은 한 번의 배포로 처리하지 않는다. 각 release는 위 1~8 게이트를 독립적으로 통과한다.
 
 1. **호출 인벤토리**: web, OTA 가능 셸, 스토어 APK의 `user_books`·`wish_books` 직접 조회와 `friends|followers` 공개범위 처리 버전을 확인한다.
 2. **확장 단계 후보 — 신 경로 선배포**: 제한 friend view/RPC, 공개범위 호환 처리를 구현하고 신규 클라이언트가 이를 사용하게 한다. 이 release를 DEV QA → 동일 SHA Production QA → 필요 시 Play Store 순으로 전달한다. 이 단계에서 base RLS를 먼저 좁히지 않는다.
 3. **수신·전환 확인**: OTA production 채널 수신율, 스토어 지원 버전 분포, friend RPC 호출과 legacy base 호출의 버전별 관측을 남긴다.
 4. **컷오버 승인**: 구 API 실패를 허용할 최소 지원 버전, 업데이트/차단 정책, `friends|followers` fail-closed 방식을 제품·운영이 승인한다. 수치와 방식은 관측 전 임의 확정하지 않는다.
 5. **축소 단계 후보 — 권한 축소**: 별도 migration release로 base RLS를 소유자 전용으로 좁힌다. 다시 DEV 직접 API QA → 동일 migration·SHA Production → Production 직접 API QA를 수행한다.
-6. **rollback**: 축소 단계 장애 시 친구 책나무 UI·제한 RPC를 비활성화한다. 광범위한 base select 정책을 복원해 개인정보 노출을 되살리지 않는다. 최소 버전 이하 구 APK의 친구 서재 실패는 승인된 업데이트 정책으로 처리한다.
+6. **rollback**: 축소 단계 장애 시 폐기 예정 친구 기능 UI·제한 RPC를 비활성화한다. 광범위한 base select 정책을 복원해 개인정보 노출을 되살리지 않는다. 최소 버전 이하 구 APK의 친구 서재 실패는 승인된 업데이트 정책으로 처리한다.
 
 확장 단계 수신 증거와 축소 단계 승인 사이에는 broad `ub_sel` 개인정보 갭이 남는다. 이 기간을 정상 완료 상태로 보지 않고, 기간·영향·완화·종료 조건을 release 기록에 남긴다.
 
 ### 0.2 활성화와 롤백
 
-- **책나무 UI 노출 게이트**: 새 책나무 UI와 읽기 모델의 노출을 제어한다. off면 기존 화면으로 돌아가되 신규 XP 쓰기를 다시 켜지 않는다. 실제 flag 식별자는 구현 계획에서 정한다.
-- **친구 공개 게이트**: 친구 책나무 UI와 제한 friend view/RPC 호출을 제어한다. RLS·구버전 컷오버가 배포·검증되기 전 기본 off다. 실제 flag 식별자는 구현 계획에서 정한다.
+- **레거시 UI 노출 게이트**: 새 레거시 UI와 읽기 모델의 노출을 제어한다. off면 기존 화면으로 돌아가되 신규 XP 쓰기를 다시 켜지 않는다. 실제 flag 식별자는 구현 계획에서 정한다.
+- **친구 공개 게이트**: 폐기 예정 친구 기능 UI와 제한 friend view/RPC 호출을 제어한다. RLS·구버전 컷오버가 배포·검증되기 전 기본 off다. 실제 flag 식별자는 구현 계획에서 정한다.
 - XP·둥지·성·하루 만회 제거는 feature flag rollback 대상이 아니다. 장애 시에도 신규 XP 적립을 재개하지 않으며, DB rollback이 필요하면 승인된 migration 백업에서 폐기 컬럼·RPC만 복원한다.
 - 공개범위 migration은 가역적 mapping과 영향 건수, 백업·복원 쿼리, 고지 버전·효력일·opt-out 및 철회 상태의 기기 간 복원 기록을 갖춘 별도 승인 작업이다.
 - 일반 schema rollback은 하위호환을 우선하지만, XP·둥지·만회 전용 표면은 구 APK 호환을 삭제 게이트로 사용하지 않는다. 앱·DB rollback 단위를 release receipt에 분리 기록한다.

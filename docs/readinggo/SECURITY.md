@@ -1,6 +1,6 @@
 # ReadingGo 보안 정책 & 입력 검증 규칙
 
-> 2026-06-04 클로즈베타 감사의 역사적 기준선이다. v17 친구 책나무 보안 정본은 [`specs/backend.md §7.0.3`](./specs/backend.md)과 [`specs/feed.md §5.7.0`](./specs/feed.md)이다. broad base-table read, 구 클라이언트 fail-open, private 문장 존재·개수·상호작용 side channel은 해결·역할별 검증 전까지 Production 활성화 blocker다.
+> 2026-06-04 클로즈베타 감사의 역사적 기준선이다. v17 폐기 예정 친구 기능 보안 정본은 [`specs/backend.md §7.0.3`](./specs/backend.md)과 [`specs/feed.md §5.7.0`](./specs/feed.md)이다. broad base-table read, 구 클라이언트 fail-open, private 문장 존재·개수·상호작용 side channel은 해결·역할별 검증 전까지 Production 활성화 blocker다.
 
 ## 1. 입력 검증 규칙 ("값 생성 규칙")
 단일 출처: 클라 `js/config.js`의 **`RG_VALIDATE`** + 서버 DB CHECK. 클라는 UX(즉시 인라인 경고), 서버는 최종 방어선(anon 키 직접 POST 등 우회 차단)이다. 아래 표는 현행과 승인된 v17 목표를 분리한다.
@@ -18,7 +18,7 @@
 **전환 원칙**: #1457의 Worker·DataStore·DB CHECK·OCR·직접입력·배치/import·카피·경계 테스트가 모두 반영되고 DEV 역할별 저장/재조회 증거가 생기기 전에는 1,000자 공개 저장을 구현 완료로 표시하지 않는다. 정상 클라이언트는 1,001자 이상을 앞 1,000 Unicode 문자로 정규화하고 사용자에게 알리며, 직접 API/DB 우회 입력은 서버와 CHECK가 최종 거부한다. 새 입력 필드는 클라 검증과 DB CHECK를 함께 추가한다.
 
 ## 2. 보안 감사 요약 (2026-06-04)
-**2026-06 당시 감사 범위**의 위험도는 LOW–MEDIUM, Critical/High 0건이었다. 이 평가는 이후 추가된 친구 책나무·공개범위·구 APK 전환의 안전 판정이 아니다. 현재 알려진 broad `user_books` read와 private 문장 존재 추론 side channel은 v17 친구 책나무 출시 차단급 결함이다.
+**2026-06 당시 감사 범위**의 위험도는 LOW–MEDIUM, Critical/High 0건이었다. 이 평가는 이후 추가된 폐기 예정 친구 기능·공개범위·구 APK 전환의 안전 판정이 아니다. 현재 알려진 broad `user_books` read와 private 문장 존재 추론 side channel은 v17 폐기 예정 친구 기능 출시 차단급 결함이다.
 
 ### 조치 완료
 - ✅ **[Medium] 서버측 입력 제약 부재** → DB CHECK 8종 추가(`04_constraints.sql`, `NOT VALID`로 라이브 안전 적용). 클라 우회 시 저비용 DoS·이상치 저장 차단.
@@ -37,7 +37,7 @@ SQL 인젝션 없음(PostgREST 파라미터화) · 저장형 XSS 없음(React �
 1. **시크릿**: `service_role`·Management PAT·Google Secret·알라딘 TTBKey 는 `.env`/Netlify env/`process.env`에서만. 채팅·깃·클라 번들 금지. 클라엔 publishable(anon) 키만(RLS 보호).
 2. **DB 접근**: 항상 supabase-js 빌더(`.eq/.insert/...` 파라미터화). 동적 문자열 SQL 금지. `admin-cli` 인라인 SQL은 운영자 전용(입력 신뢰).
 3. **렌더**: 사용자 콘텐츠는 JSX 표현식(자동 이스케이프). `dangerouslySetInnerHTML`/`innerHTML`/`eval`에 사용자 입력 **절대 금지**(현재 SVG 둥지는 내부 상수만 — 회귀 주의).
-4. **공개 데이터**: 레거시 `select using(true)` 또는 broad authenticated-read 정책을 신규 친구 책나무의 권한 경계로 사용하지 않는다. 상호 팔로우·차단·opt-out·문장 공개범위는 서버의 제한 view/RPC가 판정하고, base table은 5-A 컷오버 뒤 `owner-only`로 축소한다. private 문장은 본문뿐 아니라 존재·개수·오류 차이·clap/report/count도 숨긴다.
+4. **공개 데이터**: 레거시 `select using(true)` 또는 broad authenticated-read 정책을 신규 폐기 예정 친구 기능의 권한 경계로 사용하지 않는다. 상호 팔로우·차단·opt-out·문장 공개범위는 서버의 제한 view/RPC가 판정하고, base table은 5-A 컷오버 뒤 `owner-only`로 축소한다. private 문장은 본문뿐 아니라 존재·개수·오류 차이·clap/report/count도 숨긴다.
 
 ## 4. 공개 전환 전 체크리스트
 - [ ] `auth-autoconfirm off` 또는 비밀번호 가입 UI 제거
