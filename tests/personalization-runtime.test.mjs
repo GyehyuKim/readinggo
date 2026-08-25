@@ -140,8 +140,10 @@ for (const fn of ['control_read', 'opt_in', 'revoke_start', 'revoke_finalize', '
 }
 assert.match(sql, /personalization_opt_in[\s\S]*?on conflict\s*\(user_id\)\s*do update[\s\S]*?where personalization_controls\.revoke_pending_generation is null[\s\S]*?if not found then raise exception 'revoke_pending'/i,
   'opt-in은 revoke pending row의 conflict lock을 획득한 뒤 원자적으로 거부');
-assert.match(sql, /personalization_lease_acquire[\s\S]*?perform 1 from public\.personalization_controls[\s\S]*?for update[\s\S]*?insert into public\.personalization_dispatch_leases/i,
-  'lease acquire는 revoke와 같은 control row lock으로 직렬화한 뒤 insert');
+assert.match(sql, /personalization_lease_acquire[\s\S]*?perform 1 from public\.personalization_controls[\s\S]*?for update[\s\S]*?delete from public\.personalization_dispatch_leases[\s\S]*?insert into public\.personalization_dispatch_leases/i,
+  'lease acquire는 control→lease lock 순서로 revoke와 직렬화한 뒤 insert');
+assert.equal((sql.match(/acquired_at\s*(?:>|<=)\s*now\(\)\s*-\s*interval '2 minutes'/gi) || []).length, 4,
+  'finalize/acquire/validate/count는 같은 2분 lease TTL을 적용');
 assert.match(sql, /revoke_pending_generation/);
 assert.match(sql, /source_type[\s\S]*'sentence'[\s\S]*'qa'[\s\S]*'note'/, '문장·Q\/A·자유 감상을 한 sentence source로 분류');
 assert.doesNotMatch(sql, /embedding|profile_summary/i, 'embedding/profile summary 저장소 없음');

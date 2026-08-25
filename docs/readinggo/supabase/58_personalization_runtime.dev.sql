@@ -101,7 +101,9 @@ as $$
 declare changed int;
 begin
   if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
-  if exists(select 1 from public.personalization_dispatch_leases where user_id=auth.uid() and consent_generation < p_generation)
+  if exists(select 1 from public.personalization_dispatch_leases
+      where user_id=auth.uid() and consent_generation < p_generation
+        and acquired_at > now() - interval '2 minutes')
     then return query select auth.uid(), p_generation, 'pending'::text; return; end if;
   update public.personalization_controls set revoke_pending_generation=null, updated_at=clock_timestamp()
     where user_id=auth.uid() and enabled=false and consent_generation=p_generation and revoke_pending_generation=p_generation;
@@ -184,6 +186,8 @@ begin
       and revoke_pending_generation is null and consent_generation=p_generation
     for update;
   if not found then return false; end if;
+  delete from public.personalization_dispatch_leases
+    where user_id=auth.uid() and acquired_at <= now() - interval '2 minutes';
   insert into public.personalization_dispatch_leases(request_id,user_id,consent_generation)
     values(p_request_id,auth.uid(),p_generation) on conflict do nothing;
   return found;
@@ -194,6 +198,7 @@ returns boolean language sql security definer set search_path = public, pg_temp 
 as $$ select exists(
   select 1 from public.personalization_dispatch_leases l join public.personalization_controls c on c.user_id=l.user_id
   where l.request_id=p_request_id and l.user_id=auth.uid() and l.consent_generation=p_generation and not l.cancel_requested
+    and l.acquired_at > now() - interval '2 minutes'
     and c.enabled and c.revoke_pending_generation is null and c.consent_generation=p_generation and c.policy_version='2026-08-25'
 ) $$;
 
@@ -203,7 +208,9 @@ as $$ begin delete from public.personalization_dispatch_leases where request_id=
 
 create or replace function public.personalization_lease_count(p_before_generation bigint)
 returns bigint language sql security definer set search_path = public, pg_temp stable
-as $$ select count(*) from public.personalization_dispatch_leases where user_id=auth.uid() and consent_generation < p_before_generation $$;
+as $$ select count(*) from public.personalization_dispatch_leases
+  where user_id=auth.uid() and consent_generation < p_before_generation
+    and acquired_at > now() - interval '2 minutes' $$;
 
 revoke all on function public.personalization_control_read() from public, anon;
 revoke all on function public.personalization_opt_in() from public, anon;
