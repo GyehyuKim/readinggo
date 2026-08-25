@@ -102,6 +102,24 @@ assert.equal(response.status, 409);
 assert.equal(staleValidations, 1);
 assert.equal(staleProviderSends, 0, 'pre-provider revoke/TTL 검증 실패 뒤 provider send 0');
 
+// Consent mutation initiated by A must not be rebound to B by a delayed getSession result.
+let releaseMutationAuth;
+const delayedMutationAuth = new Promise((resolve) => { releaseMutationAuth = resolve; });
+const mutationCalls = [];
+const mutationRace = createPersonalizationLifecycle({
+  auth: async () => delayedMutationAuth,
+  rpc: async (name, args) => { mutationCalls.push({ name, args }); return [{ owner_id: B, enabled: true, policy_version: '2026-08-25' }]; },
+  fetcher: async () => { throw new Error('provider must not run'); },
+});
+mutationRace.setSession({ user: { id: A }, access_token: 'token-a-mutation' });
+const pendingOptIn = mutationRace.optIn();
+await new Promise((resolve) => setTimeout(resolve, 0));
+mutationRace.setSession({ user: { id: B }, access_token: 'token-b-mutation' });
+releaseMutationAuth({ user: { id: A }, access_token: 'token-a-mutation' });
+await assert.rejects(pendingOptIn, (error) => error && error.code === 'session_changed');
+assert.deepEqual(mutationCalls, [], 'A가 시작한 consent mutation은 B session에서 RPC 0');
+assert.equal(mutationRace.snapshot().ownerId, B, 'stale getSession completion은 최신 B snapshot을 덮어쓰지 않음');
+
 // Client A→B same-generation barrier: delayed A response cannot touch any sink.
 let session = { user: { id: A }, access_token: 'token-a' };
 let releaseFetch;
@@ -162,6 +180,8 @@ for (const table of ['personalization_controls', 'personalization_source_exclusi
   assert.match(sql, new RegExp(`revoke all on public\\.${table} from anon, authenticated`, 'i'), `${table} 직접 권한 없음`);
 }
 assert.doesNotMatch(sql, /grant\s+(select|insert|update|delete).*personalization_/i, 'control table direct grants 금지');
+assert.equal((sql.match(/auth\.uid\(\) is distinct from p_expected_owner/gi) || []).length, 4,
+  '모든 client control/source mutation은 expected owner와 auth.uid를 결속');
 for (const fn of ['control_read', 'opt_in', 'revoke_start', 'revoke_finalize', 'source_set_excluded', 'source_exclusions_read', 'context_validate', 'retrieve', 'lease_acquire', 'lease_validate', 'lease_release']) {
   assert.match(sql, new RegExp(`personalization_${fn}`), `${fn} RPC 존재`);
 }

@@ -58,13 +58,14 @@ as $$
   ) limit 1;
 $$;
 
-create or replace function public.personalization_opt_in()
+create or replace function public.personalization_opt_in(p_expected_owner uuid)
 returns table(owner_id uuid, policy_version text, enabled boolean, consent_generation bigint,
   accepted_at timestamptz, revoked_at timestamptz, revoke_pending_generation bigint)
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
   if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
+  if auth.uid() is distinct from p_expected_owner then raise exception 'session_changed' using errcode='42501'; end if;
   insert into public.personalization_controls(user_id, policy_version, enabled, consent_generation, accepted_at, revoked_at, revoke_pending_generation, updated_at)
     values(auth.uid(), '2026-08-25', true, 1, clock_timestamp(), null, null, clock_timestamp())
   on conflict(user_id) do update set policy_version='2026-08-25', enabled=true,
@@ -75,13 +76,14 @@ begin
   return query select * from public.personalization_control_read();
 end $$;
 
-create or replace function public.personalization_revoke_start()
+create or replace function public.personalization_revoke_start(p_expected_owner uuid)
 returns table(owner_id uuid, consent_generation bigint, status text)
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare g bigint;
 begin
   if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
+  if auth.uid() is distinct from p_expected_owner then raise exception 'session_changed' using errcode='42501'; end if;
   insert into public.personalization_controls(user_id, policy_version, enabled, consent_generation, revoked_at, revoke_pending_generation, updated_at)
     values(auth.uid(),'2026-08-25',false,1,clock_timestamp(),1,clock_timestamp())
   on conflict(user_id) do update set enabled=false,
@@ -94,13 +96,14 @@ begin
   return query select auth.uid(), g, 'pending'::text;
 end $$;
 
-create or replace function public.personalization_revoke_finalize(p_generation bigint)
+create or replace function public.personalization_revoke_finalize(p_generation bigint, p_expected_owner uuid)
 returns table(owner_id uuid, consent_generation bigint, status text)
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare changed int;
 begin
   if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
+  if auth.uid() is distinct from p_expected_owner then raise exception 'session_changed' using errcode='42501'; end if;
   if exists(select 1 from public.personalization_dispatch_leases
       where user_id=auth.uid() and consent_generation < p_generation
         and acquired_at > now() - interval '2 minutes')
@@ -111,11 +114,13 @@ begin
   return query select auth.uid(), p_generation, case when changed=1 then 'finalized' else 'superseded' end;
 end $$;
 
-create or replace function public.personalization_source_set_excluded(p_source_type text, p_source_id uuid, p_excluded boolean)
+create or replace function public.personalization_source_set_excluded(
+  p_source_type text, p_source_id uuid, p_excluded boolean, p_expected_owner uuid)
 returns boolean language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
   if auth.uid() is null then raise exception 'authentication required' using errcode='42501'; end if;
+  if auth.uid() is distinct from p_expected_owner then raise exception 'session_changed' using errcode='42501'; end if;
   if p_source_type not in ('sentence','note','qa') then raise exception 'invalid source type'; end if;
   -- sentence/note/qa는 같은 sentence row를 source identity로 사용한다. 한 문장의 여러
   -- 블록을 별도 record처럼 부풀리지 않으며, type+sentence ID만 제외 목록에 저장한다.

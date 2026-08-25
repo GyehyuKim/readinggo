@@ -3,6 +3,7 @@ const POLICY_VERSION = '2026-08-25';
 
 export function createPersonalizationLifecycle({ auth, rpc, fetcher, apiOrigin = '', now = () => Date.now() }) {
   let epoch = 0;
+  let sessionReadSerial = 0;
   let ownerId = null;
   let accessToken = null;
   let control = null;
@@ -18,9 +19,15 @@ export function createPersonalizationLifecycle({ auth, rpc, fetcher, apiOrigin =
   const snapshot = () => ({ ownerId, accessToken, epoch });
   const same = (captured, responseOwner) => !!captured.ownerId && captured.ownerId === ownerId
     && captured.accessToken === accessToken && captured.epoch === epoch && responseOwner === captured.ownerId;
+  const requireSame = (captured, responseOwner = captured.ownerId) => {
+    if (!same(captured, responseOwner)) { const error = new Error('session_changed'); error.code = 'session_changed'; throw error; }
+  };
 
   async function refreshSession() {
+    const serial = ++sessionReadSerial;
+    const startedEpoch = epoch;
     const session = await auth();
+    if (serial !== sessionReadSerial || startedEpoch !== epoch) return snapshot();
     setSession(session || null);
     return snapshot();
   }
@@ -35,31 +42,46 @@ export function createPersonalizationLifecycle({ auth, rpc, fetcher, apiOrigin =
     if (!resumePending || !pendingGeneration) return control;
     const count = Number(await rpc('personalization_lease_count', { p_before_generation: pendingGeneration }));
     if (!same(captured, captured.ownerId) || count > 0) return control;
-    const finalizedRows = await rpc('personalization_revoke_finalize', { p_generation: pendingGeneration });
+    const finalizedRows = await rpc('personalization_revoke_finalize', {
+      p_generation: pendingGeneration, p_expected_owner: captured.ownerId,
+    });
     const finalized = Array.isArray(finalizedRows) ? finalizedRows[0] : finalizedRows;
     if (!same(captured, captured.ownerId) || !finalized || finalized.status !== 'finalized') return control;
     return readControl({ resumePending: false });
   }
   async function optIn() {
+    const initiated = snapshot();
     await refreshSession();
-    if (!ownerId) throw new Error('auth_required');
-    const rows = await rpc('personalization_opt_in', {});
-    control = Array.isArray(rows) ? rows[0] : rows;
+    if (initiated.ownerId) requireSame(initiated);
+    const captured = snapshot();
+    if (!captured.ownerId) throw new Error('auth_required');
+    const rows = await rpc('personalization_opt_in', { p_expected_owner: captured.ownerId });
+    const next = Array.isArray(rows) ? rows[0] : rows;
+    requireSame(captured, next && next.owner_id);
+    control = next;
     return readControl();
   }
   async function revoke({ timeoutMs = 10000, pollMs = 50 } = {}) {
+    const initiated = snapshot();
     await refreshSession();
-    if (!ownerId) throw new Error('auth_required');
+    if (initiated.ownerId) requireSame(initiated);
+    const captured = snapshot();
+    if (!captured.ownerId) throw new Error('auth_required');
     control = null; inflight.clear();
-    const rows = await rpc('personalization_revoke_start', {});
+    const rows = await rpc('personalization_revoke_start', { p_expected_owner: captured.ownerId });
     const start = Array.isArray(rows) ? rows[0] : rows;
+    requireSame(captured, start && start.owner_id);
     const generation = Number(start && start.consent_generation);
     const deadline = now() + timeoutMs;
     while (now() < deadline) {
       const count = Number(await rpc('personalization_lease_count', { p_before_generation: generation }));
+      requireSame(captured);
       if (count === 0) {
-        const finalizedRows = await rpc('personalization_revoke_finalize', { p_generation: generation });
+        const finalizedRows = await rpc('personalization_revoke_finalize', {
+          p_generation: generation, p_expected_owner: captured.ownerId,
+        });
         const finalized = Array.isArray(finalizedRows) ? finalizedRows[0] : finalizedRows;
+        requireSame(captured);
         if (finalized && finalized.status === 'finalized') {
           const verified = await readControl();
           if (verified && verified.enabled === false && Number(verified.consent_generation) === generation) return verified;
@@ -78,9 +100,16 @@ export function createPersonalizationLifecycle({ auth, rpc, fetcher, apiOrigin =
     return same(captured, captured.ownerId) && Array.isArray(rows) ? rows : [];
   }
   async function setSourceExcluded(type, id, excluded) {
+    const initiated = snapshot();
     await refreshSession();
-    if (!ownerId) throw new Error('auth_required');
-    return rpc('personalization_source_set_excluded', { p_source_type: type, p_source_id: id, p_excluded: !!excluded });
+    if (initiated.ownerId) requireSame(initiated);
+    const captured = snapshot();
+    if (!captured.ownerId) throw new Error('auth_required');
+    const result = await rpc('personalization_source_set_excluded', {
+      p_source_type: type, p_source_id: id, p_excluded: !!excluded, p_expected_owner: captured.ownerId,
+    });
+    requireSame(captured);
+    return result;
   }
   async function requestQuestion(payload) {
     await refreshSession();
