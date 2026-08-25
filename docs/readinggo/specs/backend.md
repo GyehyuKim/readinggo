@@ -650,13 +650,24 @@ inquiries                                   -- v7.2 신설 (09_inquiries.sql) �
   created_at    timestamptz
   -- RLS: 본인 insert/select + is_admin() select·update. LLM 자동분류는 Phase 2. email=작성시점 auth 이메일(답장용)
 
+personalization_controls                    -- #1309 목표 상태. 공개 profile users 행과 분리; #1373 UAT 전 migration 금지
+  user_id                    uuid PK FK users.id ON DELETE CASCADE
+  policy_version             text
+  enabled                    bool DEFAULT false
+  generation                 bigint DEFAULT 0 CHECK (generation >= 0)
+  revoke_pending_generation  bigint NULL CHECK (revoke_pending_generation IS NULL OR revoke_pending_generation = generation)
+  accepted_at                timestamptz NULL
+  revoked_at                 timestamptz NULL
+  excluded_sources           jsonb DEFAULT '[]' -- [{type:'sentence'|'note'|'qa', id:uuid}], 원문 없음
+  -- table/view 직접 grant 없음. bearer owner를 고정한 전용 SECURITY DEFINER read/transition RPC만 접근
+
 -- v7 제거: operator_replies 테이블 전체 (운영자 짹 폐기)
 ```
 
 > **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md` 계약이 합의된 후속 이슈에서 확정된 뒤 `pause_log` 류 테이블을 본 절에 추가.
 
 JSONB 사용:
-- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public", "personalized_context": {"policy_version": "2026-08-25", "enabled": false, "generation": 0, "revoke_pending_generation": null, "accepted_at": null, "revoked_at": null, "excluded_sources": []}}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). `personalized_context`의 generation은 계정별 단조 증가 정수이고 동의·철회 시각은 DB/Worker server time 정본이며, `revoke_pending_generation`은 해당 OFF generation의 drain 직렬화에만 쓴다. 제외 목록은 `{type:'sentence'|'note'|'qa', id:uuid}`만 허용한다. 이 제어 metadata는 기록 원문 복사·새 profile이 아니다. 알림은 Phase 2 PWA 이후 실동작.
+- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public"}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). 개인화 동의·generation·철회·제외 source는 공개 profile row 및 범용 settings update 권한과 분리해 `personalization_controls`에만 저장한다. 알림은 Phase 2 PWA 이후 실동작.
 - 그 외 관계형 컬럼. JSON 남발 금지.
 
 ### 7.4 인덱스
@@ -695,6 +706,7 @@ village_parts(village_id, part_order)                    -- v7 신설
 - `import_staging`: all(select/insert/update/delete) = 본인만(`user_id = auth.uid()`). grant authenticated만(로그인 전용 — anon 미부여). #1048, `37_import_staging.sql`(수동 적용)
 - `sentence_bookmarks`: 본인만 insert/select/delete
 - `inquiries` (v7.2): 본인만 insert(user_id=auth.uid()). select = 본인 OR `is_admin()`. update = `is_admin()`만(상태 변경)
+- `personalization_controls`: 공개 profile 조회 경로와 분리한다. `anon`, `authenticated`, `public`의 table/view 직접 `SELECT/INSERT/UPDATE/DELETE`를 모두 revoke한다. bearer를 검증한 SECURITY DEFINER RPC만 `auth.uid()=user_id`인 자기 상태를 최소 projection으로 읽고, 최초 동의·철회 시작·drain finalize·재동의·source 제외/재포함은 server timestamp와 generation CAS를 수행하는 전용 원자 RPC로만 변경한다. 범용 `users.update`, `settings.update`, PostgREST table endpoint로 enabled, generation, revoke pending, timestamp, excluded source UUID를 읽거나 조작할 수 없다.
 - `village_members` (v7.2): leave = 본인 행 delete (마을 탈퇴, #9)
 - `villages`: 누구나 공개 마을 목록 select. insert는 로그인 사용자. `village_members` 의 멤버만 피드/멤버 현황 select (구경 불가는 §village 에서 규정). **단 `password_hash` 컬럼은 `revoke select` 로 클라 read 차단** — 비번 검증은 `room_verify_password` RPC 서버측만(#996, §7.6.1)
 - `village_members` (#1022, CSO HIGH): `vmembers_mod` = **본인 탈퇴(delete)만** 클라 직접 허용. **INSERT 자격 회수** — 클라 직접 `village_members` insert/upsert 가 방 비번·정원·visibility 우회 입장 경로였으므로(RLS 가 `user_id=auth.uid()` 만 봄), 멤버십 생성은 SECURITY DEFINER RPC(`room_join`/`room_create_membership`, §7.6.1)가 서버측 검증 후에만 수행한다(`36_room_join_rpc.sql`). select(`vmembers_sel`)는 유지
@@ -814,14 +826,14 @@ Phase 0 (localStorage, `rg_v41`):
 
 - 요청은 `Authorization: Bearer <Supabase access token>`이 필수다. Worker는 Supabase Auth로 토큰을 검증해 얻은 `auth.uid()`만 owner identity로 사용한다. body/query의 `user_id`, owner ID, 임의 source ID 목록은 받지 않으며 보내도 400으로 거부한다. 쿠키·IP·PostHog ID·DEV persona ID를 사용자 identity로 대체하지 않는다.
 - 입력은 현재 대화의 검색 단서와 현재 source 식별자만 허용한다: `{current_sentence_id, book_id, query_text, preset}`. 각 ID는 현재 bearer 소유/접근을 다시 검증한다. `query_text`는 현재 문장·메모·직전 답에서 만든 최대 2,000 Unicode 문자이며 요청 처리 외에 저장·로그하지 않는다.
-- 응답은 `{sources:[{type,id,book_id,page,created_at,preview,text}], total_chars}` 형태의 owner-verified manifest다. `sources.length<=5`다. `total_chars`는 `text`만의 합이 아니라 LLM에 넣는 canonical retrieval context block 전체를 Unicode code point로 직렬화한 값이다. 고정 label·separator와 제목·저자·쪽수·날짜·상태·preview·본문 등 provider에 전달되는 모든 source-derived 문자열을 포함해 **2,000자 이하**를 Worker가 최종 강제한다. 안정 정렬 뒤 마지막 source의 본문/preview를 줄이고, metadata만으로 남은 예산을 넘으면 그 source를 제외한다. 0건은 정상 `sources:[]`다.
-- retrieval 후 일반 companion 호출로 넘길 때도 서버 내부에서 같은 bearer와 active consent를 재검증하고, 클라이언트가 manifest를 바꿔 다른 ID/본문을 삽입할 수 없도록 한 번의 서버 조립으로 결합한다. provider 전송 직전에는 active consent generation에 묶인 server dispatch lease를 원자 획득한 요청만 진행한다. lease에는 `user_id`·generation·opaque request ID·시각만 두고 prompt/source/응답은 저장하지 않으며, provider 호출 완료·실패·취소의 `finally`에서 해제한다. API 응답·오류·로그에는 다른 계정 record 존재 여부를 구분할 단서를 주지 않는다.
+- retrieval manifest 응답은 `{consent_generation,sources:[{type,id,book_id,page,created_at,preview,text}],total_chars}` 형태다. `sources.length<=5`다. `total_chars`는 `text`만의 합이 아니라 LLM에 넣는 canonical retrieval context block 전체를 Unicode code point로 직렬화한 값이다. 고정 label·separator와 제목·저자·쪽수·날짜·상태·preview·본문 등 provider에 전달되는 모든 source-derived 문자열을 포함해 **2,000자 이하**를 Worker가 최종 강제한다. 안정 정렬 뒤 마지막 source의 본문/preview를 줄이고, metadata만으로 남은 예산을 넘으면 그 source를 제외한다. 0건은 정상 `sources:[]`다.
+- retrieval 후 일반 companion 호출로 넘길 때도 서버 내부에서 같은 bearer와 active consent를 재검증하고, 클라이언트가 manifest를 바꿔 다른 ID/본문을 삽입할 수 없도록 한 번의 서버 조립으로 결합한다. provider 전송 직전에는 active consent generation에 묶인 server dispatch lease를 원자 획득한 요청만 진행한다. lease에는 `user_id`·generation·opaque request ID·시각만 두고 prompt/source/응답은 저장하지 않는다. provider 결과를 받은 서버는 lease를 보유한 채 `enabled=true AND generation=request_generation`을 다시 확인하고 불일치 결과를 폐기해 `stale_consent_generation`으로 끝낸다. 유효한 companion 응답에도 `consent_generation`을 포함하고 결과 직렬화 뒤 `finally`에서 lease를 해제한다. 네트워크에서 늦게 도착한 응답은 클라이언트가 owner-only control read RPC의 현재 enabled generation과 일치할 때만 화면 표시·대화 저장·분석 이벤트를 허용하며, OFF 또는 다른 generation이면 본문·source manifest를 즉시 폐기한다. API 응답·오류·로그에는 다른 계정 record 존재 여부를 구분할 단서를 주지 않는다.
 
 **동의·계정 동기화**
 
-- `users.settings.personalized_context.policy_version='2026-08-25'`이고 `enabled=true`, `accepted_at`이 server timestamp이며 `revoked_at=null`일 때만 active다. 키 없음·형식 오류·버전 불일치·동의 저장 실패는 OFF다. 기존 `RG_consent=yes`, 대화 아카이브, 공개 문장 또는 프리셋 선택으로 채우지 않는다.
-- 최초 opt-in과 재동의는 `accepted_at=server_now`, `revoked_at=null`과 새 단조 증가 consent generation을 기록한다. 단, `revoke_pending_generation`이 있으면 재동의를 직렬화해 `409 revoke_pending`으로 거부하며 새 generation이나 lease를 만들지 않는다. 철회는 **먼저** `enabled=false`, `revoked_at=server_now`, generation 증가, `revoke_pending_generation=그 OFF generation`을 원자 저장해 신규 dispatch lease를 차단한 뒤, 이전 generation의 lease를 취소 요청하고 모두 해제될 때까지 서버에서 drain한다. active lease 0 뒤에는 `generation=해당 OFF generation AND enabled=false AND revoke_pending_generation=해당 OFF generation`을 조건으로 CAS finalize하고 pending을 지운 경우에만 그 generation의 철회 성공을 만든다. CAS 실패·다른 generation 관측은 `superseded`, timeout·worker 장애·lease 해제 불확실 상태는 완료가 아니라 `pending`/실패로 응답하되 OFF 상태와 신규 lease 차단은 유지한다. lease를 TTL만으로 성공 처리하지 않는다. 성공 응답은 OFF generation을 포함하고 클라이언트는 authoritative settings를 즉시 readback해 같은 OFF generation일 때만 `철회 완료`를 표시한다. 이미 더 최신 generation이면 과거 응답을 성공 UI로 적용하지 않는다. 과거 동의/철회 감사가 법무상 필요하면 별도 최소 audit 승인을 받으며 원문·prompt·retrieval 결과 이력은 만들지 않는다.
-- 로그인 시 server settings가 모든 기기의 정본이다. 새 기기·재설치도 계정 값을 복원하고, 오프라인에서 임의로 ON으로 전환하지 않는다. 철회 시작 즉시 메모리 manifest·진행 중 결과를 폐기하고, UI는 drain 성공 전 `철회 처리 중`으로 표시하며 완료로 단정하지 않는다. 로그아웃 시 로컬 동의 cache·source manifest를 지우며 다른 계정으로 승계하지 않는다. 게스트는 기능 설명과 로그인 경로만 제공하고 opt-in 상태를 로컬에 저장하지 않는다.
+- `personalization_controls.policy_version='2026-08-25'`이고 `enabled=true`, `accepted_at`이 server timestamp이며 `revoked_at=null`일 때만 active다. 행 없음·형식 오류·버전 불일치·control read 실패는 OFF다. 기존 `RG_consent=yes`, `users.settings`, 대화 아카이브, 공개 문장 또는 프리셋 선택으로 채우지 않는다.
+- 최초 opt-in과 재동의는 전용 원자 RPC가 bearer owner를 고정하고 `accepted_at=server_now`, `revoked_at=null`과 새 단조 증가 consent generation을 기록한다. 단, `revoke_pending_generation`이 있으면 재동의를 `409 revoke_pending`으로 거부해 새 generation이나 lease를 만들지 않는다. 철회 RPC는 **먼저** `enabled=false`, `revoked_at=server_now`, generation 증가, `revoke_pending_generation=그 OFF generation`을 원자 저장해 신규 dispatch lease를 차단한 뒤 이전 generation lease를 취소 요청하고 모두 해제될 때까지 drain한다. active lease 0 뒤에는 `generation=해당 OFF generation AND enabled=false AND revoke_pending_generation=해당 OFF generation`을 조건으로 전용 RPC가 CAS finalize하고 pending을 지운 경우에만 성공이다. CAS 실패·다른 generation 관측은 `superseded`, timeout·worker 장애·lease 해제 불확실 상태는 `pending`/실패이며 OFF와 신규 lease 차단은 유지한다. lease를 TTL만으로 성공 처리하지 않는다. 성공 응답은 OFF generation을 포함하고 클라이언트는 owner-only control read RPC로 같은 OFF generation을 확인할 때만 완료 UI를 표시한다. 과거 동의/철회 감사가 법무상 필요하면 별도 최소 audit 승인을 받으며 원문·prompt·retrieval 결과 이력은 만들지 않는다.
+- 로그인 시 owner-only control read RPC가 모든 기기의 정본이다. 새 기기·재설치도 이 값을 복원하고 오프라인에서 임의로 ON으로 전환하지 않는다. 철회 시작 즉시 메모리 manifest·진행 중 결과를 폐기하고 UI는 drain 성공 전 `철회 처리 중`으로 표시한다. 로그아웃 시 로컬 동의 cache·source manifest를 지우며 다른 계정으로 승계하지 않는다. 게스트는 기능 설명과 로그인 경로만 제공하고 opt-in 상태를 로컬에 저장하지 않는다.
 
 **조회·RLS/권한**
 
@@ -831,7 +843,7 @@ Phase 0 (localStorage, `rg_v41`):
 
 **검증·배포 게이트**
 
-- API/DB 테스트: 무 bearer·만료/위조 bearer, body `user_id` 주입, A 사용자의 A private/public/note/Q&A, A bearer의 B record ID, 삭제/제외, missing·malformed·old policy, opt-in/철회/재동의, 두 기기 복원, 로그아웃/계정 전환, 0/1/5/6건을 포함한다. 1,999/2,000/2,001 Unicode 경계는 본문만이 아니라 label·separator·제목·저자·쪽수·날짜·상태·preview를 포함한 canonical provider-bound block으로 emoji/결합문자까지 검증한다. 동의 확인 직후 타 기기 철회 race에서는 신규 lease가 거부되고, 이미 획득한 lease는 release 전 철회 성공 0건, drain 뒤 성공, timeout은 pending이며 성공 응답 뒤 provider 전송 0건임을 결정적으로 검증한다. gen1 ON/lease → gen2 revoke pending → 재동의 409·새 lease 0 → gen1 release → gen2 OFF CAS finalize 순서를 고정 검증하고, CAS에 다른 generation을 주입한 stale revoke는 성공이 아닌 `superseded`, 응답 readback이 다른 generation이면 완료 UI 0건이어야 한다.
+- API/DB 테스트: 무 bearer·만료/위조 bearer, body `user_id` 주입, A 사용자의 A private/public/note/Q&A, A bearer의 B record ID, 삭제/제외, missing·malformed·old policy, opt-in/철회/재동의, 두 기기 복원, 로그아웃/계정 전환, 0/1/5/6건을 포함한다. 1,999/2,000/2,001 Unicode 경계는 본문만이 아니라 label·separator·제목·저자·쪽수·날짜·상태·preview를 포함한 canonical provider-bound block으로 emoji/결합문자까지 검증한다. 다른 계정 control 직접 SELECT는 0건/거부이고 자기 계정도 PostgREST 직접 INSERT/UPDATE/DELETE로 enabled, generation, revoke pending, timestamp, excluded source를 바꿀 수 없으며 범용 `users.settings` update가 control에 영향 0임을 고정한다. owner control read와 상태 전이는 bearer-bound 전용 RPC만 성공해야 한다. 동의 확인 직후 타 기기 철회 race에서는 신규 lease가 거부되고 이미 획득한 lease는 release 전 철회 성공 0건, drain 뒤 성공, timeout은 pending이며 성공 응답 뒤 provider 전송 0건임을 결정적으로 검증한다. gen1 ON/lease → gen2 revoke pending → 재동의 409·새 lease 0 → gen1 release → gen2 OFF CAS finalize 순서를 고정 검증하고, CAS에 다른 generation을 주입한 stale revoke는 `superseded`, 응답 readback이 다른 generation이면 완료 UI 0건이어야 한다. `gen1 provider 결과 생성 → gen1 server 재검증/응답 지연 → gen2 revoke OFF finalize → gen3 재동의 → 지연된 gen1 HTTP 응답 도착`도 barrier로 고정하고 client generation mismatch가 gen1 본문·manifest를 화면·대화 저장·analytics 어디에도 반영하지 않음을 검증한다.
 - 보안 기대값은 타인 record가 존재/부재해도 동일한 404/빈 결과이며 본문·개수·오류 차이 누출 0이다. 테스트 로그와 fixture는 합성 데이터만 쓴다.
 - DEV route·migration·feature flag와 합성 검증은 허용한다. #1373의 OFF/ON UAT 인수 전 Production route/flag는 fail-closed OFF이며, Production migration·실사용자 opt-in·배포 승격을 실행하지 않는다.
 

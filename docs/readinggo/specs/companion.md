@@ -162,7 +162,7 @@
 
 - **별도 계정 opt-in, 기본 OFF**: `내 기록을 참고한 대화`는 로그인 계정별 선택 기능이다. 기존 `RG_consent`, 세션 리플레이·식별 분석·대화 아카이브/학습 동의, 문장 공개범위, 가입 또는 재키 사용 이력에서 동의를 추론하거나 일괄 승계하지 않는다. 동의 키가 없거나 손상됐거나 정책 버전이 다르면 OFF로 fail-closed한다.
 - OFF에서도 현재 문장·책 메타데이터·해당 문장의 직전 Q/A만 쓰는 §2의 10턴 핵심 대화를 동일하게 제공한다. opt-in을 거부·철회했다는 사실을 질문 문구로 압박하거나 품질 저하 카피로 사용하지 않는다.
-- 동의·철회·기기 간 복원 정본은 [backend.md §7.9.3](./backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309)의 계정 설정이다. 철회 시작 시 서버는 먼저 OFF와 새 consent generation을 저장해 신규 provider dispatch lease를 차단하고 기존 generation 요청을 drain한다. active lease 0건을 확인한 뒤에만 `철회 완료`를 표시한다. 그 전에는 `철회 처리 중`이며 timeout/장애를 완료로 오인하지 않는다. 진행 중 결과는 즉시 화면·저장에서 폐기하고, 완료 응답 뒤 과거 기록의 신규 LLM 전송은 0건이어야 한다.
+- 동의·철회·기기 간 복원 정본은 [backend.md §7.9.3](./backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309)의 공개 프로필과 분리된 owner-only control RPC다. 철회 시작 시 서버는 먼저 OFF와 새 consent generation을 저장해 신규 provider dispatch lease를 차단하고 기존 generation 요청을 drain한다. active lease 0건을 확인한 뒤에만 `철회 완료`를 표시한다. 그 전에는 `철회 처리 중`이며 timeout/장애를 완료로 오인하지 않는다. 모든 개인화 응답은 `consent_generation`을 포함하며, 클라이언트는 owner-only authoritative readback과 일치하는 ON generation만 화면·대화 저장·analytics에 반영한다. 철회·재동의 뒤 늦게 도착한 과거 generation 결과는 즉시 폐기하고, 완료 응답 뒤 과거 기록의 신규 LLM 전송은 0건이어야 한다.
 
 #### 4.7.2 허용 source와 request-time 예산
 
