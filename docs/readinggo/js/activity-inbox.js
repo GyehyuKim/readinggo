@@ -16,7 +16,32 @@ function activityInboxCopy(item) {
   return `${actor}님이 콕 찔렀어요`;
 }
 
-function ActivityInboxButton({ guest, onLogin }) {
+function createActivityInboxRequestGate(initialAccountKey) {
+  let accountKey = String(initialAccountKey || 'guest');
+  let generation = 0;
+  const capture = () => ({ accountKey, generation });
+  return {
+    setAccount(nextAccountKey) {
+      const next = String(nextAccountKey || 'guest');
+      if (next !== accountKey) {
+        accountKey = next;
+        generation += 1;
+      }
+      return capture();
+    },
+    begin() {
+      generation += 1;
+      return capture();
+    },
+    capture,
+    invalidate() { generation += 1; },
+    isCurrent(token) {
+      return !!token && token.accountKey === accountKey && token.generation === generation;
+    },
+  };
+}
+
+function ActivityInboxButton({ guest, accountKey, onLogin }) {
   const { useEffect, useRef, useState } = React;
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState({ items: [], unreadCount: 0 });
@@ -26,9 +51,16 @@ function ActivityInboxButton({ guest, onLogin }) {
   const closeRef = useRef(null);
   const markedResponseRef = useRef(null);
   const restoreFocusRef = useRef(true);
-  const unreadRequestRef = useRef(0);
-  const close = () => setOpen(false);
+  const requestGateRef = useRef(null);
+  if (!requestGateRef.current) requestGateRef.current = createActivityInboxRequestGate(accountKey);
+  const requestGate = requestGateRef.current;
+  requestGate.setAccount(accountKey);
+  const close = () => {
+    requestGate.invalidate();
+    setOpen(false);
+  };
   const openInbox = () => {
+    requestGate.invalidate();
     restoreFocusRef.current = true;
     setOpen(true);
   };
@@ -41,20 +73,21 @@ function ActivityInboxButton({ guest, onLogin }) {
   overlayBack(open, close);
 
   const loadCount = () => {
-    const request = ++unreadRequestRef.current;
+    const request = requestGate.capture();
     if (guest || !(DataStore.activityInbox && DataStore.activityInbox.unreadCount)) {
       setResult({ items: [], unreadCount: 0 });
       return;
     }
     Promise.resolve(DataStore.activityInbox.unreadCount())
       .then((count) => {
-        if (request !== unreadRequestRef.current) return;
+        if (!requestGate.isCurrent(request)) return;
         setResult((current) => ({ ...current, unreadCount: Math.max(0, Number(count) || 0) }));
       })
       .catch(() => {});
   };
 
   const load = () => {
+    const request = requestGate.begin();
     if (guest) {
       setResult({ items: [], unreadCount: 0 });
       setError(false);
@@ -65,26 +98,32 @@ function ActivityInboxButton({ guest, onLogin }) {
     setError(false);
     return Promise.resolve(DataStore.activityInbox.list())
       .then((next) => {
+        if (!requestGate.isCurrent(request)) return null;
         const safe = {
           items: Array.isArray(next && next.items) ? next.items : [],
           unreadCount: Math.max(0, Number(next && next.unreadCount) || 0),
         };
-        unreadRequestRef.current += 1;
         markedResponseRef.current = null;
         setResult(safe);
         return safe;
       })
       .catch((loadError) => {
+        if (!requestGate.isCurrent(request)) return null;
         setError(true);
         throw loadError;
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (requestGate.isCurrent(request)) setLoading(false); });
   };
 
   useEffect(() => {
+    setResult({ items: [], unreadCount: 0 });
+    setError(false);
+    setLoading(false);
+    markedResponseRef.current = null;
     loadCount();
-    return () => { unreadRequestRef.current += 1; };
-  }, [guest]);
+    return () => { requestGate.invalidate(); };
+  }, [guest, accountKey]);
+  useEffect(() => () => { requestGate.invalidate(); }, []);
   useEffect(() => {
     if (!open) return undefined;
     load().catch(() => {});
@@ -92,7 +131,7 @@ function ActivityInboxButton({ guest, onLogin }) {
     return () => {
       if (restoreFocusRef.current) requestAnimationFrame(() => { if (triggerRef.current) triggerRef.current.focus(); });
     };
-  }, [open, guest]);
+  }, [open, guest, accountKey]);
 
   const trapDialogFocus = (event) => {
     if (event.key === 'Escape') {
@@ -122,22 +161,27 @@ function ActivityInboxButton({ guest, onLogin }) {
     if (!keys.length || markedResponseRef.current === responseIdentity) return undefined;
     const frame = requestAnimationFrame(() => {
       markedResponseRef.current = responseIdentity;
-      unreadRequestRef.current += 1;
+      const request = requestGate.capture();
       const markedKeys = new Set(keys);
       Promise.resolve(DataStore.activityInbox.markSeen(keys))
-        .then((marked) => setResult((current) => ({
-          ...current,
-          items: current.items.map((item) => markedKeys.has(item.eventKey) ? { ...item, isUnread: false } : item),
-          unreadCount: Math.max(0, Number(marked && marked.unreadCount) || 0),
-        })))
-        .catch(() => { markedResponseRef.current = null; });
+        .then((marked) => {
+          if (!requestGate.isCurrent(request)) return;
+          setResult((current) => ({
+            ...current,
+            items: current.items.map((item) => markedKeys.has(item.eventKey) ? { ...item, isUnread: false } : item),
+            unreadCount: Math.max(0, Number(marked && marked.unreadCount) || 0),
+          }));
+        })
+        .catch(() => { if (requestGate.isCurrent(request)) markedResponseRef.current = null; });
     });
     return () => cancelAnimationFrame(frame);
-  }, [open, guest, loading, error, result.items]);
+  }, [open, guest, accountKey, loading, error, result.items]);
 
   const openItem = async (item) => {
+    const request = requestGate.capture();
     try {
       const fresh = await DataStore.activityInbox.list();
+      if (!requestGate.isCurrent(request)) return;
       const current = (fresh.items || []).find((candidate) => candidate.eventKey === item.eventKey);
       if (!current) {
         setResult(fresh);
@@ -150,7 +194,7 @@ function ActivityInboxButton({ guest, onLogin }) {
         handoff(() => window.RG_openProfile(current.actor.handle));
       }
     } catch (e) {
-      setError(true);
+      if (requestGate.isCurrent(request)) setError(true);
     }
   };
 
@@ -217,5 +261,6 @@ function ActivityInboxButton({ guest, onLogin }) {
   );
 }
 
+window.createActivityInboxRequestGate = createActivityInboxRequestGate;
 window.activityInboxCopy = activityInboxCopy;
 window.ActivityInboxButton = ActivityInboxButton;

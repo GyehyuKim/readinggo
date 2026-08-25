@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -12,6 +13,7 @@ const local = read('docs/readinggo/js/datastore.js');
 const ui = read('docs/readinggo/js/activity-inbox.js');
 const app = read('docs/readinggo/js/app.js');
 const main = read('docs/readinggo/main.js');
+const createRequestGate = vm.runInNewContext(`${ui.slice(0, ui.indexOf('function ActivityInboxButton'))}\ncreateActivityInboxRequestGate`);
 
 function domain(source, name, nextName) {
   const start = source.indexOf(`${name}: {`);
@@ -79,10 +81,29 @@ test('DataStore adapters have parity and guest adapter is empty/no-op with no RP
   assert.doesNotMatch(localDomain, /rpc\(|fetch\(/);
 });
 
+test('request gate rejects stale list, mark and cross-account responses', () => {
+  const gate = createRequestGate('user-a');
+  const firstList = gate.begin();
+  const firstMark = gate.capture();
+  const reopenedList = gate.begin();
+  assert.equal(gate.isCurrent(firstList), false);
+  assert.equal(gate.isCurrent(firstMark), false);
+  assert.equal(gate.isCurrent(reopenedList), true);
+
+  gate.invalidate();
+  assert.equal(gate.isCurrent(reopenedList), false);
+  const userARequest = gate.begin();
+  gate.setAccount('user-b');
+  assert.equal(gate.isCurrent(userARequest), false);
+  assert.equal(gate.isCurrent(gate.capture()), true);
+});
+
 test('같이읽기 header action and sheet preserve guest/error/empty/rendered-key behavior', () => {
   assert.match(main, /import '\.\/js\/activity-inbox\.js'/);
   assert.match(app, /activeTab === 'social'[\s\S]+ActivityInboxButton/);
   assert.match(app, /activityGuest = authUser === null \|\| authUser === 'local'/);
+  assert.match(app, /activityAccountKey = activityGuest \? 'guest' : String\(\(authUser && authUser\.id\)/);
+  assert.match(app, /ActivityInboxButton key=\{activityAccountKey\} guest=\{activityGuest\} accountKey=\{activityAccountKey\}/);
   assert.doesNotMatch(app, /activityGuest = window\.DataStore !== window\.SupabaseDataStore/);
   assert.match(ui, /width: 44, height: 44/);
   assert.match(ui, /읽지 않은 활동 \$\{unread\}개/);
@@ -97,7 +118,7 @@ test('같이읽기 header action and sheet preserve guest/error/empty/rendered-k
   assert.match(ui, /아직 새로운 활동이 없어요/);
   assert.match(ui, /활동을 불러오지 못했어요\. 다시 시도해주세요/);
   assert.match(ui, /requestAnimationFrame[\s\S]+markSeen\(keys\)/);
-  assert.match(ui, /unreadRequestRef[\s\S]+request !== unreadRequestRef\.current[\s\S]+unreadRequestRef\.current \+= 1/);
+  assert.match(ui, /createActivityInboxRequestGate[\s\S]+requestGate\.begin\(\)[\s\S]+requestGate\.isCurrent\(request\)/);
   assert.match(ui, /markedKeys\.has\(item\.eventKey\)[\s\S]+isUnread: false/);
   assert.match(ui, /DataStore\.activityInbox\.list\(\)[\s\S]+find\(\(candidate\) => candidate\.eventKey === item\.eventKey\)/);
   assert.match(ui, /지금은 볼 수 없는 활동이에요/);
