@@ -14,7 +14,7 @@
 |---|---|---|
 | **제품 코어** | [`onboarding.md`](./onboarding.md) | 첫 진입·책 등록·가입 여정. 책나무 세계관은 v18에서 보류 |
 |  | [`nest.md`](./nest.md) | 홈·읽기 계약과 보류된 둥지/책나무 이력 |
-|  | [`profile.md`](./profile.md) | 3번째 서재 목표·기존 프로필·책 상태·문장 탐색 |
+|  | [`profile.md`](./profile.md) | 3번째 서재 가로 탐색·프로필 월간 활동·책 상태·문장 탐색 |
 |  | [`feed.md`](./feed.md) | 피드·공개 문장·UGC 안전. 친구 책나무 표면은 보류 |
 |  | [`co-reading.md`](./co-reading.md) | 같이읽기 기능과 읽기방 |
 |  | [`companion.md`](./companion.md) | AI 독서 동반자 대화·완독 회고 |
@@ -112,7 +112,7 @@
 | 독려 넛지 | **콕찌르기** | DB `pokes`; 죄책감·상실 예고 금지 |
 | 같이 읽는 기능/공간 | **같이읽기 / 읽기방** | 내부 `social`, `rooms.*` 유지 가능. `숲`은 사용자 노출에서 폐기 |
 | AI 동반자 이름 | **TBD** | 결정 전 런타임 `Jacky / 재키` 유지 |
-| 하단 탭 | **홈 / 같이읽기 / 서재 / [4번째 명칭 TBD] / 설정** | canonical `library`; legacy `nest-grow`는 전환기 alias. `내활동`은 working label |
+| 하단 탭 | **홈 / 같이읽기 / 서재 / 프로필 / 설정** | canonical `library`; legacy `nest-grow`는 전환기 alias |
 
 > v8~v16의 XP 기반 둥지·성·완성 둥지 계약은 v17이 대체했고, v18은 v17의 책나무 사용자 표면을 다시 보류한다. 기록 비손실·XP 폐기·최근 14일 리듬·누적 성장일은 유지한다. [결정 이력](./meta/decisions.md)을 따른다.
 
