@@ -2,7 +2,7 @@
 
 > ## ⚠️ ARCHIVE — 아래 §0~§6 매트릭스는 히스토리컬 (정본 아님, 2026-06-01)
 > Phase·스택의 **정본은 [`specs/README.md` §3](./specs/README.md)** + [`CLAUDE.md` Stack Lock](../../CLAUDE.md)다. 아래 표는 v5.1 기준이라 다수 항목이 폐기/이동됐고 **참고용으로만** 남긴다.
-> **v17 추가 경계:** XP·둥지 진화·성·스트릭 상실 UX·전체 공개 피드는 활성 목표가 아니다. 사용자당 책나무 1그루·책당 가지 1개·저장 문장당 잎 1장과 최근 14일 리듬·누적 성장일은 `specs/README.md`·`nest.md`·`systems.md`를 따른다.
+> **v18 경계:** XP·둥지 진화·성·스트릭 상실 UX·전체 공개 피드는 활성 목표가 아니다. 책·문장 기록, 최근 14일 리듬·누적 성장일은 `specs/README.md`·`nest.md`·`systems.md`를 따른다.
 >
 > **v8 반전 (2026-06, 런칭 결정)**: **Capacitor 채택 — iOS+Android 앱스토어 출시**(선행 = Vite 전환 완료 #871). 아래 "Phase 3 보류/web-first" 문구는 **해제됨**. OCR도 웹 기반 허용(#972 이후). STT만 여전히 Phase 3.
 >

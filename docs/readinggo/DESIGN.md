@@ -9,7 +9,7 @@
 
 ## ReadingGo Feeling Guardrail
 
-> **ReadingGo는 생산성 대시보드가 아니라, 다시 책으로 돌아오게 하는 따뜻한 서재다.** 책과 문장이 한 그루 책나무에 조용히 쌓이는 감각을 우선한다. 모든 시각·카피·인터랙션 결정은 이 감성을 먼저 통과한다. (상세는 아래 Product Context · Aesthetic Direction.)
+> **ReadingGo는 생산성 대시보드가 아니라, 다시 책으로 돌아오게 하는 따뜻한 서재다.** 책과 문장이 차분히 쌓이고 다시 발견되는 감각을 우선한다. 모든 시각·카피·인터랙션 결정은 이 감성을 먼저 통과한다. (상세는 아래 Product Context · Aesthetic Direction.)
 
 | Always | Avoid |
 |---|---|
@@ -23,7 +23,7 @@
 
 > 아래는 **항상 적용**되는 코드 레벨 규칙이며, `tests/spec-align/design_lint.py` 가 `js/*.js`·`index.html` 을 스캔해 위반을 자동 탐지한다(이모지·raw hex·ghost·라운딩 = `exit 1`). 새 UI 코드는 예외 없이 지킨다. 상세 근거는 아래 'Color'·'Typography'·'Layout & 버튼 위계' 섹션.
 
-- ❌ **기능 UI 이모지 금지** (📖 📚 📦 📸 📷 🔍 🔎 🔖 ✍️ ✏️ ⚙️ ✕ 🗑 🏠 ❤️ 등) → `RG_ICONS` + `rgIcon('name')` 모노라인 SVG(`icons.js`)로 통일. 현행 둥지 단계·컴패니언 동물 이모지는 레거시 as-built 예외일 뿐 신규 책나무 UI의 정본이 아니다. 책나무 탭 아이콘은 20px·24px 실기 비교와 승인 전 확정하지 않는다.
+- ❌ **기능 UI 이모지 금지** (📖 📚 📦 📸 📷 🔍 🔎 🔖 ✍️ ✏️ ⚙️ ✕ 🗑 🏠 ❤️ 등) → `RG_ICONS` + `rgIcon('name')` 모노라인 SVG(`icons.js`)로 통일. 현행 둥지 단계·컴패니언 동물 이모지는 레거시 as-built 예외이며 신규 UI의 정본이 아니다.
 - ⭐ **평점 별은 이모지(⭐) 대신 `★`/`☆` 글리프** — 색·크기를 CSS로 제어하고 플랫폼 렌더 편차를 없앤다.
 - ❌ **raw hex 색값 금지** (`color:'#1a9e5a'`, `background:'#0B0D10'` 등) → `var(--token)`(`--brand`·`--ink`·`--line` 등 `:root` 토큰). `#fff`/`#000` 중립색과 OAuth 브랜드색(`#FEE500`/`#191919`)은 예외. 데이터 팔레트 파일(`data.js`·`datastore*.js`·`icons.js`)도 예외.
 - **Border radius = 12 / 16 / 18 만** → `var(--r-sm)` / `var(--r-md)` / `var(--r-lg)`. 그 외 정수 라운딩 금지(pill `50`/`999` 는 예외).
@@ -33,7 +33,7 @@
 
 ## Product Context
 
-- **무엇:** 하루 한 페이지·한 문장의 낮은 마찰로 독서를 이어가고, 책과 문장을 한 그루 책나무로 보여주는 독서 습관 앱
+- **무엇:** 하루 한 페이지·한 문장의 낮은 마찰로 독서를 이어가고, 책과 문장을 서재와 개인 활동에서 되찾게 하는 독서 습관 앱
 - **누구:** 책을 더 꾸준히 읽고 싶은 사람 (습관이 안 잡힌 독자)
 - **카테고리:** 독서 트래커 × 습관 형성. 인접 제품 — StoryGraph·Literal.club(진중), Fable(활기), Finch(젠틀 습관)
 - **타입:** 모바일-퍼스트 반응형 웹앱 (Phase 0/1 순수 웹)

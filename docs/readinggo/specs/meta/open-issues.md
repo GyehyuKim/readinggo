@@ -86,23 +86,23 @@
 
 ### 13.7 v17 후속과 v18 서재 전환 게이트 (#1515)
 
-v18은 책나무 사용자 표면만 보류하고 v17의 기록 비손실·XP/둥지 폐기·홈 독서 루프·공개범위·배포 안전 계약은 유지한다. 아래 항목은 **유지 / 보류 / 별도 진행**을 섞지 않고 추적한다. 구현 계획에서 미정 숫자·카피·스키마를 임의로 채우지 않는다.
+v18은 레거시 사용자 표면만 보류하고 v17의 기록 비손실·XP/둥지 폐기·홈 독서 루프·공개범위·배포 안전 계약은 유지한다. 아래 항목은 **유지 / 보류 / 별도 진행**을 섞지 않고 추적한다. 구현 계획에서 미정 숫자·카피·스키마를 임의로 채우지 않는다.
 
 | 항목 | v18 상태 | 남은 결정·증거 | 차단 범위 |
 |---|---|---|---|
 | 3번째 서재 탭 (#1515·#1520) | **구현 결정 완료**: 기존 상태별 카드를 유한 가로 `scroll-snap` 레일로 표시. 0권 빈 상태·1권 단일 카드·실제 시작/끝·명시적 활성 책 변경 보존 | 실제 대량 도서에서 지연이 측정될 때만 windowing·pagination·preload 수치를 별도 결정 | 가로 flick 코드·DEV 검증 |
 | 4번째 프로필 활동 (#1520) | **구현 결정 완료**: 명칭·route는 프로필/`profile`. 세션 날짜+내 문장 로컬 날짜 합집합의 월간 캘린더, 현재 연속일·선택 월 최장 연속일을 비징벌적으로 표시 | 책 표지·대표 책·하루 여러 책 상세는 이번 slice OUT이며 별도 사용자 요구 때 결정 | 월간 캘린더 코드·DEV 검증 |
 | 게스트 서재 이관 | 문장 있는 책과 `pending.book` 중심의 현행 이관을 전체 상태·위시리스트로 확대 필요 | 빈/혼합 상태, 문장 없는 책, 멱등 재시도, 부분 실패, active ID 치환, 성공 전 로컬 원본 보존 테스트 | 서재 탭 전환 |
-| 책나무 탭 아이콘 (#1453) | **보류**. Lucide `book-open`·`sprout`·`tree-deciduous` 시안과 논의 이력 보존 | 책나무 재검토 시 20px·24px, 활성/비활성·light/dark·Android 조건에서 재개 | 현재 서재 IA·데이터 구현을 차단하지 않음 |
+| 레거시 탭 아이콘 (#1453) | **종료**. Lucide `book-open`·`sprout`·`tree-deciduous` 시안은 결정 이력일 뿐 제품 후보가 아님 | 책나무·레거시 탭용 자산·flag·route 재개 없음 | 없음 |
 | 캐릭터 이름 (#1455) | 이름 결정 보류, `Jacky / 재키` 유지 | Judy·Jerome 논의, 후보 의도·권리/혼동 조사, 동일 조건 비교 | 새 이름 반영만 차단. 다른 v17 구현은 가능 |
-| 기존 사용자 공개범위 (#1456) | **UI 보류 / 안전 계약 유지**. 친구 책나무 자동 활성화는 v18에서 실행하지 않되, 전체 opt-out과 비공개 확대 금지는 유지 | 친구 책나무 재개 시 고지 문구·효력일·설정 위치·철회 전파·캐시 무효화·`wishlist_public` 처리·rollback 증거를 다시 승인 | 친구 책나무 Production 재활성화 |
-| 문장 공개범위 구버전 호환 | `followers`/알 수 없는 값의 `public` 확대 금지. **5-A** 최소 지원 버전 강제 원칙 유지 | `friends` alias 정규화 위치, fail-closed 방식, 구 APK 왕복·업데이트 차단 테스트 | 새 문장 공개범위와 향후 친구 기능 출시 |
+| 기존 사용자 공개범위 (#1456) | **책나무 UI 종료 / 안전 계약 유지**. 기존 visibility·`wishlist_public`을 확대·재작성하지 않고 unknown은 private fail-closed | retained 피드·프로필·활동함의 역할별 RLS/API 회귀와 구 client round-trip만 검증 | base RLS 축소와 공개범위 migration |
+| 문장 공개범위 구버전 호환 | `followers`/알 수 없는 값의 `public` 확대 금지. **5-A** 최소 지원 버전 강제 원칙 유지 | `friends` alias 정규화 위치, fail-closed 방식, 구 APK 왕복·업데이트 차단 테스트 | retained 문장 공개범위와 base RLS 축소 |
 | 문장 1,000자 정렬 (#1457) | PR #1466·#1470 merge, DEV DB migration 53 적용, `public\|followers\|private` 경계 transaction과 게스트 live UI 절단 저장 검증 완료 | 로그인 사용자 DEV 웹·Android 저장/재조회·수정·삭제, Production migration 순서·rollback, 동일 SHA 승격 후 E2E | 1,000자 계약의 Production 승격. 저작권 재검토와 #1463은 비게이트 |
 | 권리자 takedown 운영 (#1463) | 현재 규모에서는 기존 문의 이메일과 관리자 수동 비공개·삭제를 최소 대응으로 사용. 전용 상태 시스템·이의 절차·자동 전 표면 검증은 후순위 운영 백로그 | 반복 요청, 공개량·활성 사용자·영리성 증가, 수동 처리 누락·지연이 실제로 나타나면 접수 폼·상태 전이·감사 기록·캐시 비노출 E2E를 재검토 | 1,000자 계약과 일반 DEV·Production 배포를 차단하지 않음. 크롤 seed 확대·상용화 시 별도 위험 검토 |
 | 레거시 배포 workflow 드리프트 (#1464) | 정상 경로는 stable DEV→동일 SHA 수동 Production 승격. `deploy-verify`는 수동 전용이지만 직접 rollback 계약이 충돌하고 OTA 상단 주석도 실제 trigger와 다름 | workflow 제거·재설계, 자동 rollback 제거, test/OTA 주석 정렬, rollback receipt 검증 | 레거시 workflow 수동 실행과 OTA 운영. 이 spec-only PR 머지는 비차단 |
-| base RLS·구 APK 컷오버 | **5-A** 제한 view/RPC·신규 앱 선배포→최소 버전 미만 차단→broad `ub_sel` 소유자 전용 축소. 보안 rollback으로 broad 정책 복원 금지 | 버전별 직접 조회 인벤토리, OTA/스토어 수신·호출 증거, 정확한 최소 버전, 구버전 실패·rollback 테스트 | base RLS 축소와 친구 책나무 Production 활성화 |
+| base RLS·구 APK 컷오버 | **5-A** retained surface의 최소 view/RPC·신규 앱 선배포→최소 버전 미만 차단→broad `ub_sel` 소유자 전용 축소. 책나무 전용 API는 이관하지 않고 제거하며 보안 rollback으로 broad 정책 복원 금지 | 버전별 직접 조회 인벤토리, OTA/스토어 수신·호출 증거, 정확한 최소 버전, 구버전 실패·rollback 테스트 | base RLS 축소와 retained surface 안전성 |
 | XP·만회 물리 삭제 (#1452·#1453) | 구 APK 미지원. 앱·DataStore·분석 참조 제거 후 DEV 백업·drop·schema readback 검증 | production module graph·운영 참조 0, migration digest, 백업·rollback, 동일 SHA DEV 증거 | Hyu 승인 후 Production 컬럼·RPC 삭제 |
-| 재독 회차 스키마 | **3-A** 책당 `user_book`·가지 하나 + `reading_rounds` 명시 회차. 기존 문장 `reading_round_id=NULL` 무손실 보존 | 정확한 컬럼·FK·상태 전이, 신규 문장 귀속, 구 앱 호환, migration·rollback 테스트 | 회차별 UI·DB migration |
+| 재독 회차 스키마 | **3-A** 책당 `user_book` 하나 + `reading_rounds` 명시 회차. 기존 문장 `reading_round_id=NULL` 무손실 보존 | 정확한 컬럼·FK·상태 전이, 신규 문장 귀속, 구 앱 호환, migration·rollback 테스트 | 회차별 UI·DB migration |
 
 ### 13.8 공개 문장 누적 저작권 위험 — 수용·추후 검토
 

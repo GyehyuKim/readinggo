@@ -157,7 +157,7 @@ OCR 분석은 원문을 수집하지 않고 성공·실패와 surface 수준의 
 
 ### 3.1.3 서재·개인 활동 측정 계약 (v18, 후보)
 
-책나무·친구 책나무 이벤트는 신규 활성 계약이 아니다. 서재 이벤트명·property·bucket·대시보드명도 구현 이슈에서 개인정보·표본·운영 필요를 다시 승인하기 전에는 **후보**다. 검색어·책 제목·문장 원문·개인 메모·정확한 활동 날짜를 분석에 보내지 않는다.
+폐기된 제품 표면의 이벤트는 신규 활성 계약이 아니다. 서재 이벤트명·property·bucket·대시보드명도 구현 이슈에서 개인정보·표본·운영 필요를 다시 승인하기 전에는 **후보**다. 검색어·책 제목·문장 원문·개인 메모·정확한 활동 날짜를 분석에 보내지 않는다.
 
 | 상태 | 이벤트 후보 | 발화 시점 | 허용 속성 | 금지 속성 |
 |---|---|---|---|---|
@@ -171,19 +171,11 @@ OCR 분석은 원문을 수집하지 않고 성공·실패와 surface 수준의 
 | 현행 유지 | `sentence_added` | 문장 영속 성공 뒤 | 기존 승인 속성 | 문장 원문·개인 메모 |
 
 - `library_carousel_navigated`는 성능 telemetry가 아니라 사용자 상호작용 후보 이벤트다. frame drop·decode·메모리는 실기기 성능 프로파일과 집계 가능한 기술 지표로 별도 검증하며 원시 pointer/touch 로그를 수집하지 않는다.
-- `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`, `book_tree_*`, `friend_book_tree_*`는 과거 데이터에서만 legacy로 취급한다. 새 번들의 이벤트 상수·호출·속성 정의와 WAU·리텐션·v18 퍼널에서 제외한다.
+- `xp_earned`, `streak_broken`, `streak_repair_shown`, `streak_repaired`, `streak_repair_skipped`, `nest_tab_viewed`, `nest_growth_guide_opened`, `nest_completion_viewed`와 폐기된 표면 전용 이벤트는 과거 데이터에서만 legacy로 취급한다. 새 번들의 이벤트 상수·호출·속성 정의와 WAU·리텐션·v18 퍼널에서 제외한다.
 - 기존 저장 이벤트 이름을 소급 변경하지 않는다. 과거 리포트는 `release_sha`·`schema_version`·컷오버 시각으로 재현한다.
 - XP 물리 삭제는 구 APK 버전 분포나 legacy 호출 소멸 telemetry를 기다리지 않는다. Production module graph·운영 쿼리에서 참조 0, DEV 백업·drop migration·schema readback 성공을 증거로 삼는다.
 - 성장일은 분석 이벤트 합계가 아니라 권위 DB의 distinct local date에서 계산한다. 4번째 탭 명칭·달력 셀·대표 책·스트릭 규칙이 승인되기 전에는 새 활동 KPI를 확정하지 않는다.
 - Production 적용은 검증된 동일 SHA와 migration digest를 제시한 뒤 Hyu 승인을 받는다.
-
-#### v17 친구 책나무 이벤트 — 보류 이력
-
-아래 이름은 이미 구현된 DEV 이벤트와 과거 분석 재현을 위해 문서에 남긴다. v18 신규 KPI·퍼널에는 포함하지 않고, 친구 책나무 UI가 보류된 동안 새 호출을 추가하지 않는다.
-
-- `friend_book_tree_viewed`: 제한 RPC 성공 후 렌더 1회. 과거 허용 속성은 `branch_count_bucket`, `visible_leaf_count_bucket`, `entry_point`였다.
-- `friend_book_tree_branch_opened`: 가지 열기. 과거 허용 속성은 `book_status`, `leaf_count_bucket`, `entry_point`였다.
-- 두 이벤트 모두 사용자 ID·핸들·정확한 개수·책 제목·문장 원문·비공개 문장 존재·공개범위 판정 이유를 보내지 않는다.
 
 ### 3.1.4 과거 둥지 측정 이력 (#1308, superseded)
 
