@@ -656,7 +656,7 @@ inquiries                                   -- v7.2 신설 (09_inquiries.sql) �
 > **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md` 계약이 합의된 후속 이슈에서 확정된 뒤 `pause_log` 류 테이블을 본 절에 추가.
 
 JSONB 사용:
-- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public", "personalized_context": {"policy_version": "2026-08-25", "enabled": false, "accepted_at": null, "revoked_at": null, "excluded_sources": []}}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). `personalized_context`의 동의·철회 시각은 DB/Worker server time 정본이며 제외 목록은 `{type:'sentence'|'note'|'qa', id:uuid}`만 허용한다. 이 제어 metadata는 기록 원문 복사·새 profile이 아니다. 알림은 Phase 2 PWA 이후 실동작.
+- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public", "personalized_context": {"policy_version": "2026-08-25", "enabled": false, "generation": 0, "revoke_pending_generation": null, "accepted_at": null, "revoked_at": null, "excluded_sources": []}}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). `personalized_context`의 generation은 계정별 단조 증가 정수이고 동의·철회 시각은 DB/Worker server time 정본이며, `revoke_pending_generation`은 해당 OFF generation의 drain 직렬화에만 쓴다. 제외 목록은 `{type:'sentence'|'note'|'qa', id:uuid}`만 허용한다. 이 제어 metadata는 기록 원문 복사·새 profile이 아니다. 알림은 Phase 2 PWA 이후 실동작.
 - 그 외 관계형 컬럼. JSON 남발 금지.
 
 ### 7.4 인덱스
@@ -820,7 +820,7 @@ Phase 0 (localStorage, `rg_v41`):
 **동의·계정 동기화**
 
 - `users.settings.personalized_context.policy_version='2026-08-25'`이고 `enabled=true`, `accepted_at`이 server timestamp이며 `revoked_at=null`일 때만 active다. 키 없음·형식 오류·버전 불일치·동의 저장 실패는 OFF다. 기존 `RG_consent=yes`, 대화 아카이브, 공개 문장 또는 프리셋 선택으로 채우지 않는다.
-- 최초 opt-in과 재동의는 `accepted_at=server_now`, `revoked_at=null`과 새 단조 증가 consent generation을 기록한다. 철회는 **먼저** `enabled=false`, `revoked_at=server_now`, generation 증가를 원자 저장해 신규 dispatch lease를 차단한 뒤, 이전 generation의 lease를 취소 요청하고 모두 해제될 때까지 서버에서 drain한다. active lease가 0임을 확인한 뒤에만 철회 성공을 응답한다. timeout·worker 장애·lease 해제 불확실 상태는 완료가 아니라 `pending`/실패로 응답하되 OFF 상태와 신규 lease 차단은 유지한다. lease를 TTL만으로 성공 처리하지 않는다. 과거 동의/철회 감사가 법무상 필요하면 별도 최소 audit 승인을 받으며 원문·prompt·retrieval 결과 이력은 만들지 않는다.
+- 최초 opt-in과 재동의는 `accepted_at=server_now`, `revoked_at=null`과 새 단조 증가 consent generation을 기록한다. 단, `revoke_pending_generation`이 있으면 재동의를 직렬화해 `409 revoke_pending`으로 거부하며 새 generation이나 lease를 만들지 않는다. 철회는 **먼저** `enabled=false`, `revoked_at=server_now`, generation 증가, `revoke_pending_generation=그 OFF generation`을 원자 저장해 신규 dispatch lease를 차단한 뒤, 이전 generation의 lease를 취소 요청하고 모두 해제될 때까지 서버에서 drain한다. active lease 0 뒤에는 `generation=해당 OFF generation AND enabled=false AND revoke_pending_generation=해당 OFF generation`을 조건으로 CAS finalize하고 pending을 지운 경우에만 그 generation의 철회 성공을 만든다. CAS 실패·다른 generation 관측은 `superseded`, timeout·worker 장애·lease 해제 불확실 상태는 완료가 아니라 `pending`/실패로 응답하되 OFF 상태와 신규 lease 차단은 유지한다. lease를 TTL만으로 성공 처리하지 않는다. 성공 응답은 OFF generation을 포함하고 클라이언트는 authoritative settings를 즉시 readback해 같은 OFF generation일 때만 `철회 완료`를 표시한다. 이미 더 최신 generation이면 과거 응답을 성공 UI로 적용하지 않는다. 과거 동의/철회 감사가 법무상 필요하면 별도 최소 audit 승인을 받으며 원문·prompt·retrieval 결과 이력은 만들지 않는다.
 - 로그인 시 server settings가 모든 기기의 정본이다. 새 기기·재설치도 계정 값을 복원하고, 오프라인에서 임의로 ON으로 전환하지 않는다. 철회 시작 즉시 메모리 manifest·진행 중 결과를 폐기하고, UI는 drain 성공 전 `철회 처리 중`으로 표시하며 완료로 단정하지 않는다. 로그아웃 시 로컬 동의 cache·source manifest를 지우며 다른 계정으로 승계하지 않는다. 게스트는 기능 설명과 로그인 경로만 제공하고 opt-in 상태를 로컬에 저장하지 않는다.
 
 **조회·RLS/권한**
@@ -831,7 +831,7 @@ Phase 0 (localStorage, `rg_v41`):
 
 **검증·배포 게이트**
 
-- API/DB 테스트: 무 bearer·만료/위조 bearer, body `user_id` 주입, A 사용자의 A private/public/note/Q&A, A bearer의 B record ID, 삭제/제외, missing·malformed·old policy, opt-in/철회/재동의, 두 기기 복원, 로그아웃/계정 전환, 0/1/5/6건을 포함한다. 1,999/2,000/2,001 Unicode 경계는 본문만이 아니라 label·separator·제목·저자·쪽수·날짜·상태·preview를 포함한 canonical provider-bound block으로 emoji/결합문자까지 검증한다. 동의 확인 직후 타 기기 철회 race에서는 신규 lease가 거부되고, 이미 획득한 lease는 release 전 철회 성공 0건, drain 뒤 성공, timeout은 pending이며 성공 응답 뒤 provider 전송 0건임을 결정적으로 검증한다.
+- API/DB 테스트: 무 bearer·만료/위조 bearer, body `user_id` 주입, A 사용자의 A private/public/note/Q&A, A bearer의 B record ID, 삭제/제외, missing·malformed·old policy, opt-in/철회/재동의, 두 기기 복원, 로그아웃/계정 전환, 0/1/5/6건을 포함한다. 1,999/2,000/2,001 Unicode 경계는 본문만이 아니라 label·separator·제목·저자·쪽수·날짜·상태·preview를 포함한 canonical provider-bound block으로 emoji/결합문자까지 검증한다. 동의 확인 직후 타 기기 철회 race에서는 신규 lease가 거부되고, 이미 획득한 lease는 release 전 철회 성공 0건, drain 뒤 성공, timeout은 pending이며 성공 응답 뒤 provider 전송 0건임을 결정적으로 검증한다. gen1 ON/lease → gen2 revoke pending → 재동의 409·새 lease 0 → gen1 release → gen2 OFF CAS finalize 순서를 고정 검증하고, CAS에 다른 generation을 주입한 stale revoke는 성공이 아닌 `superseded`, 응답 readback이 다른 generation이면 완료 UI 0건이어야 한다.
 - 보안 기대값은 타인 record가 존재/부재해도 동일한 404/빈 결과이며 본문·개수·오류 차이 누출 0이다. 테스트 로그와 fixture는 합성 데이터만 쓴다.
 - DEV route·migration·feature flag와 합성 검증은 허용한다. #1373의 OFF/ON UAT 인수 전 Production route/flag는 fail-closed OFF이며, Production migration·실사용자 opt-in·배포 승격을 실행하지 않는다.
 
