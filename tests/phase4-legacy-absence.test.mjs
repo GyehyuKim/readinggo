@@ -34,9 +34,11 @@ function productionModuleGraph(entry) {
   return [...seen];
 }
 
-test('production graph keeps nest-grow as the internal book-tree route without legacy modules', () => {
+test('production graph keeps library canonical while nest-grow remains alias-only and legacy modules stay absent', () => {
   const app = read(path.join(jsRoot, 'app.js'));
-  assert.match(app, /activeTab === 'nest-grow'[\s\S]*BookTreeHomeView/);
+  assert.match(app, /tab === 'nest-grow' \? 'library' : tab/);
+  assert.match(app, /activeTab === 'library'[\s\S]*mode="library"/);
+  assert.doesNotMatch(app, /activeTab === 'nest-grow'[\s\S]*BookTreeHomeView/);
 
   const graph = productionModuleGraph(path.join(appRoot, 'main.js'));
   const relativeGraph = graph.map((file) => path.relative(appRoot, file));

@@ -755,10 +755,10 @@ function App() {
   const [companionSentence, setCompanionSentence] = useState(null);
   // #1070: 두 번째 인자로 진입 모드 지정 — { mode: 'note'|'jacky' }. 카드 버튼이 문장별 선택을 전달(없으면 모달이 자체 추정).
   useEffect(() => { window.RG_openCompanion = (s, opts) => setCompanionSentence((opts && opts.mode) ? { ...s, _openMode: opts.mode } : s); return () => { window.RG_openCompanion = null; }; }, []);
-  // 재키 캡 CTA(#1409): 책장 탭으로 이동한 뒤 해당 책 상세(문장·Q/A 기록 포함)를 연다.
+  // 재키 캡 CTA(#1409): 서재 탭으로 이동한 뒤 해당 책 상세(문장·Q/A 기록 포함)를 연다.
   useEffect(() => {
     window.RG_openBookshelfRecord = (bookId) => {
-      setActiveTab('profile');
+      setActiveTab('library');
       if (bookId && window.RG_openBook) window.RG_openBook(bookId);
     };
     return () => { window.RG_openBookshelfRecord = null; };
@@ -1059,7 +1059,8 @@ function App() {
   }, [_supa, reviewMode]);
 
   const switchTab = useCallback((tab) => {
-    setActiveTab(tab);
+    const canonicalTab = tab === 'nest-grow' ? 'library' : tab;
+    setActiveTab(canonicalTab);
     // 스크롤 맨위로
     const main = document.querySelector('.main');
     if (main) main.scrollTop = 0;
@@ -1342,30 +1343,6 @@ function App() {
   // 활성 책 전환을 전역 노출 — 둥지 캐러셀(#185)이 호출
   useEffect(() => { window.RG_activateBook = handleActivateUserBook; return () => { window.RG_activateBook = null; }; }, [handleActivateUserBook]);
 
-  // 책나무 가지에서 활성 책을 고를 때는 기존 activeBook.set 쓰기를 UI 컴포넌트가
-  // 완료한 뒤 홈 입력 흐름이 참조하는 appState.book만 같은 user_book으로 맞춘다.
-  // 탭은 책나무에 남겨 선택 상세가 즉시 다시 렌더되게 한다.
-  const handleBookTreeActiveChange = useCallback((branch) => {
-    if (!branch || !branch.book) return;
-    setAppState(s => ({
-      ...s,
-      book: {
-        id: branch.book.id || branch.bookId,
-        ubId: branch.id,
-        title: branch.book.title || '책',
-        author: branch.book.author || '',
-        pub: '',
-        cur: branch.currentPage || 0,
-        total: branch.book.totalPages || 0,
-        days: 1,
-        cover: branch.book.coverUrl || '',
-        fb: ['#9AA7B2', '#C7D0D8'],
-        toc: [],
-      },
-    }));
-    showToast(`${branch.book.title || '책'} — 활성 책으로 변경`);
-  }, []);
-
   // 뒤로가기로 최상위 오버레이 닫기 (#1199, nav.js). 각 오버레이 상태가 열리면 합성 history
   // 엔트리를 push하고, 브라우저/OS 뒤로가기(모바일 Safari 엣지 스와이프)가 오면 최상위 하나만
   // 닫는다 — 실제 앱 히스토리/로그인 상태로 튕기지 않도록. 훅은 매 렌더 같은 순서로 호출.
@@ -1485,18 +1462,18 @@ function App() {
               state={appState}
             />
           )}
-          {activeTab === 'nest-grow' && (
-            <window.BookTreeHomeView
-              key="nest-grow"
-              dataStore={window.DataStore}
-              activeUserBookId={appState.book && appState.book.ubId}
-              onActiveBookChange={handleBookTreeActiveChange}
-              onOpenSearch={() => setIsSearchOpen(true)}
+          {activeTab === 'library' && (
+            <LibraryView
+              key="library"
+              mode="library"
+              state={appState}
+              onActivateUserBook={handleActivateUserBook}
             />
           )}
           {activeTab === 'profile' && (
             <LibraryView
-              key="library"
+              key="profile"
+              mode="profile"
               state={appState}
               onActivateUserBook={handleActivateUserBook}
             />
@@ -1508,7 +1485,7 @@ function App() {
           </ErrorBoundary>
         </main>
 
-        {/* 하단 탭바 — 내부 nest-grow 키는 호환을 위해 유지하고 사용자 라벨만 책나무로 전환. */}
+        {/* 하단 탭바 — v18 canonical 3번째 route는 library. nest-grow는 switchTab 입력 alias로만 유지. */}
         <nav className="tabbar">
           {[
             { id: 'nest', label: '홈', svg: (
@@ -1525,8 +1502,7 @@ function App() {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             )},
-            // 최종 책나무 아이콘 결정 전까지 기존 모노라인 책 아이콘을 중립 폴백으로 사용한다.
-            { id: 'nest-grow', label: '책나무', svg: window.rgIcon('book', 22) },
+            { id: 'library', label: '서재', svg: window.rgIcon('book', 22) },
             { id: 'profile', label: '프로필', svg: (
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4"/>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the active v17 book-tree route and Phase 4 legacy-absence contracts."""
+"""Verify the active v18 library route and preserved legacy-absence contracts."""
 
 import io
 import re
@@ -31,9 +31,11 @@ def check_absent(section: str, desc: str, files: list[str], pattern: str):
 
 def main() -> int:
     results = [
-        check_present("v17", "내부 nest-grow route는 BookTreeHomeView를 렌더", "app.js", r"activeTab === 'nest-grow'[\s\S]*BookTreeHomeView"),
-        check_present("v17", "책나무 selector/UI 모듈 노출", "book-tree-home-ui.js", r"window\.BookTreeHomeView\s*="),
-        check_present("v17", "홈 체크인·활성책 전환 유지", "nest.js", r"function\s+NestView\b[\s\S]*RG_activateBook"),
+        check_present("v18", "canonical library route는 서재 전용 mode를 렌더", "app.js", r"activeTab === 'library'[\s\S]*mode=\"library\""),
+        check_present("v18", "legacy nest-grow 입력은 library alias로 정규화", "app.js", r"tab === 'nest-grow' \? 'library' : tab"),
+        check_absent("v18", "책나무 route 사용자 표면 보류", ["app.js"], r"activeTab === 'nest-grow'"),
+        check_present("v17-history", "책나무 selector/UI 모듈 이력 보존", "book-tree-home-ui.js", r"window\.BookTreeHomeView\s*="),
+        check_present("v18", "홈 체크인·활성책 전환 유지", "nest.js", r"function\s+NestView\b[\s\S]*RG_activateBook"),
         check_absent("P4", "XP/둥지 진화 계산 제거", ["data.js", "nest.js", "app.js", "datastore.js", "datastore-supabase.js"], r"NEST_STAGES|NEST_CYCLE_XP|getNestStageByXp|nestXpProgress|nestCastleCount|XP_RULES|computeCheckinXp|grantXp"),
         check_absent("P4", "레거시 UI 모듈 제거", ["nest-theatre.js", "nest-grow.js", "streak-repair-copy.js"], r"."),
         check_absent("P4", "DataStore XP/성/만회 계약 제거", ["datastore.js", "datastore-supabase.js"], r"\bxp\s*:\s*\{|\bcastles\s*:\s*\{|repairStatus\s*\(|last_repair_date"),
