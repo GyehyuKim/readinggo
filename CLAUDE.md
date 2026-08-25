@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a course project folder for **BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습** (KAIST IMMS, Spring 2026, instructor: 이지수).
 
-The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가는 독서 습관 앱. **v18 목표**는 3번째 탭을 책나무에서 서재로 전환해 읽고 싶은 책·읽는 중·읽은 책·중단한 책을 하나의 연속 흐름에서 검색·필터·정렬하게 하는 것이다. 빠른 flick은 인접 표지 preload와 bounded rendering을 포함하며, 책을 넘기는 것만으로 활성 책을 바꾸지 않는다. 4번째 탭은 그날 읽은 책 중심의 개인 활동 방향으로 재검토하되 명칭·스트릭·달력 집계는 미정이다. 책=가지·문장=잎의 책나무와 친구 책나무 사용자 표면은 보류하지만 기록 비손실·최근 14일 리듬·누적 성장일·문장 공개범위·RLS 안전 계약은 유지한다. XP·둥지·성·방패·하루 만회 전용 표면은 구 APK 호환을 요구하지 않고 단계 삭제한다. 활성 정본은 `docs/readinggo/specs/README.md`, 데모 엔트리포인트는 `docs/readinggo/index.html`이다.
+The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가는 독서 습관 앱. **v18 목표**는 3번째 탭을 책나무에서 서재로 전환해 읽고 싶은 책·읽는 중·읽은 책·중단한 책을 하나의 연속 흐름에서 검색·필터·정렬하게 하는 것이다. 기존 카드는 유한한 가로 `scroll-snap` 레일로 빠르게 넘기며, 넘기기만으로 활성 책을 바꾸지 않는다. 4번째 탭은 **프로필**을 유지하고 사용자 로컬 기준 페이지 세션·내 문장 저장일의 합집합을 월간 활동 캘린더와 비징벌적 연속일 요약으로 보여준다. 책=가지·문장=잎의 책나무와 친구 책나무 사용자 표면은 보류하지만 기록 비손실·최근 14일 리듬·누적 성장일·문장 공개범위·RLS 안전 계약은 유지한다. XP·둥지·성·방패·하루 만회 전용 표면은 구 APK 호환을 요구하지 않고 단계 삭제한다. 활성 정본은 `docs/readinggo/specs/README.md`, 데모 엔트리포인트는 `docs/readinggo/index.html`이다.
 
 ## Governance — MANDATORY
 
