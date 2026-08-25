@@ -101,6 +101,13 @@ function extractFunction(source, name) {
 
 const sandbox = {};
 vm.createContext(sandbox);
+vm.runInContext(`${extractFunction(library, '_mapWish')}; ${extractFunction(library, '_mapUserBook')}; this.libraryMap = { _mapWish, _mapUserBook };`, sandbox);
+assert.equal(sandbox.libraryMap._mapUserBook({ status: 'completed', completed_at: '2026-08-20T00:00:00Z', started_at: '2026-07-01T00:00:00Z', updated_at: '2099-01-01T00:00:00Z', book: {} }).updatedAt, '2026-08-20T00:00:00Z',
+  '완독 사용자 책 최근순은 실제 completed_at을 사용해야 한다');
+assert.equal(sandbox.libraryMap._mapUserBook({ status: 'reading', started_at: '2026-08-18T00:00:00Z', updated_at: '2099-01-01T00:00:00Z', book: {} }).updatedAt, '2026-08-18T00:00:00Z',
+  '그 밖의 사용자 책 최근순은 실제 started_at을 사용해야 한다');
+assert.equal(sandbox.libraryMap._mapWish({ created_at: '2026-08-19T00:00:00Z', updated_at: '2099-01-01T00:00:00Z', book: {} }).updatedAt, '2026-08-19T00:00:00Z',
+  '관심 책 최근순은 실제 created_at을 사용해야 한다');
 const oldTz = process.env.TZ;
 process.env.TZ = 'Asia/Seoul';
 vm.runInContext(`${extractFunction(library, '_rgLocalDateKey')}; ${extractFunction(library, '_rgShiftDateKey')}; ${extractFunction(library, '_rgActivityStats')}; ${extractFunction(library, '_rgMonthCells')}; this.activity = { _rgLocalDateKey, _rgShiftDateKey, _rgActivityStats, _rgMonthCells };`, sandbox);

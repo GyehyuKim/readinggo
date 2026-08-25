@@ -149,7 +149,23 @@ function ReadingActivityCalendar({ quotes }) {
 // 위시 행 → 표시용 책 (#403). 양 어댑터 모두 {book_id, book} 객체 반환(로컬은 datastore에서 getBook 해소).
 function _mapWish(w) {
   const b = (w && w.book) || w || {};
-  return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish', updatedAt: w.updated_at || w.created_at || '' };
+  return { id: b.id || w.book_id, title: b.title || '', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: 0, status: 'wish', updatedAt: w.created_at || '' };
+}
+
+function _mapUserBook(ub) {
+  const b = ub.book || {};
+  return {
+    ubId: ub.id, id: ub.book_id,
+    title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '',
+    cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'],
+    total: b.total_pages || 0, isbn: b.isbn13 || '',
+    cur: ub.current_page || 0, status: ub.status,
+    rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at,
+    updatedAt: (ub.status === 'completed' ? ub.completed_at : ub.started_at) || '',
+    recap: ub.companion_recap || '',
+    description: (b.description || '').trim(),
+    source: b.source || '',
+  };
 }
 
 function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
@@ -249,21 +265,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
       .then(rows => { if (alive) setSavedCount((rows || []).filter(row => row && row.sentence).length); }).catch(() => {});
     Promise.resolve(DataStore.myBooks.list()).then(rows => {
       if (!alive) return;
-      setMyBooks((rows || []).map(ub => {
-        const b = ub.book || {};
-        return {
-          ubId: ub.id, id: ub.book_id,
-          title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '',
-          cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'],
-          total: b.total_pages || 0, isbn: b.isbn13 || '',
-          cur: ub.current_page || 0, status: ub.status,
-          rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at,
-          updatedAt: ub.updated_at || ub.completed_at || ub.started_at || ub.created_at || '',
-          recap: ub.companion_recap || '',   // 참새 완독 회고 캐시 (#352)
-          description: (b.description || '').trim(),   // 책 소개 DB 값 (#530) — 모달이 우선 사용, 없으면 알라딘 폴백
-          source: b.source || '',   // 소개 출처 (#642) — 'llm'이면 AI 작성 칩
-        };
-      }));
+      setMyBooks((rows || []).map(_mapUserBook));
     }).catch(() => { if (alive) setMyBooks([]); });
     Promise.resolve((DataStore.wishBooks && DataStore.wishBooks.list) ? DataStore.wishBooks.list() : []).then(rows => {
       if (!alive) return;
@@ -312,7 +314,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
         setWishlistBooks((rows || []).map(_mapWish));
       }).catch(() => {});
       Promise.resolve(DataStore.myBooks.list()).then(rows => {
-        setMyBooks((rows || []).map(ub => { const b = ub.book || {}; return { ubId: ub.id, id: ub.book_id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, updatedAt: ub.updated_at || ub.completed_at || ub.started_at || ub.created_at || '', recap: ub.companion_recap || '', description: (b.description || '').trim(), source: b.source || '' }; }));
+        setMyBooks((rows || []).map(_mapUserBook));
       }).catch(() => {});
     };
     window.addEventListener('rg:wish-changed', reload);
