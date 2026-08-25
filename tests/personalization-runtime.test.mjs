@@ -112,6 +112,24 @@ const delayedProof = await delayedProofPromise;
 assert.equal(lifecycle2.commit(delayedProof, { display: () => sinks.display++, store: () => sinks.store++, analytics: () => sinks.analytics++ }), false);
 assert.deepEqual(sinks, { display: 0, store: 0, analytics: 0 }, 'readback 지연 중 전환도 모든 sink 0');
 
+let revokePending = true;
+let finalizeCalls = 0;
+const recovery = createPersonalizationLifecycle({
+  auth: async () => ({ user: { id: A }, access_token: 'token-a' }),
+  rpc: async (name) => {
+    if (name === 'personalization_control_read') return { owner_id: A, enabled: false, consent_generation: 2, policy_version: '2026-08-25', revoke_pending_generation: revokePending ? 2 : null };
+    if (name === 'personalization_lease_count') return 0;
+    if (name === 'personalization_revoke_finalize') { finalizeCalls += 1; revokePending = false; return { status: 'finalized' }; }
+    throw new Error(`unexpected recovery rpc ${name}`);
+  },
+  fetcher: async () => { throw new Error('provider must not run during revoke recovery'); },
+});
+await recovery.refreshSession();
+const recovered = await recovery.readControl();
+assert.equal(finalizeCalls, 1, '앱 재시작 뒤 pending revoke를 정확히 한 번 finalize');
+assert.equal(recovered.revoke_pending_generation, null);
+assert.equal(recovered.enabled, false);
+
 const sql = readFileSync(new URL('../docs/readinggo/supabase/58_personalization_runtime.dev.sql', import.meta.url), 'utf8');
 for (const table of ['personalization_controls', 'personalization_source_exclusions', 'personalization_dispatch_leases']) {
   assert.match(sql, new RegExp(`revoke all on public\\.${table} from anon, authenticated`, 'i'), `${table} 직접 권한 없음`);

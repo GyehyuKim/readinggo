@@ -24,14 +24,21 @@ export function createPersonalizationLifecycle({ auth, rpc, fetcher, apiOrigin =
     setSession(session || null);
     return snapshot();
   }
-  async function readControl() {
+  async function readControl({ resumePending = true } = {}) {
     const captured = snapshot();
     if (!captured.ownerId) return null;
     const rows = await rpc('personalization_control_read', {});
     const row = Array.isArray(rows) ? rows[0] : rows;
     if (!same(captured, row && row.owner_id)) return null;
     control = row && row.policy_version === POLICY_VERSION ? row : null;
-    return control;
+    const pendingGeneration = Number(control && control.revoke_pending_generation || 0);
+    if (!resumePending || !pendingGeneration) return control;
+    const count = Number(await rpc('personalization_lease_count', { p_before_generation: pendingGeneration }));
+    if (!same(captured, captured.ownerId) || count > 0) return control;
+    const finalizedRows = await rpc('personalization_revoke_finalize', { p_generation: pendingGeneration });
+    const finalized = Array.isArray(finalizedRows) ? finalizedRows[0] : finalizedRows;
+    if (!same(captured, captured.ownerId) || !finalized || finalized.status !== 'finalized') return control;
+    return readControl({ resumePending: false });
   }
   async function optIn() {
     await refreshSession();
