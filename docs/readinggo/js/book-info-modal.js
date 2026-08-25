@@ -200,7 +200,7 @@ function BookInfoModal({ bookId, onClose }) {
                   const u = s.user || {};
                   return (
                     <SentenceCard key={s.id} bookId={bk.id} noBlind
-                      item={{ id: s.id, q: decodeEntities(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: <window.SparrowMark size={20} />,
+                      item={{ id: s.id, q: decodeEntities(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: window.rgIcon('user', 20),
                               page: s.page, time: '', claps: s.clapCount || 0, bookId: bk.id, bookTitle: '', isMine: false }} />
                   );
                 })}

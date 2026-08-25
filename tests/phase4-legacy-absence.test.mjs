@@ -34,15 +34,15 @@ function productionModuleGraph(entry) {
   return [...seen];
 }
 
-test('production graph keeps library canonical while nest-grow remains alias-only and legacy modules stay absent', () => {
+test('production graph keeps library canonical while retired routes and modules stay absent', () => {
   const app = read(path.join(jsRoot, 'app.js'));
-  assert.match(app, /tab === 'nest-grow' \? 'library' : tab/);
+  assert.doesNotMatch(app, /nest-grow|bookTree|BookTree|책나무/);
   assert.match(app, /activeTab === 'library'[\s\S]*mode="library"/);
-  assert.doesNotMatch(app, /activeTab === 'nest-grow'[\s\S]*BookTreeHomeView/);
+
 
   const graph = productionModuleGraph(path.join(appRoot, 'main.js'));
   const relativeGraph = graph.map((file) => path.relative(appRoot, file));
-  for (const legacy of ['js/nest-theatre.js', 'js/nest-grow.js', 'js/streak-repair-copy.js']) {
+  for (const legacy of ['js/nest-theatre.js', 'js/nest-grow.js', 'js/streak-repair-copy.js', 'js/book-tree-selector.js', 'js/book-tree-home-ui.js', 'js/friend-book-tree-view.js']) {
     assert.equal(fs.existsSync(path.join(appRoot, legacy)), false, `${legacy} must be physically removed`);
     assert.equal(relativeGraph.includes(legacy), false, `${legacy} must not be production-reachable`);
   }

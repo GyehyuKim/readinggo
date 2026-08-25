@@ -655,6 +655,7 @@ function App() {
   const [reviewPersona] = useState(() => RG_DEV_REVIEW_ENABLED && window.RG_DEV_REVIEW ? window.RG_DEV_REVIEW.current() : null);
   const [reviewPersonas, setReviewPersonas] = useState(null);
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [mascotReviewOpen, setMascotReviewOpen] = useState(false);
   const [authUser, setAuthUser] = useState(reviewMode ? 'local' : (_supa ? undefined : 'local')); // undefined=확인중, null=로그아웃(게스트), 그외=OK
   const [dataReady, setDataReady] = useState(!_supa);
   const [ugcTermsRequired, setUgcTermsRequired] = useState(false); // #1392 로그인 사용자의 공개 UGC 정책 동의
@@ -670,11 +671,9 @@ function App() {
   useEffect(() => { if (window.RG_applyConsent) window.RG_applyConsent(window.RG_consent && window.RG_consent.get()); }, []);
   // 타인 프로필 모달(§5.8.2) — @핸들 탭으로 열림. SentenceCard 가 window.RG_openProfile 호출.
   const [profileHandle, setProfileHandle] = useState(null);
-  const [profileTreeStart, setProfileTreeStart] = useState(null);
   useEffect(() => {
-    window.RG_openProfile = (h) => { setProfileTreeStart(null); setProfileHandle(h); };
-    window.RG_openFriendTree = (h) => { setProfileTreeStart('feed'); setProfileHandle(h); };
-    return () => { window.RG_openProfile = null; window.RG_openFriendTree = null; };
+    window.RG_openProfile = (h) => setProfileHandle(h);
+    return () => { window.RG_openProfile = null; };
   }, []);
   // 설정 탭 진입 — 이전 모달 방식에서 탭 전환으로 변경 (#library-tab-ux).
   useEffect(() => { window.RG_openSettings = () => switchTab('settings'); return () => { window.RG_openSettings = null; }; }, []);
@@ -795,36 +794,7 @@ function App() {
     return () => { window.RG_openShelfImport = null; window.RG_openTextImport = null; };
   }, [authUser]);
   const [appState, setAppState] = useState(() => ({ ...INITIAL_STATE, ...(buildStateFromGuest() || {}) }));
-  // TopBar와 전용 책나무 화면은 같은 읽기 전용 projection을 사용한다. 세계관 온보딩
-  // 플래그가 아직 없으므로 익숙한 책·문장 용어만 표시하고 로딩 중 0으로 단정하지 않는다.
-  const [topbarTree, setTopbarTree] = useState({ tree: null, loading: true, error: false });
   const [popularBooks, setPopularBooks] = useState(null);  // #835: 검색 추천 인기 도서(우리 사이트) — startedThisWeek + ALL_BOOKS 폴백
-
-  useEffect(() => {
-    let alive = true;
-    let requestId = 0;
-    const refresh = () => {
-      const currentRequest = ++requestId;
-      setTopbarTree((current) => ({ ...current, loading: !current.tree, error: false }));
-      Promise.resolve(window.RG_bookTree.fromDataStore(window.DataStore))
-        .then((tree) => {
-          if (alive && currentRequest === requestId) setTopbarTree({ tree, loading: false, error: false });
-        })
-        .catch(() => {
-          if (alive && currentRequest === requestId) setTopbarTree((current) => ({ ...current, loading: false, error: true }));
-        });
-    };
-    refresh();
-    window.addEventListener('rg:sentence-added', refresh);
-    window.addEventListener('rg:sentence-removed', refresh);
-    window.addEventListener('rg:wish-changed', refresh);
-    return () => {
-      alive = false;
-      window.removeEventListener('rg:sentence-added', refresh);
-      window.removeEventListener('rg:sentence-removed', refresh);
-      window.removeEventListener('rg:wish-changed', refresh);
-    };
-  }, [authUser, dataReady, appState.book && appState.book.ubId]);
 
   // 검색 추천 '인기 도서' (#835) — 우리 사이트 인기(최근 등록 상위, social과 동일 RPC) 우선, 부족분은 카탈로그 폴백.
   useEffect(() => {
@@ -1059,8 +1029,7 @@ function App() {
   }, [_supa, reviewMode]);
 
   const switchTab = useCallback((tab) => {
-    const canonicalTab = tab === 'nest-grow' ? 'library' : tab;
-    setActiveTab(canonicalTab);
+    setActiveTab(tab);
     // 스크롤 맨위로
     const main = document.querySelector('.main');
     if (main) main.scrollTop = 0;
@@ -1381,6 +1350,7 @@ function App() {
             <span style={{ flex: '1 1 100%' }}>DEV 검수 모드 · {reviewPersona ? reviewPersona.name : '합성 페르소나'} · 브라우저 즉시 저장 + DEV DB 동기화 · PRD 미사용</span>
             <button onClick={openDevReviewPicker} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>전환</button>
             <button onClick={resetDevReview} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>초기 데이터로 리셋</button>
+            <button onClick={() => setMascotReviewOpen(true)} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>재키 A/B/C 비교</button>
             <button onClick={exitDevReview} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--paper)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>검수 종료</button>
           </div>
         )}
@@ -1395,16 +1365,7 @@ function App() {
               <span>Reading<span className="go">Go</span></span>
             </div>
             <div className="topbar-stats">
-              <span
-                className="stat book-tree-count"
-                role="status"
-                aria-live="polite"
-                title={topbarTree.error ? '책과 문장 수를 불러오지 못했어요' : undefined}
-              >
-                {topbarTree.tree
-                  ? topbarTree.tree.familiarSummary
-                  : (topbarTree.loading ? '책과 문장 불러오는 중…' : '책 · 문장')}
-              </span>
+              <span className="stat" aria-label="책과 문장">책 · 문장</span>
               {/* 스포일러 토글은 설정(프로필 ⚙️)으로 이전 (#3) */}
               {activeTab === 'social' && window.ActivityInboxButton && (
                 <window.ActivityInboxButton key={activityAccountKey} guest={activityGuest} accountKey={activityAccountKey} onLogin={() => setShowLogin(true)} />
@@ -1490,7 +1451,7 @@ function App() {
           </ErrorBoundary>
         </main>
 
-        {/* 하단 탭바 — v18 canonical 3번째 route는 library. nest-grow는 switchTab 입력 alias로만 유지. */}
+        {/* 하단 탭바 — v18 canonical 3번째 route는 library. */}
         <nav className="tabbar">
           {[
             { id: 'nest', label: '홈', svg: (
@@ -1550,8 +1511,11 @@ function App() {
 
         {/* 타인 프로필 모달 (§5.8.2) — @핸들 탭으로 열림 */}
         {profileHandle && ReactDOM.createPortal(
-          <UserProfileModal handle={profileHandle} initialFriendTree={profileTreeStart} onClose={() => { setProfileHandle(null); setProfileTreeStart(null); }} />,
+          <UserProfileModal handle={profileHandle} onClose={() => setProfileHandle(null)} />,
           document.body
+        )}
+        {RG_DEV_REVIEW_ENABLED && mascotReviewOpen && window.RG_MASCOT_REVIEW && (
+          <window.RG_MASCOT_REVIEW onClose={() => setMascotReviewOpen(false)} />
         )}
 
         {/* 책 정보 모달 (#11) — 한 문장 책 제목 탭 */}
