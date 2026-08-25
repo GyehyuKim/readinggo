@@ -196,6 +196,23 @@ rgTrack('lens_switched',       { book_id, from_lens, to_lens })   // 렌즈 도�
 rgTrack('import_completed',    { source, count })                 // 외부 임포트 (#288)
 ```
 
+### 3.1.5 개인화 context 이벤트 allowlist (#1309, 목표)
+
+개인화 기능 동의는 분석 동의가 아니다. 아래 이벤트는 **PostHog 선택 분석 동의가 별도로 active인 경우에만** 발화하며, 개인화 opt-in만으로 분석을 시작하지 않는다. Production 발화는 #1373 인수와 [companion.md §4.7.4](./companion.md#474-평가와-출시-게이트)의 승격 뒤에만 허용한다.
+
+| 이벤트 | 발화 시점 | 허용 속성 |
+|---|---|---|
+| `personalized_context_consent_changed` | 계정 설정의 opt-in/철회 server 저장 성공 뒤 | `enabled`, `policy_version`, `source=settings\|companion` |
+| `personalized_context_applied` | owner-verified source 1건 이상을 실제 prompt에 넣은 응답 표시 뒤 | `source_count_bucket=1\|2_3\|4_5`, `source_type_set`, `preset`, `outcome=applied` |
+| `personalized_context_empty` | opt-in 요청이 정상 완료됐지만 후보가 0건일 때 | `preset`, `outcome=no_relevant_source` |
+| `personalized_context_source_action` | 출처 목록에서 이동·제외·재포함·삭제가 성공했을 때 | `action=navigate\|exclude\|include\|delete`, `source_type=sentence\|note\|qa` |
+| `personalized_context_failed` | 요청이 최종 실패했을 때 1회 | `stage=auth\|consent\|retrieve\|compose\|render`, `code=auth_required\|consent_inactive\|invalid_request\|rate_limited\|network\|server\|unknown` |
+
+- 공통 §3.1.1 metadata 외 **사용자/record/source ID, 정확한 책 ID·제목·쪽수·날짜, 문장·감상·Q/A·검색 query·prompt·응답 원문, visibility, 민감 주제, 제외 목록, 동의/철회 timestamp**를 보내지 않는다.
+- `source_type_set`은 중복 제거한 `sentence|note|qa` allowlist 배열뿐이다. 정확한 문자 수·후보 수·랭킹 점수·token 수는 전송하지 않는다. `preset`은 기존 7개 허용값만 쓴다.
+- OFF 요청은 기능 호출 자체가 없어야 하므로 `personalized_context_empty`로 세지 않는다. 철회 후 `consent_changed(enabled=false)` 외 retrieval/apply 이벤트가 생기면 개인정보 회귀로 경보한다.
+- 이벤트는 제품 동작의 권한 근거가 아니며, 삭제·철회·동기화 검증은 Supabase 정본과 API/RLS 테스트로 수행한다.
+
 ### 3.2 유저 식별 (✅ 구현 #293 — app.js 로그인 effect)
 
 Supabase 로그인 후:
