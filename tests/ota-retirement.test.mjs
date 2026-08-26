@@ -14,13 +14,14 @@ for (const path of forbiddenFiles) {
 }
 
 const ignoredDirectories = new Set(['.git', '.gradle', 'node_modules', 'dist', 'build']);
-const activeExtensions = /\.(?:cjs|mjs|js|jsx|ts|tsx|json|ya?ml|toml|gradle|java|kt|kts|swift|xml|plist|properties|xcconfig|html|css|scss|sh|bash|py)$/;
+const activeExtensions = /\.(?:cjs|mjs|js|jsx|ts|tsx|json|jsonc|ya?ml|toml|gradle|java|kt|kts|swift|xml|plist|properties|xcconfig|html|css|scss|sh|bash|py|sql|txt|svg|storyboard|bat|example|pbxproj|pro|resolved)$/;
+const activeNames = new Set(['Dockerfile', 'Makefile', 'gradlew']);
 const forbidden = /@capgo\/capacitor-updater|CapacitorUpdater|capgo-capacitor-updater|\/api\/ota|OTA_KV|OTA_PRIVATE_KEY|OTA_PUBLIC_KEY|ota-production|RG_otaDiagnostics|notifyAppReady|defaultChannel/;
 const walk = (directory, prefix = '') => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
   if (entry.isDirectory() && ignoredDirectories.has(entry.name)) return [];
   const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
   if (entry.isDirectory()) return walk(new URL(`${entry.name}/`, directory), relative);
-  return activeExtensions.test(entry.name) ? [relative] : [];
+  return activeExtensions.test(entry.name) || activeNames.has(entry.name) ? [relative] : [];
 });
 for (const path of walk(root)) {
   if (path === 'tests/ota-retirement.test.mjs') continue;
