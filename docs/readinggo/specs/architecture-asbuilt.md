@@ -14,11 +14,11 @@
 | **프론트엔드** | React 18 + **Vite**(빌드타임 JSX, #871) | esbuild가 `.js`의 JSX를 classic 변환. `main.js` 진입. `js/` 모듈은 §2 부팅 순서와 저장소 실측을 따른다 |
 | **모듈 로드·공유** | `main.js` ES import + `window.X` shim | import 순서가 계약. 파일 간 공개 API는 아직 `window.X` |
 | **상태/데이터** | DataStore 계약 | 미로그인=localStorage / 로그인=Supabase (부팅 스왑) |
-| **백엔드** | Cloudflare Worker (`worker/index.mjs`) | 정적 서빙 + 12개 API/프록시 라우트 + cron 2종 |
+| **백엔드** | Cloudflare Worker (`worker/index.mjs`) | 정적 서빙 + API/프록시 라우트 + cron |
 | **DB/인증** | Supabase (Postgres·Auth·RLS·pg_cron) | 스키마·마이그레이션은 `docs/readinggo/supabase/`와 원격 ledger를 대조한다. 파일 개수는 적용 증거가 아니다 |
 | **외부 연동** | 알라딘·구글북스·오픈라이브러리·네이버·Upstage·**Gemini(vision)**·PostHog | 키는 워커(서버)에만 |
 | **배포** | GitHub Actions + Cloudflare Workers | `main` 머지는 stable DEV 자동 배포. Production Worker는 stable DEV에서 검증한 동일 SHA를 `promote-production`으로 수동 승격 |
-| **CI·릴리스** | GitHub Actions | test · spec-drift · preview-smoke · deploy-dev · Production/OTA 수동 승격 |
+| **CI·릴리스** | GitHub Actions | test · spec-drift · preview-smoke · deploy-dev · Worker Production 수동 승격 · 스토어 앱 빌드 |
 
 ---
 
@@ -152,7 +152,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 
 정적 사이트(`[assets]`)를 서빙하고, 키가 필요한 호출을 대행(동일출처만 허용, 키 클라 비노출).
 
-> **드리프트 정정 2026-07-09**: `/js/config.js` 버전주입 라우트는 코드에 없음(제거) — 대신 라이브 엔드포인트 5개(`/api/wiki-ask`·`/api/parse-books`·`/api/delete-account`·`/api/extract-highlights`·`/api/ota`) 추가. cron 2종.
+> `/js/config.js` 버전주입 라우트는 코드에 없으며, 현재 라우트는 아래 표와 `worker/index.mjs`가 정본이다.
 
 | 라우트 | 무엇 | 외부 호출 |
 |---|---|---|
@@ -168,7 +168,6 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `/api/shelf-import` | 서가 가져오기(#772) | 검색 소스·Supabase(+Gemini vision) |
 | `/api/seed` | 시드 데이터 | Supabase(service_role) |
 | `/api/book-upsert` | 책 캐노니컬 upsert — 검색 raw id → books id(#1191) | Supabase(service_role) |
-| `/api/ota` | OTA 번들 매니페스트 체크(#876) | — (OTA_KV) |
 | **cron** `0 18 * * *`(UTC)=KST 03:00 | 일일 인기도서 아카이브(#239) | 알라딘·Supabase |
 | 문의 접수 | 인증된 Supabase DataStore 저장 → 관리자 대시보드에서 개별 직접 대응 | Supabase |
 
@@ -207,11 +206,11 @@ setup-globals → config → supabase-client → datastore-supabase →
 
 ## 8. 배포 (`wrangler.toml`)
 
-> **드리프트 정정 2026-07-09**: `[version_metadata]/CF_VERSION` 바인딩 없음(제거). cron 2종. `[vars]`에 `VISION_BASE_URL`/`VISION_MODEL` 추가. `OTA_KV` KV 바인딩 존재. `[assets]`는 Vite 산출물 `dist`.
+> `[version_metadata]/CF_VERSION` 바인딩은 없고, `[assets]`는 Vite 산출물 `dist`를 가리킨다.
 - **Cloudflare Worker** `readinggo`, `main = worker/index.mjs`. `preview_urls = true`(#899).
 - `[build] command = "cd docs/readinggo && npm ci && npm run build"` → 배포 전 Vite 빌드(#871).
 - `[assets] directory = docs/readinggo/dist` → 워커가 Vite 산출물 정적 서빙.
-- `[[kv_namespaces]] binding = OTA_KV` → OTA 번들 매니페스트(#876).
+- `[[kv_namespaces]] binding = APP_KV` → rate limit 카운터와 내부 실험 로그.
 - `[vars]`: `SUPABASE_URL`·`ARCHIVE_DAILY_CAP`·`LLM_BASE_URL`(upstage)·`LLM_MODEL`(solar-pro3)·`VISION_BASE_URL`(gemini)·`VISION_MODEL`(gemini-2.5-flash).
 - `[triggers] crons = ["0 18 * * *"]` (인기도서 아카이브·선충전·쪽수 보강). 문의는 자동 동기화하지 않고 관리자 대시보드에서 개별 직접 대응한다([inquiry-sync.md](./inquiry-sync.md)).
 - **배포**: `main` push는 `deploy-dev.yml`로 stable DEV에 자동 배포된다. Production Worker는 승인 SHA를 `promote-production.yml` (`workflow_dispatch`, GitHub `production` environment)로 수동 승격한다. 저장소 workflow 기준으로 main→Production 자동 trigger는 없다. Cloudflare 계정의 외부 Workers Builds 연결 여부는 저장소만으로 검증되지 않았다.
@@ -228,14 +227,13 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `preview-smoke.yml` | PR event는 localhost build/render smoke만 수행한다. 수동 `workflow_dispatch`만 `main`을 checkout해 비프로모션 Worker version을 업로드하고 edge render-smoke를 수행한다 |
 | `deploy-dev.yml` / `promote-production.yml` | `main` push의 stable DEV 자동 배포·release 격리 검증 / 검증된 동일 SHA의 Production 수동 승격 |
 | `deploy-verify.yml` | 레거시 Production content-hash 폴링·live smoke·직접 rollback 경로. `workflow_dispatch` 전용이라 main 머지로 자동 실행되지는 않지만 현재 정상 승격 계약과 충돌해 #1464에서 제거·재설계한다. 현재 SSOT는 `deploy-dev`와 `promote-production`이다 |
-| `ota-release.yml` / `ota-promote.yml` | 둘 다 실제 trigger는 `workflow_dispatch` + `production` environment다. 승인 SHA의 stable DEV/main 일치 후 Android beta R2/KV 수동 발행 / 같은 beta manifest를 production에 수동 승격·`:prev` 백업하며, 상단의 과거 자동발행 주석은 #1464에서 정정한다 |
 
 ---
 
 ## 10. 보안 원칙(코드에서 관찰)
 
 - 모든 외부 키는 **워커(서버)에만**. 브라우저엔 publishable/anon 키만.
-- 프록시 라우트는 **동일출처(Origin) + 앱 오리진**만 허용(쿼터 남용 차단). Origin은 non-브라우저(curl)가 우회 가능 → 고비용 LLM/OCR 엔드포인트(companion·wiki-ask·parse-books·ocr·extract-highlights·shelf-import·seed·related)는 두 계층으로 방어(#1158/#1159): ① **per-IP·분 단위 레이트리밋**(OTA_KV 재사용, fail-open)으로 키드레인 상한, ② **Cloudflare Turnstile 봇 검증**(`verifyTurnstile`, Origin·레이트리밋 다음 순서). 8개 엔드포인트에만 걸고 비고비용 라우트(`/api/img`·`/aladin`·`/api/ota`·`/api/delete-account`·`/api/book-upsert`)엔 안 건다.
+- 프록시 라우트는 **동일출처(Origin) + 앱 오리진**만 허용(쿼터 남용 차단). Origin은 non-브라우저(curl)가 우회 가능 → 고비용 LLM/OCR 엔드포인트(companion·wiki-ask·parse-books·ocr·extract-highlights·shelf-import·seed·related)는 두 계층으로 방어(#1158/#1159): ① **APP_KV per-IP·분 단위 레이트리밋**(fail-open)으로 키드레인 상한, ② **Cloudflare Turnstile 봇 검증**(`verifyTurnstile`, Origin·레이트리밋 다음 순서). 8개 엔드포인트에만 걸고 비고비용 라우트(`/api/img`·`/aladin`·`/api/delete-account`·`/api/book-upsert`)엔 안 건다.
   - **네이티브 앱 오리진 허용 + CORS (#1230)**: Capacitor 앱 WebView 오리진(`https://localhost` Android·`capacitor://localhost` iOS)과 로컬 dev/preview(`http(s)://localhost[:포트]`·127.0.0.1)는 `isAppOrigin`으로 가드를 통과시키고, 워커 `fetch` 래퍼가 교차출처 앱 요청에 **OPTIONS preflight(204)** 와 **`Access-Control-Allow-Origin`**(요청 Origin 에코, `Vary: Origin`)을 응답한다 — 이전엔 앱에서 워커 API 전부(원격 책검색·book-upsert 등)가 상대경로 localhost 해석 + Origin 403 + ACAO 부재 3중으로 조용히 죽어 "앱에서 검색 안 됨"의 근본원인이었다. 허용 헤더는 `Content-Type, Authorization, cf-turnstile-token`. localhost 오리진 허용은 curl(Origin 생략)급이라 남용 표면 확대 아님(레이트리밋·Turnstile 계층 유지). 클라 측은 `config.js` 가 localhost/capacitor 오리진에서 `API_ORIGIN='https://readinggo.hyuniverse.workers.dev'` 를 세팅(웹은 '') — `ALADIN_PROXY` 절대화 + `RG_apiFetch`(js/turnstile.js)·raw 3곳(`/api/book-upsert`·`/api/delete-account`·`/api/img`) prefix. 후속: 앱에서 Turnstile 토큰 발급은 CF 대시보드 도메인 allowlist 에 localhost 추가 필요(검색·등록엔 무관).
   - **Staged rollout·fail-open (중요)**: `verifyTurnstile` 은 `env.TURNSTILE_SECRET` 이 **없으면 무동작(null 반환)** — 코드를 배포해도 inert. 시크릿이 있을 때만 토큰(`cf-turnstile-token` 헤더)을 siteverify 로 검증하고 없으면/실패면 403 `{error:'turnstile...'}`. siteverify 자체가 죽으면(Cloudflare outage) fail-open. 클라(`js/turnstile.js`)는 위젯을 `size:'normal'` + `appearance:'interaction-only'`로 렌더해 호출마다 새 토큰을 발급(`RG_apiFetch` 래퍼가 헤더 주입), 토큰 미발급·타임아웃이면 '' 로 진행(fail-open). **챌린지 표시는 전용 백드롭 레이어(#1232)**: CF `before/after-interactive-callback` 로 인터랙티브 챌린지가 뜰 때만 dimmed 백드롭(z-index 10010) + 중앙 위젯 + "잠깐, 보안 확인이 필요해요" 안내로 전환하고, 바깥 탭으로 닫을 수 있다(fail-open 유지) — 구 fixed bottom:76px 배치가 세리머니 CTA·설정 시트·책 상세를 무언으로 덮던 감사 발견 수정. (#1222: 구 `size:'invisible'`은 유효값이 아니라 — compact/flexible/normal만 유효 — api.js가 매 로드 TurnstileError를 던졌다.) 활성화 절차: 코드 배포 → 클라가 토큰 보내는 것 확인 → `wrangler secret put TURNSTILE_SECRET` → 강제 발효.
 - Supabase **RLS**로 행 단위 접근 제어. 게스트(anon)는 **공개 카탈로그(`books`)·NPC 시드만** read; 사용자 PII 테이블(`users`·`user_books`·`reading_sessions`·`streak`·`follows`·`claps`)은 **로그인 사용자 전용**(`auth.uid() is not null`) + anon grant 회수(#1165, `40_rls_anon_lockdown.sql`).
@@ -255,7 +253,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 5. **`onboarding.js` 미로드**: `window.OnboardingFlow` 정의돼 있으나 index.html 부팅·`app.js`에서 참조 없음 → **사용 안 되는 코드로 추정**(별도 확인·정리 후보).
 6. **Phase 표현**: README §3은 Phase 0/1을 미래형으로 적었으나, 실제 런타임은 **로그인=Supabase / 미로그인=localStorage 공존**.
 7. **네이티브 로컬 알림**: `@capacitor/local-notifications` + `streak-reminder.js`가 기본 OFF 21:00 스트릭 리마인더를 스케줄한다. 웹/PWA·서버 푸시는 미구현.
-8. **OTA 구현**: Capgo updater·`/api/ota`·R2·KV가 존재한다. 저장소 workflow 기준 beta 발행과 production 승격은 모두 `workflow_dispatch`+`production` environment의 수동 단계이며, 승인 SHA의 stable DEV/main 일치와 같은 beta manifest 승격을 검사한다. 설치 기기의 실제 수신 성공은 코드 스캔만으로 단정하지 않는다.
+8. **앱 릴리스**: 설치 앱은 승인 소스의 웹 자산을 `cap sync`한 Android/iOS 바이너리를 스토어로 배포한다. 플랫폼별 빌드 번호와 단계적 출시가 업데이트 경계다.
 
 ---
 

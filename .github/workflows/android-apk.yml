@@ -48,29 +48,12 @@ jobs:
           grep -R -q 'readinggo-dev.hyuniverse.workers.dev' dist
           ! grep -R -q 'cttllwwkaddghqttyhkg.supabase.co' dist
 
-      # DEV 검수 앱은 production OTA 채널을 절대 구독하지 않는다(#1489).
-      # defaultChannel=beta를 override — 네이티브가 이 값을 첫 체크 요청부터 defaultChannel
-      # 필드로 싣으므로(런타임 JS 불필요) 빌드 시점에 beta로 결정적으로 고정된다.
-      # OTA 자체를 끄지 않는다 — 꺼두면 beta 채널 회귀 검증이 애초에 안 된다.
-      - name: Pin DEV APK to beta OTA channel
+      - name: Set DEV app name
         working-directory: docs/readinggo
         run: |
-          node -e "const fs=require('fs');const p='capacitor.config.json';const c=JSON.parse(fs.readFileSync(p));c.appName='ReadingGo DEV';c.plugins.CapacitorUpdater.defaultChannel='beta';fs.writeFileSync(p,JSON.stringify(c,null,2)+'\\n')"
-          grep -q 'readinggo.hyuniverse.workers.dev/api/ota' capacitor.config.json
-          grep -q '"defaultChannel": "beta"' capacitor.config.json
+          node -e "const fs=require('fs');const p='capacitor.config.json';const c=JSON.parse(fs.readFileSync(p));c.appName='ReadingGo DEV';fs.writeFileSync(p,JSON.stringify(c,null,2)+'\\n')"
 
-      # encrypted beta bundle을 실기기에서 검증할 수 있도록 release 셸과 같은 public key를
-      # DEV APK에도 내장한다. key가 없거나 저장 뒤 beta 채널이 유실되면 fail-closed 한다.
-      - name: Embed OTA verification public key for beta
-        working-directory: docs/readinggo
-        env:
-          OTA_PUBLIC_KEY: ${{ vars.OTA_PUBLIC_KEY }}
-        run: |
-          test -n "$OTA_PUBLIC_KEY"
-          npx -y @capgo/cli@8.41.4 key save --key-data "$OTA_PUBLIC_KEY"
-          node -e "const c=require('./capacitor.config.json');if(!c.plugins?.CapacitorUpdater?.publicKey||c.plugins.CapacitorUpdater.defaultChannel!=='beta')process.exit(1)"
-
-      # dist → android 동기화 + 플러그인(capgo 등) 반영.
+      # dist → android 동기화 + 네이티브 플러그인 반영.
       - name: Capacitor sync (android)
         working-directory: docs/readinggo
         run: npx cap sync android

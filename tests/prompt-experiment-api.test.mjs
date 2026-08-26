@@ -52,7 +52,7 @@ const env = {
   LLM_BASE_URL: 'https://api.upstage.test/v1',
   LLM_MODEL: 'solar-pro3',
   UPSTAGE_API_KEY: 'upstage-test-key',
-  OTA_KV: kv,
+  APP_KV: kv,
   PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(),
 };
 const baseBody = {
@@ -162,7 +162,7 @@ try {
   response = await worker.fetch(request(baseBody, 'judy-test-token', '/api/prompt-experiments/run', { headers: { Origin: 'https://other.example' } }), { ...env, PROMPT_EXPERIMENT_DAILY_LIMIT: '100' }, {});
   check('브라우저 Origin 요청은 403', response.status === 403 && (await response.json()).error.code === 'FORBIDDEN_ORIGIN');
 
-  const minuteEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100', PROMPT_EXPERIMENT_MINUTE_LIMIT: '1' };
+  const minuteEnv = { ...env, APP_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100', PROMPT_EXPERIMENT_MINUTE_LIMIT: '1' };
   response = await worker.fetch(request(), minuteEnv, {});
   check('분당 제한 전 요청은 성공', response.status === 200);
   response = await worker.fetch(request(), minuteEnv, {});
@@ -173,19 +173,19 @@ try {
   const openapi = await readFile(new URL('openapi.yaml', contractRoot), 'utf8');
   check('JSON Schema와 OpenAPI 계약 파일이 유효한 핵심 식별자를 가짐', schema.$schema.includes('2020-12') && schema.properties.protocol_version.const === '1.0' && openapi.includes('openapi: 3.1.0'));
 
-  const exampleEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100' };
+  const exampleEnv = { ...env, APP_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100' };
   for (const name of ['first-turn', 'followup-turn', 'quote', 'thought']) {
     const example = JSON.parse(await readFile(new URL(`examples/${name}.json`, contractRoot), 'utf8'));
     response = await worker.fetch(request(example), exampleEnv, {});
     check(`${name} 문서 예제가 런타임 계약을 통과`, response.status === 200);
   }
 
-  const parallelEnv = { ...env, OTA_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '1', PROMPT_EXPERIMENT_MINUTE_LIMIT: '1' };
+  const parallelEnv = { ...env, APP_KV: new MemoryKV(), PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '1', PROMPT_EXPERIMENT_MINUTE_LIMIT: '1' };
   const parallelResponses = await Promise.all(Array.from({ length: 10 }, () => worker.fetch(request(), parallelEnv, {})));
   check('병렬 10건에서 원자적 limit=1은 정확히 1건만 승인', parallelResponses.filter((r) => r.status === 200).length === 1 && parallelResponses.filter((r) => r.status === 429).length === 9);
 
   const timeoutKv = new MemoryKV();
-  const timeoutEnv = { ...env, OTA_KV: timeoutKv, PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100', PROMPT_EXPERIMENT_TIMEOUT_MS: '5' };
+  const timeoutEnv = { ...env, APP_KV: timeoutKv, PROMPT_EXPERIMENT_LIMITER: new LimiterNamespace(), PROMPT_EXPERIMENT_DAILY_LIMIT: '100', PROMPT_EXPERIMENT_TIMEOUT_MS: '5' };
   const timeoutWaits = [];
   providerMode = 'timeout';
   response = await worker.fetch(request(), timeoutEnv, { waitUntil: (p) => timeoutWaits.push(p) });

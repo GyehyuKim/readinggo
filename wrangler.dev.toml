@@ -13,8 +13,8 @@ directory = "docs/readinggo/dist"
 binding = "ASSETS"
 
 [[kv_namespaces]]
-binding = "OTA_KV"
-id = "3bca8bcf0a5641a283cd0c61c6471666"
+binding = "APP_KV"
+id = "85021e1aabc845fca8e5da1e1ebbbcf4"
 
 [[ratelimits]]
 name = "RATE_LIMITER"
@@ -49,4 +49,4 @@ PROMPT_EXPERIMENT_TIMEOUT_MS = "30000"
 VISION_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 VISION_MODEL = "gemini-2.5-flash"
 
-# 의도적으로 [triggers]와 R2 binding이 없다. DEV는 cron, prod OTA/R2, 문의 GitHub sync를 실행하지 않는다.
+# 의도적으로 [triggers]와 R2 binding이 없다. DEV는 cron, prod R2, 문의 GitHub sync를 실행하지 않는다.

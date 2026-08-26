@@ -36,7 +36,7 @@
 
 책나무 은퇴는 이 보안 계약을 삭제하거나 broad policy를 그대로 두는 근거가 아니다. 반대로 책나무 제한 RPC를 새 경로로 선배포하거나 feature flag로 다시 켜는 단계도 만들지 않는다. retained surface(본인 서재, 공개 문장, 같이읽기, 활동함)가 필요로 하는 최소 projection만 다음 순서로 컷오버한다.
 
-1. web, OTA 가능 Capacitor shell, store APK별 base table 직접 조회·visibility 처리와 retained surface의 실제 필드 의존성을 inventory한다. 책나무 route·flag·전용 API 호출은 migration 대상이 아니라 제거 대상으로 분리한다.
+1. web과 지원 중인 스토어 앱 버전별 base table 직접 조회·visibility 처리와 retained surface의 실제 필드 의존성을 inventory한다. 책나무 route·flag·전용 API 호출은 migration 대상이 아니라 제거 대상으로 분리한다.
 2. retained surface가 필요한 owner/current-viewer projection을 기존 제한 RPC/RLS로 충족하거나, 별도 승인된 최소 view/RPC를 먼저 DEV에 배포한다. 활동함 때문에 source table broad SELECT를 추가하지 않는다.
 3. 신규 client 수신·호출 전환 증거와 구버전 실패 동작을 확인한 뒤 최소 지원 버전·업데이트 차단 정책을 승인한다. 정확한 버전은 관측 전에 임의 확정하지 않는다.
 4. 별도 migration release에서 base policy를 owner/minimum-field로 축소하고 owner·nonowner·blocked·anonymous와 `private|followers|public`, 유효/무효/타인 private UUID의 응답·오류 비구분을 직접 검증한다.

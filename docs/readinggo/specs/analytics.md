@@ -92,7 +92,7 @@ _참고(드리프트 정정 2026-07-09): `companion_q_rated`·`companion_q_regen
 | `platform` | `web` \| `ios` \| `android` | Capacitor/웹 비교 |
 
 - `VITE_READINGGO_ENV`가 명시되지 않은 로컬·테스트 빌드는 **수집하지 않는다**. 조용히 production으로 귀속시키지 않는다.
-- dev·PR preview는 `development`, 운영 Worker·승격된 OTA·스토어 앱은 `production`으로 빌드한다.
+- dev·PR preview는 `development`, 운영 Worker·스토어 앱은 `production`으로 빌드한다.
 - 자동 `$pageview`·autocapture에도 PostHog super properties로 같은 환경·SHA를 등록한다.
 
 #### 핵심 이벤트 스키마

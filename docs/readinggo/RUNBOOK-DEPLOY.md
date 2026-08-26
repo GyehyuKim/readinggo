@@ -10,7 +10,7 @@
 3. Hermes: 이슈·diff·CI·stable DEV smoke·미해결 대화를 검토한다.
 4. prod: `promote-production`을 승인 SHA로 수동 실행한다. GitHub `production` environment 승인 뒤,
    `origin/main` HEAD와 stable DEV receipt가 모두 같은 SHA일 때만 기존 `readinggo`에 배포한다.
-5. OTA가 필요하면 같은 SHA로 `ota-release`를 별도 수동 실행한다. beta→production은 기존 `ota-promote` gate를 따른다.
+
 
 ## 2. DEV 구성·비밀 경계
 
@@ -18,7 +18,7 @@
 - DB password는 macOS Keychain service `supabase-db-password-readinggo-dev`, account `ReadingGo Dev`에서 읽고 출력하지 않는다.
 - GitHub DEV secrets: `DEV_SUPABASE_URL`, `DEV_SUPABASE_PUBLISHABLE_KEY`.
 - Worker DEV secret: `SUPABASE_SERVICE_ROLE_KEY`를 `readinggo-dev`에만 등록한다.
-- DEV에는 prod 사용자 복사, prod KV/R2 binding, prod secret, cron, 문의 동기화, OTA publish를 연결하지 않는다.
+- DEV에는 prod 사용자 복사, prod KV/R2 binding, prod secret, cron, 문의 동기화를 연결하지 않는다.
 
 ## 3. 검증 receipt
 
@@ -41,5 +41,5 @@ curl -fsS https://readinggo-dev.hyuniverse.workers.dev/api/release
 ## 5. 감사 증거
 
 PR URL/commit SHA, DEV project region/status, DEV Worker URL/version, DEV KV ID, migration 목록·hash·원격 ledger,
-schema/RLS/RPC 역할별 검사 결과, preview/stable smoke run URL, production environment 승인 기록, Production Worker·OTA manifest·Play artifact·실기기 QA를
+schema/RLS/RPC 역할별 검사 결과, preview/stable smoke run URL, production environment 승인 기록, Production Worker·스토어 artifact·실기기 QA를
 [ops.md §0.3](./specs/ops.md)의 단일 release receipt로 보존한다. 각 항목은 `PASS | FAIL | BLOCKED | NOT_RUN`으로 남기며 credential은 기록하지 않는다.

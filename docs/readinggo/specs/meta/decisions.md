@@ -329,9 +329,9 @@
 
 ---
 
-### 8.15 결정 (2026-06-24, OTA Live Updates — Capgo 자가호스팅 + beta→prod 수동 승격. 충돌 시 §8.14 위에 **우선**)
+### 8.15 결정 (2026-06-24, OTA Live Updates — **v18.8에서 superseded**)
 
-> 설치 앱은 빌드 시점 웹 번들을 박제 → 웹 배포가 설치 앱에 미반영. 웹 레이어(JS/HTML/CSS)를 스토어 우회로 갱신하는 OTA 채택. 설계 정본: [`ota.md`](../ota.md), iOS-PLAN [§10.5](../../iOS-PLAN.md).
+> **과거 이력:** 설치 앱의 웹 레이어를 스토어 심사 없이 갱신하려고 아래 계약을 채택했으나, 2026-08-26 v18.8에서 전면 퇴역했다. 아래 표는 현재 계약이나 복원 지침이 아니며 Git 이력 감사용이다.
 
 | 항목 | 결정 |
 |---|---|
@@ -353,7 +353,7 @@
 | 데이터·인증 | dev/prod DB·Auth·Storage·project secret을 공유하지 않는다. 운영 사용자 복사 금지, dev에는 합성 fixture·테스트 계정만 허용 |
 | Worker·binding | dev Worker·KV·secret은 별도 리소스. dev에 prod KV/R2·cron·운영 side effect binding을 연결하지 않는다 |
 | PR | `readinggo-dev`의 비프로모션 version preview에서 build·render smoke·endpoint isolation을 검증 |
-| main | 동일 SHA를 stable dev URL에 자동 배포한다. main은 production 자동 배포·OTA publish를 하지 않는다 |
+| main | 동일 SHA를 stable dev URL에 자동 배포한다. main은 production에 자동 배포하지 않는다 |
 | prod | stable dev가 보고한 SHA와 `origin/main` HEAD가 모두 승인 SHA와 같을 때만 GitHub `production` environment의 Hermes gate 뒤 수동 승격 |
 | rollback·감사 | dev/prod 배포 receipt에 SHA·Worker version·smoke 결과를 남긴다. prod rollback도 별도 승인된 production workflow에서만 수행 |
 
@@ -564,3 +564,7 @@
 | 전달 게이트 | DEV 구현·합성 검증은 허용. **#1373 전 OFF/ON 최종 품질 인수, Production route/flag·실사용자 opt-in·Production 승격 금지** |
 
 SSOT는 [companion.md §4.7](../companion.md#47-내-기록-기반-관련-맥락-retrieval-1309-목표-계약), 인증/API/RLS는 [backend.md §7.9.3](../backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309), 개인정보·분석은 [privacy-policy.md §0.1](../privacy-policy.md#01-내-기록-기반-ai-개인화-안전-계약-1309-목표)과 [analytics.md §3.1.5](../analytics.md#315-개인화-context-이벤트-allowlist-1309-목표)을 따른다.
+
+### v18.8 — 설치 앱 OTA 은퇴 (#1540, 2026-08-26)
+
+OTA는 구현됐지만 beta·Production 매니페스트로 활성화된 적이 없다. 분산 운영·보안 복잡성과 재활성화 위험 때문에 전면 은퇴하며 설치 앱 업데이트는 App Store·Google Play 바이너리로만 전달한다. 명시적으로 다시 승인하는 별도 결정이 생길 때만 Git history에서 복원할 수 있다.

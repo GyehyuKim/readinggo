@@ -33,13 +33,13 @@ const request = (exchanges = [], ip = '203.0.113.10') => new Request('https://re
   body: JSON.stringify({ sentence: '한 문장', bookTitle: '책', exchanges }),
 });
 
-const env = { OTA_KV: new MemoryKV() };
+const env = { APP_KV: new MemoryKV() };
 let response = await worker.fetch(request(Array.from({ length: 9 }, (_, i) => ({ q: `q${i}`, a: `a${i}` }))), env, {});
 assert.equal(response.status, 200, '저장 9턴은 마지막 질문 생성을 허용해야 한다');
 response = await worker.fetch(request(Array.from({ length: 10 }, (_, i) => ({ q: `q${i}`, a: `a${i}` })), '203.0.113.11'), env, {});
 assert.equal(response.status, 409, '저장 10턴 이상은 API가 새 추론을 거절해야 한다');
 
-const rateEnv = { OTA_KV: new MemoryKV() };
+const rateEnv = { APP_KV: new MemoryKV() };
 for (let i = 0; i < 40; i++) {
   response = await worker.fetch(request([], '203.0.113.12'), rateEnv, {});
   assert.equal(response.status, 200, `분당 허용 요청 ${i + 1}은 통과해야 한다`);

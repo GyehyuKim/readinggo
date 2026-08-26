@@ -68,7 +68,7 @@
 
 운영 표면은 정확한 화면 형태와 무관하게 다음 결과를 판정할 수 있어야 한다.
 
-- release commit SHA, workflow run, Worker version, OTA version·checksum·수신 상태, Play versionCode/AAB provenance
+- release commit SHA, workflow run, Worker version, Play versionCode/AAB provenance, iOS build/archive provenance
 - DB migration 파일 hash, 적용 ledger read-back, policy·view·RPC body·grant·trigger·RLS·backfill 검증 결과
 - app version·release SHA별 XP mutation, legacy RPC/base-table 호출, 지원 버전 분포
 - owner·friend·nonfriend·blocked·anonymous 역할별 Production 직접 API/화면 QA 결과
