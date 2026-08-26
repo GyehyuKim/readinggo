@@ -14,7 +14,7 @@ for (const path of forbiddenFiles) {
 }
 
 const ignoredDirectories = new Set(['.git', '.gradle', 'node_modules', 'dist', 'build']);
-const activeExtensions = /\.(?:js|mjs|json|ya?ml|toml|gradle|swift|xml)$/;
+const activeExtensions = /\.(?:cjs|mjs|js|jsx|ts|tsx|json|ya?ml|toml|gradle|java|kt|kts|swift|xml|plist|properties|xcconfig|html|css|scss|sh|bash|py)$/;
 const forbidden = /@capgo\/capacitor-updater|CapacitorUpdater|capgo-capacitor-updater|\/api\/ota|OTA_KV|OTA_PRIVATE_KEY|OTA_PUBLIC_KEY|ota-production|RG_otaDiagnostics|notifyAppReady|defaultChannel/;
 const walk = (directory, prefix = '') => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
   if (entry.isDirectory() && ignoredDirectories.has(entry.name)) return [];
