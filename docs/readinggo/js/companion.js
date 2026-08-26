@@ -227,8 +227,9 @@ function CompanionModal({ sentence, onClose }) {
       sentence.note = note;
       window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
       if (window.rgTrack) window.rgTrack('reflection_note_saved', { book_id: sentence.bookId || '', chars: free.length });
-      showToast(free ? '내 감상을 저장했어요' : '감상을 비웠어요');
       setNoteSaving(false);
+      onClose();
+      showToast(free ? '내 감상을 저장했어요' : '감상을 비웠어요');
     }).catch(() => { setNoteSaving(false); showToast('저장 실패 — 잠시 후 다시'); });
   };
   // 한 문장 삭제 (#1) — 둥지 한 문장 상세에도 삭제. 이벤트로 둥지·서재 목록 즉시 반영.
