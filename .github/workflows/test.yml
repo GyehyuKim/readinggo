@@ -78,7 +78,7 @@ jobs:
           node tests/book-upsert-auth.test.mjs
           node --test tests/security-residuals.test.mjs tests/book-provider-guard.test.mjs
           node tests/aladin-upstream-errors.test.mjs
-          node tests/ota-retirement.test.mjs
+          node tests/store-only-retirement.test.mjs
           node tests/release-version-contract.test.mjs
           node tests/workflow-pins.test.mjs
           node tests/ceremony-sentence-action.test.mjs
