@@ -13,8 +13,8 @@ for (const path of forbiddenFiles) {
   assert.equal(existsSync(new URL(path, root)), false, `${path}는 퇴역 후 다시 생기면 안 된다`);
 }
 
-const ignoredDirectories = new Set(['.git', '.gradle', 'node_modules', 'dist', 'build']);
-const activeExtensions = /\.(?:cjs|mjs|js|jsx|ts|tsx|json|jsonc|ya?ml|toml|gradle|java|kt|kts|swift|xml|plist|properties|xcconfig|html|css|scss|sh|bash|py|sql|txt|svg|storyboard|bat|example|pbxproj|pro|resolved)$/;
+const ignoredDirectories = new Set(['.git', '.gradle', '.build', 'node_modules', 'dist', 'build']);
+const activeExtensions = /\.(?:cjs|mjs|js|jsx|ts|tsx|json|jsonc|ya?ml|toml|gradle|java|kt|kts|swift|xml|plist|properties|xcconfig|html|css|scss|sh|bash|py|sql|txt|svg|storyboard|bat|example|pbxproj|podspec|pro|resolved)$/;
 const activeNames = new Set(['Dockerfile', 'Makefile', 'gradlew']);
 const forbidden = /@capgo\/capacitor-updater|CapacitorUpdater|capgo-capacitor-updater|\/api\/ota|OTA_KV|OTA_PRIVATE_KEY|OTA_PUBLIC_KEY|ota-production|RG_otaDiagnostics|notifyAppReady|defaultChannel/;
 const walk = (directory, prefix = '') => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
