@@ -8,6 +8,7 @@ export const POSTHOG_PROJECT_ID = 458802;
 const DEFAULT_LOOKBACK_HOURS = 6;
 const MAX_LOOKBACK_HOURS = 168;
 const ROW_LIMIT = 100;
+const QUERY_ROW_LIMIT = ROW_LIMIT + 1;
 
 function sqlString(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
@@ -15,8 +16,8 @@ function sqlString(value) {
 
 export function normalizeHours(value) {
   const hours = Number(value || DEFAULT_LOOKBACK_HOURS);
-  if (!Number.isFinite(hours) || hours <= 0 || hours > MAX_LOOKBACK_HOURS) {
-    throw new Error(`LOOKBACK_HOURS must be > 0 and <= ${MAX_LOOKBACK_HOURS}`);
+  if (!Number.isSafeInteger(hours) || hours < 1 || hours > MAX_LOOKBACK_HOURS) {
+    throw new Error(`LOOKBACK_HOURS must be an integer from 1 to ${MAX_LOOKBACK_HOURS}`);
   }
   return hours;
 }
@@ -43,7 +44,7 @@ WHERE event = 'checkin_save_failed'
   AND properties.platform = ${sqlString(platform)}
   AND timestamp >= ${sqlString(new Date(since).toISOString())}
 ORDER BY timestamp DESC
-LIMIT ${ROW_LIMIT}`.trim();
+LIMIT ${QUERY_ROW_LIMIT}`.trim();
 }
 
 async function hogql({ apiKey, query, fetchImpl = fetch }) {
@@ -94,11 +95,15 @@ export function renderMarkdown(report) {
     `- Generated: ${report.generated_at}`,
     `- Since: ${report.since}`,
     `- Events: ${report.events.length}`,
+    `- Truncated at ${report.row_limit}: ${report.truncated ? 'yes' : 'no'}`,
     '- Privacy: user content and identity fields were not queried.',
     '',
     '| Time | Release | App | Source | Stage | Code | Endpoint/RPC | Status | Items | Correlation |',
     '|---|---|---|---|---|---|---|---:|---:|---|',
   ];
+  if (report.truncated) {
+    lines.push('', `> Warning: more than ${report.row_limit} events matched. Narrow the lookback window before drawing conclusions.`, '');
+  }
   for (const row of report.events) {
     lines.push(`| ${cell(row.timestamp)} | ${cell(row.release_sha)} | ${cell(row.app_version)} | ${cell(row.source)} | ${cell(row.stage)} | ${cell(row.code)} | ${cell(row.endpoint_or_rpc)} | ${cell(row.status)} | ${cell(row.item_count)} | ${cell(row.correlation_id)} |`);
   }
@@ -121,8 +126,10 @@ export async function generateReport({
     since: since.toISOString(),
     platform: 'android',
     environment: 'production',
+    row_limit: ROW_LIMIT,
+    truncated: rows.length > ROW_LIMIT,
     queried_fields_exclude_user_content_and_identity: true,
-    events: sanitizeRows(rows),
+    events: sanitizeRows(rows.slice(0, ROW_LIMIT)),
   };
   const markdown = renderMarkdown(report);
   await mkdir(outputDir, { recursive: true });
@@ -134,7 +141,7 @@ export async function generateReport({
   return report;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   generateReport({
     apiKey: process.env.POSTHOG_PERSONAL_API_KEY,
     hours: process.env.LOOKBACK_HOURS,

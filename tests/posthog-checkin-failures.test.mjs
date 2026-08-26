@@ -23,6 +23,7 @@ test('query is production Android only and excludes user content and identity', 
 test('lookback is bounded', () => {
   assert.equal(normalizeHours('6'), 6);
   assert.throws(() => normalizeHours('0'));
+  assert.throws(() => normalizeHours('0.5'));
   assert.throws(() => normalizeHours('169'));
 });
 
@@ -69,4 +70,27 @@ test('report writes sanitized JSON and Markdown', async () => {
   assert.match(json, /"code": "network"/);
   assert.match(markdown, /ocr_review/);
   assert.doesNotMatch(`${json}${markdown}`, /distinct_id|sentence_text|email/);
+});
+
+test('report marks truncation and emits at most 100 rows', async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), 'readinggo-checkin-truncated-'));
+  const row = [
+    '2026-08-26T12:00:00Z', 'android', 'abc', 'v1', '5', 'home', 'sentence',
+    'network', 'sentences', 0, 0, 1, 'corr',
+  ];
+  const fetchImpl = async () => ({
+    ok: true,
+    async json() { return { results: Array.from({ length: 101 }, () => [...row]) }; },
+  });
+  const report = await generateReport({
+    apiKey: 'test-key',
+    hours: 1,
+    now: new Date('2026-08-26T13:00:00Z'),
+    outputDir,
+    fetchImpl,
+  });
+  assert.equal(report.truncated, true);
+  assert.equal(report.row_limit, 100);
+  assert.equal(report.events.length, 100);
+  assert.match(await readFile(join(outputDir, 'report.md'), 'utf8'), /more than 100 events matched/);
 });
