@@ -83,6 +83,7 @@ jobs:
           node tests/workflow-pins.test.mjs
           node tests/ceremony-sentence-action.test.mjs
           node tests/companion-turn-limit.test.mjs
+          node --test tests/reflection-save-feedback.test.mjs
           node tests/personalization-runtime.test.mjs
           node tests/forest-like-count.test.mjs
           node --test tests/friend-book-tree.test.mjs

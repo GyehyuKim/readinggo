@@ -145,7 +145,7 @@
   - 책 상세 '내 한 문장' — 동일한 두 진입(미리보기는 자유 감상 블록만 보여줌).
   - `RG_openCompanion(sentence, { mode })` 로 모드를 명시해 연다. 모드 미지정 진입(되감기·모아보기 등)은 그 문장이 이미 가진 성찰(`rgNoteKind`)로 추정 → 없으면 아래 기본값.
 - **데이터 — 한 `my_note` 칸, 블록 분리 (과거 #404 충돌 해소)**: 자유 감상 편집은 한때 폐지됐다 — 자유 감상과 재키 Q/A 가 같은 `my_note` 칸을 서로 덮어썼기 때문(#404). 이제 `my_note` 를 **블록으로 분리**한다: 자유 감상 블록(`Q.` 로 시작하지 않음) + 재키 Q/A 블록(`Q. …\nA. …`). `rgSplitNote`/`rgJoinNote`(`companion.js`, `window` 노출)가 저장 시 **상대 영역을 항상 보존** — 재키 턴 저장이 감상 블록을 보존하고, 감상 저장이 Q/A 블록을 보존한다. `parseNoteToExchanges` 는 이미 Q/A 블록만 추출하므로 재키 화면·턴 수·되감기 후보(Q/A 필요, §5)는 불변.
-- **비강제·완결**: 감상만으로 성찰이 완결된다 — `DataStore.sentences.setNote(id, note)`(localStorage·Supabase **양 어댑터 표면 일치**, [backend.md §7.2](./backend.md)) 한 번으로 영속하고 `rg:sentence-note` 이벤트로 둥지·책 상세에 즉시 반영. LLM(재키) 호출 없음. 분석 이벤트 = `reflection_note_saved`.
+- **비강제·완결**: 감상만으로 성찰이 완결된다 — `DataStore.sentences.setNote(id, note)`(localStorage·Supabase **양 어댑터 표면 일치**, [backend.md §7.2](./backend.md)) 한 번으로 영속하고 `rg:sentence-note` 이벤트로 홈·책 상세에 즉시 반영한다. 저장 중에는 1차 버튼을 비활성화해 중복 제출을 막는다. 성공하면 모달을 닫고 갱신된 감상 미리보기로 복귀한 뒤 `내 감상을 저장했어요`(빈 감상으로 기존 감상을 제거했다면 `감상을 비웠어요`)를 보인다. 실패하면 모달과 초안을 유지하고 재시도 가능한 오류를 알린다. LLM(재키) 호출 없음. 분석 이벤트 = `reflection_note_saved`.
 
 **기본 모드 (#1081 결정 = `note`)**: 빈 문장을 **모드 미지정**으로 열 때 어디로 떨어질지(`RG_REFLECT_DEFAULT`, `companion.js`). 카드의 두 버튼은 어차피 모드를 명시하므로 이 기본값은 **카드 밖 진입**(되감기·모아보기 등)에만 영향한다.
 
