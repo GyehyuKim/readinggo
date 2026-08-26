@@ -22,9 +22,9 @@
 
 책나무 제품 은퇴와 retained surface의 base RLS 축소를 한 번의 배포로 섞지 않는다. 책나무 route·flag·전용 DataStore/RPC/analytics는 제거 대상이며 신 경로로 이관하거나 Production에서 다시 켜지 않는다. 각 release는 위 1~8 게이트를 독립적으로 통과한다.
 
-1. **호출 인벤토리**: web, OTA 가능 셸, 스토어 APK의 `users`·`user_books`·`wish_books`·`sentences`·`claps` 직접 조회와 `friends|followers` 공개범위 처리 버전을 확인한다. 책나무 전용 호출과 retained 서재·피드·프로필·활동함 호출을 구분한다.
+1. **호출 인벤토리**: web과 지원 중인 스토어 앱 버전의 `users`·`user_books`·`wish_books`·`sentences`·`claps` 직접 조회와 `friends|followers` 공개범위 처리를 확인한다. 책나무 전용 호출과 retained 서재·피드·프로필·활동함 호출을 구분한다.
 2. **retained 신 경로 선배포**: 현재 제품에 남는 surface만 owner/current-viewer 최소 projection과 fail-closed visibility 처리를 사용하게 한다. 필요 view/RPC는 별도 승인하고 DEV QA → 동일 SHA Production QA → 필요 시 Play Store 순으로 전달한다. 책나무 전용 view/RPC는 선배포하지 않는다.
-3. **수신·전환 확인**: OTA production 채널 수신율, 스토어 지원 버전 분포, retained 제한 경로와 legacy base 호출을 버전별로 관측한다. 책나무 호출은 0이어야 한다.
+3. **수신·전환 확인**: 스토어 지원 버전 분포, retained 제한 경로와 legacy base 호출을 버전별로 관측한다. 책나무 호출은 0이어야 한다.
 4. **컷오버 승인**: 구 API 실패를 허용할 최소 지원 버전, 업데이트/차단 정책, `friends|followers|unknown`의 private fail-closed 방식을 제품·운영이 승인한다. 수치와 방식은 관측 전 임의 확정하지 않는다.
 5. **권한 축소**: 별도 migration release로 broad base RLS를 owner/minimum-field로 좁힌다. DEV 역할별 직접 API QA → 동일 migration·SHA Production → Production 역할별 직접 API QA를 수행한다. #1260 source grant를 넓히지 않는다.
 6. **rollback**: 영향받은 retained UI·제한 경로를 비활성화하거나 승인된 최소권한 이전 정의로 되돌린다. broad base select 정책을 복원해 개인정보 노출을 되살리지 않으며, 책나무 route·flag·전용 API를 rollback 경로로 복원하지 않는다.
@@ -40,12 +40,11 @@ retained 신 경로 수신 증거와 base 권한 축소 사이에 broad 정책�
 
 ### 0.3 단일 release receipt와 완료 증거
 
-각 전달 단위는 다음 항목을 **하나의 release receipt**로 연결한다. Worker·OTA·DB·Play·QA가 서로 다른 SHA나 미확인 artifact를 가리키면 완료가 아니다.
+각 전달 단위는 다음 항목을 **하나의 release receipt**로 연결한다. Worker·DB·스토어 앱·QA가 서로 다른 SHA나 미확인 artifact를 가리키면 완료가 아니다.
 
 - spec merge SHA, 구현 PR, 승인 SHA, DEV workflow/run·Worker version·`/api/release`, Production workflow/run·Worker version
-- OTA beta/production version·manifest SHA·URL·checksum·`minNative`·기기 수신 결과
 - DB migration 파일명·SHA-256·적용 순서·대상 환경·원격 ledger read-back·영향 건수·rollback 쿼리
-- Play versionCode·AAB checksum·서명/출처·내부/Production 트랙·설치 기기 QA
+- Play versionCode·AAB checksum·서명/출처·내부/Production 트랙·설치 기기 QA, iOS build/archive·TestFlight·설치 기기 QA
 - owner·friend·nonfriend·blocked·anonymous 직접 API와 UI 허용·거부 결과
 - 공개 1,000자 승격은 문장 길이·공개범위·출처표기·삭제 후 비노출 회귀를 검증하되, 후순위 #1463 전용 takedown 시스템을 선행 게이트로 두지 않는다. 크롤 seed 확대·상용화·반복 권리요청이 발생하면 실제 접수 링크, 책임자, 임시 숨김→삭제→이의·기록 SOP와 전 표면 비노출 E2E를 별도 승인한다.
 - XP 신규 획득 경로의 DB 값 변화 0, Production module graph·DataStore의 XP/둥지/성/만회 참조 0, DEV migration의 backup manifest·삭제 컬럼/RPC·`users_public` 권한 readback
@@ -130,7 +129,7 @@ DEV 빌드는 `VITE_SUPABASE_URL`·`VITE_SUPABASE_PUBLISHABLE_KEY`·`VITE_API_OR
 - production 관련 workflow는 `main` push로 실행되면 안 되며 `production` environment 승인을 요구한다.
 - 이 중 하나라도 증명할 수 없으면 prod 승격을 중단하고 rollback이 아니라 pause/report한다.
 
-## 4. Android 셸·OTA 출시 보안 계약 (#1398)
+## 4. Android 셸·스토어 출시 보안 계약 (#1398)
 
 ### 4.1 Android 셸
 
@@ -139,11 +138,9 @@ DEV 빌드는 `VITE_SUPABASE_URL`·`VITE_SUPABASE_PUBLISHABLE_KEY`·`VITE_API_OR
 - release build는 R8 minification과 resource shrinking을 활성화하고 `proguard-android-optimize.txt`를 사용한다. barcode AAR처럼 전이 runtime dependency가 누락된 경우 경고 억제로 숨기지 않고 upstream metadata와 맞는 dependency를 명시하며 `lintRelease`와 `assembleRelease`를 통과해야 한다.
 - native OAuth callback은 [backend.md §7.1](./backend.md)의 빌드별 exact scheme·host/path 계약을 사용한다. development APK는 `com.readinggo.app.dev`, Production APK는 `com.readinggo.app`으로 분리한다.
 
-### 4.2 OTA artifact·승격
+### 4.2 스토어 artifact·승격
 
-- privileged OTA CLI는 exact semantic version으로 고정한다. `latest` 또는 floating major를 release·promote workflow에서 사용하지 않는다.
-- beta bundle은 private key로 암호화한 파일만 업로드한다. 평문 zip은 암호화 직후 삭제하며 manifest는 `version`, encrypted `url`, encrypted `checksum`, `sessionKey`, `minNative`, source `sha`, UTC `date`를 포함한다.
-- Android release 셸은 대응 public key가 없으면 build를 중단한다. public key는 secret이 아니지만, key 없는 셸이나 plaintext OTA를 fallback으로 만들지 않는다.
-- beta→Production 승격은 동일 manifest SHA와 필수 암호화 field를 검증하고 `ota-production` environment의 required reviewers와 prevent self-review를 통과해야 한다. workflow 이름만으로 2인 승인이 증명되지 않으므로 repository environment 설정을 readback하기 전에는 운영 게이트 완료로 보지 않는다.
-- OTA key 생성·회전, `ota-production` reviewer 설정, 실제 beta 기기 복호화·checksum·`minNative` 수신 검증, Production 승격은 코드 PR과 분리된 운영 승인 대상이다. secret이나 private key를 로그·artifact·manifest·PR에 남기지 않는다.
-- release receipt는 Android versionCode·AAB checksum·내장 public key fingerprint, Capgo CLI version, encrypted bundle checksum·sessionKey 존재, beta/Production manifest SHA, 승인자, 기기 수신 결과를 연결한다.
+- Android release artifact는 승인 SHA의 production Vite build와 `cap sync android` 결과에서 생성하며, 서명 키는 GitHub Secret으로만 복원하고 로그·artifact에 노출하지 않는다.
+- `versionCode`는 Play 업로드마다 단조 증가하고 AAB checksum·서명 출처·workflow run·내부 테스트 기기 결과를 release receipt에 연결한다.
+- iOS는 승인 SHA의 production Vite build를 `cap sync ios`한 archive만 TestFlight와 App Store Connect에 제출하고, build 번호·서명·실기기 결과를 같은 receipt에 기록한다.
+- 단계적 출시 중 회귀하면 rollout을 중단하고 직전 정상 소스를 더 큰 빌드 번호로 다시 제출한다. 과거 바이너리나 빌드 번호를 재사용하지 않는다.

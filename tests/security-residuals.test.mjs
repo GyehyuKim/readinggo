@@ -2,14 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [manifest, paths, extractionRules, gradle, auth, otaRelease, otaPromote, androidRelease, androidApk, releaseGuide] = await Promise.all([
+const [manifest, paths, extractionRules, gradle, auth, androidRelease, androidApk, releaseGuide] = await Promise.all([
   read('../docs/readinggo/android/app/src/main/AndroidManifest.xml'),
   read('../docs/readinggo/android/app/src/main/res/xml/file_paths.xml'),
   read('../docs/readinggo/android/app/src/main/res/xml/data_extraction_rules.xml'),
   read('../docs/readinggo/android/app/build.gradle'),
   read('../docs/readinggo/js/supabase-client.js'),
-  read('../.github/workflows/ota-release.yml'),
-  read('../.github/workflows/ota-promote.yml'),
   read('../.github/workflows/android-release.yml'),
   read('../.github/workflows/android-apk.yml'),
   read('../docs/readinggo/RELEASE.md'),
@@ -36,33 +34,10 @@ assert.match(auth, /url\.hostname === NATIVE_REDIRECT_HOST/);
 assert.match(auth, /url\.pathname === '' \|\| url\.pathname === '\/'/);
 assert.doesNotMatch(auth, /indexOf\('login-callback'\)/, 'OAuth callback은 부분 문자열로 신뢰하면 안 된다');
 
-assert.doesNotMatch(otaRelease, /@capgo\/cli@latest/, 'privileged OTA CLI는 latest를 사용하면 안 된다');
-assert.match(otaRelease, /@capgo\/cli@8\.41\.4/);
-assert.match(otaRelease, /OTA_PRIVATE_KEY:/, 'OTA publish는 서명/암호화 private key secret을 요구해야 한다');
-assert.match(otaRelease, /bundle encrypt[\s\S]*--key-data "\$OTA_PRIVATE_KEY"/, 'OTA bundle은 업로드 전에 private key로 보호해야 한다');
-assert.match(otaRelease, /::add-mask::\$SESSION_KEY/, '파생 sessionKey는 workflow log에서 mask해야 한다');
-assert.doesNotMatch(otaRelease, /echo "manifest: \$MANIFEST"/, 'encrypted manifest 전체를 release log에 출력하면 안 된다');
-assert.match(otaPromote, /sessionKey/);
-assert.match(otaPromote, /checksum/);
-assert.match(otaPromote, /validString\(m\.sessionKey\)/, 'promote는 sessionKey를 nonempty trimmed string으로 검증해야 한다');
-assert.match(otaPromote, /Number\.isSafeInteger\(m\.minNative\)&&m\.minNative>=5/, 'promote는 encrypted minNative 숫자형 v5 경계를 강제해야 한다');
-assert.match(otaPromote, /u\.protocol==="https:"/, 'promote는 bundle URL을 HTTPS로 제한해야 한다');
-assert.match(otaPromote, /\^\[a-f0-9\]\{64\}\$\/i\.test\(m\.checksum\)/, 'promote는 checksum을 SHA-256 hex로 검증해야 한다');
-assert.match(otaRelease, /Number\.isSafeInteger\(versionCode\) \|\| versionCode < 5/, 'release는 Android versionCode v5 경계를 publish 전에 검증해야 한다');
-assert.match(otaRelease, /u\.protocol==="https:"/, 'release는 최종 manifest bundle URL을 HTTPS로 검증해야 한다');
-assert.match(otaRelease, /\^\[a-f0-9\]\{64\}\$\/i\.test\(m\.checksum\)/, 'release는 최종 manifest checksum을 SHA-256 hex로 검증해야 한다');
 assert.doesNotMatch(releaseGuide, /wrangler@4(?=[\s`])/, '수동 rollback의 privileged CLI는 정확한 버전으로 고정해야 한다');
-assert.doesNotMatch(releaseGuide, /GOOD=.*checksum/, 'sessionKey 없는 수동 encrypted manifest 재구성 절차를 제공하면 안 된다');
-assert.match(releaseGuide, /2세대 이상 이전 복원은[\s\S]{0,120}지원하지 않는다/, '다세대 encrypted archive 전에는 2세대+ rollback을 지원한다고 쓰면 안 된다');
-assert.doesNotMatch(otaPromote, /promoting beta manifest: \$BETA|backing up current production manifest[^\n]*\$CUR/, 'OTA manifest 전체를 promote log에 출력하면 안 된다');
-assert.match(androidRelease, /OTA_PUBLIC_KEY:/, '스토어 셸 빌드는 검증 public key 변수를 요구해야 한다');
-assert.match(androidRelease, /key save --key-data "\$OTA_PUBLIC_KEY"/, 'public key를 cap sync 전에 네이티브 설정에 주입해야 한다');
-assert.match(androidApk, /OTA_PUBLIC_KEY:\s*\$\{\{ vars\.OTA_PUBLIC_KEY \}\}/, 'beta APK도 release 셸과 같은 OTA public key를 요구해야 한다');
-assert.match(androidApk, /@capgo\/cli@8\.41\.4 key save --key-data "\$OTA_PUBLIC_KEY"/, 'beta APK는 encrypted bundle 검증 key를 cap sync 전에 주입해야 한다');
-assert.match(androidApk, /publicKey\|\|c\.plugins\.CapacitorUpdater\.defaultChannel!==['"]beta['"]/, 'key 저장 후 beta 채널과 public key를 함께 fail-closed 검증해야 한다');
-assert.match(otaPromote, /environment:\s*ota-production/, 'Production OTA 승격은 별도 2인 승인 environment를 사용해야 한다');
-assert.match(otaPromote, /gh api "repos\/\$\{GITHUB_REPOSITORY\}\/environments\/ota-production"/, 'OTA 승격 전 live environment 설정을 조회해야 한다');
-assert.match(otaPromote, /rule\.prevent_self_review !== true/, 'OTA environment는 self-review 차단을 fail-closed 검증해야 한다');
-assert.match(otaPromote, /needs:\s*verify-ota-production-environment/, 'promotion job은 보호 설정 preflight 성공에 의존해야 한다');
+assert.match(androidRelease, /npx cap sync android/, '스토어 AAB는 production web bundle을 Android 프로젝트에 동기화해야 한다');
+assert.match(androidApk, /npx cap sync android/, 'DEV APK도 web bundle을 Android 프로젝트에 동기화해야 한다');
+assert.doesNotMatch(androidRelease, /PUBLIC_KEY|PRIVATE_KEY/, '스토어 빌드에 폐기된 updater key 단계가 남으면 안 된다');
+assert.doesNotMatch(androidApk, /PUBLIC_KEY|PRIVATE_KEY/, 'DEV APK에 폐기된 updater key 단계가 남으면 안 된다');
 
-console.log('OK: Android backup/FileProvider/R8, OAuth callback, OTA pin/signature/approval residual contracts');
+console.log('OK: Android backup/FileProvider/R8, OAuth callback, store-build residual contracts');

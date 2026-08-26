@@ -46,7 +46,7 @@ assert.equal((await response.json()).owner_id, A, 'owner는 bearer 검증 결과
 // Production path is absent before #1373, before auth/input handling.
 response = await worker.fetch(request({ user_id: B }, '', '/api/companion/context'), { ENVIRONMENT: 'production', ASSETS: { fetch: () => new Response('asset') } }, {});
 assert.equal(response.status, 404, 'Production context route fail-closed');
-response = await worker.fetch(request({ personalization: true, user_id: B }, '', '/api/companion'), { ENVIRONMENT: 'production', OTA_KV: { get: async () => null, put: async () => {} } }, {});
+response = await worker.fetch(request({ personalization: true, user_id: B }, '', '/api/companion'), { ENVIRONMENT: 'production', APP_KV: { get: async () => null, put: async () => {} } }, {});
 assert.equal(response.status, 404, 'Production personalized companion fail-closed');
 
 const source = (i, text = `본문 ${i}`) => ({ type: 'sentence', id: String(i), book_id: BOOK, page: i, created_at: '2026-08-25T00:00:00Z', title: `책 ${i}`, author: '합성 저자', status: 'reading', preview: `미리보기 ${i}`, text });

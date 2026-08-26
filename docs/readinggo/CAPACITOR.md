@@ -48,7 +48,7 @@ npx cap sync ios
 3. `npx cap open android` → 에뮬/실기기 빌드. **Play Console($25, #873)**.
 
 ## 웹 변경 반영 루틴
-웹 코드 수정 → `npm run build` → `npx cap sync` → 네이티브 재빌드. (런칭 후엔 OTA Live Updates 로 빌드 없이 즉시 배포 — iOS-PLAN §10.5.)
+웹 코드 수정 → `npm run build` → `npx cap sync` → 네이티브 재빌드 → 스토어 제출. 설치 앱 업데이트는 항상 스토어 바이너리로 전달한다.
 
 ## 메모
 - `appId`(com.readinggo.app)는 스토어 번들 ID — 최종 확정 시 변경 가능(`capacitor.config.json` + 네이티브 프로젝트 재생성).

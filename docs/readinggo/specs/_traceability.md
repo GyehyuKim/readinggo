@@ -38,7 +38,7 @@
 | `admin-dashboard.md` | `js/admin-dashboard.js`, `DataStore.admin.*`, admin RPC migrations | ✅ | 현행 운영 표면과 지표 계약 존재 |
 | `activity-inbox.md` | `js/activity-inbox.js`, DataStore 양 어댑터, `57_activity_inbox.sql`, `activity-inbox.test.mjs`·SQL 역할 fixture | ✅ | #1260 계약대로 같이읽기 헤더 활동함, 현재 source 90일/100개 projection, moderation, bounded seen key, guest 무네트워크를 구현. 실제 DEV/Production migration 적용·역할 SQL 실행은 별도 운영 검증 필요 |
 | `analytics.md` | `rgTrack`, PostHog 동의 게이트, 주간 리포트 workflow | 📝 | v18 서재·활동 후보 이벤트와 XP·스트릭 격리를 반영. 신규 이벤트는 구현 전 |
-| `architecture-asbuilt.md` | `main.js`, `worker/index.mjs`, `wrangler.toml`, workflows, migrations | 🔧 | main→stable DEV 자동, Worker Production·OTA beta·OTA Production 수동 동일 SHA 승격이라는 현재 workflow trigger를 보정 |
+| `architecture-asbuilt.md` | `main.js`, `worker/index.mjs`, `wrangler.toml`, workflows, migrations | 🔧 | main→stable DEV 자동, Worker Production 수동 동일 SHA 승격과 스토어 전용 앱 릴리스 계약을 보정 |
 | `backend.md` | `datastore.js`, `datastore-supabase.js`, `schema.sql`, migrations | 🚩 | v18 서재는 기존 책 데이터를 재사용. 현행 게스트 이관 누락 가능성과 `ub_sel`의 넓은 read 범위는 별도 데이터·보안 게이트 |
 | `barcode-scan.md` | `barcode-scan.js`, Android native scanner bridge | ✅ | 웹 폴백과 Android 경계가 문서화됨 |
 | `co-reading.md` | `co-reading.js`, `rooms.*`, villages/room migrations | 📝 | 현행 `함께/숲`을 이력으로 보존하고 목표 `같이읽기/읽기방`, 무랭킹·무XP·공개범위 계약 반영 |
@@ -56,8 +56,7 @@
 | `meta/rejected.md` | 역사 문서 | 📝 | 독립적인 기각 결정만 보존 |
 | `nest.md` | `nest.js`, `app.js`, `library.js`, `ceremony.js` | ✅ | 홈 독서 루프 유지. canonical 3번째 탭은 `library`; `nest-grow`는 입력 alias만 유지 |
 | `onboarding.md` | `onboarding.js`, `nest.js` empty state, local notifications | 📝 | 실제 책 검색·서재 축적·비손실 기록의 v18 목표 여정 반영 |
-| `ops.md` | dev/prod workflows, `wrangler.toml`, release scripts | 📝 | spec 승인→구현→DEV QA→동일 SHA PROD→Production QA→Play, 권한·XP 단계 증거와 rollback 계약 추가 |
-| `ota.md` | Capacitor updater, Worker `/api/ota`, OTA KV, release workflows | 🔧 | 실제 `ota-release`·`ota-promote`는 모두 `workflow_dispatch`+production environment. stable DEV/main 동일 SHA로 beta 수동 발행 후 같은 manifest를 prod에 수동 승격 |
+| `ops.md` | dev/prod workflows, `wrangler.toml`, release scripts | 📝 | spec 승인→구현→DEV QA→동일 SHA PROD→Production QA→스토어, 권한·XP 단계 증거와 rollback 계약 추가 |
 | `privacy-policy.md` | 공개 privacy URL, consent UI, account deletion | 📝 | 책나무 제품·자동 활성화 종료. 최소공개·fail-closed·retained API·base RLS 안전 조건은 유지 |
 | `profile.md` | `library.js`, `settings-view.js`, `user-profile-modal.js` | 🚩 | 3번째 탭 서재·4번째 활동 방향을 반영. 책나무 UI는 제거 대상이고 `followers` round-trip 갭은 별도 차단 이슈로 유지 |
 | `prompt-lab.md` | DEV-only API/UI, promotion transaction | 📝 | 실험·승격 경계는 유지하고 최종 캐릭터 이름 TBD, 재키/jacky는 호환 식별자로 정리 |

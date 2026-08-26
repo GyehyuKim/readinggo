@@ -33,7 +33,6 @@
 |  | [`prompt-lab.md`](./prompt-lab.md) | DEV 전용 프롬프트 실험·승격 계약 |
 |  | [`seed-collector.md`](./seed-collector.md) | 시드 문장 수집기 |
 | **운영·출시** | [`ops.md`](./ops.md) | 스펙→코드→DEV→Production 전달 게이트 |
-|  | [`ota.md`](./ota.md) | 웹 번들 OTA와 네이티브 버전 경계 |
 |  | [`admin-dashboard.md`](./admin-dashboard.md) | 운영자 지표·검토 표면 |
 |  | [`inquiry-sync.md`](./inquiry-sync.md) | 문의 직접 대응 정책 |
 |  | [`SYNC-POLICY.md`](./SYNC-POLICY.md) | 스펙·코드 드리프트 방지 정책 |

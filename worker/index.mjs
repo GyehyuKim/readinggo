@@ -289,9 +289,6 @@ export default {
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       return imgProxy(url.searchParams);
     }
-    // OTA Live Updates (#876) — 설치 앱(Capgo capacitor-updater)이 POST. 동일출처 게이트 없음
-    // (네이티브 HTTP 클라이언트라 브라우저 Origin 없음). 채널 매니페스트(KV) 비교 → 업데이트/no-update.
-    if (p === '/api/ota') return otaCheck(request, env);
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.
     return env.ASSETS.fetch(request);
   },
@@ -712,8 +709,8 @@ async function callLLMWithMeta({ messages, env, maxTokens, temperature }) {
 }
 
 async function promptExperimentLog(env, record) {
-  if (!env.OTA_KV) return;
-  try { await env.OTA_KV.put(`pe:run:${record.run_id}`, JSON.stringify(record), { expirationTtl: PE_LOG_TTL_SECONDS }); } catch (e) { /* 실행 결과는 로그 장애와 분리 */ }
+  if (!env.APP_KV) return;
+  try { await env.APP_KV.put(`pe:run:${record.run_id}`, JSON.stringify(record), { expirationTtl: PE_LOG_TTL_SECONDS }); } catch (e) { /* 실행 결과는 로그 장애와 분리 */ }
 }
 
 async function promptExperimentProxy(request, env, ctx) {
@@ -2844,75 +2841,6 @@ async function devReviewPersonaProxy(request, env, url) {
   }
 }
 
-// OTA Live Updates (#876) — Capgo capacitor-updater protocol v7. KV 기반 채널 매니페스트.
-// 업데이트면 {version,url,checksum,sessionKey?}, 없으면 {} 반환(Capgo 규약: url 생략 = no update).
-// 채널(beta|production)은 defaultChannel 필드로 선택한다 — capacitor.config.json
-// plugins.CapacitorUpdater.defaultChannel(네이티브 CapgoUpdater.createInfoObject)이
-// 앱의 *첫* 체크 요청부터 매번 싣는 필드라, 런타임 JS 호출(setChannel) 없이도 빌드 시점에
-// 결정적으로 고정된다. custom_id는 별개 필드(계정 타게팅용, Phase 2 OUT — spec ota.md §3④)라
-// 채널 선택에 쓰지 않는다(#1489 — 이전엔 custom_id를 오독해 미설정 시 production으로 샜다).
-// #1489 fail-closed: defaultChannel이 beta/production 둘 다 아니면(미설정·빈 값·미상 값)
-// production으로 넘기지 않고 즉시 no-update — 안전한 기본값은 "아무것도 안 주는 것"이다.
-// version_code(셸 versionCode)로 minNative 게이트 — 구 셸에 새 네이티브 API 쓰는 번들이
-// 내려가 크래시하는 것 방지(spec ota.md §1·§5).
-// 번들 바이너리 호스팅은 매니페스트 url 에 위임(R2/GitHub Releases, 페이즈 C). 워커는 매니페스트만 본다.
-async function otaCheck(request, env) {
-  if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-  let b = {};
-  try {
-    const parsed = await request.json();
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) b = parsed;
-  } catch (e) {}
-  const platform = (b.platform === 'ios' || b.platform === 'electron') ? b.platform : 'android';
-  const hasDefaultChannel = Object.prototype.hasOwnProperty.call(b, 'defaultChannel');
-  const requestedChannel = typeof b.defaultChannel === 'string' ? b.defaultChannel : '';
-  const explicitChannel = requestedChannel === 'beta' || requestedChannel === 'production';
-  // #1489 이전 release 셸은 defaultChannel 필드 자체가 없이 is_prod:true만 보낸다. 이 경우에만
-  // production 호환을 유지한다. null·객체·빈 문자열·미상 채널은 legacy로 정규화하지 않는다.
-  const legacyProduction = !hasDefaultChannel && b.is_prod === true;
-  if (!explicitChannel && !legacyProduction) return json({}); // fail closed
-  const channel = legacyProduction ? 'production' : requestedChannel;
-  const cur = b.version_name || 'builtin';                       // 현재 깔린 번들 버전
-  const rawNativeCode = Object.prototype.hasOwnProperty.call(b, 'version_code') ? b.version_code : b.version_build;
-  const nativeCodeText = typeof rawNativeCode === 'number' ? String(rawNativeCode) : rawNativeCode;
-  const validNativeCode = typeof nativeCodeText === 'string' && /^[1-9]\d*$/.test(nativeCodeText)
-    && Number.isSafeInteger(Number(nativeCodeText));
-  const nativeCode = validNativeCode ? Number(nativeCodeText) : 0;
-  if (!validNativeCode) return json({}); // malformed/누락은 KV 조회·legacy plaintext 예외 모두 불가
-  if (!env.OTA_KV) return json({});                              // KV 미바인딩 → no update
-  const raw = await env.OTA_KV.get(`ota:${platform}:${channel}`);
-  if (!raw) return json({});                                     // 채널 비어있음 → no update
-  let m; try { m = JSON.parse(raw); } catch (e) { return json({}); }
-  const validVersion = typeof m?.version === 'string' && m.version.length > 0
-    && m.version === m.version.trim();
-  let validUrl = false;
-  if (typeof m?.url === 'string' && m.url.length > 0 && m.url === m.url.trim()) {
-    try {
-      const parsedUrl = new URL(m.url);
-      validUrl = parsedUrl.protocol === 'https:' && !parsedUrl.username && !parsedUrl.password;
-    } catch (e) { /* malformed URL → no update */ }
-  }
-  if (!validVersion || !validUrl) return json({});
-  if (m.version === cur) return json({});                        // 이미 최신
-  const hasSessionKey = Object.prototype.hasOwnProperty.call(m, 'sessionKey');
-  const validSessionKey = typeof m.sessionKey === 'string' && m.sessionKey.length > 0
-    && m.sessionKey === m.sessionKey.trim();
-  if (hasSessionKey && !validSessionKey) return json({});         // invalid encrypted manifest는 plaintext로 폴백 금지
-  const hasMinNative = Object.prototype.hasOwnProperty.call(m, 'minNative');
-  const validMinNative = Number.isSafeInteger(m.minNative) && m.minNative > 0;
-  if (hasMinNative && !validMinNative) return json({});           // malformed 하한은 비교 우회 금지
-  const validChecksum = typeof m.checksum === 'string' && /^[a-f0-9]{64}$/i.test(m.checksum);
-  if (validSessionKey && (!validMinNative || m.minNative < 5 || !validChecksum)) return json({}); // encrypted v5+SHA-256 필수
-  if (validMinNative && m.minNative > nativeCode) return json({ message: `min native ${m.minNative} > ${nativeCode}` }); // 구 셸 → 스킵(스토어 업데이트 유도)
-  // 평문 read compatibility는 defaultChannel이 없던 구 Production 셸(v4 이하)에만 허용한다.
-  // v5 또는 명시적 beta/production 요청은 sessionKey가 없으면 public-key 보호를 우회할 수
-  // 있으므로 fail-closed no-update다. 신규 workflow는 평문 manifest를 발행하지 않는다.
-  if (!hasSessionKey && !(legacyProduction && validNativeCode && nativeCode <= 4)) return json({});
-  const update = { version: m.version, url: m.url, checksum: m.checksum || '' };
-  if (validSessionKey) update.sessionKey = m.sessionKey;
-  return json(update);
-}
-
 function json(obj, status, maxAge) {
   const headers = { 'content-type': 'application/json; charset=utf-8' };
   if (maxAge) headers['cache-control'] = `public, max-age=${maxAge}`;
@@ -2931,7 +2859,7 @@ function jsonNoStore(obj, status) {
 
 // ── per-IP 레이트리밋 (#1158/#1159) — 고비용 LLM/OCR 엔드포인트 남용·키드레인 규모 차단.
 //   Origin 체크는 non-브라우저(curl)가 헤더 생략/위조로 우회 가능 → 실비용 상한을 IP·분 단위로 건다.
-//   OTA_KV 재사용(새 바인딩 없음, Stack Lock). Turnstile(봇 차단) 게이트는 후속 — 이건 상한선.
+//   APP_KV를 사용한다. Turnstile(봇 차단) 게이트는 후속 — 이건 상한선.
 //   ponytail: KV 최종일관성이라 창 경계에서 약간 초과 가능·per-key 쓰기비용이 한계.
 //     지속 남용 시 Durable Object/네이티브 rate-limit 바인딩으로 격상. 지금은 KV 최소안.
 //   fail-open: KV 미바인딩/오류 시 통과(가용성 우선 — 정상 사용자를 막지 않는다).
@@ -2952,12 +2880,12 @@ async function rateLimited(request, env, name) {
         ? json({ error: 'rate limited', retryAfter: 60 }, 429)
         : null;
     }
-    if (!env.OTA_KV) return null;
+    if (!env.APP_KV) return null;
     const bucket = Math.floor(Date.now() / 60000);            // 1분 창
     const key = `rl:${name}:${ip}:${bucket}`;
-    const cur = parseInt((await env.OTA_KV.get(key)) || '0', 10) || 0;
+    const cur = parseInt((await env.APP_KV.get(key)) || '0', 10) || 0;
     if (cur >= limit) return json({ error: 'rate limited', retryAfter: 60 }, 429);
-    await env.OTA_KV.put(key, String(cur + 1), { expirationTtl: 120 });
+    await env.APP_KV.put(key, String(cur + 1), { expirationTtl: 120 });
     return null;
   } catch (e) { return null; }   // fail-open
 }

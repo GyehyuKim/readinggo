@@ -1,310 +1,72 @@
-# RELEASE.md — 릴리스 프로세스 (OTA · 릴리스 브랜치 · 버전 · 롤백)
+# RELEASE.md — 스토어 전용 앱 릴리스
 
-> **신설 (2026-06-26, #876)**: ReadingGo 가 출시될 때 *어떻게* 업데이트를 내보내는가의 **프로세스 문서**.
-> iOS-PLAN [§10.5 업데이트 전략](./iOS-PLAN.md#105-업데이트-전략-런칭-후--ota--릴리스-브랜치)의 골격과 [`specs/ota.md`](./specs/ota.md)의 OTA 구현 결정을 **운영 절차로 묶는다**.
->
-> **파일 분리 (중요)**: 이 문서는 *프로세스*(채널·브랜치·버전 동기화·롤백 절차)만 다룬다.
-> 스토어 빌드의 **메커닉**(`.aab`/`.ipa` 빌드·서명·Play/App Store Connect 업로드 명령)은 별도 문서
-> **`RELEASE-BUILD.md`**(#1024)가 담당한다. 둘이 겹치면 빌드 명령은 RELEASE-BUILD, 의사결정·순서·게이트는 RELEASE 가 source of truth.
->
-> **연관 문서**: [`DEPLOY.md`](./DEPLOY.md)·[`RUNBOOK-DEPLOY.md`](./RUNBOOK-DEPLOY.md)는 **웹(Cloudflare Worker)** 배포 런북이다.
-> 이 문서는 **설치된 앱**(iOS/Android 셸 + OTA 웹 번들)의 릴리스를 다룬다. 웹 Worker production도 main 자동배포가 아니라 stable DEV에서 검증한 동일 SHA를 승인 후 수동 승격한다.
+ReadingGo 설치 앱은 iOS App Store와 Google Play의 **스토어 바이너리로만** 배포·업데이트한다. 웹 Worker 배포는 설치 앱 업데이트가 아니며, 앱에 포함될 웹 자산은 승인된 소스에서 Vite로 빌드해 네이티브 바이너리에 함께 넣는다.
 
----
+스토어 빌드·서명 명령은 [`RELEASE-BUILD.md`](./RELEASE-BUILD.md), 웹 Worker의 DEV→Production 승격은 [`RUNBOOK-DEPLOY.md`](./RUNBOOK-DEPLOY.md)가 담당한다.
 
-## 0. TL;DR — 무엇을 어디로 내보내나
+## 1. 릴리스 원칙
 
-| 바꾼 것 | 경로 | 심사 | 속도 | 버전 올림 |
-|---|---|---|---|---|
-| JS / HTML / CSS / assets (웹 번들 = `dist`) | **OTA** (Capgo self-hosted → KV 매니페스트) | 없음 | 즉시(다음 앱 시작 시 적용) | `1.0.<run_number>` 자동 |
-| 네이티브 (플러그인·권한·`AndroidManifest`·아이콘·스플래시·OS SDK) | **스토어 바이너리** (Play / App Store Connect) | 있음(iOS 1~3일) | 주기적 | `versionName`/`versionCode`·`MARKETING_VERSION` 수동 |
+- 앱 변경은 JS·HTML·CSS·정적 자산을 포함해 모두 새 APK/AAB 또는 IPA에 포함하고 스토어 심사를 거친다.
+- `main`에서 stable DEV를 검증한 뒤 릴리스용 브랜치나 태그를 만들고, 같은 승인 소스에서 production 웹 번들을 빌드한다.
+- Android와 iOS는 각 스토어의 단계적 출시 기능을 사용한다. 이상이 있으면 롤아웃을 중단하고 직전 정상 소스를 더 큰 빌드 번호로 다시 제출한다.
+- 저장소의 빌드·서명 workflow는 아티팩트 생성까지만 담당한다. 스토어 업로드·심사·출시는 별도 승인 작업이다.
 
-**한 줄 규칙**: `dist` 안에서 끝나는 변경 = OTA. `dist` 밖(네이티브 셸)을 건드리면 = 스토어 빌드 + `minNative` 상향.
+## 2. 버전 SSOT
 
-> ⚠️ 현재 OTA 구현 범위 = **Android 만**(iOS OTA 는 `specs/ota.md` §3④ OUT, 후속). iOS 는 당분간 **스토어 빌드로만** 업데이트된다. 아래 OTA 절은 Android 기준이며, iOS OTA 활성화 시 본 문서를 갱신한다.
-
----
-
-## 1. OTA 채널 — staging(=beta) / production
-
-### 1.1 채널 2개와 흐름
-
-OTA 매니페스트는 Workers KV 에 **채널별**로 저장된다: `ota:android:beta` · `ota:android:production`.
-
-> **용어 주의**: 본 문서·iOS-PLAN §10.5 의 "staging" = 구현(`specs/ota.md`·워크플로우)의 **`beta`** 채널과 동일물이다.
-> KV 키·`ota-promote.yml`·`capacitor.config.json` 채널명은 전부 `beta`/`production` 이다(코드가 source of truth). "staging" 은 개념어로만 쓴다.
-
-```
-[main 머지 → stable DEV 자동 배포·QA]
-   │  승인 SHA로 ota-release.yml (workflow_dispatch + production environment)
-   ▼
-vite build → dist zip → private-key encrypt → SHA-256 → R2 업로드 → KV: ota:android:beta = {version,encrypted url,encrypted checksum,sessionKey,minNative,sha}
-   │  = beta 채널 수동 publish
-   ▼
-[베타 앱(채널=beta)]  다음 시작 시 수신 → checksum 검증 → 적용. 운영자/베타테스터가 확인.
-   │
-   │  ── 정상 ──▶  ota-promote.yml (workflow_dispatch, 수동)
-   │                  KV: ota:android:production ← ota:android:beta (verbatim 복사, 재빌드 X)
-   │                  = production 채널 승격 → 설치 사용자(prod 앱) 순차 수신
-   │
-   └─ 이상 ──▶  승격 안 함(prod 무영향). beta 는 Capgo 자동 롤백(§4).
-```
-
-- **왜 수동 발행·승격인가**: main push는 stable DEV까지만 자동이다. 승인 SHA로 beta를 발행하고 운영자가 확인한 *같은 manifest·바이너리·체크섬*만 production으로 복사한다. 웹 Worker production도 같은 stable DEV SHA gate를 사용한다. (`specs/ota.md` §3③)
-- **최초 encrypted OTA 전환 순서**: `sessionKey` 전달 코드가 포함된 Worker를 별도 승인으로 Production에 먼저 승격하고 exact SHA를 확인한다. 그 다음 같은 public key가 내장된 v5 beta APK를 설치한 뒤 encrypted beta를 발행·실기기 복호화 QA한다. 마지막으로 보호된 `ota-production` 승인을 거쳐 같은 manifest를 승격한다. stable DEV receipt만으로 Production Worker 반영을 간주하지 않는다.
-- **앱이 채널을 어떻게 아는가**: Capgo `defaultChannel` / 런타임 `setChannel`. 베타테스터 빌드 = `beta`, 스토어 배포 빌드 = `production`. (현재 `capacitor.config.json` 의 `updateUrl` 은 `…/api/ota`; 워커가 `?channel=` 로 분기.)
-
-### 1.2 무엇이 OTA 로 가고 무엇이 네이티브 빌드인가 (★ 안전의 핵심)
-
-| OTA 로 내리는 것 (`dist` 안) | 스토어 빌드 필수 (`dist` 밖 = 네이티브 셸) |
-|---|---|
-| React/JS 로직, 컴포넌트, 카피·문구 | Capacitor **플러그인 추가/제거/버전업** |
-| CSS·디자인 토큰·레이아웃 | `AndroidManifest`(딥링크·권한)·`Info.plist` |
-| `public/` 정적 자산(폰트·이미지) | 앱 아이콘·스플래시 |
-| Supabase 쿼리·클라이언트 로직 | OS 권한·네이티브 SDK·Capacitor core 업그레이드 |
-
-- **`minNativeVersion` 게이트**는 네이티브 셸 API 호환 장치다. 설치된 셸이 요구 버전보다 낮으면 번들을 받지 않아 크래시를 차단한다. DB migration·RLS/RPC·공개범위 enum·legacy API 의미 호환은 보증하지 않으며 별도 fail-closed 전환과 역할별 QA가 필요하다.
-  - `ota-release.yml` 은 Android `build.gradle`의 `versionCode`를 읽어 `minNative`로 발행한다. 별도 숫자를 수동 관리하지 않으므로 네이티브 셸과 OTA 매니페스트가 단일 원천으로 일치한다.
-- **판단 규칙**: "이 변경이 새 APK/IPA 없이 기존 설치 앱에서 동작하나?" → 예면 OTA, 아니오면 스토어 빌드. 애매하면 **스토어 빌드 + `minNative` 상향**(보수적 기본값).
-- **스토어 약관**: 웹/해석형 콘텐츠 업데이트는 Play·App Store 모두 허용. **네이티브 실행코드 다운로드는 금지** — 우리는 웹 번들(`dist`)만 내리므로 적합.
-
----
-
-## 2. release 브랜치 전략 + SemVer
-
-### 2.1 main 과 release 브랜치의 관계
-
-- **`main` = 연속 통합 + stable DEV 소스.** 피처 브랜치 → PR → `main` 머지 시 DEV Worker만 자동 배포·smoke한다.
-- **웹 production**: `promote-production.yml`을 승인 SHA로 수동 실행해 stable DEV receipt·`origin/main` 일치 뒤 같은 checkout을 배포한다.
-- **앱 OTA**: `ota-release.yml`을 승인 SHA로 수동 실행해 beta를 발행하고, 기기 QA 뒤 `ota-promote.yml`로 같은 manifest를 production에 수동 승격한다.
-- **`release/x.y.z` = 스토어 바이너리 컷 지점.** 네이티브 변경을 스토어에 내보낼 때만 `main` 에서 브랜치를 컷한다. 일상 OTA 업데이트는 release 브랜치가 필요 없지만 beta·production 승인 gate는 생략하지 않는다.
-
-```
-main  ──●──●──●──────●──────●──●──▶   (연속, 매 머지 = stable DEV; OTA는 승인 SHA로 별도 실행)
-            │ cut          │ cut
-            ▼              ▼
-   release/1.1.0    release/1.2.0      ← 네이티브 변경 시에만 컷
-        │                  │
-   (버전 범프·빌드·         (동일)
-    스토어 제출·태그)
-```
-
-### 2.2 release 브랜치 컷 시점
-
-`release/x.y.z` 를 컷하는 **유일한 트리거 = 스토어 바이너리 제출이 필요한 시점**, 즉 다음 중 하나:
-
-1. **네이티브 변경**이 main 에 쌓여 설치 사용자에게 전달돼야 할 때(`minNative` 게이트에 막혀 OTA 로 못 가는 것).
-2. **정기 스토어 동기화**(예: 월 1회) — 그동안 OTA 로 나간 웹 번들을 새 스토어 빌드에 박제(baseline 갱신, OTA 적용 전 첫 실행 경험 개선).
-3. **스토어 정책상 강제 업데이트**(SDK 최소버전 상향 등).
-
-컷 절차:
-
-```bash
-# main 최신에서 컷
-git fetch origin && git checkout -b release/1.2.0 origin/main
-# → §3 버전 범프 → 빌드(RELEASE-BUILD.md) → 스토어 제출 → 태그
-git tag v1.2.0 && git push origin v1.2.0
-```
-
-- release 브랜치는 **빌드·제출용 동결 지점**이다. 새 기능은 계속 `main` 에. 스토어 심사 중 main 이 앞서가도 무방(다음 컷이 따라잡는다).
-- release 브랜치의 버전 범프 커밋은 **main 으로 다시 머지/체리픽**한다(버전 단조 증가 유지, §3.4).
-
-### 2.3 hotfix 흐름
-
-| 핫픽스 종류 | 경로 | 근거 |
-|---|---|---|
-| **웹 레이어 버그**(대다수) | `main` 에 fix PR 머지 → beta OTA → 확인 → prod 승격 | OTA 가 *곧* 핫픽스 채널. 스토어 우회. |
-| **네이티브 버그**(크래시·권한·플러그인) | `release/x.y.(z+1)` 컷 → patch 범프 → 빌드 → **긴급 제출** | OTA 로 못 고침. iOS 는 [긴급 심사 요청](https://developer.apple.com/contact/app-store/?topic=expedite) 가능. |
-| **나쁜 OTA 번들이 prod 에 나감** | **롤백 먼저**(§4) → main 에서 정상 fix → 재-publish | 사용자 영향 최소화가 1순위. |
-
-### 2.4 SemVer 규칙 — `major.minor.patch`
-
-스토어 바이너리(`versionName`/`MARKETING_VERSION`)에 적용. 기준:
-
-| 증가 | 언제 | 예 | 보통 경로 |
+| 역할 | 파일 | 키 | 규칙 |
 |---|---|---|---|
-| **major** (`x`) | 호환 깨짐·전면 개편·데이터 마이그레이션 동반 | `1.x.x → 2.0.0` | release 브랜치 |
-| **minor** (`y`) | 새 기능·**네이티브 추가**(플러그인·권한) | `1.1.x → 1.2.0` | release 브랜치(스토어 빌드) |
-| **patch** (`z`) | 버그픽스·카피·UI 미세 조정 | `1.2.0 → 1.2.1` | **대부분 OTA**(웹), 네이티브 버그만 release 브랜치 |
+| npm·웹 패키지 메타데이터 | `package.json` | `version` | 내부 빌드 메타데이터. 모바일 버전과 독립 |
+| Android 마케팅 버전 | `android/app/build.gradle` | `versionName` | 사용자 노출 SemVer |
+| Android 빌드 번호 | `android/app/build.gradle` | `versionCode` | Play 업로드마다 단조 증가하는 양의 정수 |
+| iOS 마케팅 버전 | `ios/App/App.xcodeproj/project.pbxproj` | `MARKETING_VERSION` | App Store 사용자 노출 버전 |
+| iOS 빌드 번호 | 같은 파일 | `CURRENT_PROJECT_VERSION` | App Store Connect 업로드마다 단조 증가하는 양의 정수 |
 
-> **핵심 비대칭**: patch·웹 핫픽스는 **OTA**(스토어 안 거침). minor 이상(네이티브 동반)은 **스토어 바이너리 릴리스**. → 일상 업데이트는 지금 웹처럼 수시 배포, 스토어 제출은 네이티브가 바뀔 때만.
->
-> **OTA 번들 버전 ≠ 스토어 SemVer**: OTA 번들 버전은 `ota-release.yml` 이 `1.0.<github.run_number>`(단조 증가)로 자동 발급한다. Capgo CLI 가 비-semver(예: `2026.06.24-sha`)를 거부하기 때문(`invalid_semver`). git sha·날짜는 매니페스트의 `sha`/`date` 메타데이터에만 싣는다. **스토어 SemVer(`x.y.z`)는 사람이 release 브랜치에서 범프**한다 — 둘은 독립 축이다(OTA=웹 번들 일련번호, SemVer=네이티브 셸 마케팅 버전).
+- 플랫폼 간 문자열 일치 요구 없음: npm, Android, iOS는 소비자와 릴리스 주기가 다르다.
+- 빌드 번호도 플랫폼 간 동기화하지 않음: 각 스토어 이력 안에서만 단조 증가하면 된다.
+- Android Debug/Release 설정끼리, iOS Debug/Release 설정끼리는 같은 플랫폼 버전에 합의해야 한다.
 
----
-
-## 3. 역할별 버전 절차
-
-### 3.1 버전 SSOT
-
-| 역할 | 파일/생성 위치 | 키·형식 | 현재값 | 계약 |
-|---|---|---|---|---|
-| npm·웹 패키지 메타데이터 | `docs/readinggo/package.json` | `version` | `0.1.0` | 내부 웹 패키지·빌드 메타데이터. Android/iOS 출시 버전의 SSOT가 아니다. |
-| Android 마케팅 버전 | `docs/readinggo/android/app/build.gradle` | `versionName` | `"1.0.4"` | Play 사용자에게 노출되는 Android native release 정본. |
-| Android 빌드 번호 | 같은 파일 | `versionCode` | `5` | Play 업로드 순서를 판단하는 Android 독립 정수. Android 스토어 업로드마다 단조 증가한다. |
-| OTA 번들 버전 | `.github/workflows/ota-release.yml` | `1.0.<github.run_number>` | 실행별 자동 생성 | 웹 번들의 단조 증가 식별자. npm·Android·iOS 마케팅 버전과 동기화하지 않는다. |
-| OTA native 하한 | 같은 workflow가 Android Gradle에서 읽음 | `minNative` | 현재 `versionCode`에서 파생 | 기존 Android 셸 호환성 게이트. 별도 숫자나 npm/iOS 버전에서 파생하지 않는다. |
-| iOS 마케팅 버전 | `docs/readinggo/ios/App/App.xcodeproj/project.pbxproj` | `MARKETING_VERSION` | `1.0` | iOS native 출시 시 App Store 사용자에게 노출되는 독립 정본. |
-| iOS 빌드 번호 | 같은 파일 | `CURRENT_PROJECT_VERSION` | `1` | App Store 업로드 순서를 판단하는 iOS 독립 정수. iOS 업로드마다 단조 증가한다. |
-
-> `capacitor.config.json` 에는 **버전 필드가 없다**(앱 버전은 네이티브 프로젝트 소유). Capgo `@capgo/capacitor-updater` 의 OTA 버전은 빌드타임이 아니라 릴리스 workflow가 만든 런타임 매니페스트가 결정한다.
->
-> ⚠️ `build.gradle`·iOS `project.pbxproj` 의 실제 **편집 명령·빌드·서명**은 `RELEASE-BUILD.md`(#1024) 소관이다. 여기서는 어떤 역할이 어느 정본을 소유하는지만 정의한다.
-
-### 3.2 독립 관리 규칙
-
-- **플랫폼 간 문자열 일치 요구 없음**: npm `version`, Android `versionName`, OTA 번들 버전, iOS `MARKETING_VERSION`을 같은 값으로 강제하지 않는다. 각 값은 릴리스 주기와 소비자가 다르다.
-- **Android**: `versionName`은 Android 마케팅 버전으로 관리하고 `versionCode`는 Play 업로드마다 이전 승인 빌드보다 크게 올린다.
-- **OTA**: 번들 버전은 workflow run number로 자동 생성한다. `minNative`는 `ota-release.yml`이 Android `versionCode`를 직접 읽어 매니페스트에 넣으며 수동 상수를 두지 않는다.
-- **npm**: 내부 웹 패키지·빌드 메타데이터를 배포할 때만 독립적으로 범프한다. npm 범프가 Android·iOS native release를 자동으로 요구하지 않는다.
-- **iOS**: Android 공개 출시 게이트와 분리한다. iOS native 출시를 준비할 때 `MARKETING_VERSION`과 `CURRENT_PROJECT_VERSION`을 App Store 이력에 맞춰 독립적으로 올린다.
-- **빌드 번호도 플랫폼 간 동기화하지 않음**: Android `versionCode`와 iOS `CURRENT_PROJECT_VERSION`은 각 스토어 안에서만 단조 증가하면 된다.
-
-### 3.3 릴리스별 체크리스트
-
-**Android native release**
+## 3. Android 체크리스트
 
 ```text
-[ ] origin/main의 승인된 SHA에서 Android release PR 준비
-[ ] build.gradle versionName → 이번 Android 마케팅 버전
-[ ] build.gradle versionCode → 직전 Play 승인/업로드 번호보다 크게 증가
-[ ] ota-release.yml이 같은 build.gradle versionCode를 minNative로 읽는 계약 테스트 통과
-[ ] Android 빌드·서명·내부 테스트 → RELEASE-BUILD.md
-[ ] staged rollout 및 rollback/roll-forward 계획 확인
+[ ] origin/main의 승인된 SHA와 stable DEV 검증 근거 확인
+[ ] versionName 결정, versionCode를 직전 Play 업로드보다 크게 증가
+[ ] VITE_READINGGO_ENV=production npm run build
+[ ] npx cap sync android
+[ ] android-release workflow 또는 RELEASE-BUILD.md 절차로 서명된 AAB/APK 생성
+[ ] 내부 테스트에서 설치·로그인·핵심 기록·업데이트 설치 확인
+[ ] Play Console에 업로드하고 staged rollout 계획 확인
+[ ] commit SHA, versionName/versionCode, AAB checksum, workflow run, 기기 QA를 receipt에 기록
 ```
 
-**OTA release**
+## 4. iOS 체크리스트
 
 ```text
-[ ] main → stable DEV의 동일 SHA와 QA 근거 확인
-[ ] ota-release.yml 수동 실행: 승인 SHA를 beta에 발행
-[ ] version=1.0.<run_number>, minNative=Android versionCode readback
-[ ] beta 앱 검증 후 같은 SHA를 ota-promote.yml로 production 수동 승격
+[ ] origin/main의 승인된 SHA와 stable DEV 검증 근거 확인
+[ ] MARKETING_VERSION 결정, CURRENT_PROJECT_VERSION을 직전 업로드보다 크게 증가
+[ ] Debug/Release 선언값이 각각 하나의 값으로 일치하는지 확인
+[ ] VITE_READINGGO_ENV=production npm run build
+[ ] npx cap sync ios
+[ ] Xcode archive·서명·TestFlight 빌드 생성
+[ ] TestFlight 실기기에서 로그인·핵심 기록·업데이트 설치 확인
+[ ] App Store Connect에 제출하고 phased release 계획 확인
+[ ] commit SHA, 버전/빌드, archive provenance, workflow·기기 QA를 receipt에 기록
 ```
 
-**iOS native release — Android 공개 출시 후 별도**
+## 5. 롤백과 핫픽스
 
-```text
-[ ] iOS release PR에서 MARKETING_VERSION 결정
-[ ] CURRENT_PROJECT_VERSION을 직전 App Store Connect 업로드보다 크게 증가
-[ ] Debug/Release 두 설정값이 각각 동일한지 확인
-[ ] iOS 빌드·서명·TestFlight·실기기 검증 → RELEASE-BUILD.md
-```
+- **출시 중**: Play staged rollout 또는 App Store phased release를 즉시 중단한다.
+- **이미 설치됨**: 스토어는 자동 다운그레이드를 제공하지 않는다. 직전 정상 소스로 복구하되 새 `versionCode` 또는 `CURRENT_PROJECT_VERSION`으로 롤포워드 빌드를 제출한다.
+- **웹 코드 핫픽스**도 동일하다. 수정 PR → stable DEV 검증 → 새 스토어 바이너리 → 내부 테스트 → 단계적 출시 순서를 생략하지 않는다.
+- 과거 바이너리 재사용, 빌드 번호 재사용, 승인되지 않은 로컬 소스의 긴급 업로드는 금지한다.
 
-**npm·웹 패키지 메타데이터**
-
-```text
-[ ] 내부 패키지 배포가 실제 필요한지 확인
-[ ] package.json version만 npm SemVer 정책에 따라 독립 범프
-[ ] Android/iOS 버전 파일은 해당 native release가 아니면 변경하지 않음
-```
-
-### 3.4 정합 확인 스크립트 (읽기 전용)
-
-아래 명령은 각 정본의 현재값을 읽는다. **출력값끼리 같은지는 통과 조건이 아니다.** 각 값이 파싱 가능하고, Android `versionCode`가 OTA `minNative`의 유일한 원천인지 검증한다.
+## 6. 읽기 전용 정합 검사
 
 ```bash
-# docs/readinggo 에서 실행
+# docs/readinggo에서 실행
 node -p "'npm metadata: ' + require('./package.json').version"
-grep -m1 -E '^\\s*versionName\\s+' android/app/build.gradle
-grep -m1 -E '^\\s*versionCode\\s+' android/app/build.gradle
+grep -m1 -E '^\s*versionName\s+' android/app/build.gradle
+grep -m1 -E '^\s*versionCode\s+' android/app/build.gradle
 grep -o 'MARKETING_VERSION = [^;]*' ios/App/App.xcodeproj/project.pbxproj | sort -u
 grep -o 'CURRENT_PROJECT_VERSION = [^;]*' ios/App/App.xcodeproj/project.pbxproj | sort -u
-node ../../tests/ota-native-gate.test.mjs
+node ../../tests/release-version-contract.test.mjs
 ```
-
-CI는 플랫폼 간 버전 문자열 일치가 아니라 파일별 형식·중복 선언·Android `versionCode`→OTA `minNative` 연결을 검증한다. 자동 범프는 플랫폼별 release 절차에서만 수행하며 여러 플랫폼 파일을 한 번에 수정하지 않는다.
-
----
-
-## 4. 롤백 검증
-
-### 4.1 OTA 롤백 — 이전 KV 매니페스트로
-
-OTA 롤백은 두 층이다:
-
-1. **Capgo 자동 롤백 (앱 내, 즉시)**: 새 번들이 부팅 후 시간 내 `notifyAppReady()` 를 호출하지 못하면(크래시·백스크린) 플러그인이 **직전 양호 번들로 자동 복귀**한다(`resetWhenUpdate`/내장 안전망). → 망가진 번들이 앱을 벽돌로 만들지 않음. 사용자 측 1차 방어선.
-2. **수동 롤백 (서버 측, prod 채널 되돌리기)**: 나쁜 번들이 *충돌은 안 하지만 잘못된* 경우(기능 회귀·데이터 오작동) — 자동 롤백이 안 걸린다. 운영자가 **production 매니페스트를 직전 양호 버전으로 덮어쓴다**.
-
-production 을 직전 양호 매니페스트로 되돌리는 법(서버 측). 아래 **A) 가 기본**(원클릭) — `ota-promote.yml` 이 매 승격마다 직전 prod 를 `:prev` 키에 자동 백업하므로(#1029), 한 줄로 복원한다.
-
-> **최초 승격 주의(#1252)**: wrangler v4 `kv key get --remote` 는 키 부재 시 빈 출력이 아니라
-> **404 + exit 1** 이다. 백업 스텝은 이를 허용(`|| true`)해 "prod 없음 → 백업 스킵" 으로
-> 흐른다 — 최초 승격(2026-07-14 이전)이 이 지점에서 항상 실패했던 회귀 방지.
-
-```bash
-NS=e22049c87f9d44139242316c3c445bf9   # OTA_KV namespace id (wrangler.toml)
-
-# A) ★ 표준 수동 롤백 — 직전 prod encrypted 매니페스트(:prev)를 검증 후 production 으로 복원.
-#    ota-promote.yml 이 승격 직전 현재 prod 를 ota:android:production:prev 로 백업해 둔다(#1029).
-#    = 직전 1세대로 즉시 되돌리기. 가장 흔한 롤백(방금 승격이 나빴다).
-#    --remote 필수: 없으면 로컬 KV 만 건드려 실제 prod 가 안 바뀐다(#990).
-PREV=$(npx -y wrangler@4.118.0 kv key get --remote --namespace-id "$NS" "ota:android:production:prev")
-if [ -z "$PREV" ]; then
-  echo "백업 없음(:prev). 최초 승격이거나 백업 전 — Production 변경 중단."
-  exit 1
-fi
-printf '%s' "$PREV" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);const v=x=>typeof x==="string"&&x.length>0&&x===x.trim();let u=false;if(v(m.url)){try{const x=new URL(m.url);u=x.protocol==="https:"&&!x.username&&!x.password}catch{}}if(!v(m.version)||!u||typeof m.checksum!=="string"||!/^[a-f0-9]{64}$/i.test(m.checksum)||!v(m.sessionKey)||!Number.isSafeInteger(m.minNative)||m.minNative<5)process.exit(1)})'
-npx -y wrangler@4.118.0 kv key put --remote --namespace-id "$NS" "ota:android:production" "$PREV"
-
-# B) beta 가 아직 양호하면: ota-promote.yml의 보호된 승인·검증 경로로 재승격한다.
-#    beta 도 이미 나쁜 번들이면 쓰지 않는다. (:prev 가 있으면 A가 기본이다.)
-
-# C) 2세대 이상 이전의 임의 버전 수동 재구성은 현재 지원하지 않는다.
-#    encrypted manifest는 원본 sessionKey까지 완전하게 보존해야 하며, URL/checksum만으로
-#    새 JSON을 만들면 v5 앱이 복호화할 수 없다. 검증된 다세대 manifest archive가 도입되기
-#    전에는 불완전한 값을 production KV에 직접 쓰지 않는다.
-```
-
-- **핵심**: prod 매니페스트만 이전 버전을 가리키게 하면, prod 앱은 다음 체크에서 그 이전 번들을 받아 복귀한다(번들 바이너리는 R2 에 그대로 남아 있으므로 재빌드 불필요).
-- 현재 매니페스트 확인: `npx -y wrangler@4.118.0 kv key get --remote --namespace-id "$NS" "ota:android:production"`.
-- 백업 확인(롤백 전 무엇으로 돌아가는지): `npx -y wrangler@4.118.0 kv key get --remote --namespace-id "$NS" "ota:android:production:prev"`.
-- **`:prev` 범위·주의**: `:prev` 는 **직전 1세대만** 보관한다(매 승격이 직전 값으로 덮어씀). 롤백(A) 직후 곧장 또 승격하면 그 롤백 값이 다시 `:prev` 가 되므로, 연속 작업은 매번 현재 prod 를 먼저 확인한다. 2세대 이상 이전 복원은 원본 encrypted manifest 전체를 검증·보존하는 다세대 archive가 생기기 전까지 지원하지 않는다.
-
-### 4.2 네이티브 롤백 — 스토어 한계
-
-- **OTA 처럼 즉시 되돌릴 수 없다.** 스토어에 이미 배포된 바이너리는 클라이언트가 자동 다운그레이드되지 않는다.
-- **Android(Play)**: 단계적 출시(staged rollout) 중이면 **롤아웃 중단/일시정지**로 추가 노출을 막을 수 있다. 이미 받은 사용자는 다운그레이드 안 됨 → **이전 양호 빌드를 새 versionCode 로 재업로드**(롤포워드)해야 실질 복구.
-- **iOS(App Store)**: 출시 후 즉시 롤백 없음. 단계적 출시(phased release) 중이면 **일시정지** 가능. 복구 = 이전 코드로 빌드해 **새 빌드 번호로 재제출**(심사 재대기).
-- **결론**: 네이티브 변경은 **보수적으로**. 그래서 ① 네이티브 변경 ≠ 일상 업데이트(OTA 로 최대한 흡수), ② 스토어는 **단계적 출시**(10%→50%→100%)로 회귀 조기 발견, ③ 웬만한 핫픽스는 OTA 로 가능하게 설계.
-
-### 4.3 롤백 테스트 방법 (출시 전 1회 + 분기마다)
-
-OTA 롤백이 *실제로* 동작하는지 검증한다(설계만 믿지 않는다):
-
-```text
-[OTA 자동 롤백]
-[ ] 일부러 부팅 크래시 번들(예: 최상위에서 throw) 을 beta 에 publish
-[ ] 베타 기기에서 앱 재시작 → 크래시 → 재시작 시 직전 양호 번들로 복귀 확인
-[ ] 정상 화면 뜨면 통과 (Capgo notifyAppReady 안전망 동작)
-
-[OTA 수동 롤백]
-[ ] 정상이지만 눈에 띄는 회귀(예: 버튼 라벨 변경) 번들을 prod 로 승격
-[ ] §4.1-A 원클릭(:prev → production)으로 prod 매니페스트를 직전 버전으로 되돌림
-[ ] prod 기기 재시작 → 이전 라벨로 복귀 확인
-
-[네이티브 (스토어) — 모의]
-[ ] 내부테스트 트랙에서 staged rollout 일시정지 동작 확인(실제 prod 위험 없이)
-[ ] 롤포워드 절차(이전 코드 + versionCode+1 재빌드)를 RELEASE-BUILD.md 대로 1회 리허설
-```
-
----
-
-## 5. 한눈에 — 의사결정 요약
-
-| 항목 | 결정 |
-|---|---|
-| OTA 채널 | `beta`(=staging 개념) → `production`. stable DEV 승인 SHA로 beta 수동 발행, 같은 manifest를 production에 수동 승격. |
-| OTA 범위 | 현재 **Android 만**. `dist` 웹 번들. iOS OTA·서명·staged% 는 후속. |
-| OTA/네이티브 경계 | `dist` 안=OTA, `dist` 밖(셸)=스토어 빌드. `minNativeVersion`은 셸 API만 보호하며 DB/RLS/API 의미 호환은 별도 gate. |
-| release 브랜치 | `release/x.y.z` 는 **스토어 빌드 컷 지점만**. 일상 OTA 는 불필요. |
-| SemVer | patch·웹=OTA, minor↑(네이티브)=스토어. OTA 번들 버전(`1.0.<run#>`)과 스토어 SemVer 는 독립. |
-| 버전 동기화 | 마케팅 3곳 일치(package.json·versionName·MARKETING_VERSION), 빌드번호 단조+1(versionCode·CURRENT_PROJECT_VERSION). |
-| 롤백 | OTA=자동(crash)+수동(prod KV 되돌리기). 네이티브=스토어 한계 → staged rollout·롤포워드. 분기마다 리허설. |
-
-## 6. 변경 이력
-
-| 날짜 | 변경 |
-|---|---|
-| 2026-06-26 | 신설(#876). OTA 채널·release 브랜치·버전 동기화·롤백 절차 문서화. iOS-PLAN §10.5 + `specs/ota.md` 를 운영 프로세스로 통합. |
-| 2026-06-26 | §4.1 원클릭 OTA 롤백 추가(#1029). `ota-promote.yml` 이 승격 직전 prod 를 `ota:android:production:prev` 로 백업 → `:prev`→`production` 한 줄 복원. 본 문서를 상시 markdownlint globs 에 등록. |

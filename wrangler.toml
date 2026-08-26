@@ -25,11 +25,10 @@ command = "cd docs/readinggo && npm ci && VITE_READINGGO_ENV=production npm run 
 directory = "docs/readinggo/dist"
 binding = "ASSETS"
 
-# OTA Live Updates (#876) — 채널별 번들 매니페스트(version·url·checksum·minNative).
-# 번들 바이너리는 매니페스트 url 에 위임(R2/GitHub Releases — 페이즈 C에서 결정). 워커는 manifest 만 보유.
+# 앱 공용 KV — rate limit 카운터와 내부 실험 로그.
 [[kv_namespaces]]
-binding = "OTA_KV"
-id = "e22049c87f9d44139242316c3c445bf9"
+binding = "APP_KV"
+id = "43754b176f714f39aebb5a9dc0974bc9"
 
 # 인증 upstream보다 먼저 적용하는 원자적 per-IP 상한 (#1398).
 [[ratelimits]]
