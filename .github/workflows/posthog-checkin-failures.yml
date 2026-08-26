@@ -1,0 +1,42 @@
+name: PostHog production check-in failures
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback_hours:
+        description: Recent hours to inspect (1-168)
+        required: true
+        default: '6'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: sanitized Android check-in failure report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Report tests
+        run: node --test tests/posthog-checkin-failures.test.mjs
+
+      - name: Query sanitized Production Android failures
+        env:
+          POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
+          LOOKBACK_HOURS: ${{ inputs.lookback_hours }}
+          REPORT_OUTPUT_DIR: artifacts/posthog-checkin-failures
+        run: node scripts/posthog-checkin-failures.mjs
+
+      - name: Upload sanitized report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: posthog-production-checkin-failures-${{ github.run_id }}
+          path: artifacts/posthog-checkin-failures/
+          if-no-files-found: warn
+          retention-days: 7
