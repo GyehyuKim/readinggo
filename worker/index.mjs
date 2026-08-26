@@ -2758,7 +2758,7 @@ async function bookUpsertProxy(request, env) {
   return created ? json(created) : json({ error: 'upsert failed' }, 502);
 }
 
-// ── OTA Live Updates (#876) ───────────────────────────────
+// ── DEV Review Personas (#1306) ───────────────────────────
 const DEV_REVIEW_PERSONA_IDS = new Set(['product-explorer', 'community-listener', 'steady-builder']);
 const DEV_REVIEW_MAX_BYTES = 120000;
 

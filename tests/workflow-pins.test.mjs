@@ -6,7 +6,6 @@ const workflowDir = new URL("../.github/workflows/", import.meta.url);
 const workflowFiles = readdirSync(workflowDir).filter((file) => /\.ya?ml$/.test(file));
 const unpinnedActions = [];
 const unpinnedWrangler = [];
-const unpinnedPrivilegedCli = [];
 
 for (const file of workflowFiles) {
   const source = readFileSync(new URL(file, workflowDir), "utf8");
@@ -18,15 +17,10 @@ for (const file of workflowFiles) {
     if (/\bwrangler@4(?:\s|$)/.test(line)) {
       unpinnedWrangler.push(`${file}:${index + 1}`);
     }
-    const cli = line.match(/\bnpx\s+-y\s+(@capgo\/cli)@([^\s]+)/);
-    if (cli && !/^\d+\.\d+\.\d+$/.test(cli[2])) {
-      unpinnedPrivilegedCli.push(`${file}:${index + 1} ${cli[0]}`);
-    }
   }
 }
 
 assert.deepEqual(unpinnedActions, [], `GitHub Actions must use full commit SHAs:\n${unpinnedActions.join("\n")}`);
 assert.deepEqual(unpinnedWrangler, [], `Privileged Wrangler calls must use an exact version:\n${unpinnedWrangler.join("\n")}`);
-assert.deepEqual(unpinnedPrivilegedCli, [], `Privileged CLIs must use exact versions:\n${unpinnedPrivilegedCli.join("\n")}`);
 
 console.log(`workflow pins: ${workflowFiles.length} files checked`);

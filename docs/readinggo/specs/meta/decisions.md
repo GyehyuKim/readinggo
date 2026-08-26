@@ -329,19 +329,9 @@
 
 ---
 
-### 8.15 결정 (2026-06-24, OTA Live Updates — **v18.8에서 superseded**)
+### 8.15 결정 (2026-08-26, 스토어 외 설치 앱 업데이트 경로 폐기)
 
-> **과거 이력:** 설치 앱의 웹 레이어를 스토어 심사 없이 갱신하려고 아래 계약을 채택했으나, 2026-08-26 v18.8에서 전면 퇴역했다. 아래 표는 현재 계약이나 복원 지침이 아니며 Git 이력 감사용이다.
-
-| 항목 | 결정 |
-|---|---|
-| 메커니즘 | **`@capgo/capacitor-updater` 자가호스팅** (CF Worker `/api/ota` + R2 번들 + KV 매니페스트). Capgo 클라우드·Appflow(2026 종료) 비채택 — 비용 0·데이터 보유·기존 워커 재사용 |
-| 릴리스 전략 ⭐ | **채널 beta·production 2개. main 머지 → beta 자동 publish, beta→production 수동 승격**(`workflow_dispatch`) = 앱판 카나리. 근거: 배포안전(#897) 카나리를 앱 레이어에 적용 |
-| 기각 | iOS-PLAN §10.5 원안 `main→production 자동 + staged %`. prod 자동 노출이 출시 초기엔 위험 → 수동 승격 채택. staged %는 Phase 2 |
-| 범위 경계 | OTA = 웹 번들만. 네이티브(플러그인·매니페스트·코드)는 스토어 빌드. **`minNativeVersion` 게이트**로 구 셸에 신 API 번들 적용 차단(크래시 방지) |
-| 동작 | 백그라운드 다운로드 → 다음 시작 시 적용. checksum 검증. `notifyAppReady()` 미호출 시 **자동 롤백**(Capgo 내장) |
-| Stack Lock | `@capgo/capacitor-updater` = Capacitor 1차 생태계·오픈소스 → **단일 lock 내**. 코드 PR에서 추가 |
-| 상태 | **결정 + spec only(`ota.md`)**. 코드·인프라(플러그인·Worker·R2/KV·GH Action)는 후속 코드 PR |
+스토어 심사를 거치지 않는 설치 앱 업데이트 경로는 전면 폐기했다. 설치 앱 업데이트는 App Store와 Google Play 바이너리로만 전달하며, 별도 승인 결정 없이는 Git 이력의 과거 구현도 복원하지 않는다.
 
 ### 8.16 결정 (2026-07-22, #1303 dev/prod 완전 분리. 충돌 시 §8.13·§8.15 위에 **우선**)
 
@@ -564,7 +554,3 @@
 | 전달 게이트 | DEV 구현·합성 검증은 허용. **#1373 전 OFF/ON 최종 품질 인수, Production route/flag·실사용자 opt-in·Production 승격 금지** |
 
 SSOT는 [companion.md §4.7](../companion.md#47-내-기록-기반-관련-맥락-retrieval-1309-목표-계약), 인증/API/RLS는 [backend.md §7.9.3](../backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309), 개인정보·분석은 [privacy-policy.md §0.1](../privacy-policy.md#01-내-기록-기반-ai-개인화-안전-계약-1309-목표)과 [analytics.md §3.1.5](../analytics.md#315-개인화-context-이벤트-allowlist-1309-목표)을 따른다.
-
-### v18.8 — 설치 앱 OTA 은퇴 (#1540, 2026-08-26)
-
-OTA는 구현됐지만 beta·Production 매니페스트로 활성화된 적이 없다. 분산 운영·보안 복잡성과 재활성화 위험 때문에 전면 은퇴하며 설치 앱 업데이트는 App Store·Google Play 바이너리로만 전달한다. 명시적으로 다시 승인하는 별도 결정이 생길 때만 Git history에서 복원할 수 있다.
