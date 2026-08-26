@@ -37,6 +37,13 @@ for (const file of readdirSync(workflowDir).filter((name) => /\.ya?ml$/.test(nam
   assert.doesNotMatch(read(`.github/workflows/${file}`), /OTA_PRIVATE_KEY|OTA_PUBLIC_KEY|ota-production|ota-release|ota-promote/, `${file}가 퇴역한 발행 경로를 참조하면 안 된다`);
 }
 
+const markdownDir = new URL('../docs/readinggo/', import.meta.url);
+for (const relative of readdirSync(markdownDir, { recursive: true }).filter((name) => name.endsWith('.md'))) {
+  const path = `docs/readinggo/${relative}`;
+  if (path === 'docs/readinggo/specs/meta/decisions.md') continue;
+  assert.doesNotMatch(read(path), /\bOTA\b|Capgo|\/api\/ota|OTA_KV|ota-release|ota-promote|ota-production|specs\/ota\.md/, `${path}에 현재 기능처럼 읽히는 OTA 서술이 남으면 안 된다`);
+}
+
 assert.match(read('docs/readinggo/RELEASE.md'), /스토어 바이너리로만/);
 assert.match(read('docs/readinggo/specs/meta/decisions.md'), /v18\.8 — 설치 앱 OTA 은퇴/);
 
