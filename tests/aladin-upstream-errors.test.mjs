@@ -18,7 +18,7 @@ function response(body, { status = 200, contentType = 'application/json' } = {})
   });
 }
 
-async function requestLegacy({ isbn = false, aladin, google = () => response({ items: [googleItem] }) }) {
+async function requestLegacy({ isbn = false, cursor = '', aladin, google = () => response({ items: [googleItem] }) }) {
   const savedFetch = globalThis.fetch;
   const savedError = console.error;
   const calls = [];
@@ -32,7 +32,9 @@ async function requestLegacy({ isbn = false, aladin, google = () => response({ i
   };
   console.error = (...args) => logs.push(args);
   try {
-    const params = isbn ? 'isbn=9781234567890' : `query=${encodeURIComponent(QUERY)}&max=2`;
+    const params = isbn
+      ? 'isbn=9781234567890'
+      : `query=${encodeURIComponent(QUERY)}&max=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
     const result = await worker.fetch(
       new Request(`https://readinggo.example/aladin?${params}`),
       { ALADIN_TTB_KEY: SECRET_KEY, BOOKS_PROVIDER: 'aladin' },
@@ -80,14 +82,25 @@ for (const [name, aladin, classification, status] of failures) {
 }
 
 const emptyPrimary = await requestLegacy({
-  aladin: () => response({ item: [] }),
-  google: () => response({ items: [] }),
+  aladin: () => response({ item: [], totalResults: 0 }),
 });
 assert.equal(emptyPrimary.result.status, 200, '유효한 Aladin 빈 결과는 성공이어야 한다');
 assert.deepEqual(emptyPrimary.body.items, []);
+assert.equal(emptyPrimary.body.hasMore, true, 'primary 종료 뒤 Google continuation이 있어야 한다');
+assert.equal(typeof emptyPrimary.body.nextCursor, 'string');
 assert.match(emptyPrimary.result.headers.get('cache-control') || '', /max-age=86400/, '유효한 primary 빈 결과는 24시간 캐시한다');
-assert.deepEqual(emptyPrimary.calls.map((url) => url.hostname), ['aladin.co.kr', 'www.googleapis.com'], 'primary 빈 결과도 기존 Google 보강 경로를 유지해야 한다');
+assert.deepEqual(emptyPrimary.calls.map((url) => url.hostname), ['aladin.co.kr'], 'primary 응답은 같은 요청에서 Google과 섞지 않는다');
 assert.equal(emptyPrimary.logs.length, 0);
+
+const emptyPrimaryContinuation = await requestLegacy({
+  cursor: emptyPrimary.body.nextCursor,
+  aladin: () => { throw new Error('Google cursor는 Aladin을 재호출하면 안 된다'); },
+  google: () => response({ totalItems: 0, items: [] }),
+});
+assert.equal(emptyPrimaryContinuation.result.status, 200);
+assert.deepEqual(emptyPrimaryContinuation.body.items, []);
+assert.equal(emptyPrimaryContinuation.body.hasMore, false);
+assert.deepEqual(emptyPrimaryContinuation.calls.map((url) => url.hostname), ['www.googleapis.com']);
 
 const emptyFallback = await requestLegacy({
   aladin: () => response({ errorCode: 429 }, { status: 429 }),
