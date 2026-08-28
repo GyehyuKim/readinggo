@@ -2274,11 +2274,10 @@ function normalizeNLK(doc, isbn) {
 async function kakaoSearchProxy(query, max, env, ctx) {
   try {
     let items = await kakaoBookSearch(query, max, env);
-    // 외서 균형 보강(#302 유지): 기본 국내(카카오) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
-    // 요청 max가 10보다 작으면 provider 보강 뒤에도 그 상한을 지킨다(#1458).
-    // Google 결과는 실시간 응답만 — 영구 upsert 없음(ToS §5.e).
+    // 주 공급자 결과를 제품 상한까지 보존하고, 빈자리만 Google 실시간 결과로 보강한다.
+    // 고정 5+5 할당은 관련 국내 도서를 누락시키므로 사용하지 않는다. 요청 max 계약은 #1458 유지.
     const responseMax = Math.min(max, 10);
-    items = items.slice(0, Math.min(5, responseMax));
+    items = items.slice(0, responseMax);
     if (items.length < responseMax) {
       try {
         const gb = await googleBooksSearch(query, responseMax - items.length, env);
@@ -2376,12 +2375,11 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
       const toPersist = persistItems || items;
       ctx.waitUntil(Promise.all(toPersist.filter((b) => b.isbn13).map((b) => upsertBook(SB, SRK, b).catch(() => {}))));
     }
-    // 외서 균형 보강 (#302) — 검색이면 기본 국내(알라딘) 최대 5 + 외서(Google) 최대 5 = 총 ≤10.
-    // 요청 max가 10보다 작으면 provider 보강 뒤에도 그 상한을 지킨다(#1458).
-    // ISBN 단건 조회엔 미적용한다.
+    // 검색이면 주 공급자 결과를 제품 상한까지 보존하고, 빈자리만 Google로 보강한다.
+    // 고정 5+5 할당은 관련 국내 도서를 누락시키므로 사용하지 않는다. ISBN 단건엔 미적용한다.
     if (query) {
       const responseMax = Math.min(max, 10);
-      items = items.slice(0, Math.min(5, responseMax));
+      items = items.slice(0, responseMax);
       if (items.length < responseMax) {
         try {
           const gb = await googleBooksSearch(query, responseMax - items.length, env);
