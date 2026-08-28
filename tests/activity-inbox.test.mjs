@@ -30,7 +30,8 @@ test('migration derives a bounded deterministic current projection without snaps
   assert.match(migration, /p\.to_user_id = p_viewer[\s\S]+p\.from_user_id <> p_viewer/);
   assert.match(migration, /statement_timestamp\(\) - interval '90 days'/);
   assert.match(migration, /order by v\.occurred_at desc, v\.kind asc, v\.event_key asc[\s\S]+limit 100/);
-  assert.match(migration, /follow:' \|\| encode\(digest\([\s\S]+f\.created_at[\s\S]+'sha256'/);
+  assert.match(migration, /follow:' \|\| encode\(extensions\.digest\([\s\S]+f\.created_at[\s\S]+'sha256'/);
+  assert.doesNotMatch(migration, /encode\(digest\(/, 'restricted search_path에서 public.digest를 찾지 않아야 한다');
   for (const filter of ['moderation_suspended_users', 'user_blocks', 'moderation_hidden_sentences']) {
     assert.match(migration, new RegExp(filter));
   }

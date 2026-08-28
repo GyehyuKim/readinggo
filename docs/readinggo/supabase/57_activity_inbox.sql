@@ -66,7 +66,7 @@ as $$
     select
       'follow'::text,
       null::uuid,
-      ('follow:' || encode(digest(
+      ('follow:' || encode(extensions.digest(
         f.follower_id::text || ':' || f.following_id::text || ':' ||
         to_char(f.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
         'sha256'
