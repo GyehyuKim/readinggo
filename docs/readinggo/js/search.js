@@ -141,6 +141,68 @@ function rgRankSearchResults(rows, query) {
   return out.map((x) => x.book);
 }
 
+function rgNormalizeRemoteBook(it) {
+  return {
+    book_id: it.isbn13 || `${it.title || ''}|${it.author || ''}|${it.publisher || ''}`,
+    isbn13: it.isbn13,
+    isbn: it.isbn13,
+    title: it.title,
+    author: it.author,
+    publisher: it.publisher,
+    total_pages: it.total_pages,
+    cover_url: it.cover_url,
+    _source: 'aladin',
+  };
+}
+
+function rgRemoteBookKey(book) {
+  return book.isbn13 || book.isbn || `${_rgSquash(book.title)}|${_rgAuthorKey(book.author)}|${_rgSquash(book.publisher)}`;
+}
+
+// provider page를 작품 행 기준으로 채운다. 판 그룹핑으로 10개 후보가 6행이 되면 다음 cursor를
+// 자동 조회하고, `더 보기`도 같은 함수로 다음 10행을 보충한다. cursor는 서버가 준 값을 그대로 쓴다.
+async function rgFetchRemoteWindow(proxy, query, cursor = '', existing = [], targetRows = 10, request = fetch) {
+  const books = Array.isArray(existing) ? [...existing] : [];
+  const seenBooks = new Set(books.map(rgRemoteBookKey).filter(Boolean));
+  const startingRows = rgRankSearchResults(books, query).length;
+  const desiredRows = startingRows + Math.max(1, targetRows);
+  const seenCursors = new Set();
+  let nextCursor = cursor || '';
+  let hasMore = true;
+  let loadedPages = 0;
+
+  do {
+    const cursorKey = nextCursor || '__first__';
+    if (seenCursors.has(cursorKey)) return { items: books, nextCursor: '', hasMore: false };
+    seenCursors.add(cursorKey);
+
+    const params = new URLSearchParams({ query, max: '10' });
+    if (nextCursor) params.set('cursor', nextCursor);
+    let response;
+    try {
+      response = await request(`${proxy}?${params.toString()}`);
+      if (!response.ok) throw new Error('search continuation failed');
+    } catch (error) {
+      if (!loadedPages) throw error;
+      return { items: books, nextCursor, hasMore: true };
+    }
+    const data = await response.json();
+    if (!data || !Array.isArray(data.items)) throw new Error('invalid search continuation');
+    for (const item of data.items) {
+      const book = rgNormalizeRemoteBook(item);
+      const key = rgRemoteBookKey(book);
+      if (!key || seenBooks.has(key)) continue;
+      seenBooks.add(key);
+      books.push(book);
+    }
+    loadedPages += 1;
+    nextCursor = typeof data.nextCursor === 'string' ? data.nextCursor : '';
+    hasMore = Boolean(data.hasMore && nextCursor);
+  } while (hasMore && loadedPages < 50 && rgRankSearchResults(books, query).length < desiredRows);
+
+  return { items: books, nextCursor, hasMore };
+}
+
 const SearchModal = ({
   isOpen,
   onClose,
@@ -156,6 +218,10 @@ const SearchModal = ({
   const [dbResults, setDbResults] = React.useState([]); // 우리 DB(books) 결과 — 즉시 표시 (#148)
   const [dbLoading, setDbLoading] = React.useState(false);     // 검색 진행중 구분 (#202)
   const [remoteLoading, setRemoteLoading] = React.useState(false);
+  const [remoteCursor, setRemoteCursor] = React.useState('');
+  const [remoteHasMore, setRemoteHasMore] = React.useState(false);
+  const [visibleCount, setVisibleCount] = React.useState(10);
+  const remoteRequestId = React.useRef(0);
   const [pendingBook, setPendingBook] = React.useState(null); // 책장 선택 대기 (#409)
   const [scanOpen, setScanOpen] = React.useState(false); // 바코드 스캔 모달 (#943)
   const [scanSupported, setScanSupported] = React.useState(false); // capability gate — 지원 환경만 진입점 노출
@@ -218,34 +284,33 @@ const SearchModal = ({
     return () => { alive = false; clearTimeout(t); };
   }, [query]);
 
-  // 알라딘 원격 검색(외부) — 디바운스 + graceful(프록시 미배포/실패 시 무시).
+  // 원격 일반 검색 — 최초 작품 10행이 찰 때까지 provider cursor를 자동 진행한다.
   React.useEffect(() => {
     const q = query.trim();
-    if (!q) { setRemote([]); setRemoteLoading(false); return; }
+    const requestId = ++remoteRequestId.current;
+    setVisibleCount(10);
+    if (!isOpen || !q) { setRemote([]); setRemoteCursor(''); setRemoteHasMore(false); setRemoteLoading(false); return; }
     const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
-    if (!proxy) { setRemote([]); setRemoteLoading(false); return; }
+    if (!proxy) { setRemote([]); setRemoteCursor(''); setRemoteHasMore(false); setRemoteLoading(false); return; }
     let alive = true;
     setRemoteLoading(true);
     const t = setTimeout(() => {
-      fetch(`${proxy}?query=${encodeURIComponent(q)}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (!alive || !d || !Array.isArray(d.items)) return;
-          setRemote(d.items.map((it) => ({
-            book_id: it.isbn13 || it.title,
-            isbn13: it.isbn13, isbn: it.isbn13,
-            title: it.title, author: it.author,
-            publisher: it.publisher, total_pages: it.total_pages,
-            cover_url: it.cover_url, _source: 'aladin',
-          })));
+      rgFetchRemoteWindow(proxy, q, '', [], 10)
+        .then((result) => {
+          if (!alive || requestId !== remoteRequestId.current) return;
+          setRemote(result.items);
+          setRemoteCursor(result.nextCursor);
+          setRemoteHasMore(result.hasMore);
         })
-        .catch(() => { if (alive) setRemote([]); })
-        .then(() => { if (alive) setRemoteLoading(false); });
+        .catch(() => {
+          if (alive && requestId === remoteRequestId.current) {
+            setRemote([]); setRemoteCursor(''); setRemoteHasMore(false);
+          }
+        })
+        .then(() => { if (alive && requestId === remoteRequestId.current) setRemoteLoading(false); });
     }, 350);
     return () => { alive = false; clearTimeout(t); };
-  }, [query]);
-
-  if (!isOpen) return null;
+  }, [query, isOpen]);
 
   // 책 탭 → 즉시 등록(읽는중) 대신 책장 선택 시트(#409). 찜/읽는중/완독 분기.
   const handleSelectResult = (item) => {
@@ -272,7 +337,34 @@ const SearchModal = ({
   const merged = rgRankSearchResults(
     _dedup(dbResults).concat(_dedup(localItems)).concat(_dedup(remote)), query
   );
+  const visibleResults = merged.slice(0, visibleCount);
   const searching = dbLoading || remoteLoading;  // 진행중 — 결과없음과 구분 (#202)
+
+  const handleLoadMore = () => {
+    if (remoteLoading) return;
+    const nextVisibleCount = visibleCount + 10;
+    if (merged.length >= nextVisibleCount || !remoteHasMore || !remoteCursor) {
+      setVisibleCount(nextVisibleCount);
+      return;
+    }
+    const q = query.trim();
+    const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
+    if (!q || !proxy) return;
+    const requestId = remoteRequestId.current;
+    setRemoteLoading(true);
+    rgFetchRemoteWindow(proxy, q, remoteCursor, remote, 10)
+      .then((result) => {
+        if (requestId !== remoteRequestId.current) return;
+        setRemote(result.items);
+        setRemoteCursor(result.nextCursor);
+        setRemoteHasMore(result.hasMore);
+        setVisibleCount(nextVisibleCount);
+      })
+      .catch(() => {})
+      .then(() => { if (requestId === remoteRequestId.current) setRemoteLoading(false); });
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -430,15 +522,32 @@ const SearchModal = ({
                   color: 'var(--ink-3)',
                 }}
               >
-                {merged.length}개 검색 결과
+                {visibleResults.length}개 검색 결과
               </div>
-              {merged.map((book) => (
+              {visibleResults.map((book) => (
                 <SearchResultItem
                   key={book.book_id}
                   book={book}
                   onClick={() => handleSelectResult(book)}
                 />
               ))}
+              {(remoteHasMore || merged.length > visibleCount) && (
+                <div style={{ padding: '12px 16px 18px' }}>
+                  <button
+                    type="button"
+                    onClick={handleLoadMore}
+                    disabled={remoteLoading}
+                    style={{
+                      width: '100%', padding: '12px 14px', borderRadius: 12,
+                      border: '1px solid var(--line)', background: 'var(--card)',
+                      color: 'var(--ink)', font: 'inherit', fontSize: 14, fontWeight: 800,
+                      cursor: remoteLoading ? 'default' : 'pointer', opacity: remoteLoading ? 0.65 : 1,
+                    }}
+                  >
+                    {remoteLoading ? '불러오는 중…' : '더 보기'}
+                  </button>
+                </div>
+              )}
             </div>
           ) : searching ? (
             // 검색 진행중 (#202) — 결과없음과 구분

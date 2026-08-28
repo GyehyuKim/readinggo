@@ -1963,8 +1963,8 @@ async function fetchBookBrief(title, env) {
   if (!title) return '';
   if (kakaoReady(env)) {
     try {
-      const items = await kakaoBookSearch(title, 1, env);
-      const desc = items && items[0] && String(items[0].description || '').trim();
+      const result = await kakaoBookSearch(title, 1, 1, env);
+      const desc = result.items[0] && String(result.items[0].description || '').trim();
       return desc ? desc.slice(0, 400) : '';
     } catch (e) { return ''; }
   }
@@ -2144,7 +2144,15 @@ async function bookProviderRequest(request, q, env, ctx) {
   // 그렇지 않으면 공격자가 빈 query/잘못된 ISBN만으로 전역 일일 예산을 소진할 수 있다.
   if (isbn && !/^\d{10,13}$/.test(isbn)) return json({ error: 'isbn 형식 오류' }, 400);
   if (!isbn && !query) return json({ error: 'query 또는 isbn 필요' }, 400);
-  const provider = isbn && nlkReady(env) ? 'nlk' : (!isbn && kakaoReady(env) ? 'kakao' : 'aladin');
+  let provider;
+  if (isbn) {
+    provider = nlkReady(env) ? 'nlk' : 'aladin';
+  } else {
+    const primaryProvider = kakaoReady(env) ? 'kakao' : 'aladin';
+    const cursor = parseSearchCursor(q.get('cursor'), primaryProvider);
+    if (!cursor) return json({ error: 'cursor 형식 오류' }, 400);
+    provider = cursor.provider;
+  }
   const cacheUrl = new URL('https://book-provider-cache.internal/aladin');
   cacheUrl.searchParams.set('provider', provider);
   for (const [key, value] of [...q.entries()].sort(([ak, av], [bk, bv]) => ak.localeCompare(bk) || av.localeCompare(bv))) {
@@ -2204,16 +2212,37 @@ async function bookProviderRequest(request, q, env, ctx) {
    라우트 `/aladin` 은 클라 회귀 방지 위해 과도기 유지(§7.2.1). 키 존재에 따라
    ISBN 단건 → 국중도(nlkIsbnLookup), 키워드 검색 → 카카오(kakaoSearchProxy),
    둘 다 없으면 기존 알라딘 경로(aladinLegacyProxy) — 현 배포 상태와 동일 동작. */
+function parseSearchCursor(raw, primaryProvider) {
+  if (!raw) return { provider: primaryProvider, page: 1 };
+  const match = /^(kakao|aladin|google):([1-9]\d*)$/.exec(String(raw));
+  if (!match) return null;
+  const page = Number(match[2]);
+  if (page < 1 || page > 50) return null;
+  if (match[1] !== 'google' && match[1] !== primaryProvider) return null;
+  return { provider: match[1], page };
+}
+
+function nextSearchCursor(provider, page) {
+  return page < 50 ? `${provider}:${page + 1}` : '';
+}
+
 async function aladinProxy(q, env, ctx) {
   const isbn = (q.get('isbn') || '').trim();
   const query = (q.get('query') || q.get('q') || '').trim().slice(0, 100);
-  const requestedMax = parseInt(q.get('max'), 10);
-  const max = Number.isFinite(requestedMax) && requestedMax > 0 ? Math.min(requestedMax, 20) : 10;
+  const rawMax = q.get('max');
+  const requestedMax = rawMax && /^\d+$/.test(rawMax) ? Number(rawMax) : NaN;
+  const max = Number.isFinite(requestedMax) && requestedMax > 0 ? Math.min(requestedMax, 50) : 10;
   if (isbn && !/^\d{10,13}$/.test(isbn)) return json({ error: 'isbn 형식 오류' }, 400);
   if (!isbn && !query) return json({ error: 'query 또는 isbn 필요' }, 400);
   if (isbn && nlkReady(env)) return nlkIsbnLookup(isbn, env, ctx);
-  if (!isbn && kakaoReady(env)) return kakaoSearchProxy(query, max, env, ctx);
-  return aladinLegacyProxy(isbn, query, max, env, ctx);
+  if (isbn) return aladinLegacyProxy(isbn, query, max, 1, env, ctx);
+
+  const primaryProvider = kakaoReady(env) ? 'kakao' : 'aladin';
+  const cursor = parseSearchCursor(q.get('cursor'), primaryProvider);
+  if (!cursor) return json({ error: 'cursor 형식 오류' }, 400);
+  if (cursor.provider === 'google') return googleSearchProxy(query, max, cursor.page, env);
+  if (cursor.provider === 'kakao') return kakaoSearchProxy(query, max, cursor.page, env, ctx);
+  return aladinLegacyProxy('', query, max, cursor.page, env, ctx);
 }
 
 /* ── 국중도 서지정보 — ISBN 단건 백본 (#1044) ─────────────────
@@ -2271,24 +2300,10 @@ function normalizeNLK(doc, isbn) {
 /* ── 카카오 책검색 — 검색 프론트 (#1044) ─────────────────────
    발견 전용. 영구 적재는 카카오 응답 직접 upsert 대신 발견 ISBN 을 국중도로 재조회한 행만
    (카카오 운영정책 캐시 조항 회피 — 리서치 #1044). 국중도 키 없으면 저장 생략(응답만). */
-async function kakaoSearchProxy(query, max, env, ctx) {
+async function kakaoSearchProxy(query, max, page, env, ctx) {
   try {
-    let items = await kakaoBookSearch(query, max, env);
-    // 주 공급자 결과를 제품 상한까지 보존하고, 빈자리만 Google 실시간 결과로 보강한다.
-    // 고정 5+5 할당은 관련 국내 도서를 누락시키므로 사용하지 않는다. 요청 max 계약은 #1458 유지.
-    const responseMax = Math.min(max, 10);
-    items = items.slice(0, responseMax);
-    if (items.length < responseMax) {
-      try {
-        const gb = await googleBooksSearch(query, responseMax - items.length, env);
-        const seen = new Set(items.map((it) => it.isbn13 || it.title));
-        for (const g of gb) {
-          if (items.length >= responseMax) break;
-          const k = g.isbn13 || g.title;
-          if (k && !seen.has(k)) { seen.add(k); items.push(g); }
-        }
-      } catch (e) { /* 보강 실패 무시 */ }
-    }
+    const result = await kakaoBookSearch(query, max, page, env);
+    const items = result.items;
     // 검색 도서 자동 저장(#489 계승): 카카오 발견 ISBN → 국중도 재조회 후 canonical 적재.
     if (ctx && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && nlkReady(env)) {
       const isbns = items.filter((b) => b.source === 'kakao' && b.isbn13).map((b) => b.isbn13);
@@ -2301,23 +2316,38 @@ async function kakaoSearchProxy(query, max, env, ctx) {
         }
       })());
     }
-    return json({ items }, 200, 86400);
+    const primaryCursor = !result.isEnd ? nextSearchCursor('kakao', page) : '';
+    const nextCursor = primaryCursor || 'google:1';
+    return json({
+      items,
+      hasMore: Boolean(nextCursor),
+      nextCursor,
+      totalCount: result.totalCount,
+      pageableCount: result.pageableCount,
+    }, 200, 86400);
   } catch (e) {
     // 카카오 자체 실패 → Google 실시간 폴백(저장 없음) — 레거시 경로와 동일 무중단 규약.
-    const fallbackMax = Math.min(max, 10);
-    try { const gb = await googleBooksSearch(query, fallbackMax, env); if (gb.length) return json({ items: gb.slice(0, fallbackMax) }, 200, 3600); } catch (e2) {}
+    try { return await googleSearchProxy(query, max, 1, env); } catch (e2) {}
     return json({ error: '카카오 호출 실패', detail: String((e && e.message) || e) }, 502);
   }
 }
 
 // 카카오 책검색 API 호출 (#1044) — KakaoAK 헤더, REST 키 서버 보관(클라 노출 금지).
-async function kakaoBookSearch(query, max, env) {
-  const r = await fetch(`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(query)}&size=${Math.min(max || 10, 50)}`, {
+async function kakaoBookSearch(query, max, page, env) {
+  const r = await fetch(`https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(query)}&size=${Math.min(max || 10, 50)}&page=${page}`, {
     headers: { Authorization: `KakaoAK ${env.KAKAO_REST_KEY}` },
   });
   if (!r.ok) throw new Error(`kakao ${r.status}`);
   const d = await r.json();
-  return (Array.isArray(d.documents) ? d.documents : []).map(normalizeKakao).filter((b) => b.title);
+  const meta = d && d.meta && typeof d.meta === 'object' ? d.meta : {};
+  const pageSize = Math.min(max || 10, 50);
+  const items = (Array.isArray(d.documents) ? d.documents : []).map(normalizeKakao).filter((b) => b.title).slice(0, pageSize);
+  return {
+    items,
+    totalCount: Number(meta.total_count) || 0,
+    pageableCount: Number(meta.pageable_count) || 0,
+    isEnd: items.length === 0 || meta.is_end !== false || page >= 50,
+  };
 }
 
 // 카카오 응답 → books 컬럼 (#1044) — 쪽수 미제공(total_pages 키 생략, 국중도 PAGE 로 보강).
@@ -2337,7 +2367,7 @@ function normalizeKakao(doc) {
 }
 
 /* ── 알라딘 프록시 (aladin.js 포팅) — 레거시 폴백 (#1044 과도기) ── */
-async function aladinLegacyProxy(isbn, query, max, env, ctx) {
+async function aladinLegacyProxy(isbn, query, max, page, env, ctx) {
   const key = env.ALADIN_TTB_KEY;
   if (!key) return json({ error: 'ALADIN_TTB_KEY 미설정' }, 500);
 
@@ -2347,13 +2377,14 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
       + `&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`;
   } else {
     apiUrl = `${ALADIN}ItemSearch.aspx?ttbkey=${key}&Query=${encodeURIComponent(query)}`
-      + `&QueryType=Keyword&SearchTarget=Book&MaxResults=${max}&start=1`
+      + `&QueryType=Keyword&SearchTarget=Book&MaxResults=${max}&start=${page}`
       + `&output=js&Version=20131101&Cover=Big&OptResult=packing,Toc,Story,fulldescription,categoryIdList`;
   }
 
   try {
     // normalize()가 풀 메타(description 등) 매핑 (#489).
-    let items = (await aladinFetch(apiUrl)).map(normalize);
+    const payload = query ? await aladinFetchEnvelope(apiUrl) : { item: await aladinFetch(apiUrl) };
+    let items = (payload.item || []).map(normalize);
     // #529: ISBN 단건 등록 경로 — 알라딘 빈필드를 OpenLibrary→LLM 으로 비파괴 보강(외서 대응).
     // #1133/#1044 §5.e: 영속 행(persistItems)은 Google 제외(Google Books ToS 가 영구 DB 캐시 금지),
     // 표시 행(items)만 Google 로 보강해 클라 응답에만 사용(저장 안 함). 저장·표시 분리.
@@ -2375,35 +2406,19 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
       const toPersist = persistItems || items;
       ctx.waitUntil(Promise.all(toPersist.filter((b) => b.isbn13).map((b) => upsertBook(SB, SRK, b).catch(() => {}))));
     }
-    // 검색이면 주 공급자 결과를 제품 상한까지 보존하고, 빈자리만 Google로 보강한다.
-    // 고정 5+5 할당은 관련 국내 도서를 누락시키므로 사용하지 않는다. ISBN 단건엔 미적용한다.
     if (query) {
-      const responseMax = Math.min(max, 10);
-      items = items.slice(0, responseMax);
-      if (items.length < responseMax) {
-        try {
-          const gb = await googleBooksSearch(query, responseMax - items.length, env);
-          const seen = new Set(items.map((it) => it.isbn13 || it.title));
-          for (const g of gb) {
-            if (items.length >= responseMax) break;
-            const k = g.isbn13 || g.title;
-            if (k && !seen.has(k)) { seen.add(k); items.push(g); }
-          }
-        } catch (e) { /* 폴백 실패 무시 */ }
-      }
-      items = items.slice(0, responseMax);
-      // (#1044) 구 #529 의 Google 결과 upsert 는 제거 — Google ToS §5.e 가 영구 DB 캐시를
-      // 금지하므로 Google 은 실시간 응답 표시만. 외서 영구 저장 폴백은 OpenLibrary(ISBN 등록 경로).
+      const totalCount = Number(payload.totalResults) || items.length;
+      const primaryHasMore = items.length > 0 && page < 50 && page * max < totalCount;
+      const nextCursor = primaryHasMore ? nextSearchCursor('aladin', page) : 'google:1';
+      return json({ items, hasMore: true, nextCursor, totalCount, pageableCount: totalCount }, 200, 86400);
     }
     return json({ items }, 200, 86400);
   } catch (e) {
     if (e instanceof AladinUpstreamError) logAladinFailure(e, isbn ? 'isbn' : 'search');
     // 알라딘 자체 실패 시 검색은 Google Books로 한 번 더 (외서 가용성↑).
     if (query) {
-      const fallbackMax = Math.min(max, 10);
       try {
-        const gb = await googleBooksSearch(query, fallbackMax, env);
-        return json({ items: gb.slice(0, fallbackMax) }, 200, 3600);
+        return await googleSearchProxy(query, max, 1, env);
       } catch (e2) { /* generic failure below */ }
     }
     return jsonNoStore({ error: 'upstream_failure' }, 502);
@@ -2412,13 +2427,27 @@ async function aladinLegacyProxy(isbn, query, max, env, ctx) {
 
 // Google Books 검색 (#302) — 알라딘 미검색 외서 보강용.
 // ⚠️ 무키 엔드포인트는 레이트리밋(429/403)이 잦음 → GOOGLE_BOOKS_API_KEY(무료) 권장.
-async function googleBooksSearch(query, max, env) {
+async function googleSearchProxy(query, max, page, env) {
+  const result = await googleBooksSearch(query, max, env, page, true);
+  const nextCursor = result.hasMore ? nextSearchCursor('google', page) : '';
+  return json({
+    items: result.items,
+    hasMore: Boolean(nextCursor),
+    nextCursor,
+    totalCount: result.totalCount,
+    pageableCount: result.totalCount,
+  }, 200, 3600);
+}
+
+async function googleBooksSearch(query, max, env, page = 1, includeMeta = false) {
   const key = env && env.GOOGLE_BOOKS_API_KEY ? `&key=${env.GOOGLE_BOOKS_API_KEY}` : '';
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${Math.min(max || 10, 20)}&printType=books&country=KR${key}`;
+  const pageSize = Math.min(max || 10, 40);
+  const startIndex = (page - 1) * pageSize;
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${pageSize}&startIndex=${startIndex}&printType=books&country=KR${key}`;
   const r = await fetch(url);
   if (!r.ok) throw new Error('google upstream http failure');
   const d = await r.json();
-  return (d.items || []).map((it) => {
+  const items = (d.items || []).map((it) => {
     const v = it.volumeInfo || {};
     const ids = v.industryIdentifiers || [];
     const isbn = (ids.find((x) => x.type === 'ISBN_13') || {}).identifier || (ids.find((x) => x.type === 'ISBN_10') || {}).identifier || '';
@@ -2432,7 +2461,10 @@ async function googleBooksSearch(query, max, env) {
       cover_url: cover,
       source: 'google',
     };
-  }).filter((b) => b.title);
+  }).filter((b) => b.title).slice(0, pageSize);
+  if (!includeMeta) return items;
+  const totalCount = Number(d.totalItems) || items.length;
+  return { items, totalCount, hasMore: items.length > 0 && page < 50 && startIndex + items.length < totalCount };
 }
 
 // OpenLibrary ISBN 조회 (#529) — 무키. 외서 빈필드·표지 폴백.
@@ -2624,7 +2656,7 @@ class AladinUpstreamError extends Error {
   }
 }
 
-async function aladinFetch(url) {
+async function aladinFetchEnvelope(url) {
   let r;
   try { r = await fetch(url); }
   catch (e) { throw new AladinUpstreamError('network'); }
@@ -2643,7 +2675,11 @@ async function aladinFetch(url) {
   if (!hasItem || providerError || (d.item != null && !Array.isArray(d.item))) {
     throw new AladinUpstreamError('provider');
   }
-  return d.item || [];
+  return d;
+}
+
+async function aladinFetch(url) {
+  return (await aladinFetchEnvelope(url)).item || [];
 }
 
 function logAladinFailure(error, route) {

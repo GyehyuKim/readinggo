@@ -99,24 +99,21 @@ assert.deepEqual(JSON.parse(clientFetches[1].body), { isbn13: '9781234567897' })
 
 console.log('OK: book-upsert 인증·인증 전 rate-limit·서버 정본·세션 갱신 경계');
 
-// /aladin 검색 응답은 Kakao + Google 보강 뒤에도 요청 max를 넘지 않아야 한다 (#1458).
-const kakaoDocuments = Array.from({ length: 10 }, (_, i) => ({
-  isbn: `123456789012${i}`,
-  title: `카카오 책 ${i}`,
+// /aladin 일반 검색은 페이지 크기와 provider continuation을 지켜야 한다 (#1547).
+const kakaoDocuments = Array.from({ length: 60 }, (_, i) => ({
+  isbn: `1234567890 9780000${String(i + 1).padStart(6, '0')}`,
+  title: `카카오 책 ${i + 1}`,
   authors: ['저자'],
 }));
-const googleItems = Array.from({ length: 11 }, (_, i) => ({
+const googleItems = Array.from({ length: 60 }, (_, i) => ({
   volumeInfo: {
-    title: `Google Book ${i}`,
-    industryIdentifiers: [{
-      type: 'ISBN_13',
-      identifier: i === 0 ? '1234567890120' : (i === 1 ? '3234567890120' : `223456789012${i}`),
-    }],
+    title: `Google Book ${i + 1}`,
+    industryIdentifiers: [{ type: 'ISBN_13', identifier: `9790000${String(i + 1).padStart(6, '0')}` }],
   },
 }));
-const aladinItems = Array.from({ length: 10 }, (_, i) => ({
-  isbn13: `323456789012${i}`,
-  title: `알라딘 책 ${i}`,
+const aladinItems = Array.from({ length: 60 }, (_, i) => ({
+  isbn13: `9781000${String(i + 1).padStart(6, '0')}`,
+  title: `알라딘 책 ${i + 1}`,
   author: '저자',
 }));
 
@@ -124,9 +121,10 @@ async function searchResult(max, {
   kakaoFails = false,
   aladinFails = false,
   googleFailure = '',
-  primaryCount = 10,
+  primaryCount = 60,
   legacy = false,
   isbn = false,
+  cursor = '',
   expectedStatus = 200,
 } = {}) {
   const savedFetch = globalThis.fetch;
@@ -135,32 +133,40 @@ async function searchResult(max, {
     const url = new URL(input);
     upstream.push(url);
     if (url.hostname === 'dapi.kakao.com') {
-      return kakaoFails
-        ? Response.json({ error: 'upstream failure' }, { status: 502 })
-        : Response.json({ documents: kakaoDocuments.slice(0, primaryCount) });
+      if (kakaoFails) return Response.json({ error: 'upstream failure' }, { status: 502 });
+      const size = Number(url.searchParams.get('size') || 10);
+      const page = Number(url.searchParams.get('page') || 1);
+      const start = (page - 1) * size;
+      return Response.json({
+        documents: kakaoDocuments.slice(start, Math.min(start + size, primaryCount)),
+        meta: { total_count: primaryCount, pageable_count: primaryCount, is_end: start + size >= primaryCount },
+      });
     }
     if (url.hostname === 'www.googleapis.com') {
       if (googleFailure === 'network') throw new Error('google network failure');
       if (googleFailure === 'http') return Response.json({ error: 'google failure' }, { status: 502 });
-      return Response.json({ items: googleItems });
+      const size = Number(url.searchParams.get('maxResults') || 10);
+      const start = Number(url.searchParams.get('startIndex') || 0);
+      return Response.json({ totalItems: googleItems.length, items: googleItems.slice(start, start + size) });
     }
     if (url.hostname === 'aladin.co.kr') {
       if (aladinFails) throw new Error('aladin network failure');
-      return Response.json({ item: url.searchParams.has('ItemId') ? [aladinItems[0]] : aladinItems.slice(0, primaryCount) });
+      if (url.searchParams.has('ItemId')) return Response.json({ item: [aladinItems[0]] });
+      const size = Number(url.searchParams.get('MaxResults') || 10);
+      const page = Number(url.searchParams.get('start') || 1);
+      const start = (page - 1) * size;
+      return Response.json({ item: aladinItems.slice(start, Math.min(start + size, primaryCount)), totalResults: primaryCount });
     }
     throw new Error(`unexpected search upstream ${url}`);
   };
   try {
     const suffix = max == null ? '' : `&max=${encodeURIComponent(max)}`;
+    const cursorSuffix = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
     const searchEnv = legacy || isbn
       ? { ALADIN_TTB_KEY: 'test-key', BOOKS_PROVIDER: 'aladin' }
       : { KAKAO_REST_KEY: 'test-key' };
-    const requestPath = isbn ? `isbn=3234567890120${suffix}` : `query=test${suffix}`;
-    const response = await worker.fetch(
-      new Request(`https://readinggo.example/aladin?${requestPath}`),
-      searchEnv,
-      {},
-    );
+    const requestPath = isbn ? `isbn=3234567890120${suffix}` : `query=test${suffix}${cursorSuffix}`;
+    const response = await worker.fetch(new Request(`https://readinggo.example/aladin?${requestPath}`), searchEnv, {});
     assert.equal(response.status, expectedStatus);
     const body = await response.json();
     return { items: body.items || [], body, response, upstream };
@@ -169,70 +175,53 @@ async function searchResult(max, {
   }
 }
 
-async function searchItems(max, options) {
-  return (await searchResult(max, options)).items;
+for (const [max, expected] of [[1, 1], [2, 2], [5, 5], [10, 10], [20, 20], [50, 50], [51, 50]]) {
+  const result = await searchResult(max);
+  assert.equal(result.items.length, expected, `Kakao max=${max} 페이지 크기`);
 }
+assert.equal((await searchResult()).items.length, 10, 'max 미지정은 기본 페이지 10개');
+assert.equal((await searchResult('invalid')).items.length, 10, '잘못된 max는 기본 페이지 10개');
+assert.equal((await searchResult('2abc')).items.length, 10, '부분 숫자 max는 기본 페이지 10개');
+assert.equal((await searchResult('2.5')).items.length, 10, '정수가 아닌 max는 기본 페이지 10개');
+assert.equal((await searchResult(0)).items.length, 10, 'max=0은 기본 페이지 10개');
+assert.equal((await searchResult(-1)).items.length, 10, '음수 max는 기본 페이지 10개');
 
-for (const [max, expected] of [[1, 1], [2, 2], [5, 5], [10, 10], [20, 10], [21, 10]]) {
-  const items = await searchItems(max);
-  assert.equal(items.length, expected, `Kakao+Google max=${max} 결과 상한`);
-}
-assert.equal((await searchItems()).length, 10, 'max 미지정은 기존 기본 10개를 유지해야 한다');
-assert.equal((await searchItems('invalid')).length, 10, '잘못된 max는 기존 기본 10개를 유지해야 한다');
-assert.equal((await searchItems(0)).length, 10, 'max=0은 기존 기본 10개를 유지해야 한다');
-assert.equal((await searchItems(-1)).length, 10, '음수 max는 기존 기본 10개를 유지해야 한다');
-assert.equal((await searchItems(2, { kakaoFails: true })).length, 2, 'Kakao 실패→Google fallback도 max를 지켜야 한다');
-
-const kakaoFull = await searchResult(5);
-assert.deepEqual(kakaoFull.upstream.map((url) => url.hostname), ['dapi.kakao.com'], 'primary 할당이 상한을 채우면 Google을 호출하지 않아야 한다');
-assert.equal(kakaoFull.upstream[0].searchParams.get('size'), '5', 'Kakao upstream에도 max를 전달해야 한다');
-assert.match(kakaoFull.response.headers.get('cache-control') || '', /max-age=86400/, 'primary 성공 검색은 기존 24시간 캐시를 유지해야 한다');
-
-const kakaoPrimaryFull = await searchResult(10);
-assert.deepEqual(kakaoPrimaryFull.upstream.map((url) => url.hostname), ['dapi.kakao.com'], 'primary 10건이 상한을 채우면 Google 슬롯을 따로 예약하지 않아야 한다');
-
-const kakaoAugmented = await searchResult(10, { primaryCount: 5 });
-assert.deepEqual(kakaoAugmented.upstream.map((url) => url.hostname), ['dapi.kakao.com', 'www.googleapis.com'], 'primary가 부족할 때만 Google로 남은 슬롯을 보강해야 한다');
-const deduped = kakaoAugmented.items;
-assert.equal(new Set(deduped.map((item) => item.isbn13 || item.title)).size, deduped.length, 'Kakao+Google 병합 결과는 중복을 제거해야 한다');
-
-const kakaoAugmentFailure = await searchResult(10, { primaryCount: 5, googleFailure: 'network' });
-assert.equal(kakaoAugmentFailure.items.length, 5, 'Kakao 성공 뒤 Google 네트워크 보강 실패는 국내 결과를 유지해야 한다');
-assert.match(kakaoAugmentFailure.response.headers.get('cache-control') || '', /max-age=86400/, 'primary 성공 뒤 보강 실패도 24시간 캐시를 유지해야 한다');
-const kakaoDoubleFailure = await searchResult(10, { kakaoFails: true, googleFailure: 'http', expectedStatus: 502 });
-assert.equal(kakaoDoubleFailure.items.length, 0, 'Kakao와 Google이 모두 실패하면 검색 결과를 성공으로 위장하지 않아야 한다');
+const kakaoFirst = await searchResult(10, { primaryCount: 15 });
+assert.deepEqual(kakaoFirst.upstream.map((url) => url.hostname), ['dapi.kakao.com']);
+assert.equal(kakaoFirst.body.hasMore, true);
+const kakaoSecond = await searchResult(10, { primaryCount: 15, cursor: kakaoFirst.body.nextCursor });
+assert.equal(kakaoSecond.items.length, 5);
+assert.equal(kakaoSecond.body.hasMore, true, 'primary 종료 뒤 Google continuation을 제공한다');
+assert.deepEqual(kakaoSecond.upstream.map((url) => url.hostname), ['dapi.kakao.com']);
+const googleAfterPrimary = await searchResult(10, { cursor: kakaoSecond.body.nextCursor });
+assert.equal(googleAfterPrimary.items.length, 10);
+assert.deepEqual(googleAfterPrimary.upstream.map((url) => url.hostname), ['www.googleapis.com']);
 
 const kakaoFallback = await searchResult(20, { kakaoFails: true });
-assert.equal(kakaoFallback.items.length, 10, 'Kakao 실패 fallback도 역사적 총 10개 상한을 지켜야 한다');
-assert.match(kakaoFallback.response.headers.get('cache-control') || '', /max-age=3600/, 'Kakao 실패 fallback은 기존 1시간 캐시를 유지해야 한다');
+assert.equal(kakaoFallback.items.length, 20, 'Kakao 실패 fallback도 요청 페이지 크기를 지켜야 한다');
+assert.match(kakaoFallback.response.headers.get('cache-control') || '', /max-age=3600/);
+const kakaoDoubleFailure = await searchResult(10, { kakaoFails: true, googleFailure: 'http', expectedStatus: 502 });
+assert.equal(kakaoDoubleFailure.items.length, 0);
 
-for (const max of [2, 20]) {
+for (const max of [2, 20, 50]) {
   const legacySuccess = await searchResult(max, { legacy: true });
-  assert.equal(legacySuccess.items.length, Math.min(max, 10), `레거시 Aladin 성공 max=${max} 상한`);
-  assert.match(legacySuccess.response.headers.get('cache-control') || '', /max-age=86400/, 'Aladin primary 성공은 기존 24시간 캐시를 유지해야 한다');
-
+  assert.equal(legacySuccess.items.length, max, `레거시 Aladin 성공 max=${max} 페이지 크기`);
+  assert.match(legacySuccess.response.headers.get('cache-control') || '', /max-age=86400/);
   const legacyFallback = await searchResult(max, { legacy: true, aladinFails: true });
-  assert.equal(legacyFallback.items.length, Math.min(max, 10), `Aladin 실패→Google fallback max=${max} 상한`);
-  assert.match(legacyFallback.response.headers.get('cache-control') || '', /max-age=3600/, 'Aladin 실패 fallback은 기존 1시간 캐시를 유지해야 한다');
+  assert.equal(legacyFallback.items.length, Math.min(max, 40), `Aladin 실패→Google fallback max=${max} 페이지 크기`);
+  assert.match(legacyFallback.response.headers.get('cache-control') || '', /max-age=3600/);
 }
 
-const legacyFull = await searchResult(5, { legacy: true });
-assert.deepEqual(legacyFull.upstream.map((url) => url.hostname), ['aladin.co.kr'], 'Aladin 할당이 상한을 채우면 Google을 호출하지 않아야 한다');
-const legacyDeduped = await searchItems(10, { legacy: true, primaryCount: 5 });
-assert.equal(new Set(legacyDeduped.map((item) => item.isbn13 || item.title)).size, legacyDeduped.length, 'Aladin+Google 병합 결과도 중복을 제거해야 한다');
+const legacyFirst = await searchResult(10, { legacy: true, primaryCount: 15 });
+const legacySecond = await searchResult(10, { legacy: true, primaryCount: 15, cursor: legacyFirst.body.nextCursor });
+assert.equal(legacySecond.items.length, 5);
+assert.equal(legacySecond.upstream[0].searchParams.get('start'), '2');
 
-const legacyAugmentFailure = await searchResult(10, { legacy: true, primaryCount: 5, googleFailure: 'http' });
-assert.equal(legacyAugmentFailure.items.length, 5, 'Aladin 성공 뒤 Google HTTP 보강 실패는 국내 결과를 유지해야 한다');
-const legacyDoubleFailure = await searchResult(10, {
-  legacy: true,
-  aladinFails: true,
-  googleFailure: 'network',
-  expectedStatus: 502,
-});
-assert.equal(legacyDoubleFailure.items.length, 0, 'Aladin과 Google이 모두 실패하면 검색 결과를 성공으로 위장하지 않아야 한다');
+const legacyDoubleFailure = await searchResult(10, { legacy: true, aladinFails: true, googleFailure: 'network', expectedStatus: 502 });
+assert.equal(legacyDoubleFailure.items.length, 0);
 
 const isbnResult = await searchResult(1, { isbn: true });
-assert.equal(isbnResult.items.length, 1, 'ISBN 단건 조회는 검색 병합 상한 변경의 영향을 받지 않아야 한다');
-assert.ok(!isbnResult.upstream.some((url) => url.hostname === 'dapi.kakao.com'), 'ISBN 단건 조회는 Kakao 검색 경로를 타지 않아야 한다');
+assert.equal(isbnResult.items.length, 1, 'ISBN 단건 조회는 검색 pagination 변경의 영향을 받지 않아야 한다');
+assert.ok(!isbnResult.upstream.some((url) => url.hostname === 'dapi.kakao.com'));
 
-console.log('OK: book search max boundary across Kakao, Google fallback and legacy Aladin');
+console.log('OK: book search page size, continuation, fallback and ISBN boundary');
