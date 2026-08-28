@@ -23,10 +23,12 @@ const nextWorks = Array.from({ length: 10 }, (_, i) => ({
 }));
 
 const calls = [];
+const pageSizes = [];
 const request = async (url) => {
   const parsed = new URL(url);
   const cursor = parsed.searchParams.get('cursor') || '';
   calls.push(cursor);
+  pageSizes.push(parsed.searchParams.get('max'));
   if (!cursor) return { ok: true, json: async () => ({ items: editionHeavy, hasMore: true, nextCursor: 'kakao:2' }) };
   if (cursor === 'kakao:2') return { ok: true, json: async () => ({ items: nextWorks.slice(0, 4), hasMore: true, nextCursor: 'kakao:3' }) };
   if (cursor === 'kakao:3') return { ok: true, json: async () => ({ items: nextWorks.slice(4), hasMore: false, nextCursor: '' }) };
@@ -35,6 +37,7 @@ const request = async (url) => {
 
 const first = await context.fetchWindow('https://api.example/aladin', 'Hemingway', '', [], 10, request);
 assert.deepEqual(calls, ['', 'kakao:2'], '판 그룹핑 후 10행이 찰 때까지 다음 cursor를 자동 조회해야 한다');
+assert.equal(pageSizes.every((size) => size === '50'), true, 'provider는 공식 최대 page size 50으로 조회해야 한다');
 assert.equal(context.rank(first.items, 'Hemingway').length, 10);
 assert.equal(first.hasMore, true);
 assert.equal(first.nextCursor, 'kakao:3');

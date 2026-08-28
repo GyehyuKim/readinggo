@@ -176,7 +176,7 @@ async function rgFetchRemoteWindow(proxy, query, cursor = '', existing = [], tar
     if (seenCursors.has(cursorKey)) return { items: books, nextCursor: '', hasMore: false };
     seenCursors.add(cursorKey);
 
-    const params = new URLSearchParams({ query, max: '10' });
+    const params = new URLSearchParams({ query, max: '50' });
     if (nextCursor) params.set('cursor', nextCursor);
     let response;
     try {
