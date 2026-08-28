@@ -159,6 +159,34 @@ function rgRemoteBookKey(book) {
   return book.isbn13 || book.isbn || `${_rgSquash(book.title)}|${_rgAuthorKey(book.author)}|${_rgSquash(book.publisher)}`;
 }
 
+function rgSearchWorkKey(book) {
+  const titleKey = _rgSquash(_rgCoreTitle(book.title)) || _rgSquash(book.title);
+  return titleKey ? `${titleKey}|${_rgAuthorKey(book.author)}` : rgRemoteBookKey(book);
+}
+
+function rgAppendStableSearchResults(previous = [], candidates = []) {
+  const candidateByWork = new Map();
+  for (const book of candidates) {
+    const key = rgSearchWorkKey(book);
+    if (key && !candidateByWork.has(key)) candidateByWork.set(key, book);
+  }
+  const used = new Set();
+  const stable = [];
+  for (const previousBook of previous) {
+    const key = rgSearchWorkKey(previousBook);
+    if (!key || used.has(key)) continue;
+    stable.push(candidateByWork.get(key) || previousBook);
+    used.add(key);
+  }
+  for (const book of candidates) {
+    const key = rgSearchWorkKey(book);
+    if (!key || used.has(key)) continue;
+    stable.push(book);
+    used.add(key);
+  }
+  return stable;
+}
+
 // provider page를 작품 행 기준으로 채운다. 판 그룹핑으로 10개 후보가 6행이 되면 다음 cursor를
 // 자동 조회하고, `더 보기`도 같은 함수로 다음 10행을 보충한다. cursor는 서버가 준 값을 그대로 쓴다.
 async function rgFetchRemoteWindow(proxy, query, cursor = '', existing = [], targetRows = 10, request = fetch, countRows = null) {
@@ -222,6 +250,7 @@ const SearchModal = ({
   const [remoteCursor, setRemoteCursor] = React.useState('');
   const [remoteHasMore, setRemoteHasMore] = React.useState(false);
   const [visibleCount, setVisibleCount] = React.useState(10);
+  const [pinnedResultOrder, setPinnedResultOrder] = React.useState({ query: '', items: [] });
   const remoteRequestId = React.useRef(0);
   const [pendingBook, setPendingBook] = React.useState(null); // 책장 선택 대기 (#409)
   const [scanOpen, setScanOpen] = React.useState(false); // 바코드 스캔 모달 (#943)
@@ -290,6 +319,7 @@ const SearchModal = ({
     const q = query.trim();
     const requestId = ++remoteRequestId.current;
     setVisibleCount(10);
+    setPinnedResultOrder({ query: q, items: [] });
     if (!isOpen || !q) { setRemote([]); setRemoteCursor(''); setRemoteHasMore(false); setRemoteLoading(false); return; }
     const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
     if (!proxy) { setRemote([]); setRemoteCursor(''); setRemoteHasMore(false); setRemoteLoading(false); return; }
@@ -335,9 +365,12 @@ const SearchModal = ({
     _seen.add(k);
     return true;
   });
-  const merged = rgRankSearchResults(
+  const rankedMerged = rgRankSearchResults(
     _dedup(dbResults).concat(_dedup(localItems)).concat(_dedup(remote)), query
   );
+  const merged = pinnedResultOrder.query === query.trim() && pinnedResultOrder.items.length
+    ? rgAppendStableSearchResults(pinnedResultOrder.items, rankedMerged)
+    : rankedMerged;
   const visibleResults = merged.slice(0, visibleCount);
   const searching = dbLoading || remoteLoading;  // 진행중 — 결과없음과 구분 (#202)
 
@@ -352,6 +385,7 @@ const SearchModal = ({
     const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
     if (!q || !proxy) return;
     const requestId = remoteRequestId.current;
+    setPinnedResultOrder({ query: q, items: merged });
     const countIntegratedRows = (remoteBooks) => {
       const seen = new Set();
       const dedup = (rows) => rows.filter((book) => {

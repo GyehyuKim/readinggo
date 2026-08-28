@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const source = fs.readFileSync(new URL('../docs/readinggo/js/search.js', import.meta.url), 'utf8');
 const purePrefix = source.slice(0, source.indexOf('const SearchModal'));
 const context = { URL, URLSearchParams };
-vm.runInNewContext(`${purePrefix}\nthis.rank = rgRankSearchResults; this.fetchWindow = rgFetchRemoteWindow;`, context);
+vm.runInNewContext(`${purePrefix}\nthis.rank = rgRankSearchResults; this.fetchWindow = rgFetchRemoteWindow; this.appendStable = rgAppendStableSearchResults;`, context);
 
 const editionHeavy = [
   ...Array.from({ length: 4 }, (_, i) => ({ isbn13: `97800000000${i}`, title: 'Hemingway', author: 'Lynn K', source: 'kakao' })),
@@ -79,3 +79,25 @@ const integrated = await context.fetchWindow(
 );
 assert.deepEqual(integratedCalls, ['kakao:2', 'kakao:3'], 'DB/로컬 작품과 그룹핑돼도 통합 10행이 찰 때까지 계속 조회해야 한다');
 assert.equal(countIntegratedRows(integrated.items), countIntegratedRows(baseWorks) + 10);
+
+const previousPage = context.rank([
+  { isbn13: '9782000000001', title: '카뮈', author: '최수철', _source: 'aladin' },
+  { isbn13: '9782000000002', title: '페스트', author: '알베르 카뮈', _source: 'aladin' },
+  { isbn13: '9782000000003', title: '이방인', author: '알베르 카뮈', _source: 'aladin' },
+], '카뮈');
+const rerankedAfterContinuation = context.rank([
+  ...previousPage,
+  { isbn13: '9782000000004', title: '카뮈의 철학', author: '신규 저자', _source: 'aladin' },
+  { isbn13: '9782000000005', title: '카뮈 평전', author: '신규 저자', _source: 'aladin' },
+], '카뮈');
+const stableAfterContinuation = context.appendStable(previousPage, rerankedAfterContinuation);
+assert.deepEqual(
+  Array.from(stableAfterContinuation.slice(0, previousPage.length), (book) => book.title),
+  Array.from(previousPage, (book) => book.title),
+  'continuation 결과는 기존 작품 행의 상대 순서를 바꾸지 않아야 한다',
+);
+assert.deepEqual(
+  Array.from(stableAfterContinuation.slice(previousPage.length), (book) => book.title),
+  ['카뮈의 철학', '카뮈 평전'],
+  '새 작품은 새 page 내부 관련도 순서대로 기존 결과 뒤에 추가해야 한다',
+);
