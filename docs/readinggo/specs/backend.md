@@ -16,6 +16,7 @@
 > **v18.2 활동함 결정 (2026-08-25, #1260)**: 인앱 활동함은 현재 `claps`·`follows`·`pokes`에서 90일/최대 100개를 파생하고 사용자가 실제 본 opaque `seen_event_keys`만 100개 이하로 영속한다. 원격 푸시·이벤트 snapshot은 추가하지 않는다. 화면 SSOT는 [activity-inbox.md](./activity-inbox.md)다.
 > **v18.3 개인화 retrieval 결정 (2026-08-25, #1309)**: 누적 개인 기록은 별도 계정 opt-in 뒤 `/api/companion/context`가 Supabase bearer identity로 본인 기록만 요청 시 조회한다. 최대 5건·2,000 Unicode 문자, 복사본/embedding/profile summary 없음. DEV 구현은 허용하되 #1373 전 Production 승격은 차단한다.
 > **v18.4 검색 결과 예산 결정 (2026-08-28, #1544)**: `GET /aladin` 검색은 제품 총 상한 10 안에서 카카오 또는 레거시 알라딘 결과를 먼저 보존하고, 주 공급자가 상한을 채우지 못한 경우에만 Google Books가 남은 슬롯을 실시간 보강한다. 공급자별 고정 `5+5` 할당은 관련 국내 도서를 누락시키므로 폐기한다.
+> **v18.5 일반 검색 연속 조회 결정 (2026-08-28, #1547)**: v18.4의 고정 제품 총 상한 10은 첫 화면 크기와 전체 검색 상한을 혼동해, 제목 일치 후보가 먼저 10건을 채우면 뒤쪽의 저자·출판사 일치 후보를 조회하지 못하게 했다. 일반 검색 의미와 공급자 관련도 순서는 유지하되 고정 총상한을 폐기하고, 첫 10개 작품 뒤에는 공급자가 끝날 때까지 `더 보기`로 연속 조회한다. 판 그룹핑으로 표시 행이 줄면 다음 공급자 페이지에서 자동 보충한다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -278,13 +279,15 @@ ai.extractBook(book, quotes)               → 추출 책 요약        // 드�
 
 **흐름**: 국내서 검색 = 카카오 → 등록(ISBN 확정) 시 국중도로 쪽수(+표지) 보강. 외서 = Google Books **실시간만**(upsert 안 함). canonical `books` 에는 **국중도·카카오 출처 행만** 영구 적재한다.
 
-**검색 결과 상한 계약 (`GET /aladin`, #1458):**
+**일반 검색 연속 조회 계약 (`GET /aladin`, #1458·#1547):**
 
-- `max`는 반환 개수의 최소 보장이 아니라 **최종 응답 상한**이다. 양의 정수는 최대 20까지 해석하되, 기존 제품 총 상한 10을 유지하므로 검색 응답의 effective limit은 `min(max, 10)`이다.
-- `max` 미지정·비숫자·`0`은 기존대로 기본값 10을 사용한다. 음수도 10으로 정규화해 현행 worker의 음수 전달 결함을 함께 교정한다. ISBN 단건 조회에는 이 검색 병합 상한을 적용하지 않는다.
-- primary provider가 성공하면 카카오 또는 레거시 알라딘 결과를 effective limit까지 우선 보존한다. 주 공급자 결과가 부족할 때만 남은 슬롯 수만큼 Google Books로 보강한다. 공급자별 고정 `5+5` 할당은 사용하지 않으며, provider 병합·중복 제거 후에도 effective limit을 넘지 않는다. primary provider 실패 후 Google fallback에도 같은 상한을 적용한다.
-- primary provider 할당 결과가 effective limit을 이미 채워 남은 슬롯이 없으면 Google 보강을 호출하지 않는다. 카카오/알라딘 primary 성공 응답은 24시간, provider 실패 후 Google fallback 성공 응답은 1시간 캐시한다.
-- 회귀 검증은 `max=1·2·5·10·20·20초과`, 기본/invalid/0/음수, 카카오·알라딘 성공/실패, 주 공급자 10건 보존, 주 공급자 부족분만큼의 Google 요청, Google 중복 제거·불필요 호출 방지, ISBN 단건 비영향을 포함한다.
+- 일반 검색은 제목·저자·출판사 중 하나로 제한하지 않는다. 공급자의 일반 검색 관련도 순서를 유지하며, 제목 일치 후보가 먼저 나와도 뒤쪽의 저자·출판사 일치 후보를 계속 조회할 수 있어야 한다.
+- `max`는 **페이지 크기**다. 미지정·비숫자·`0`·음수는 기본값 10을 사용하고, 양의 정수는 공급자 계약에 맞춰 1~50으로 제한한다. `max`를 전체 검색 상한으로 사용하지 않는다. ISBN 단건 조회에는 이 계약을 적용하지 않는다.
+- 최초 요청은 continuation 값 없이 시작한다. 응답은 기존 `items`와 함께 `hasMore`, opaque `nextCursor`, 현재 공급자의 `totalCount`·`pageableCount`를 반환한다. 후속 요청은 서버가 준 `nextCursor`를 그대로 보내며, 클라이언트가 provider page나 offset을 추측하지 않는다. 잘못됐거나 범위를 벗어난 cursor는 400으로 거부한다.
+- primary provider가 성공하면 카카오 또는 레거시 알라딘의 일반 검색 페이지를 공급자가 종료를 알릴 때까지 이어간다. primary가 끝난 뒤 Google Books 보강이 가능하면 같은 query의 Google 첫 페이지로 continuation을 넘기고 이후 Google 페이지를 이어간다. primary 실패 시 기존대로 Google 첫 페이지로 fallback한다. ISBN 우선 중복 제거와 provider 오류·캐시 계약은 유지한다.
+- 클라이언트는 최초에 판 그룹핑 후 최대 10개 **작품 행**을 표시한다. 받은 후보가 판 그룹핑·ISBN 중복 제거로 10행보다 적고 `hasMore=true`면 다음 cursor를 자동 요청해 10행을 채우거나 공급자가 끝날 때까지 진행한다. `더 보기`는 같은 방식으로 다음 10개 작품 행을 추가하며 고정 10·30개 총상한을 두지 않는다.
+- 새 query 입력·화면 이탈·요청 실패 시 진행 중 continuation을 취소하거나 폐기한다. 같은 cursor의 재요청은 같은 canonical cache key를 사용하고, 이전 페이지 결과를 반복 추가하지 않는다. UI는 로딩 중 중복 클릭을 막고 마지막 페이지에서는 `더 보기`를 숨긴다.
+- 회귀 검증은 기본/invalid/0/음수 및 페이지 크기 `1·10·50·50초과`, cursor 변조·범위, 카카오·알라딘·Google continuation, primary→Google 전환, provider 실패 fallback, 페이지 간 ISBN 중복 제거, `Hemingway` 판 그룹핑 후 10행 자동 보충, `카뮈` 10행 뒤 더 보기, ISBN 단건 비영향을 포함한다.
 
 **provider 캐시·예산 계약 (`GET /aladin`, #1398):**
 
