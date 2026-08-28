@@ -52,6 +52,10 @@ globalThis.fetch = async (input) => {
   throw new Error(`unexpected upstream: ${url}`);
 };
 const cacheValues = new Map();
+cacheValues.set(
+  'https://book-provider-cache.internal/aladin?provider=kakao&max=1&query=atomic',
+  Response.json({ items: [{ title: '배포 전 stale 검색 결과' }] }),
+);
 globalThis.caches = { default: {
   async match(request) { const value = cacheValues.get(request.url); return value ? value.clone() : undefined; },
   async put(request, response) { cacheValues.set(request.url, response.clone()); },
@@ -70,6 +74,7 @@ try {
     headers: { 'CF-Connecting-IP': '203.0.113.8' },
   }), env, ctx);
   assert.equal(first.status, 200);
+  assert.equal((await first.clone().json()).items[0].title, '원자적 보호', '배포 전 cache schema는 재사용하지 않아야 한다');
   await new Promise((resolve) => setTimeout(resolve, 0));
   const second = await worker.fetch(new Request('https://readinggo.example/aladin?max=1&query=atomic', {
     headers: { 'CF-Connecting-IP': '203.0.113.8' },
