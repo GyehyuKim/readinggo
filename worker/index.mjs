@@ -2155,6 +2155,7 @@ async function bookProviderRequest(request, q, env, ctx) {
   }
   const cacheUrl = new URL('https://book-provider-cache.internal/aladin');
   cacheUrl.searchParams.set('provider', provider);
+  cacheUrl.searchParams.set('schema', 'continuation-v1');
   for (const [key, value] of [...q.entries()].sort(([ak, av], [bk, bv]) => ak.localeCompare(bk) || av.localeCompare(bv))) {
     cacheUrl.searchParams.append(key, value);
   }
