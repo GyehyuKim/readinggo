@@ -15,6 +15,7 @@
 > **v18.1 활동 계산 결정 (2026-08-25, #1520)**: 프로필 월간 활동일은 기존 `sessions.calendar(days)`가 주는 로컬 날짜 문자열 `reading_sessions.session_date`와, 본인 문장 `created_at` 타임스탬프만 사용자 로컬 날짜로 변환한 값의 합집합으로 클라이언트에서 재계산한다. 새 table·column·RPC·migration은 추가하지 않는다.
 > **v18.2 활동함 결정 (2026-08-25, #1260)**: 인앱 활동함은 현재 `claps`·`follows`·`pokes`에서 90일/최대 100개를 파생하고 사용자가 실제 본 opaque `seen_event_keys`만 100개 이하로 영속한다. 원격 푸시·이벤트 snapshot은 추가하지 않는다. 화면 SSOT는 [activity-inbox.md](./activity-inbox.md)다.
 > **v18.3 개인화 retrieval 결정 (2026-08-25, #1309)**: 누적 개인 기록은 별도 계정 opt-in 뒤 `/api/companion/context`가 Supabase bearer identity로 본인 기록만 요청 시 조회한다. 최대 5건·2,000 Unicode 문자, 복사본/embedding/profile summary 없음. DEV 구현은 허용하되 #1373 전 Production 승격은 차단한다.
+> **v18.4 검색 결과 예산 결정 (2026-08-28, #1544)**: `GET /aladin` 검색은 제품 총 상한 10 안에서 카카오 또는 레거시 알라딘 결과를 먼저 보존하고, 주 공급자가 상한을 채우지 못한 경우에만 Google Books가 남은 슬롯을 실시간 보강한다. 공급자별 고정 `5+5` 할당은 관련 국내 도서를 누락시키므로 폐기한다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -150,7 +151,7 @@ books.search(query)                        → Book[]          // DB ilike(즉�
 // 검색 결과 합성(#1223·#1388, search.js `rgRankSearchResults`): 병합(DB→로컬→원격, isbn 중복제거) 후 ① **관련성 정렬** — 정규화 제목(부제·괄호·에디션 꼬리 컷 + 구두점 squash) 완전일치 > 제목 prefix > 제목 포함 > **Fuse threshold 0.3 안의 점수 보유 로컬 후보** > 제목+저자+**출판사** 토큰 포함(#1234 — "민음사 시지프 신화" #1118 케이스 보존) > 무관. 질의가 있으면 tier 0은 제외하며, 점수 없이 우연히 합쳐진 원격·DB 행을 fuzzy로 승격하지 않는다. alias별 Fuse 슬롯은 균등 배분하고, **확장 alias에서는 핵심 제목이 alias와 정확히 같은 판만 허용**해 `2010 스페이스 오디세이` 같은 다른 작품을 섞지 않으며, 같은 ISBN은 가장 강한 Fuse 점수만 보존한다. 동률은 canonical DB > 로컬 > 원격, 표지·쪽수 보유 가점. (감사 사례: "데미안" 1위가 무관 시리즈 "데미안더모던타임즈 5"였던 소스 순서 병합을 대체 — 첫 슬롯 = 최다 클릭.) ② **판 그룹핑** — 핵심제목+저자(역할표기 제거) 동일 행(벚꽃/단풍 에디션·양장·큰글자·리커버 등)은 최고점 1행만 표시 + 메타 줄 "다른 판 N" 힌트(판 선택 UI 없음. 권차 "2권"·"초판본 X" prefix 는 핵심제목이 달라 안 묶임 — 과소 그룹핑이 안전). **저자키 빈 그룹은 같은 핵심제목의 저자 있는 그룹에 흡수**(#1235 — 메타 불완전·카탈로그 오염 행이 canonical 과 나란히 뜨던 유령 중복 제거). ③ **표지 폴백** — 대표 행에 cover_url 없고 같은 그룹의 다른 판(카카오 등)에 있으면 **표시용으로만** 차용. 서버 PATCH 없음(§7.2.1 "카카오 결과 직접 적재 금지" 유지) — 등록 시 그 행이 기존 `/api/book-upsert`(#1191) 경로로 저장되며 cover 는 그때 자연 영속. 검색 입력창 포커스는 브랜드 링(`.rg-search-input:focus`, #1236 — UA 기본 링 노출 방지).
 // ⚠️ 데이터 소스 이전(#1044, §7.2.1): canonical 소스를 알라딘 → 국중도(쪽수·표지)+카카오(검색·표지)로 옮긴다. 아래 알라딘 서술은 *이전 전 현행*(코드 후속 PR 에서 재배선).
 // 도서 프록시(Cloudflare Worker `worker/index.mjs` `/aladin`, 별칭 `/.netlify/functions/aladin`): **ItemSearch(검색)는 packing을 줘도 itemPage 미제공** — 쪽수는 **ItemLookUp(?isbn=)만** 반환. ISBN 단건 등록은 즉시 보강하나 **검색 일괄 upsert 는 비용상 미보강**이라 total_pages=null 로 남았다(과거 ~894권이 화면에 "/ 1p"로 표시 #1117). → **일일 cron `backfillPages`(#1117·#1044)** 가 null·유효 isbn13 책을 보강: **국중도 `PAGE`(NLK 키 설치 시 1순위) → Aladin itemPage(레거시 모드 전용, 키 설치 후엔 미호출) → OpenLibrary `number_of_pages` 폴백**. ~~Google Books `pageCount` 폴백~~ **(#1044 제거)** — Google ToS §5.e 영구 캐시 금지로 영구 PATCH 경로에서 삭제(실시간 표시만 허용). `BACKFILL_DAILY_CAP` 기본 300, 멱등. 대량 과거 null(~894)은 1회 `collector/backfill-pages.mjs` 로 해소(894→24). **끝내 어느 소스에도 쪽수 없는 책(문제집·사전류)** 은 앱이 `total>0` 가드로 **"현재 N쪽"만 표시**(가짜 "/ 1p"·100% 금지 — nest.js #1117).
-// 외서 균형 보강(#302): 검색이면 **국내(알라딘) 최대 5 + 외서(Google Books) 최대 5 = 총 ≤10**, isbn13/title 중복제거. Google 키는 `GOOGLE_BOOKS_API_KEY`(무키 시 레이트리밋). ISBN 단건 조회엔 미적용.
+// 외서 보강(#302·#1544): 검색이면 제품 총 상한 10 안에서 주 공급자 결과를 먼저 보존하고, 부족한 슬롯만 Google Books가 실시간 보강한다. isbn13/title 중복제거. Google 키는 `GOOGLE_BOOKS_API_KEY`(무키 시 레이트리밋). ISBN 단건 조회엔 미적용.
 // 책 소개·풀 메타(#316→#489): 검색·ISBN 조회 응답에 알라딘 풀 메타(`description` 등) 첨부. **#489: `normalize()` 가 books 풀 메타 컬럼(위 테이블)을 채워 upsert** → archive·검색 양 경로 공통 반영(이전엔 description 컬럼 부재로 미반영).
 // 검색 도서 자동 저장(#489): `aladinProxy` 가 알라딘 결과를 `ctx.waitUntil` 백그라운드로 books upsert(`on_conflict=isbn13`). 검색(ItemSearch)은 itemPage 누락 잦아 **저장 직전 ISBN 보강**(위 QA7). **`upsertBook` 단일 게이트(#1117): 진짜 ISBN-13(`^97[89]\d{10}$`)만 적재 — Aladin 묶음상품 K-id(`[세트]…전2권`)·EAN 바코드·ISBN-10 차단**(세트는 단일 쪽수가 없어 영구 null + 검색 노이즈. 검색·archive·seed 전 경로 공통 적용. 과거 유입분 83권 1회 정리). ~~Google 외서는 우리 컬럼 매핑분만 + `source='google'`~~ **(#1044 제거)** — Google ToS §5.e 영구 캐시 금지로 검색 보강 Google 결과 upsert 를 삭제, Google 은 실시간 응답 표시만. 응답 지연 0(upsert는 응답과 분리).
 // 외서·빈필드 폴백 체인(#489): 등록 시 **알라딘 → Google Books → OpenLibrary** 순으로 빈 필드만 non-destructive merge(표지: Google thumbnail → OpenLibrary covers). 끝내 빈 `description`은 **LLM 보강 허용**(solar-pro3/Gemini, **결과를 books DB ISBN 매칭해 환각 필터**, 사실성 부담 큰 쪽수·가격엔 미적용). `source`·`enriched_at` 로 출처·재보강 추적. 신뢰 카피 차등은 [nest.md/library 추천 #496] 참조.
@@ -281,9 +282,9 @@ ai.extractBook(book, quotes)               → 추출 책 요약        // 드�
 
 - `max`는 반환 개수의 최소 보장이 아니라 **최종 응답 상한**이다. 양의 정수는 최대 20까지 해석하되, 기존 제품 총 상한 10을 유지하므로 검색 응답의 effective limit은 `min(max, 10)`이다.
 - `max` 미지정·비숫자·`0`은 기존대로 기본값 10을 사용한다. 음수도 10으로 정규화해 현행 worker의 음수 전달 결함을 함께 교정한다. ISBN 단건 조회에는 이 검색 병합 상한을 적용하지 않는다.
-- primary provider가 성공하면 카카오 또는 레거시 알라딘 결과를 `min(5, effective limit)`개까지 우선 배치하고, 남은 슬롯을 Google Books로 보강한다. provider 병합·중복 제거 후에도 effective limit을 넘지 않는다. primary provider 실패 후 Google fallback에도 같은 상한을 적용한다.
+- primary provider가 성공하면 카카오 또는 레거시 알라딘 결과를 effective limit까지 우선 보존한다. 주 공급자 결과가 부족할 때만 남은 슬롯 수만큼 Google Books로 보강한다. 공급자별 고정 `5+5` 할당은 사용하지 않으며, provider 병합·중복 제거 후에도 effective limit을 넘지 않는다. primary provider 실패 후 Google fallback에도 같은 상한을 적용한다.
 - primary provider 할당 결과가 effective limit을 이미 채워 남은 슬롯이 없으면 Google 보강을 호출하지 않는다. 카카오/알라딘 primary 성공 응답은 24시간, provider 실패 후 Google fallback 성공 응답은 1시간 캐시한다.
-- 회귀 검증은 `max=1·2·5·10·20·20초과`, 기본/invalid/0/음수, 카카오·알라딘 성공/실패, Google 중복 제거·불필요 호출 방지, ISBN 단건 비영향을 포함한다.
+- 회귀 검증은 `max=1·2·5·10·20·20초과`, 기본/invalid/0/음수, 카카오·알라딘 성공/실패, 주 공급자 10건 보존, 주 공급자 부족분만큼의 Google 요청, Google 중복 제거·불필요 호출 방지, ISBN 단건 비영향을 포함한다.
 
 **provider 캐시·예산 계약 (`GET /aladin`, #1398):**
 
