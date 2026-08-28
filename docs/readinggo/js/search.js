@@ -161,10 +161,11 @@ function rgRemoteBookKey(book) {
 
 // provider page를 작품 행 기준으로 채운다. 판 그룹핑으로 10개 후보가 6행이 되면 다음 cursor를
 // 자동 조회하고, `더 보기`도 같은 함수로 다음 10행을 보충한다. cursor는 서버가 준 값을 그대로 쓴다.
-async function rgFetchRemoteWindow(proxy, query, cursor = '', existing = [], targetRows = 10, request = fetch) {
+async function rgFetchRemoteWindow(proxy, query, cursor = '', existing = [], targetRows = 10, request = fetch, countRows = null) {
   const books = Array.isArray(existing) ? [...existing] : [];
   const seenBooks = new Set(books.map(rgRemoteBookKey).filter(Boolean));
-  const startingRows = rgRankSearchResults(books, query).length;
+  const getRowCount = typeof countRows === 'function' ? countRows : (rows) => rgRankSearchResults(rows, query).length;
+  const startingRows = getRowCount(books);
   const desiredRows = startingRows + Math.max(1, targetRows);
   const seenCursors = new Set();
   let nextCursor = cursor || '';
@@ -198,7 +199,7 @@ async function rgFetchRemoteWindow(proxy, query, cursor = '', existing = [], tar
     loadedPages += 1;
     nextCursor = typeof data.nextCursor === 'string' ? data.nextCursor : '';
     hasMore = Boolean(data.hasMore && nextCursor);
-  } while (hasMore && loadedPages < 50 && rgRankSearchResults(books, query).length < desiredRows);
+  } while (hasMore && loadedPages < 50 && getRowCount(books) < desiredRows);
 
   return { items: books, nextCursor, hasMore };
 }
@@ -351,8 +352,20 @@ const SearchModal = ({
     const proxy = (window.RG_CONFIG && window.RG_CONFIG.ALADIN_PROXY) || '';
     if (!q || !proxy) return;
     const requestId = remoteRequestId.current;
+    const countIntegratedRows = (remoteBooks) => {
+      const seen = new Set();
+      const dedup = (rows) => rows.filter((book) => {
+        const key = book.isbn13 || book.isbn || book.title;
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return rgRankSearchResults(
+        dedup(dbResults).concat(dedup(localItems)).concat(dedup(remoteBooks)), q
+      ).length;
+    };
     setRemoteLoading(true);
-    rgFetchRemoteWindow(proxy, q, remoteCursor, remote, 10)
+    rgFetchRemoteWindow(proxy, q, remoteCursor, remote, 10, fetch, countIntegratedRows)
       .then((result) => {
         if (requestId !== remoteRequestId.current) return;
         setRemote(result.items);
