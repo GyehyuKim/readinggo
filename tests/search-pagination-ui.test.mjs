@@ -48,3 +48,34 @@ assert.deepEqual(calls, ['kakao:3']);
 assert.equal(context.rank(more.items, 'Hemingway').length > context.rank(first.items, 'Hemingway').length, true);
 assert.equal(more.hasMore, false);
 assert.equal(more.nextCursor, '');
+
+const baseWorks = Array.from({ length: 10 }, (_, i) => ({
+  isbn13: `9781111111${String(i).padStart(3, '0')}`,
+  title: `Hemingway base ${i + 1}`,
+  author: 'Base author',
+  source: 'kakao',
+}));
+const overlappingLocal = {
+  isbn13: '9789999999999',
+  title: 'Hemingway work 5',
+  author: 'Ernest Hemingway',
+  _source: 'db',
+};
+const integratedCalls = [];
+const integratedRequest = async (url) => {
+  const cursor = new URL(url).searchParams.get('cursor') || '';
+  integratedCalls.push(cursor);
+  if (cursor === 'kakao:2') return { ok: true, json: async () => ({ items: nextWorks, hasMore: true, nextCursor: 'kakao:3' }) };
+  if (cursor === 'kakao:3') return { ok: true, json: async () => ({
+    items: [{ isbn13: '9799999999999', title: 'Hemingway final work', author: 'Ernest Hemingway', source: 'kakao' }],
+    hasMore: false,
+    nextCursor: '',
+  }) };
+  throw new Error(`unexpected integrated cursor ${cursor}`);
+};
+const countIntegratedRows = (remoteBooks) => context.rank([overlappingLocal, ...remoteBooks], 'Hemingway').length;
+const integrated = await context.fetchWindow(
+  'https://api.example/aladin', 'Hemingway', 'kakao:2', baseWorks, 10, integratedRequest, countIntegratedRows,
+);
+assert.deepEqual(integratedCalls, ['kakao:2', 'kakao:3'], 'DB/로컬 작품과 그룹핑돼도 통합 10행이 찰 때까지 계속 조회해야 한다');
+assert.equal(countIntegratedRows(integrated.items), countIntegratedRows(baseWorks) + 10);
