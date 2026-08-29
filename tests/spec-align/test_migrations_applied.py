@@ -41,6 +41,22 @@ class ParseExpectedTests(unittest.TestCase):
         self.assertIn(("public", "books", "subtitle"), columns)
         self.assertNotIn(("public", "migration_backups"), tables)
 
+    def test_later_drop_column_removes_previous_expected_column(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            sql_dir = Path(directory)
+            (sql_dir / "01_add.sql").write_text(
+                "alter table public.streak add column if not exists last_repair_date date;",
+                encoding="utf-8",
+            )
+            (sql_dir / "02_drop.sql").write_text(
+                "alter table if exists public.streak drop column if exists last_repair_date;",
+                encoding="utf-8",
+            )
+
+            columns, _ = MIGRATIONS.parse_expected(sql_dir)
+
+        self.assertNotIn(("public", "streak", "last_repair_date"), columns)
+
     def test_excludes_dev_only_sql(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             sql_dir = Path(directory)

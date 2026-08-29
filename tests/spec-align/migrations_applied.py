@@ -86,19 +86,28 @@ def parse_expected(
             re.I,
         ):
             tables.add(_parse_table_target(statement.group("target"), path))
-        # `alter table [if exists] schema.X ... ;` block — collect every add-column inside it.
+        # `alter table [if exists] schema.X ... ;` block — apply add/drop columns in migration order.
         for block in re.finditer(
             r"alter\s+table\s+(?:if\s+exists\s+)?(?P<target>[^\s;]+)(?P<body>.*?);",
             raw,
             re.I | re.S,
         ):
             schema, table = _parse_table_target(block.group("target"), path)
+            body = block.group("body")
             for column in re.finditer(
                 rf"add\s+column\s+if\s+not\s+exists\s+(?P<column>{_IDENT})",
-                block.group("body"),
+                body,
                 re.I,
             ):
                 cols.add(
+                    (schema, table, _normalize_identifier(column.group("column")))
+                )
+            for column in re.finditer(
+                rf"drop\s+column\s+(?:if\s+exists\s+)?(?P<column>{_IDENT})",
+                body,
+                re.I,
+            ):
+                cols.discard(
                     (schema, table, _normalize_identifier(column.group("column")))
                 )
     return cols, tables
