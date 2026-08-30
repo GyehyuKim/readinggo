@@ -34,34 +34,44 @@ async function assertView(label) {
 async function assertLibrarySurface() {
   const activityCount = await page.locator('.rg-activity').count();
   if (activityCount !== 0) fails.push('[서재] profile 활동 캘린더가 중복 노출됨');
-  const rail = page.locator('.shelf-grid');
+  const focusCard = page.locator('.shelf-focus-card');
+  const focusCount = await focusCard.count();
+  const emptyCount = await page.getByText('아직 서재에 책이 없어요', { exact: true }).count();
+  if (focusCount > 1 || (focusCount === 0 && emptyCount === 0)) {
+    fails.push('[서재] 중앙 전체 표지 또는 정식 빈 상태가 없음');
+  }
+  const rail = page.locator('.shelf-peek-rail');
   if (await rail.count()) {
     const metrics = await rail.evaluate((el) => ({
       overflowX: getComputedStyle(el).overflowX,
       snap: getComputedStyle(el).scrollSnapType,
-      cards: el.querySelectorAll('.shelf-grid-item').length,
+      cards: el.querySelectorAll('.shelf-peek-item').length,
       scrollWidth: el.scrollWidth,
       clientWidth: el.clientWidth,
+      active: el.getAttribute('aria-activedescendant'),
     }));
     if (!/auto|scroll/.test(metrics.overflowX) || !/x/.test(metrics.snap)) {
-      fails.push(`[서재] 가로 rail CSS 불일치 overflow=${metrics.overflowX} snap=${metrics.snap}`);
+      fails.push(`[서재] 주변 책 rail CSS 불일치 overflow=${metrics.overflowX} snap=${metrics.snap}`);
     }
-    if (metrics.cards > 1 && metrics.scrollWidth <= metrics.clientWidth) {
-      fails.push('[서재] 여러 책인데 유한 가로 스크롤 범위가 없음');
+    if (metrics.cards > 5 && metrics.scrollWidth <= metrics.clientWidth) {
+      fails.push('[서재] 책이 많은데 유한 가로 스크롤 범위가 없음');
     }
-    if (metrics.cards > 2) {
+    if (metrics.cards > 1) {
+      const titleBefore = await focusCard.locator('.shelf-focus-title').innerText();
       await rail.focus();
-      const before = await rail.evaluate((el) => el.scrollLeft);
       await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(500);
-      const after = await rail.evaluate((el) => el.scrollLeft);
-      if (after <= before) fails.push('[서재] ArrowRight로 rail이 이동하지 않음');
+      await page.waitForTimeout(200);
+      const titleAfter = await focusCard.locator('.shelf-focus-title').innerText();
+      const activeAfter = await rail.getAttribute('aria-activedescendant');
+      if (titleAfter === titleBefore || activeAfter === metrics.active) {
+        fails.push('[서재] ArrowRight로 중앙 선택 책이 바뀌지 않음');
+      }
     }
   }
 }
 
 async function assertProfileActivity() {
-  if (await page.locator('.shelf-grid').count()) fails.push('[프로필] 서재 rail이 중복 노출됨');
+  if (await page.locator('.shelf-stage, .shelf-peek-rail').count()) fails.push('[프로필] 서재 탐색 UI가 중복 노출됨');
   const activity = page.locator('.rg-activity');
   if (await activity.count() !== 1) { fails.push('[프로필] 월간 활동 캘린더가 없음'); return; }
   if (await activity.locator('.rg-activity-day').count() !== 42) fails.push('[프로필] 월간 캘린더가 42칸이 아님');
