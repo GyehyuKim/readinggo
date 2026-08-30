@@ -487,10 +487,19 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
       completionPromise = new Promise((resolve, reject) => {
         completion = {
           rollback: { book: previousNestState.book, streak: previousNestState.streak, myQuotes: previousNestState.myQuotes },
-          onSuccess: resolve,
+          onSuccess: (result) => {
+            setCeremony(current => current ? {
+              ...current,
+              reflectionPending: false,
+              reflectionSentence: result && result.reflectionSentence,
+            } : current);
+            resolve(result);
+          },
           onFailure: (error) => {
             if (!error || !error.checkinReadbackFailed) {
               setNestState(previousNestState); setCheckedToday(false); setCeremony(null); setShowConfetti(false);
+            } else {
+              setCeremony(current => current ? { ...current, reflectionPending: false, reflectionSentence: null } : current);
             }
             reject(error);
           },
@@ -510,7 +519,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
     // 이 책에서 모은 한 문장 수 (#549) — 세리머니가 거짓 '저장됨' 대신 정직한 누적/독려 표시.
     const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
-    setCeremony({ streak: ns.streak, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete });
+    setCeremony({ streak: ns.streak, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete, reflectionPending: sentenceCount === 1 && !isComplete, reflectionSentence: null });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
     const persistenceResult = completionPromise || checkinResult;
@@ -774,6 +783,36 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
     _sentenceCeremonyRef.current = null;
     setCeremony(null);
     if (onNavigate) onNavigate('library');
+  };
+
+  const saveReflectionFromCeremony = (draft) => {
+    const sentence = ceremony && ceremony.reflectionSentence;
+    if (!sentence || !sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) {
+      return Promise.reject(new Error('reflection_sentence_unavailable'));
+    }
+    const note = rgJoinNote(draft.trim(), rgSplitNote(sentence.note).qa);
+    return Promise.resolve(DataStore.sentences.setNote(sentence.id, note || null)).then(() => {
+      sentence.note = note;
+      setCeremony(current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
+        ? { ...current, reflectionSentence: { ...current.reflectionSentence, note } }
+        : current);
+      setNestState(current => ({
+        ...current,
+        myQuotes: (current.myQuotes || []).map(q => q.id === sentence.id ? { ...q, note } : q),
+      }));
+      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+      if (window.rgTrack) window.rgTrack('reflection_note_saved', { book_id: sentence.bookId || '', chars: draft.trim().length, source: 'post_save' });
+      return true;
+    });
+  };
+
+  const talkToJackyFromCeremony = () => {
+    const sentence = ceremony && ceremony.reflectionSentence;
+    if (!sentence || !sentence.id || !window.RG_openCompanion) return;
+    _sentenceCeremonyRef.current = null;
+    pendingMilestoneRef.current = null;
+    setCeremony(null);
+    window.RG_openCompanion(sentence, { mode: 'jacky' });
   };
 
   _useEffect(() => {
@@ -1264,6 +1303,8 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
           onContinue={openSentenceFromCeremony}
           onViewSaved={viewSavedFromCeremony}
           onGoLibrary={goLibraryFromCeremony}
+          onSaveReflection={saveReflectionFromCeremony}
+          onTalkToJacky={talkToJackyFromCeremony}
         />,
         document.body
       )}
