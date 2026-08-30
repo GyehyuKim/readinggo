@@ -18,9 +18,8 @@ test('legacy tab inputs normalize to canonical routes', () => {
 });
 
 test('runtime state and output use canonical home after the alias boundary', () => {
-  const boundaryStart = app.indexOf(source);
-  assert.notEqual(boundaryStart, -1);
-  const canonicalRuntime = app.slice(boundaryStart + source.length);
+  assert.equal(app.split(source).length - 1, 1, 'normalizeTab boundary must appear exactly once');
+  const canonicalRuntime = app.replace(source, '');
 
   assert.match(canonicalRuntime, /useState\('home'\)/);
   assert.match(canonicalRuntime, /setActiveTab\(normalizeTab\(tab\)\)/);
