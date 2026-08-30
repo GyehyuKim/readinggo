@@ -40,6 +40,21 @@ assert.doesNotMatch(
 );
 assert.match(
   librarySource,
+  /className="shelf-focus-progress"/,
+  '중앙 책 진척 텍스트는 고정 class를 사용해야 한다',
+);
+assert.match(
+  stylesSource,
+  /\.shelf-focus-progress\s*\{/,
+  '중앙 책 진척 텍스트 class에는 대응 CSS가 있어야 한다',
+);
+assert.doesNotMatch(
+  stylesSource,
+  /\.shelf-focus-prog\s*\{/,
+  '사용되지 않는 축약 selector가 남으면 안 된다',
+);
+assert.match(
+  librarySource,
   /className="shelf-focus-card"[\s\S]*?onClick=\{\(\) => setSelectedBookId\(focusedBook\.id\)\}/,
   '중앙 전체 표지를 탭하면 기존 상세를 열 수 있어야 한다',
 );
