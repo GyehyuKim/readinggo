@@ -19,7 +19,7 @@
 | 검증 | 결과 | 해석 |
 |---|---|---|
 | `python3 tests/spec-align/align_v7.py` | `PASS` (94/94) | 과거 v7~v16 기능과 #1260 활동함 표면의 존재·부재 검사. 최신 제품 결정을 전부 검증하지는 않음 |
-| `python3 tests/spec-align/nest.py` | `PASS` (7/7) | canonical `library` route, `nest-grow` 입력 alias, 책나무 active route 부재, XP 제거 상태 확인 |
+| `python3 tests/spec-align/nest.py` | `PASS` (8/8) | canonical `home`·`library` route, 과거 입력 alias 정규화, 퇴역 projection·XP 부재 확인. 후속 구현 PR에서 verifier를 `home.py`로 rename한다 |
 | `python3 tests/spec-align/architecture_current.py` | `PASS` (3/3) | Vite·Capacitor·Cloudflare·DataStore 현재 계약 확인 |
 | `python3 tests/spec-align/drift.py` | `PASS` | spec-drift workflow 구조 확인 |
 | `python3 tests/spec-align/design_lint.py` | `PASS` (0건) | 이모지·raw hex·ghost·radius·font 규칙 위반 없음 |
@@ -54,8 +54,8 @@
 | `meta/journey.md` | 역사 문서 | ✅ | v5/v6 여정으로만 사용. 현재 계약으로 사용하지 않음 |
 | `meta/open-issues.md` | GitHub #1452~#1515와 수동 대조 | 📝 | v18 서재 전환과 게스트 이관·carousel·라우팅·4번째 탭 결정, XP 삭제·재독·문장 1,000자 후속을 분리 추적 |
 | `meta/rejected.md` | 역사 문서 | 📝 | 독립적인 기각 결정만 보존 |
-| `home-reading.md` | `nest.js`, `app.js`, `library.js`, `ceremony.js` | 📝 | 정본은 홈 `home`·독서 세션·문장 기록. 현행 활성 파일·component·test 이름과 홈 route는 구현 PR에서 중립 이름으로 전환하고 입력 alias만 단일 정규화 경계에 임시 유지 |
-| `onboarding.md` | `onboarding.js`, `nest.js` empty state, local notifications | 📝 | 실제 책 검색·서재 축적·비손실 기록의 v18 목표 여정 반영 |
+| `home-reading.md` | 현행 `nest.js`, `app.js`, `library.js`, `ceremony.js` | 📝 | 정본은 홈 `home`·독서 세션·문장 기록. 현행 컴포넌트는 이미 `HomeView`이며, 후속 구현 PR에서 `nest.js`·`nest.py` 파일명과 남은 내부 식별자를 중립 이름으로 전환하고 입력 alias만 단일 정규화 경계에 임시 유지 |
+| `onboarding.md` | `onboarding.js`, 현행 `nest.js` empty state, local notifications | 📝 | 실제 책 검색·서재 축적·비손실 기록의 v18 목표 여정 반영. 후속 구현 PR에서 홈 파일명을 `home.js`로 전환 |
 | `ops.md` | dev/prod workflows, `wrangler.toml`, release scripts | 📝 | spec 승인→구현→DEV QA→동일 SHA PROD→Production QA→스토어, 권한·XP 단계 증거와 rollback 계약 추가 |
 | `privacy-policy.md` | 공개 privacy URL, consent UI, account deletion | 📝 | 책나무 제품·자동 활성화 종료. 최소공개·fail-closed·retained API·base RLS 안전 조건은 유지 |
 | `profile.md` | `library.js`, `settings-view.js`, `user-profile-modal.js` | 🚩 | 3번째 탭 서재·4번째 활동 방향을 반영. 책나무 UI는 제거 대상이고 `followers` round-trip 갭은 별도 차단 이슈로 유지 |
@@ -72,9 +72,9 @@
 | 영역 | 구현 위치 | 현재 사실 |
 |---|---|---|
 | 홈 상단 | `js/app.js` `topbar-stats` | 책·문장 수를 중립 용어로 노출 |
-| 홈·3번째 탭 | `js/app.js`, `js/nest.js`, `js/library.js` | 목표 canonical은 `home`·`library`. 현행 `nest`·`nest-grow` 입력은 구현 PR에서 단일 경계의 임시 alias로만 정규화 |
+| 홈·3번째 탭 | `js/app.js`, 현행 `js/nest.js`, `js/library.js` | canonical은 `home`·`library`. 후속 구현 PR에서 홈 파일명을 `home.js`로 전환하고 `nest`·`nest-grow` 입력은 단일 경계의 임시 alias로만 정규화 |
 | XP·둥지 표면 | 앱·DataStore·migration 참조 감사 | 신규 XP 쓰기와 둥지/성/만회 계약은 제거됐으며 레거시 SQL 이력은 별도 보존 |
-| 스트릭 | `js/datastore.js`, `js/nest.js` | 현재 연속일 계산·7/30일 세리머니가 일부 남아 있다. v18 4번째 탭 결정 전 새 스트릭 상품 계약으로 해석하지 않음 |
+| 스트릭 | `js/datastore.js`, 현행 `js/nest.js` | 현재 연속일 계산·7/30일 세리머니가 일부 남아 있다. 후속 구현 PR에서 홈 파일명을 `home.js`로 전환하며, v18 4번째 탭 결정 전 새 스트릭 상품 계약으로 해석하지 않음 |
 | 책 상태 | `user_books.status`, `wish_books`, `myBooks.abort/resume/complete` | reading/completed/aborted와 wish가 별도 구조로 존재 |
 | 공개 문장 | `sentences.visibility`, `sentences_public`, moderation policies | public/followers/private와 신고·차단 필터 구현 |
 | 타인 서재 UI | `users.publicShelf`, `users.publicWishlist`, `user-profile-modal.js` | 읽는 중·완독만 렌더하고 위시리스트는 `wishlist_public` 토글에 의존 |
