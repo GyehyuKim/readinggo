@@ -15,9 +15,9 @@ assert.match(ceremony, /onClick=\{onGoLibrary\}>내 서재로 가기<\/button>/,
   '저장 뒤 서재 자산으로 이동할 수 있어야 한다');
 assert.doesNotMatch(ceremony, /reward-card|onAddSentence/,
   '저장 개수를 별도 결과 카드로 반복하지 않아야 한다');
-assert.match(nest, /pushState\(\{ rgCeremonySentence: true, bookId: nestState\.book\.id \}/,
+assert.match(nest, /pushState\(\{ rgCeremonySentence: true, bookId: homeState\.book\.id \}/,
   '입력 이동 시 현재 책 문맥과 뒤로가기 history 항목을 보존해야 한다');
-assert.match(nest, /pushState\(\{ rgCeremonySaved: true, bookId: nestState\.book\.id \}/,
+assert.match(nest, /pushState\(\{ rgCeremonySaved: true, bookId: homeState\.book\.id \}/,
   '저장 문장 이동도 현재 책 문맥과 뒤로가기를 보존해야 한다');
 assert.match(nest, /_quickSentRef\.current[\s\S]*scrollIntoView[\s\S]*focus\(\{ preventScroll: true \}\)/,
   '현재 책의 한 문장 입력을 표시하고 포커스해야 한다');

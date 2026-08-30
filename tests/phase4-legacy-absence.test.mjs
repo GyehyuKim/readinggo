@@ -36,7 +36,8 @@ function productionModuleGraph(entry) {
 
 test('production graph keeps library canonical while retired routes and modules stay absent', () => {
   const app = read(path.join(jsRoot, 'app.js'));
-  assert.doesNotMatch(app, /nest-grow|bookTree|BookTree|책나무/);
+  const appWithoutTabAliases = app.replace(/function normalizeTab\(tab\) \{[\s\S]*?\n\}/, '');
+  assert.doesNotMatch(appWithoutTabAliases, /nest-grow|bookTree|BookTree|책나무/);
   assert.match(app, /activeTab === 'library'[\s\S]*mode="library"/);
 
 

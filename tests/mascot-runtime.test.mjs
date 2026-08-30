@@ -65,8 +65,9 @@ test('retired product implementation and mascot-as-user fallbacks are absent fro
 
   const source = fs.readdirSync(jsRoot).filter((name) => name.endsWith('.js'))
     .map((name) => read(path.join(jsRoot, name))).join('\n');
+  const sourceWithoutTabAliases = source.replace(/function normalizeTab\(tab\) \{[\s\S]*?\n\}/, '');
   for (const retired of ['book-tree', 'bookTree', 'BookTree', 'friendBookTree', 'friend_book_tree', '책나무', 'nest-grow']) {
-    assert.equal(source.includes(retired), false, `active JS contains retired marker: ${retired}`);
+    assert.equal(sourceWithoutTabAliases.includes(retired), false, `active JS outside compatibility boundary contains retired marker: ${retired}`);
   }
   assert.doesNotMatch(source, /avatar\s*:[^\n]*SparrowMark|display_name[^\n]*SparrowMark|RG_ME[^\n]*SparrowMark/);
   assert.match(read(path.join(jsRoot, 'companion.js')), /_JackAvatar[\s\S]*<window\.SparrowMark/);
