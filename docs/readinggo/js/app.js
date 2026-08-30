@@ -1420,6 +1420,7 @@ function App() {
               state={appState}
               onCheckin={handleCheckin}
               onOpenSearch={() => setIsSearchOpen(true)}
+              onNavigate={switchTab}
             />
           )}
           {activeTab === 'social' && (

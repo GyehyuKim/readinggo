@@ -25,23 +25,28 @@ assert.equal(
 );
 assert.doesNotMatch(
   librarySource,
-  /shelf-grid-item['"`]?\s*\+\s*\([^)]*activeBookId/,
-  '책장 카드 className은 활성 책에 따라 강조되면 안 된다',
+  /shelf-peek-item['"`]?\s*\+\s*\([^)]*activeBookId/,
+  '주변 탐색 조각은 홈 활성 책에 따라 강조되면 안 된다',
 );
 assert.doesNotMatch(
   librarySource,
-  /shelf-grid-active-pill/,
-  '책장 목록에 활성 책 전용 읽는중 pill을 렌더하면 안 된다',
+  /shelf-peek-active-pill/,
+  '주변 탐색 레일에 활성 책 전용 pill을 렌더하면 안 된다',
 );
 assert.doesNotMatch(
   stylesSource,
-  /\.shelf-grid-item\.active|\.shelf-grid-active-pill/,
-  '제거한 활성 책 강조 스타일이 남으면 안 된다',
+  /\.shelf-peek-item\.active|\.shelf-peek-active-pill/,
+  '홈 활성 책 강조 스타일이 남으면 안 된다',
 );
 assert.match(
   librarySource,
-  /onClick=\{\(\) => setSelectedBookId\(b\.id\)\}/,
-  '각 읽는 중 책은 기존처럼 상세를 열 수 있어야 한다',
+  /className="shelf-focus-card"[\s\S]*?onClick=\{\(\) => setSelectedBookId\(focusedBook\.id\)\}/,
+  '중앙 전체 표지를 탭하면 기존 상세를 열 수 있어야 한다',
+);
+assert.match(
+  librarySource,
+  /className=\{`shelf-peek-item\$\{isFocused \? ' on' : ''\}`\}[\s\S]*?onClick=\{\(\) => setShelfFocusId\(book\.id\)\}/,
+  '주변 조각 탭은 중앙 선택만 바꿔야 한다',
 );
 assert.doesNotMatch(
   librarySource,

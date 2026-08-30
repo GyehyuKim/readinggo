@@ -170,6 +170,9 @@ function _mapUserBook(ub) {
 
 function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
   const [selectedBookId, setSelectedBookId] = _useState(null);
+  // 서재 탐색의 중앙 선택은 상세 modal 선택과 분리한다(#1561).
+  // 주변 책을 넘기는 것만으로 상세나 홈 활성 책이 바뀌면 안 된다.
+  const [shelfFocusId, setShelfFocusId] = _useState(null);
   const [includedStatuses, setIncludedStatuses] = _useState(() => new Set(['wish', 'reading', 'completed', 'aborted']));
   // 통합 서재 정렬. key=정렬축('recent'|'rating'|'title'), dir=방향(1=최근·높은·ㄱ→ㅎ, -1=반대).
   const [librarySort, setLibrarySort] = _useState({ key: 'recent', dir: 1 });
@@ -421,6 +424,33 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
       if (!aDate !== !bDate) return aDate ? -1 : 1;
       return bDate.localeCompare(aDate) * d;
     });
+
+  const focusedBook = displayBooks.find((book) => book.id === shelfFocusId) || displayBooks[0] || null;
+  const focusedBookIndex = focusedBook ? displayBooks.findIndex((book) => book.id === focusedBook.id) : -1;
+  const focusedStatus = focusedBook
+    ? (statusFilters.find((filter) => filter.id === focusedBook.status)?.label || '서재 책')
+    : '';
+  const focusedProgress = !focusedBook
+    ? ''
+    : focusedBook.status === 'wish'
+      ? (focusedBook.author || '관심책')
+      : focusedBook.status === 'completed'
+        ? (typeof focusedBook.rating === 'number' ? `★ ${focusedBook.rating.toFixed(1)}` : '완독')
+        : focusedBook.status === 'aborted'
+          ? (focusedBook.cur > 0 ? `${focusedBook.cur}/${focusedBook.total}쪽 · 중단` : '중단')
+          : (focusedBook.total > 0 ? `${focusedBook.cur}/${focusedBook.total}쪽` : '읽는 중');
+  const moveShelfFocus = (delta) => {
+    if (!displayBooks.length) return;
+    const currentIndex = focusedBookIndex >= 0 ? focusedBookIndex : 0;
+    const nextIndex = Math.max(0, Math.min(displayBooks.length - 1, currentIndex + delta));
+    const next = displayBooks[nextIndex];
+    if (!next || next.id === focusedBook?.id) return;
+    setShelfFocusId(next.id);
+    requestAnimationFrame(() => {
+      const item = document.getElementById(`shelf-peek-${nextIndex}`);
+      if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
+  };
 
   const currentBookIds = displayBooks.map(b => b.id);
   const tabQuotes = (state.myQuotes || [])
@@ -692,48 +722,59 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
           </div>
         ), document.body)}
 
-        {/* 책 목록 */}
+        {/* 중앙 전체 표지 + 주변 둥근 상단부 탐색(#1561) */}
         {myBooks === null ? (
           <div style={{textAlign:'center', padding:'40px 20px', color:'var(--ink-3)', fontSize:13, fontWeight:700}}>불러오는 중…</div>
-        ) : displayBooks.length > 0 ? (
-          <div className="shelf-grid" role="list" tabIndex="0" aria-label="서재 책 목록, 좌우로 넘겨보기"
-            onKeyDown={(e) => {
-              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-              e.preventDefault();
-              e.currentTarget.scrollBy({ left: (e.key === 'ArrowRight' ? 1 : -1) * e.currentTarget.clientWidth * 0.72, behavior: 'smooth' });
-            }}>
-            {displayBooks.map(b => {
-              const isCompleted = b.status === 'completed';
-              const progText = isCompleted
-                ? (typeof b.rating === 'number' ? `★ ${b.rating.toFixed(1)}` : '완독')
-                : b.status === 'aborted'
-                  ? (<span style={{display:'inline-flex', alignItems:'center', gap:3}}>{window.rgIcon('pause',10)}{b.cur > 0 ? `${b.cur}/${b.total}p` : '중단'}</span>)
-                  : (b.total > 0 ? `${b.cur}/${b.total}쪽` : '읽는 중');   /* #1224: 읽는 중 책에 '미완독' 오표기 → 진행률(0쪽 포함), 쪽수 미상만 '읽는 중' */
-              return (
-                <div
-                  key={b.ubId || b.id}
-                  className="shelf-grid-item"
-                  role="listitem"
-                  tabIndex="0"
-                  aria-label={`${b.title}, ${statusFilters.find((filter) => filter.id === b.status)?.label || '서재 책'}`}
-                  onClick={() => setSelectedBookId(b.id)}
-                  onKeyDown={(e) => {
-                    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
-                    e.preventDefault();
-                    setSelectedBookId(b.id);
-                  }}
-                >
-                  {b.status === 'wish' && (
-                    <button onClick={(e) => removeWish(e, b.id)} title="찜 삭제" aria-label="찜 삭제"
-                      className="shelf-grid-remove-wish">{window.rgIcon('close',14)}</button>
-                  )}
-                  <BookCover className="shelf-grid-cover" title={b.title} author={b.author} cover={b.cover} fb={b.fb} />
-                  <div className={`shelf-grid-status ${b.status}`}>{statusFilters.find((filter) => filter.id === b.status)?.label || ''}</div>
-                  <div className="shelf-grid-title">{b.title}</div>
-                  <div className="shelf-grid-prog">{b.status === 'wish' ? (b.author || '관심책') : progText}</div>
-                </div>
-              );
-            })}
+        ) : focusedBook ? (
+          <div className="shelf-stage">
+            <button
+              type="button"
+              className="shelf-focus-card"
+              aria-label={`${focusedBook.title}, ${focusedStatus}. 책 상세 보기`}
+              onClick={() => setSelectedBookId(focusedBook.id)}
+            >
+              <BookCover className="shelf-focus-cover" title={focusedBook.title} author={focusedBook.author} cover={focusedBook.cover} fb={focusedBook.fb} />
+              <span className={`shelf-focus-status ${focusedBook.status}`}>{focusedStatus}</span>
+              <strong className="shelf-focus-title">{focusedBook.title}</strong>
+              <span className="shelf-focus-progress">{focusedProgress}</span>
+            </button>
+            {focusedBook.status === 'wish' && (
+              <button type="button" onClick={(e) => removeWish(e, focusedBook.id)} title="찜 삭제" aria-label="찜 삭제"
+                className="shelf-focus-remove-wish">{window.rgIcon('close',14)}</button>
+            )}
+            {displayBooks.length > 1 && (
+              <div
+                className="shelf-peek-rail"
+                role="listbox"
+                tabIndex="0"
+                aria-label={`서재 ${displayBooks.length}권, 좌우로 넘겨 중앙 책 선택`}
+                aria-activedescendant={`shelf-peek-${Math.max(0, focusedBookIndex)}`}
+                onKeyDown={(e) => {
+                  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                  e.preventDefault();
+                  moveShelfFocus(e.key === 'ArrowRight' ? 1 : -1);
+                }}
+              >
+                {displayBooks.map((book, index) => {
+                  const isFocused = book.id === focusedBook.id;
+                  return (
+                    <button
+                      type="button"
+                      id={`shelf-peek-${index}`}
+                      key={book.ubId || book.id}
+                      className={`shelf-peek-item${isFocused ? ' on' : ''}`}
+                      role="option"
+                      aria-selected={isFocused}
+                      aria-label={`${book.title}, ${index + 1}/${displayBooks.length}`}
+                      onClick={() => setShelfFocusId(book.id)}
+                    >
+                      <BookCover className="shelf-peek-cover" title={book.title} author={book.author} cover={book.cover} fb={book.fb} />
+                      <span className="shelf-peek-title" aria-hidden="true">{book.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{textAlign:'center', padding:'40px 20px', color:'var(--ink-3)'}}>

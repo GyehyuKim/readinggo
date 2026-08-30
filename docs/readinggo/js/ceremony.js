@@ -14,7 +14,7 @@ function finishCeremony(options) {
 }
 
 /* ── Ceremony ─────────────────────────────────────────── */
-function Ceremony({ data, onClose, onComplete, onAddSentence }) {
+function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibrary }) {
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
   // 게스트 여부(#1134) — 성공적으로 기록한 뒤 계정 저장을 조용히 제안한다.
@@ -28,7 +28,7 @@ function Ceremony({ data, onClose, onComplete, onAddSentence }) {
   }, []);
 
   if (!data) return null;
-  const { sentence, sentenceCount, bookQuoteCount, pagesAdded, isComplete } = data;
+  const { sentence, sentenceCount, pagesAdded, isComplete } = data;
   const savedCount = (typeof sentenceCount === 'number' && sentenceCount > 0)
     ? sentenceCount
     : (sentence && String(sentence).trim() ? 1 : 0);
@@ -50,21 +50,11 @@ function Ceremony({ data, onClose, onComplete, onAddSentence }) {
   return (
     <div className="ceremony show">
       <div className="inner">
+        <button type="button" className="ceremony-dismiss" aria-label="완료 화면 닫기" onClick={onClose}>
+          {window.rgIcon('close', 18)}
+        </button>
         <h2>{isComplete ? '완독을 축하해요!' : '기록을 남겼어요'}</h2>
         <div className="lead">{leadText}</div>
-
-        <div className="reward-grid">
-          <button
-            type="button"
-            className="reward-card gold reward-card-action"
-            onClick={onAddSentence}
-            aria-label={`${savedSentence ? `문장 ${savedCount}개 저장됨` : (bookQuoteCount > 0 ? `이 책 문장 ${bookQuoteCount}개` : '이 책 문장 0개')}. 한 문장 남기기로 이동`}
-          >
-            <span className="ico">{savedSentence ? window.rgIcon('bookmark', 22) : (bookQuoteCount > 0 ? window.rgIcon('book', 22) : window.rgIcon('pen', 22))}</span>
-            <div className="val">{savedSentence ? `${savedCount}개` : `${bookQuoteCount || 0}개`}</div>
-            <div className="lbl">{savedSentence ? '저장한 문장' : (bookQuoteCount > 0 ? '이 책의 문장' : '한 문장 남겨봐요')}</div>
-          </button>
-        </div>
 
         {sentence && (
           <div className="saved-quote">
@@ -102,9 +92,20 @@ function Ceremony({ data, onClose, onComplete, onAddSentence }) {
           </div>
         )}
 
-        <button className="next-btn" onClick={finish}>
-          {isComplete ? '완독 기록 남기기 →' : '닫기'}
-        </button>
+        {isComplete && (
+          <button className="next-btn" onClick={finish}>완독 기록 남기기 →</button>
+        )}
+        {!isComplete && (
+          <div className="ceremony-actions">
+            <button type="button" className="ceremony-action-primary" onClick={onContinue}>
+              이 책에서 계속 기록하기
+            </button>
+            <div className="ceremony-action-secondary">
+              <button type="button" onClick={onViewSaved}>저장한 문장 보기</button>
+              <button type="button" onClick={onGoLibrary}>내 서재로 가기</button>
+            </div>
+          </div>
+        )}
         {isGuest && (
           <button type="button" onClick={() => { onClose(); if (window.RG_login) window.RG_login(); }}
             style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--brand-3)', textDecoration: 'underline', padding: 6 }}>

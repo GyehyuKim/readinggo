@@ -181,7 +181,7 @@ function BookEditModal({ book, onClose, onSaved }) {
     </div>, document.body);
 }
 
-function NestView({ state, onCheckin, onOpenSearch }) {
+function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const [modalOpen, setModalOpen] = _useState(false);
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
@@ -208,6 +208,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
   const _ocrHistoryRef = _useRef(false);
   const _ocrSavingRef = _useRef(false);
   const _quickSentRef = _useRef(null);        // #1068 빈 상태 CTA → 한 문장 입력창 포커스 타깃
+  const _bookQuotesRef = _useRef(null);        // #1561 저장 완료 → 현재 책 문장 영역
   const [checkedToday, setCheckedToday] = _useState(false); // 오늘 짹 완료 — 읽기모드/체크인 후 중복 CTA 숨김 (#203)
   const [readingBooks, setReadingBooks] = _useState([]);  // 캐러셀용 읽는 중 책 (#185)
   const [bookEditOpen, setBookEditOpen] = _useState(false); // 책 정보 수정 모달 (#410)
@@ -758,6 +759,23 @@ function NestView({ state, onCheckin, onOpenSearch }) {
     }, 0);
   };
 
+  const viewSavedFromCeremony = () => {
+    if (!ceremony || !_bookQuotesRef.current) return;
+    _sentenceCeremonyRef.current = ceremony;
+    window.history.pushState({ rgCeremonySaved: true, bookId: nestState.book.id }, '');
+    setCeremony(null);
+    setTimeout(() => {
+      const section = _bookQuotesRef.current;
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  };
+
+  const goLibraryFromCeremony = () => {
+    _sentenceCeremonyRef.current = null;
+    setCeremony(null);
+    if (onNavigate) onNavigate('library');
+  };
+
   _useEffect(() => {
     const onPop = () => {
       const previous = _sentenceCeremonyRef.current;
@@ -1130,7 +1148,7 @@ function NestView({ state, onCheckin, onOpenSearch }) {
       )}
 
       {/* 이 책, 한 문장 (#499) — 현재 책 전체 기간 최신순 + 날짜·좋아요·삭제. */}
-      <div className="section-head">
+      <div className="section-head" ref={_bookQuotesRef}>
         {/* #1068: 0문장이면 카운트('0')·'전체 문장 보기'(빈 동선)를 숨겨 헤더를 비우고, 아래 빈 상태가 유도를 전담한다 */}
         <h3>내가 남긴 흔적 {bookQuotes.length > 0 && <span className="my-q-count">{bookQuotes.length}</span>}</h3>
         {bookQuotes.length > 0 && (
@@ -1243,7 +1261,9 @@ function NestView({ state, onCheckin, onOpenSearch }) {
           data={ceremony}
           onClose={closeCeremony}
           onComplete={handleComplete}
-          onAddSentence={openSentenceFromCeremony}
+          onContinue={openSentenceFromCeremony}
+          onViewSaved={viewSavedFromCeremony}
+          onGoLibrary={goLibraryFromCeremony}
         />,
         document.body
       )}

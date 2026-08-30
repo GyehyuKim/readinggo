@@ -53,10 +53,10 @@ assert.match(library, /new Set\(\['wish', 'reading', 'completed', 'aborted'\]\)/
   '서재는 네 상태를 하나의 projection에 기본 포함해야 한다');
 assert.doesNotMatch(library, /activeSubtab|setActiveSubtab/,
   '서재에 상호배타적인 상태 탭을 다시 도입하면 안 된다');
-assert.match(indexHtml, /\.shelf-grid\s*\{[\s\S]*?overflow-x:auto[\s\S]*?scroll-snap-type:x mandatory/,
-  '서재 책 목록은 유한 가로 scroll-snap rail이어야 한다');
-assert.match(indexHtml, /\.shelf-grid-item\s*\{[\s\S]*?scroll-snap-align:start/,
-  '각 책 카드는 시작점에 snap해야 한다');
+assert.match(indexHtml, /\.shelf-peek-rail\s*\{[\s\S]*?overflow-x:auto[\s\S]*?scroll-snap-type:x mandatory/,
+  '서재 주변 책 목록은 유한 가로 scroll-snap rail이어야 한다');
+assert.match(indexHtml, /\.shelf-peek-item\s*\{[\s\S]*?scroll-snap-align:center/,
+  '각 주변 책 조각은 중앙에 snap해야 한다');
 assert.match(library, /\{showProfile && <ReadingActivityCalendar quotes=\{state\.myQuotes \|\| \[\]\} \/>\}/,
   '월간 활동 캘린더는 profile 소유 surface에만 렌더해야 한다');
 assert.match(library, /setSessionDates\(Array\.from\(new Set\(readDates\)\)\)/,
