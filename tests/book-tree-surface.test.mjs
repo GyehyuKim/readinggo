@@ -11,6 +11,7 @@ const nest = read('docs/readinggo/js/nest.js');
 const library = read('docs/readinggo/js/library.js');
 const datastore = read('docs/readinggo/js/datastore.js');
 const indexHtml = read('docs/readinggo/index.html');
+const appWithoutTabAliases = app.replace(/function normalizeTab\(tab\) \{[\s\S]*?\n\}/, '');
 
 const tabbar = app.slice(app.indexOf('<nav className="tabbar">'), app.indexOf('</nav>', app.indexOf('<nav className="tabbar">')));
 const bookshelfRecordStart = app.indexOf('window.RG_openBookshelfRecord = (bookId) => {');
@@ -26,8 +27,8 @@ assert.match(tabbar, /aria-label=\{t\.label\}/,
   '하단 탭 접근성 이름은 표시 라벨과 같아야 한다');
 assert.doesNotMatch(tabbar, /label:\s*'둥지'/,
   '하단 탭에 구 둥지 라벨이 남으면 안 된다');
-assert.doesNotMatch(app, /nest-grow|bookTree|BookTree|책나무/,
-  '은퇴한 route·projection·사용자 카피가 app runtime에 남으면 안 된다');
+assert.doesNotMatch(appWithoutTabAliases, /nest-grow|bookTree|BookTree|책나무/,
+  '호환 정규화 경계 밖 app runtime에 은퇴한 route·projection·사용자 카피가 남으면 안 된다');
 assert.match(bookshelfRecord, /setActiveTab\('library'\)/,
   '재키 책장 기록 CTA는 canonical 서재로 이동해야 한다');
 assert.match(bookshelfRecord, /if \(bookId && window\.RG_openBook\) window\.RG_openBook\(bookId\)/,

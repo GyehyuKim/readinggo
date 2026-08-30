@@ -1,6 +1,6 @@
 /* =========================================================
    ReadingGo — nest.js
-   둥지 탭(NestView): 책 카드, 체크인 CTA(짹), 내 한 문장, 같은 책 피드 + 책정보 수정(BookEditModal).
+   둥지 탭(HomeView): 책 카드, 체크인 CTA(짹), 내 한 문장, 같은 책 피드 + 책정보 수정(BookEditModal).
    Ceremony·CompanionModal·OcrCropOverlay는 #761로 별도 모듈 분리, CheckinModal은 #252 폐기 후 제거.
    ========================================================= */
 const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _useMemo } = React;
@@ -135,7 +135,7 @@ function _retainUnsavedDrafts(drafts, savedIndices) {
 }
 window._retainUnsavedDrafts = _retainUnsavedDrafts;
 
-/* ── NestView ─────────────────────────────────────────── */
+/* ── HomeView ─────────────────────────────────────────── */
 
 // 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 둥지 진척 즉시 반영.
 function BookEditModal({ book, onClose, onSaved }) {
@@ -181,7 +181,7 @@ function BookEditModal({ book, onClose, onSaved }) {
     </div>, document.body);
 }
 
-function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
+function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const [modalOpen, setModalOpen] = _useState(false);
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
@@ -218,7 +218,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const [showConfetti, setShowConfetti] = _useState(false);
   // 둥지 단계 = 활성 책 진척률(book.cur/book.total). 체력/days 추적 없음.
   const _pctOf = (bk) => bk && bk.total ? Math.round(bk.cur / bk.total * 100) : 0;
-  const [nestState, setNestState] = _useState({
+  const [homeState, setHomeState] = _useState({
     streak: state.streak,
     myQuotes: state.myQuotes,
     book: state.book,
@@ -227,11 +227,11 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const pendingMilestoneRef = _useRef(null);
   // 한 문장 삭제(#1)·종류변경(#381) 이벤트 → 둥지 '내 한 문장' 목록 즉시 반영.
   _useEffect(() => {
-    const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
-    const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
-    const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, note: d.note } : q) })); };
+    const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
+    const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
+    const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, note: d.note } : q) })); };
     // 한 문장 본문·페이지 수정 (#683/#731) — '이 책 한 문장' 카드 즉시 반영.
-    const onUpd = (e) => { const d = e && e.detail; if (!d || !d.id) return; setNestState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, text: d.text, page: d.page } : q) })); };
+    const onUpd = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, text: d.text, page: d.page } : q) })); };
     window.addEventListener('rg:sentence-removed', onRm);
     window.addEventListener('rg:sentence-kind', onKind);
     window.addEventListener('rg:sentence-note', onNote);
@@ -241,7 +241,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   // 활성 책이 바뀌면(또는 마운트) 부모 상태에서 재시드.
   _useEffect(() => {
-    setNestState({
+    setHomeState({
       streak: state.streak,
       myQuotes: state.myQuotes,
       book: state.book,
@@ -254,11 +254,11 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   // 안정 id가 생기기 전 액션을 열지 않는 SentenceActions 계약을 유지하면서 저장 직후
   // 공개범위·좋아요·공유·수정·삭제·감상 액션이 나타나게 한다(#1338).
   _useEffect(() => {
-    setNestState((ns) => ({ ...ns, myQuotes: state.myQuotes }));
+    setHomeState((ns) => ({ ...ns, myQuotes: state.myQuotes }));
   }, [state.myQuotes]);
 
   // 초안 임시저장 (#1198) — drafts 변경마다 현재 책 키로 영속(리로드·네비게이션 보존).
-  _useEffect(() => { _saveDrafts(nestState.book.id, drafts); }, [drafts, nestState.book.id]);
+  _useEffect(() => { _saveDrafts(homeState.book.id, drafts); }, [drafts, homeState.book.id]);
 
   const _draftCount = drafts.filter((x) => (x.text || '').trim()).length; // 실내용 있는 초안 수(버튼 라벨·요약)
   const setDraft = (i, patch) => setDrafts((d) => d.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -309,7 +309,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   }, [state.book.id]);
   const switchBook = (dir) => {
     if (!readingBooks || readingBooks.length < 2) { showToast('읽는 중인 책이 하나예요'); return; }
-    const idx = readingBooks.findIndex((b) => b.id === nestState.book.id);
+    const idx = readingBooks.findIndex((b) => b.id === homeState.book.id);
     const ni = ((idx < 0 ? 0 : idx) + dir + readingBooks.length) % readingBooks.length;
     if (window.RG_activateBook) window.RG_activateBook(readingBooks[ni]);
   };
@@ -444,8 +444,8 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
     }
     setModalOpen(false);
     setCheckedToday(true);
-    const previousNestState = nestState;
-    const ns = { ...nestState };
+    const previousHomeState = homeState;
+    const ns = { ...homeState };
     const pagesAdded = Math.max(0, page - ns.book.cur);
     // 스트릭은 실제 마지막 기록일 기준으로 계산(#927). 종전 `ns.streak += 1`(맹목 증가)은
     // 며칠 건너뛴 뒤에도 +1 해 세리머니에 부풀린 값을 띄우던 문제를 막기 위해
@@ -481,12 +481,12 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
       ns.myQuotes = [{ text: savedSentence, bookId: ns.book.id, bookTitle: ns.book.title || '', page: quotePage, when: '방금', kind: kind || 'quote', visibility: defaultVisibility }, ...ns.myQuotes];
     }
 
-    setNestState(ns);
+    setHomeState(ns);
     let completionPromise = null, completion = null;
     if (awaitPersistence) {
       completionPromise = new Promise((resolve, reject) => {
         completion = {
-          rollback: { book: previousNestState.book, streak: previousNestState.streak, myQuotes: previousNestState.myQuotes },
+          rollback: { book: previousHomeState.book, streak: previousHomeState.streak, myQuotes: previousHomeState.myQuotes },
           onSuccess: (result) => {
             setCeremony(current => current ? {
               ...current,
@@ -497,7 +497,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
           },
           onFailure: (error) => {
             if (!error || !error.checkinReadbackFailed) {
-              setNestState(previousNestState); setCheckedToday(false); setCeremony(null); setShowConfetti(false);
+              setHomeState(previousHomeState); setCheckedToday(false); setCeremony(null); setShowConfetti(false);
             } else {
               setCeremony(current => current ? { ...current, reflectionPending: false, reflectionSentence: null } : current);
             }
@@ -541,9 +541,9 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
     Promise.resolve((window.ocrExtractSentence ? window.ocrExtractSentence(file) : Promise.resolve({ text: '', error: 'unavailable' })))
       .then((d) => {
         if (d && String(d.text || '').trim()) {
-          setOcrReview({ text: String(d.text), page: '', sourceBook: nestState.book.id });
+          setOcrReview({ text: String(d.text), page: '', sourceBook: homeState.book.id });
           setOcrErrors({ text: '', page: '', status: '' });
-          rgTrack('ocr_extracted', { source: 'home_single', book_id: nestState.book.id, chars: Array.from(String(d.text)).length });
+          rgTrack('ocr_extracted', { source: 'home_single', book_id: homeState.book.id, chars: Array.from(String(d.text)).length });
         } else if (d && d.empty) {
           showToast('글자를 찾지 못했어요 — 더 또렷한 사진으로');
           rgTrack('ocr_failed', window.RG_createOcrFailureProps({ source: 'home_single', code: d.code || 'ocr_empty', stage: d.stage || 'result' }));
@@ -618,7 +618,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   const saveOcrReview = async () => {
     if (!ocrReview || ocrSaving) return;
-    const checked = _validateOcrReview(ocrReview.text, ocrReview.page, nestState.book.cur, nestState.book.total);
+    const checked = _validateOcrReview(ocrReview.text, ocrReview.page, homeState.book.cur, homeState.book.total);
     if (!checked.valid) {
       setOcrErrors({ text: checked.textError, page: checked.pageError, status: '입력 내용을 확인해주세요.' });
       setTimeout(() => { const target = checked.textError ? _ocrTextRef.current : _ocrPageRef.current; if (target) target.focus(); }, 0);
@@ -626,7 +626,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
     }
     _ocrSavingRef.current = true; setOcrSaving(true); setOcrErrors({ text: '', page: '', status: '저장 중입니다.' });
     try {
-      const progressPage = Math.max(nestState.book.cur || 0, checked.page);
+      const progressPage = Math.max(homeState.book.cur || 0, checked.page);
       await Promise.resolve(handleCheckin({ page: progressPage, sentence: checked.sentence, kind: 'quote', sentPage: checked.page, awaitPersistence: true, source: 'ocr_review' }));
       setOcrErrors({ text: '', page: '', status: '저장했습니다.' });
       if (checked.truncated) showToast('1,000자를 넘어 앞부분만 저장했어요');
@@ -644,8 +644,8 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   // 입력 페이지 정규화 (#1203) — 1..total 로만 클램프. 현재 쪽보다 낮아도 허용(재독) — current_page 를 그 값으로 덮어씀.
   const _quickTargetPage = () => {
-    const total = nestState.book.total || 0;
-    const cur = nestState.book.cur || 0;
+    const total = homeState.book.total || 0;
+    const cur = homeState.book.cur || 0;
     const raw = quickPage === '' ? cur : (parseInt(quickPage, 10) || 0);
     const p = raw < 1 ? 1 : raw;
     return total ? Math.min(total, p) : p;
@@ -669,7 +669,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
     const hadTruncation = ready.some((x) => Array.from(x.text).length > 1000);
     // #589/#1202: 한 문장 전용/공유 페이지(quickSentPage = 덮을 때의 쪽). 비우면 현재 진도.
     // 입력한 쪽 그대로 문장에 저장 — 현재 쪽보다 낮아도(앞부분 발췌·재독) 1..total 로만 클램프.
-    const cur = nestState.book.cur || 0, total = nestState.book.total || 0;
+    const cur = homeState.book.cur || 0, total = homeState.book.total || 0;
     let sp = quickSentPage === '' ? cur : (parseInt(quickSentPage, 10) || cur);
     if (sp < 1) sp = 1;
     if (total) sp = Math.min(total, sp);
@@ -703,7 +703,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   // 쪽수 stepper (#717) — 빈 값이면 현재 쪽 기준 ±delta, [0, total] 클램프.
   // type="number" 네이티브 스피너가 빈 값(=0)에서 증감해 0으로 점프하던 버그 대체.
   const _stepPage = (setter, delta) => {
-    const cur = nestState.book.cur || 0, total = nestState.book.total || 0;
+    const cur = homeState.book.cur || 0, total = homeState.book.total || 0;
     setter(prev => {
       const base = prev === '' ? cur : (parseInt(prev, 10) || cur);
       let n = base + delta;
@@ -726,7 +726,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
         if (ub && ub.id) {
           await Promise.resolve(DataStore.books.complete(ub.id, { rating, review_text }));
           if (window.rgTrack) window.rgTrack('book_completed', {
-            book_id: ub.book_id || (ub.book && ub.book.id) || nestState.book.id || '',
+            book_id: ub.book_id || (ub.book && ub.book.id) || homeState.book.id || '',
             rating_present: !!rating,
             review_present: !!String(review_text || '').trim(),
           });
@@ -758,7 +758,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const openSentenceFromCeremony = () => {
     if (!ceremony || !_quickSentRef.current) return;
     _sentenceCeremonyRef.current = ceremony;
-    window.history.pushState({ rgCeremonySentence: true, bookId: nestState.book.id }, '');
+    window.history.pushState({ rgCeremonySentence: true, bookId: homeState.book.id }, '');
     setCeremony(null);
     setTimeout(() => {
       const input = _quickSentRef.current;
@@ -771,7 +771,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const viewSavedFromCeremony = () => {
     if (!ceremony || !_bookQuotesRef.current) return;
     _sentenceCeremonyRef.current = ceremony;
-    window.history.pushState({ rgCeremonySaved: true, bookId: nestState.book.id }, '');
+    window.history.pushState({ rgCeremonySaved: true, bookId: homeState.book.id }, '');
     setCeremony(null);
     setTimeout(() => {
       const section = _bookQuotesRef.current;
@@ -796,7 +796,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
       setCeremony(current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
         ? { ...current, reflectionSentence: { ...current.reflectionSentence, note } }
         : current);
-      setNestState(current => ({
+      setHomeState(current => ({
         ...current,
         myQuotes: (current.myQuotes || []).map(q => q.id === sentence.id ? { ...q, note } : q),
       }));
@@ -827,8 +827,8 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
   }, []);
 
   // 이 책 한 문장 (#499) — 현재 책의 전체 기간 최신순(오늘만 아님). 오늘 작성분은 '오늘' 라벨.
-  const bookQuotes = (nestState.myQuotes || [])
-    .filter((q) => q.bookId === nestState.book.id)   // 현재 선택한 책만
+  const bookQuotes = (homeState.myQuotes || [])
+    .filter((q) => q.bookId === homeState.book.id)   // 현재 선택한 책만
     .slice()
     .sort((a, b) => {
       // 페이지 내림차순(#737) — 미상(null)은 맨 아래, 동일 페이지는 최신순.
@@ -854,7 +854,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
       .then((rows) => { if (alive) setFavIds(new Set((rows || []).map((b) => b.sentence_id))); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [nestState.book.id, (nestState.myQuotes || []).length]);
+  }, [homeState.book.id, (homeState.myQuotes || []).length]);
   // #610: 자체 좋아요/삭제 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 '이 책 한 문장' 카드).
   //   favIds 는 SentenceActions fav 초기값 시드용으로만 유지(claps.list 로 로드).
 
@@ -870,26 +870,26 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
     if (!_coldStart) { setOthersQuotes([]); setOthersResolved(false); setOthersSeeding(false); return; }
     let alive = true;
     setOthersResolved(false);
-    Promise.resolve((DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(nestState.book.id, { limit: 8, sort: 'likes' }) : [])
+    Promise.resolve((DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(homeState.book.id, { limit: 8, sort: 'likes' }) : [])
       .then((rows) => { if (alive) { setOthersQuotes(Array.isArray(rows) ? rows : []); setOthersResolved(true); } })
       .catch(() => { if (alive) { setOthersQuotes([]); setOthersResolved(true); } });
     return () => { alive = false; };
-  }, [nestState.book.id, _coldStart]);
+  }, [homeState.book.id, _coldStart]);
   // 마중물 시드 (#774, 큐 방식) — 타인 문장이 0건(빈 책)이면 /api/seed 로 큐잉 트리거 후 byBook 을 짧게 폴링.
   //   collector(맥미니)가 예스24 발췌를 여러 NPC 명의로 적재하면 폴링이 잡아 노출(book-info-modal.js 동일 패턴).
   //   deps 는 othersResolved/_coldStart 만 — 폴링이 setOthersQuotes 로 갱신하므로 결과를 deps 에 넣으면 무한 재실행.
   _useEffect(() => {
-    if (!_coldStart || !othersResolved || othersQuotes.length > 0 || !nestState.book.title) { setOthersSeeding(false); return; }
+    if (!_coldStart || !othersResolved || othersQuotes.length > 0 || !homeState.book.title) { setOthersSeeding(false); return; }
     let alive = true;
     let timer = null;
     setOthersSeeding(true);
-    window.RG_apiFetch('/api/seed', { method: 'POST', rgQuiet: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: nestState.book.title, author: nestState.book.author || '', isbn: nestState.book.isbn || '', have: 0 }) }).catch(() => {});
+    window.RG_apiFetch('/api/seed', { method: 'POST', rgQuiet: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: homeState.book.title, author: homeState.book.author || '', isbn: homeState.book.isbn || '', have: 0 }) }).catch(() => {});
     const MAX = 5, DELAY = 4000;
     let tries = 0;
     const poll = () => {
       if (!alive) return;
       tries += 1;
-      Promise.resolve((DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(nestState.book.id, { limit: 8, sort: 'likes' }) : [])
+      Promise.resolve((DataStore.sentences && DataStore.sentences.byBook) ? DataStore.sentences.byBook(homeState.book.id, { limit: 8, sort: 'likes' }) : [])
         .then((rows) => {
           if (!alive) return;
           if (Array.isArray(rows) && rows.length) { setOthersQuotes(rows); setOthersSeeding(false); return; }
@@ -899,10 +899,10 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
     };
     timer = setTimeout(poll, DELAY);
     return () => { alive = false; if (timer) clearTimeout(timer); };
-  }, [nestState.book.id, _coldStart, othersResolved]);
+  }, [homeState.book.id, _coldStart, othersResolved]);
 
   // 활성 책 없음(신규/미등록): 데모책 대신 '책 등록' 온보딩 — 유령 책 체크인(영속 실패) 방지.
-  if (!nestState.book || !nestState.book.id) {
+  if (!homeState.book || !homeState.book.id) {
     return (
       <section className="view active">
         <div className="card book-card-wrap">
@@ -952,10 +952,10 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
         {/* 책 정보 탭 → 책 상세 모달(BookInfoModal) 진입 (#495). ⚙️ 수정 버튼은 stopPropagation으로 격리.
             ref=_cardRef: 스와이프 중 이 카드만 translateX(화살표·점은 wrap 기준 고정, #1001). */}
         <div className="book-card" ref={_cardRef} role="button" tabIndex={0} aria-label="책 상세 정보 보기"
-          style={{ cursor: (nestState.book.id && window.RG_openBook) ? 'pointer' : 'default', willChange: 'transform' }}
-          onClick={(e) => { if (_swallowClickIfDragged(e)) return; if (nestState.book.id && window.RG_openBook) window.RG_openBook(nestState.book.id); }}
-          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && nestState.book.id && window.RG_openBook) { e.preventDefault(); window.RG_openBook(nestState.book.id); } }}>
-          <BookCover className="book-cover" title={nestState.book.title} author={nestState.book.author} cover={nestState.book.cover} fb={nestState.book.fb} />
+          style={{ cursor: (homeState.book.id && window.RG_openBook) ? 'pointer' : 'default', willChange: 'transform' }}
+          onClick={(e) => { if (_swallowClickIfDragged(e)) return; if (homeState.book.id && window.RG_openBook) window.RG_openBook(homeState.book.id); }}
+          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && homeState.book.id && window.RG_openBook) { e.preventDefault(); window.RG_openBook(homeState.book.id); } }}>
+          <BookCover className="book-cover" title={homeState.book.title} author={homeState.book.author} cover={homeState.book.cover} fb={homeState.book.fb} />
           <div className="book-meta">
             <div className="book-title-row">
               {readingBooks.length > 1 && (
@@ -964,7 +964,7 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
                 </button>
               )}
-              <p className="book-title">{nestState.book.title}</p>
+              <p className="book-title">{homeState.book.title}</p>
               {/* 책 정보 수정 (#410) — 제목과 같은 행에서 현재 책 편집 맥락을 명확히 표시. */}
               <button className="book-jump" onClick={(e) => { e.stopPropagation(); setBookEditOpen(true); }} title="책 정보 수정" aria-label="책 정보 수정">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -979,19 +979,19 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
                 </button>
               )}
             </div>
-            <p className="book-author">{[nestState.book.author, nestState.book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
+            <p className="book-author">{[homeState.book.author, homeState.book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
             <div className="book-progress-row">
               <div className="book-progress">
-                <span style={{width: (nestState.book.total > 0 ? Math.min(100, Math.round(nestState.book.cur / nestState.book.total * 100)) : 0) + '%'}} />
+                <span style={{width: (homeState.book.total > 0 ? Math.min(100, Math.round(homeState.book.cur / homeState.book.total * 100)) : 0) + '%'}} />
               </div>
               {/* #1117: 쪽수 미상(total=0)이면 "/ Np" 대신 현재 쪽만 — 가짜 "/ 1p"·100% 방지 */}
-              <span className="book-progress-num">{nestState.book.total > 0 ? `${nestState.book.cur} / ${nestState.book.total}p` : `${nestState.book.cur}p`}</span>
+              <span className="book-progress-num">{homeState.book.total > 0 ? `${homeState.book.cur} / ${homeState.book.total}p` : `${homeState.book.cur}p`}</span>
             </div>
           </div>
         </div>
         {readingBooks.length > 1 && (
           <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 4 }}>
-            {readingBooks.map((b, i) => <span key={b.id || i} style={{ width: 5, height: 5, borderRadius: '50%', background: b.id === nestState.book.id ? 'var(--brand)' : 'var(--line-2, #ccc)' }} />)}
+            {readingBooks.map((b, i) => <span key={b.id || i} style={{ width: 5, height: 5, borderRadius: '50%', background: b.id === homeState.book.id ? 'var(--brand)' : 'var(--line-2, #ccc)' }} />)}
           </div>
         )}
       </div>
@@ -1005,18 +1005,18 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
         <div className="home-page-progress-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="home-page-control-group" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <button onClick={() => _stepPage(setQuickPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtn}>−</button>
-            <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickPage} placeholder={String(nestState.book.cur||0)}
+            <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickPage} placeholder={String(homeState.book.cur||0)}
               className="rg-noscale-input"
               onChange={e => setQuickPage(e.target.value.replace(/[^0-9]/g, ''))}
-              style={{ '--page-input-ch': _pageInputCh(quickPage, nestState.book.cur), textAlign: 'center', fontSize: 26, fontWeight: 900, color: 'var(--ink)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand)', outline: 'none', padding: '0 4px 2px', fontFamily: 'inherit' }} />
+              style={{ '--page-input-ch': _pageInputCh(quickPage, homeState.book.cur), textAlign: 'center', fontSize: 26, fontWeight: 900, color: 'var(--ink)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand)', outline: 'none', padding: '0 4px 2px', fontFamily: 'inherit' }} />
             <button onClick={() => _stepPage(setQuickPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtn}>+</button>
-            {nestState.book.total > 0
-              ? <span className="home-page-total" style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}p</span>
+            {homeState.book.total > 0
+              ? <span className="home-page-total" style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>/ {homeState.book.total}p</span>
               : <span className="home-page-total" style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 700 }}>p</span>}
           </span>
-          {nestState.book.total > 0 && (
+          {homeState.book.total > 0 && (
             <span style={{ fontSize: 12, color: 'var(--brand-3)', fontWeight: 800, background: 'var(--brand-tint)', borderRadius: 999, padding: '3px 10px' }}>
-              {Math.min(100, Math.round((parseInt(quickPage,10)||nestState.book.cur||0) / nestState.book.total * 100))}%
+              {Math.min(100, Math.round((parseInt(quickPage,10)||homeState.book.cur||0) / homeState.book.total * 100))}%
             </span>
           )}
           <button onClick={submitPage}
@@ -1082,10 +1082,10 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
             <button onClick={() => _stepPage(setQuickSentPage, -1)} aria-label="쪽수 1 줄이기" style={_stepBtnSm}>−</button>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={quickSentPage}
               className="home-page-number-input"
-              placeholder={String(nestState.book.cur || 0)} onChange={(e) => setQuickSentPage(e.target.value.replace(/[^0-9]/g, ''))}
-              style={{ '--page-input-ch': _pageInputCh(quickSentPage, nestState.book.cur), textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 12, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
+              placeholder={String(homeState.book.cur || 0)} onChange={(e) => setQuickSentPage(e.target.value.replace(/[^0-9]/g, ''))}
+              style={{ '--page-input-ch': _pageInputCh(quickSentPage, homeState.book.cur), textAlign: 'center', padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 12, fontSize: 12, fontWeight: 700, background: 'var(--paper)' }} />
             <button onClick={() => _stepPage(setQuickSentPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtnSm}>+</button>
-            {nestState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {nestState.book.total}</span>}
+            {homeState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {homeState.book.total}</span>}
           </span>
           <button onClick={() => { setSentFlip(true); setTimeout(() => { submitSentence(); setSentFlip(false); }, 280); }}
             disabled={sentenceSubmitting} aria-busy={sentenceSubmitting}
@@ -1142,10 +1142,10 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
               <label htmlFor="ocr-review-page">페이지</label>
               <div className="ocr-review-page-row">
                 <input id="ocr-review-page" ref={_ocrPageRef} type="text" inputMode="numeric" pattern="[0-9]*"
-                  value={ocrReview.page} placeholder={String(Math.max(1, nestState.book.cur || 1))}
+                  value={ocrReview.page} placeholder={String(Math.max(1, homeState.book.cur || 1))}
                   onChange={(e) => { setOcrReview((r) => ({ ...r, page: e.target.value.replace(/[^0-9]/g, '') })); setOcrErrors((v) => ({ ...v, page: '', status: '' })); }}
                   aria-invalid={!!ocrErrors.page} aria-describedby="ocr-review-page-help ocr-review-page-error" />
-                {nestState.book.total > 0 && <span>/ {nestState.book.total}p</span>}
+                {homeState.book.total > 0 && <span>/ {homeState.book.total}p</span>}
               </div>
               <div id="ocr-review-page-help" className="ocr-review-help">비우면 현재 페이지로 저장돼요.</div>
               <div id="ocr-review-page-error" className="ocr-review-error">{ocrErrors.page}</div>
@@ -1273,9 +1273,9 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
             const u = s.user || {};
             const _dec = window.decodeEntities || ((x) => x); // nest.js 스코프엔 alias 없음 → window 참조(미정의 폴백)
             return (
-              <window.SentenceCard key={s.id} bookId={nestState.book.id} noBlind
+              <window.SentenceCard key={s.id} bookId={homeState.book.id} noBlind
                 item={{ id: s.id, q: _dec(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: window.rgIcon('user', 20),
-                        page: s.page, time: '', claps: s.clapCount || 0, bookId: nestState.book.id, bookTitle: '', isMine: false }} />
+                        page: s.page, time: '', claps: s.clapCount || 0, bookId: homeState.book.id, bookTitle: '', isMine: false }} />
             );
           })}
         </div>
@@ -1315,12 +1315,12 @@ function NestView({ state, onCheckin, onOpenSearch, onNavigate }) {
         document.body
       )}
       {/* 책 정보 수정 (#410) — ⚙️ 진입. 저장 시 둥지 진척(total) 즉시 반영 */}
-      {bookEditOpen && nestState.book && nestState.book.id && (
-        <BookEditModal book={nestState.book} onClose={() => setBookEditOpen(false)}
-          onSaved={({ pub, total }) => setNestState((ns) => ({ ...ns, book: { ...ns.book, pub: pub, total: total || ns.book.total } }))} />
+      {bookEditOpen && homeState.book && homeState.book.id && (
+        <BookEditModal book={homeState.book} onClose={() => setBookEditOpen(false)}
+          onSaved={({ pub, total }) => setHomeState((ns) => ({ ...ns, book: { ...ns.book, pub: pub, total: total || ns.book.total } }))} />
       )}
     </section>
   );
 }
 
-window.NestView = NestView;
+window.HomeView = HomeView;

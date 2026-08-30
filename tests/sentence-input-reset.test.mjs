@@ -30,7 +30,7 @@ assert.deepEqual(Array.from(batchSandbox.window.RG_retainFailedBatchItems(batchI
 
 const nestSandbox = { window: {}, Set, Array };
 vm.createContext(nestSandbox);
-vm.runInContext(section(nestSource, 'function _retainUnsavedDrafts', '/* ── NestView'), nestSandbox);
+vm.runInContext(section(nestSource, 'function _retainUnsavedDrafts', '/* ── HomeView'), nestSandbox);
 const retainedDrafts = nestSandbox.window._retainUnsavedDrafts([
   { text: '첫째' }, { text: '' }, { text: '둘째' }, { text: '셋째' },
 ], [0, 2]);

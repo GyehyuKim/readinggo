@@ -33,10 +33,10 @@ assert.match(ceremony, /className="ceremony-dismiss"[\s\S]*aria-label="완료 �
 assert.match(ceremony, /isComplete && \([\s\S]*className="complete-review"[\s\S]*완독 기록 남기기/,
   '완독 별점·소감 흐름은 일반 행동으로 대체하면 안 된다');
 assert.match(nest, /onContinue=\{openSentenceFromCeremony\}[\s\S]*onViewSaved=\{viewSavedFromCeremony\}[\s\S]*onGoLibrary=\{goLibraryFromCeremony\}/,
-  'NestView가 세 행동을 각각 현재 책 문맥에 연결해야 한다');
+  'HomeView가 세 행동을 각각 현재 책 문맥에 연결해야 한다');
 assert.match(nest, /_bookQuotesRef\.current[\s\S]*scrollIntoView/,
   '저장한 문장 보기는 현재 책 문장 영역으로 이동해야 한다');
-assert.match(app, /<NestView[\s\S]*onNavigate=\{switchTab\}/,
+assert.match(app, /<HomeView[\s\S]*onNavigate=\{switchTab\}/,
   '내 서재 이동은 기존 canonical tab 전환 함수를 재사용해야 한다');
 
 console.log('✓ #1561 서재 양감 탐색·저장 후 행동 회귀 계약');

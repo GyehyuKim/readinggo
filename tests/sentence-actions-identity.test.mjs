@@ -68,7 +68,7 @@ assert.equal(rows[0].id, created.id, '리로드 후에도 생성 시 반환한 i
 assert.match(actionsSrc, /if \(!id\) return null;/, '안정 id 없는 행의 액션 가드를 유지해야 한다');
 assert.match(
   nestSrc,
-  /setNestState\(\(ns\) => \(\{ \.\.\.ns, myQuotes: state\.myQuotes \}\)\);\s*\}, \[state\.myQuotes\]\);/,
+  /setHomeState\(\(ns\) => \(\{ \.\.\.ns, myQuotes: state\.myQuotes \}\)\);\s*\}, \[state\.myQuotes\]\);/,
   '영속 완료 후 id 포함 부모 문장 목록을 홈에 동기화해야 한다',
 );
 assert.match(

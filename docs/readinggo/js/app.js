@@ -644,6 +644,12 @@ function InAppBanner() {
   );
 }
 
+function normalizeTab(tab) {
+  if (tab === 'nest') return 'home';
+  if (tab === 'nest-grow') return 'library';
+  return tab;
+}
+
 function App() {
   const { useState, useCallback, useMemo, useEffect } = React;
   // Phase 1: Supabase 설정 시 로그인 게이트 + 실데이터. 미설정/미로그인은 localStorage 폴백.
@@ -662,7 +668,7 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);        // 로그인 화면 온디맨드(벽 아님)
   const [guestBannerOff, setGuestBannerOff] = useState(false); // 게스트 안내 배너 세션 닫기
   const [showConsent, setShowConsent] = useState(() => !!(window.RG_consent && window.RG_consent.get() === null)); // 진입 동의 배너 (#331)
-  const [activeTab, setActiveTab] = useState('nest');
+  const [activeTab, setActiveTab] = useState('home');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   // 스포일러 전역 토글 (§5.7.1): true 면 모든 페이지 블라인드 해제.
   const [spoilerReveal, setSpoilerReveal] = useState(false);
@@ -1004,7 +1010,7 @@ function App() {
 
   // 멀티 디바이스 정합(#191) — 탭이 다시 보일 때 Supabase 상태 재로드(다른 기기 변경 반영, stale view 방지)
   // ⚠️ 가드(장시간 세션 버그 — 1h QA 재현): 게스트/세션만료 상태에서 재로드하면 모든 fetch가
-  // 401→catch 폴백 → "빈 상태"가 기존 상태를 덮어 둥지가 빈 화면이 되고, NestView가
+  // 401→catch 폴백 → "빈 상태"가 기존 상태를 덮어 홈이 빈 화면이 되고, HomeView가
   // 빈 둥지 UI로 갈아끼워지며 portal(ReadingMode)이 언마운트 → 타이머·세션 소멸 + 콘솔 400 에러.
   useEffect(() => {
     if (!_supa || reviewMode) return;
@@ -1029,13 +1035,13 @@ function App() {
   }, [_supa, reviewMode]);
 
   const switchTab = useCallback((tab) => {
-    setActiveTab(tab);
+    setActiveTab(normalizeTab(tab));
     // 스크롤 맨위로
     const main = document.querySelector('.main');
     if (main) main.scrollTop = 0;
   }, []);
 
-  // NestView가 체크인 후 자체 업데이트하고 콜백으로 상위 동기화.
+  // HomeView가 체크인 후 자체 업데이트하고 콜백으로 상위 동기화.
   const handleCheckin = useCallback((ns, sentence, kind, sentPage, sentences, visibility, completion, pagesLogged, isComplete, checkinContext = {}) => {
     // #1202: 문장 고유 페이지(sentPage)를 영속 — 진도(cur)와 분리. 없으면 현재 진도로 폴백(레거시 호출).
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
@@ -1249,7 +1255,7 @@ function App() {
         }
         // 읽는중(기존) — 활성 책 + 둥지 반영. 원본 검색 row가 아니라 저장된 user_book을
         // 다시 매핑해 canonical 첫 결과·로컬 생성 ID도 화면 상태와 같은 데이터 계약을 쓰게 한다(#1221).
-        switchTab('nest');
+        switchTab('home');
         await Promise.resolve(DataStore.activeBook.set(ub.id));
         const savedBook = ub.book || {};
         if (window.rgTrack) window.rgTrack('book_opened', { book_id: ub.book_id || ub.id || '', entry_point: 'register' }); // 퍼널 시작 (#736)
@@ -1314,7 +1320,7 @@ function App() {
       // 둥지는 책과 무관 — 유지 (#313). ubId(#822): 체크인 저장 귀속 직결.
     }));
     showToast(`${item.title} — 활성 책으로 변경`);
-    switchTab('nest');
+    switchTab('home');
     if (item.ubId && DataStore.activeBook && DataStore.activeBook.set) {
       try {
         await Promise.resolve(DataStore.activeBook.set(item.ubId));
@@ -1375,8 +1381,8 @@ function App() {
         <header className="topbar">
           <div className="topbar-row">
             <div className="brand-mark" role="button" tabIndex={0} title="홈으로"
-              onClick={() => switchTab('nest')}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchTab('nest'); }}>
+              onClick={() => switchTab('home')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchTab('home'); }}>
               <span className="sparrow" aria-hidden="true"><window.SparrowMark size={24} /></span>
               <span>Reading<span className="go">Go</span></span>
             </div>
@@ -1428,11 +1434,11 @@ function App() {
 
         {/* 메인 스크롤 영역 — 스포일러 전역 토글을 4영역 공통 제공 (§5.7.1) */}
         <main className="main">
-          <ErrorBoundary key={activeTab} label={activeTab} onReset={() => switchTab('nest')}>
+          <ErrorBoundary key={activeTab} label={activeTab} onReset={() => switchTab('home')}>
           <SpoilerContext.Provider value={spoilerReveal}>
-          {activeTab === 'nest' && (
-            <NestView
-              key="nest"
+          {activeTab === 'home' && (
+            <HomeView
+              key="home"
               state={appState}
               onCheckin={handleCheckin}
               onOpenSearch={() => setIsSearchOpen(true)}
@@ -1471,7 +1477,7 @@ function App() {
         {/* 하단 탭바 — v18 canonical 3번째 route는 library. */}
         <nav className="tabbar">
           {[
-            { id: 'nest', label: '홈', svg: (
+            { id: 'home', label: '홈', svg: (
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/>
                 <path d="M9 21V12h6v9"/>
