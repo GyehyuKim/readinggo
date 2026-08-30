@@ -80,7 +80,7 @@ retained 신 경로 수신 증거와 base 권한 축소 사이에 broad 정책�
 | 플래그 | 기능 | 기본 | off 동작 |
 |---|---|---|---|
 | `seedCollectorTrigger` | 마중물 시드 트리거 (#774) — 빈 책에서 collector(맥미니)로 `/api/seed` 큐잉+폴링. **실배선 킬 스위치** = [`js/book-info-modal.js`](../js/book-info-modal.js) | `true` | `/api/seed` POST·폴링 미실행 + '이웃의 문장 모으는 중' placeholder 생략. 이미 적재된 인기 문장(byBook 읽기)은 유지 |
-| `socialProofSentences` | 같은 책 타인 한 문장 — 콜드스타트 사회적 증거 ([nest.md §5](./nest.md), [#926](https://github.com/) in-flight) | `true` | (예시) 해당 기능 출시 시 둥지 '이 책의 다른 한 문장' 섹션·`/api/seed` 트리거를 이 플래그 뒤에 둔다 |
+| `socialProofSentences` | 같은 책 타인 한 문장 — 콜드스타트 사회적 증거([#926](https://github.com/) 이력) | `true` | 역사적 예시. 퇴역 제품명이나 전용 홈 표면을 신규 flag·UI 근거로 사용하지 않는다 |
 
 > **실배선 1건**: `seedCollectorTrigger` 가 main에 실재하는 위험 기능(collector 백엔드 의존 네트워크 트리거)을 끄는 킬 스위치로 `book-info-modal.js` 효과 진입부에 배선됐다. collector 장애·과부하 시 클라발 호출을 즉시 차단한다.
 > `socialProofSentences` 는 같은 트리거를 동반하는 신규 기능(#926, 별도 브랜치 진행 중)이 main에 들어올 때 그 섹션을 가릴 자리만 미리 잡아둔 것이다(off=미노출 원칙 적용 예시).

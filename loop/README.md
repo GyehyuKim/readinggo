@@ -28,26 +28,23 @@ oh-my-claudecode 설치 후:
 
 ```bash
 # 한 번 실행
-cat loop/nest-align/PROMPT.md | claude
+cat loop/home-align/PROMPT.md | claude
 
 # 또는 ralph-loop 명령 (DONE 파일 생길 때까지 반복)
-/ralph-loop loop/nest-align/PROMPT.md
+/ralph-loop loop/home-align/PROMPT.md
 ```
 
 ### 검증자 (모델 외부)
 
-각 PROMPT.md 의 `Exit:` 문은 *모델이 안 쓴* Python verifier 를 가리킴:
+각 `PROMPT.md`의 `Verification`·`Exit`에 적힌 repository gate를 모델 실행과 분리해 확인한다.
+단일 Python verifier가 있는 loop는 그 명령을 사용하고, build·contract·render-smoke처럼 여러 gate가 필요한
+loop는 prompt에 적힌 전체 명령이 모두 exit 0이어야 한다.
 
-| Loop | Verifier |
-|---|---|
-| `nest-align` | `tests/spec-align/nest.py` |
-| `drift-defense` | `tests/spec-align/drift.py` |
-
-verifier exit 0 → DONE 파일 작성. exit 1 → 다음 iteration.
+검증 gate 전체 exit 0 → DONE 파일 작성. 하나라도 실패 → 다음 iteration.
 
 ## 현재 loop 목록
 
-- [`nest-align/`](./nest-align/) — `nest.js` 와 `nest.md` 정합. Phase 0 데모 핵심 경로.
+- [`home-align/`](./home-align/) — `home.js`와 `home-reading.md`의 canonical route·DataStore·기록 비손실 정합.
 - [`drift-defense/`](./drift-defense/) — Spec drift GitHub Action. Pattern A (Mechanical gate), warn-only.
 - [`spec-align-full/`](./spec-align-full/) — **전체 SSOT 9파일 line-by-line ↔ 코드 추적**(`_traceability.md`) + 코드 정합. Verifier: `tests/spec-align/align_v7.py` + 추적표 완전성.
 

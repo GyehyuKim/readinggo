@@ -41,7 +41,7 @@
 | 스펙 전체 지도 | `docs/readinggo/specs/README.md` |
 | 데이터 모델 · DataStore 계약 | `docs/readinggo/specs/backend.md` |
 | 서재·개인 활동 방향 | `docs/readinggo/specs/profile.md` |
-| 홈·읽기와 레거시 XP·스트릭 경계 | `docs/readinggo/specs/nest.md`, `systems.md` |
+| 홈·독서 기록과 레거시 XP·스트릭 경계 | `docs/readinggo/specs/home-reading.md`, `systems.md` |
 | 같이읽기 | `docs/readinggo/specs/co-reading.md` |
 | 소셜·공개범위 | `docs/readinggo/specs/social.md`, `feed.md`, `profile.md` |
 | 데모 코드 | `docs/readinggo/index.html` + `docs/readinggo/js/*` |

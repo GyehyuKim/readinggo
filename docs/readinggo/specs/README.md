@@ -14,7 +14,7 @@
 |---|---|---|
 | **제품 코어** | [`onboarding.md`](./onboarding.md) | 첫 진입·책 등록·가입 여정 |
 |  | [`mascot.md`](./mascot.md) | 비진화형 2D 참새 독서 동반자와 모델 시트 검토 계약 |
-|  | [`nest.md`](./nest.md) | 홈·읽기 계약과 레거시 XP·둥지 이력 |
+|  | [`home-reading.md`](./home-reading.md) | 홈·활성 책·독서 세션·문장 기록·OCR 계약 |
 |  | [`profile.md`](./profile.md) | 3번째 서재 가로 탐색·프로필 월간 활동·책 상태·문장 탐색 |
 |  | [`feed.md`](./feed.md) | 피드·공개 문장·UGC 안전 |
 |  | [`co-reading.md`](./co-reading.md) | 같이읽기 기능과 읽기방 |
@@ -53,7 +53,7 @@
 ### 어디를 고치나
 | 변경 종류 | 대상 파일 |
 |---|---|
-| 화면 스펙 (홈·서재·피드·프로필/개인 활동) | 해당 피처 `.md` (`nest.md`, `feed.md`, `profile.md`) |
+| 화면 스펙 (홈·서재·피드·프로필/개인 활동) | 해당 피처 `.md` (`home-reading.md`, `feed.md`, `profile.md`) |
 | 가입·세계관 여정 | `onboarding.md` |
 | 성장일·레거시 XP/스트릭 전환 | `systems.md` |
 | 데이터 모델·플랫폼·RLS | `backend.md` |
@@ -87,7 +87,7 @@
 - 동일 파일을 수정하는 open PR이 있으면 먼저 충돌 가능성과 수용 기준 중복을 확인한다.
 - 동작·계약 변경은 해당 피처의 spec-only PR을 먼저 승인·머지한 뒤 코드 PR로 진행한다.
 - 감독 게이트를 통과한 PR은 승인 contributor·Hermes도 `main`에 merge하고 stable DEV까지 검증할 수 있다. Production 승격은 김계휴만 수행한다.
-- **SSOT 규칙**: 홈·읽기=`nest.md`, 서재·프로필/개인 활동=`profile.md`, 성장일·XP 전환=`systems.md`, 데이터·RLS=`backend.md`, 문장 공개=`feed.md`, 마스코트=`mascot.md`, 결정 우선순위=`meta/decisions.md`.
+- **SSOT 규칙**: 홈·독서 기록=`home-reading.md`, 서재·프로필/개인 활동=`profile.md`, 성장일·XP 전환=`systems.md`, 데이터·RLS=`backend.md`, 문장 공개=`feed.md`, 마스코트=`mascot.md`, 결정 우선순위=`meta/decisions.md`.
 
 ---
 
@@ -106,6 +106,9 @@
 | 개념 | 정식 명칭 | 내부·레거시 비고 |
 |---|---|---|
 | 저장 기록 | **문장** | DB `sentences` 유지 |
+| 홈 독서 화면 | **홈** | canonical route `home`; 과거 입력 `nest`는 정규화 경계에서만 임시 허용 |
+| 한 번의 읽기·쪽수 기록 단위 | **독서 세션** | 저장 테이블 `reading_sessions` 유지 |
+| 저장 문장과 문장별 생각 | **문장 기록** | 현재 중립적인 사용자 카피는 유지 가능. 문장별 성찰 행동은 **내 생각** |
 | 사용자 책 컬렉션 | **서재** | `user_books`·`wish_books`가 권위. 별도 tree row 없음 |
 | 등록해 읽기 시작한 책 | **책** | `user_books`가 권위 |
 | 중단한 책 | **중단한 책** | 저장 status `aborted` 유지. 포함·제외 필터 제공 |
@@ -114,7 +117,7 @@
 | 독려 넛지 | **콕찌르기** | DB `pokes`; 죄책감·상실 예고 금지 |
 | 같이 읽는 기능/공간 | **같이읽기 / 읽기방** | 내부 `social`, `rooms.*` 유지 가능. `숲`은 사용자 노출에서 폐기 |
 | AI 동반자 이름 | **TBD** | 결정 전 런타임 `Jacky / 재키` 유지 |
-| 하단 탭 | **홈 / 같이읽기 / 서재 / 프로필 / 설정** | canonical `library`; legacy `nest-grow`는 전환기 alias |
+| 하단 탭 | **홈 / 같이읽기 / 서재 / 프로필 / 설정** | canonical `home`·`library`; `nest`·`nest-grow`는 입력 전용 임시 alias |
 
 > v18은 기록 비손실·XP 폐기·최근 14일 리듬·누적 성장일을 유지한다. [결정 이력](./meta/decisions.md)을 따른다.
 
