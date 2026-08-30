@@ -103,7 +103,7 @@
 | 스트릭 캘린더 | 🔥 탭 → 최근 5주 캘린더(읽은 날 🔥·방패 지킨 날 🔵) | **systems/nest** | #173 — **스펙 반영 필요** |
 | 하단 탭바 고정 | 앱 높이 `100dvh` → main만 스크롤, 탭바 고정 | design | #7 — 스펙 반영 플래그 |
 
-**cross-file 스펙 반영 플래그**: #173 스트릭 캘린더=`systems.md`/`nest.md`, #7 탭바=`design.md`·#3 세리머니 입력=`nest.md`. 현재 작업은 고정 담당이 아니라 합의된 이슈 범위로 배정한다. [open-issues](./open-issues.md) 참조.
+**역사적 cross-file 플래그**: 당시 #173·#3은 `nest.md`를 대상으로 했다. 해당 활성 파일은 #1535로 퇴역했으며 이 절을 현재 작업 지시로 사용하지 않는다.
 
 ---
 
@@ -132,29 +132,29 @@
 | **이메일 템플릿 브랜딩** | 확인·매직링크 메일에 **ReadingGo 브랜딩 + 문의처(`readinggo.admin@gmail.com`)** 삽입 — 사용자가 발신 출처를 신뢰하고 클릭하도록. `admin-cli.mjs email-template set` | backend(운영) | 신규(#1 맥락) |
 | **#154 마을 Supabase 연동** | `village.js` 데모 하드코딩 → `DataStore.villages.listMine/listPublic/create/join` 실연동 | 폐기 #440 | 사용자 지시로 계휴 작업 |
 | **#170 본인 마을 제외** | 추천 공개 마을 목록에서 내가 생성/가입한 마을 `filter` 제외 | 폐기 #440 | — |
-| **#153 반별점 0.5** | 별 좌측 절반 탭=0.5점. nest.md §5.4 SSOT 반영 | nest | 스펙 반영(역사적 기여: 승원 구현) |
+| **#153 반별점 0.5** | 별 좌측 절반 탭=0.5점. 당시 `nest.md` 반영 | nest | 역사적 기여: 승원 구현 |
 | **#157 스포일러 토글 위치** | social.js 헤더 우측 `🔓` — 현재 미배선, 배선 대상으로 명시 | social | 스펙 현행화 |
 
 ---
 
 ### 8.4 post-beta 결정 3 (2026-06-04, batch3. 충돌 시 §8.3 위에 **우선**)
 
-> 구현·배포 완료=`gyehyu/batch3`(PR #187), 스펙=이 PR. **(2026-06-04 갱신) 읽기모드(#184)·캐러셀(#185)·1000자·페이지 명시는 nest.md §5.3/§5.4/§5.5에 반영 완료** — pending 해소.
+> 구현·배포 완료=`gyehyu/batch3`(PR #187), 스펙=당시 `nest.md`. 아래는 역사적 결정이며 현재 SSOT가 아니다.
 
 | 항목 | 결정 | 담당 | 비고 |
 |---|---|---|---|
 | **#3·4·5 타인 프로필 페이지** | 모달→**전체 페이지**. 책장 6권+더보기(읽은/읽는중 필터) + 책 탭 시 그 사람 평점·후기·한 문장 드릴다운. `users.publicShelf`·`bookContrib` 추가. '보고싶은'은 wish RLS 비공개라 본인만 | profile/backend | profile.md §5.8.2 반영 |
 | **#186 틴더 한 문장 카드** | ~~소셜 피드 '카드로 넘겨보기' → 스와이프 우=좋아요(짹+책갈피)/좌=넘김/아래=유예. Pointer Events 직접(Stack Lock)~~ → **2026-06-15 보류(§8.10/#540)** | social | feed.md 반영 · 보류(§8.10) |
 | **운영자 문의** | 설정 폼 → `inquiries` 테이블(09_inquiries.sql, RLS: 본인 insert/select+admin) → admin 대시보드 목록. LLM 자동처리는 Phase 2(Gemini) | profile/backend | DB 방식 채택 |
-| **한 문장 1000자** | 인용 200→**1000자**(감상과 동일). 클라(config)+DB(07_sentence_1000.sql) | nest/backend | ⚠️ **nest.md §5.4 '200자' → 1000자 갱신 필요** |
-| **한 문장=페이지 명시** | 입력 시 그 문장이 속한 페이지를 기록(진행률과 별개 개념). 읽기모드/체크인에 명시 | nest | ⚠️ **nest.md 반영 필요** |
-| **#184 읽기 모드** | 둥지→독서 타이머+상시 한 문장 입력(북모리식). 새 ReadingMode | **nest** | ⚠️ **nest.md 정의 필요 — pending** |
-| **#185 활성 책 캐러셀** | 둥지 책 배너 좌우 ‹ › 리볼빙 전환(`RG_activateBook`) | **nest** | ⚠️ **nest.md §5.3 반영 필요 — pending** |
+| **한 문장 1000자** | 인용 200→**1000자**(감상과 동일). 클라(config)+DB(07_sentence_1000.sql) | nest/backend | 당시 `nest.md` 반영 |
+| **한 문장=페이지 명시** | 입력 시 그 문장이 속한 페이지를 기록(진행률과 별개 개념). 읽기모드/체크인에 명시 | nest | 당시 `nest.md` 반영 |
+| **#184 읽기 모드** | 둥지→독서 타이머+상시 한 문장 입력(북모리식). 새 ReadingMode | **nest** | 당시 `nest.md` 반영 |
+| **#185 활성 책 캐러셀** | 둥지 책 배너 좌우 ‹ › 리볼빙 전환(`RG_activateBook`) | **nest** | 당시 `nest.md` 반영 |
 | **#7 NPC 닉네임** | 영문→한글 형용사+동물 30종(08_npc_rename.sql, 적용됨) | backend(운영) | — |
 | **마을 공유/나가기/알림** | 가짜 rgo.app 링크→실 공유 URL+Web Share(#8), `villages.leave` 실동작(#9), 알림 체크박스 라벨 명확화(#10) | 폐기 #440 | 당시 구현 이력 |
 | **로그인 redirect** | `site_url`·`uri_allow_list`를 Netlify URL로(서버 적용됨) — OAuth 후 localhost 폴백 해소 | backend(운영) | — |
 
-**(해소됨)** #184 읽기모드·#185 캐러셀·1000자·페이지 명시 → **nest.md §5.3/§5.4/§5.5 반영 완료**(코드=PR #187, 스펙=spec-nest-readingmode PR). #153 반별점은 nest.md §5.4 스펙에 반영됐고 당시 승원이 구현 진행 중이었다.
+**(역사적 해소)** #184·#185·1000자·페이지 명시는 당시 `nest.md`와 PR 이력에 반영됐다.
 
 ---
 
@@ -214,7 +214,7 @@
 
 **구현 vs 스펙 (#215)**: 코드는 PR #215, 결정은 이 §8.7. SSOT 세부는 [profile.md §5.8.4/§5.8.9/§5.8.10](../profile.md)·[backend.md §7.2](../backend.md)에 반영(spec-only PR).
 
-**🚩 nest.md 플래그 (역사 기록)**: #203 "**읽기 모드 종료 = 오늘의 짹 충족**"(읽기모드로 기록 시 둥지 짹 CTA 숨김) 동작이 nest.js에 구현됨 → `nest.md §5.5`에 SSOT 반영 필요.
+**역사 기록**: #203은 당시 `nest.md`와 `nest.js`를 대상으로 했다. 현재 작업 지시로 사용하지 않는다.
 
 ---
 
@@ -224,7 +224,7 @@
 
 | 항목 | 결정 | 이슈 | SSOT/경로 |
 |---|---|---|---|
-| 오늘의 짹 버튼 | **제거** — 읽기 모드 종료가 곧 오늘 기록(체크인) | #217 | 🚩 nest.md |
+| 오늘의 짹 버튼 | **제거** — 읽기 모드 종료가 곧 오늘 기록(체크인) | #217 | 당시 `nest.md` |
 | 책 쪽수 누락 | 알라딘 ItemSearch에 **`OptResult=packing`** 추가 → itemPage 수신 | #218 | backend §7(검색 프록시) |
 | 마을 한 문장 | 작성자 닉네임 **프로필 연결** + **🐦 짹(좋아요)** 버튼 | #219·#225 | village §5.5.4 |
 | 게시판 작성자 | `jerome` 하드코딩 제거 → **실 작성자(RG_ME)**, **본인 글만 수정/삭제**, 수정 동작 | #221·#222 | village §5.5.4 |
@@ -242,11 +242,11 @@
 
 | 항목 | 결정 | SSOT |
 |---|---|---|
-| 둥지 진화 | 전체 누적 XP를 그대로 단계에 매핑하지 않고 **1,600 XP 주기**로 운영 | [nest.md §5.2](../nest.md) |
+| 둥지 진화 | 전체 누적 XP를 그대로 단계에 매핑하지 않고 **1,600 XP 주기**로 운영 | 당시 `nest.md` (Git history) |
 | 단계 임계값 | 현재 주기 XP 0/100/400/900에서 Lv1/2/3/4. 1,600 경계 도달 순간 Lv5 성 완성 세리머니 | [systems.md §6.3](../systems.md) |
-| 성 획득 | `castleCount = floor(totalXp / 1600)`. 완독 권수와 분리하고 `users.xp`에서 파생 | [nest.md §5.2.1](../nest.md) |
+| 성 획득 | `castleCount = floor(totalXp / 1600)`. 완독 권수와 분리하고 `users.xp`에서 파생 | 당시 `nest.md` (Git history) |
 | 주기 완료 | 성 획득 후 `cycleXp = totalXp % 1600`으로 다음 주기 Lv1부터 재시작. 전체 XP·상단바 레벨은 리셋하지 않음 | [systems.md §6.3](../systems.md) |
-| 완독 | 책 상태·별점·소감·XP +200은 유지하되 성을 직접 지급하지 않음 | [nest.md §5.4](../nest.md) |
+| 완독 | 책 상태·별점·소감·XP +200은 유지하되 성을 직접 지급하지 않음 | 당시 `nest.md` (Git history) |
 
 ---
 
@@ -442,7 +442,7 @@
 | 홈 상단 | **XP·Lv 숫자 표시 유지**. 현행 `app.js`의 `topbar-stats`와 일치 |
 | XP·레벨 계약 | XP 적립 수치와 `level = floor(sqrt(totalXp / 100)) + 1` 계산을 변경하지 않음 |
 | 범위 경계 | 둥지 IA와 둥지 성장 설명 UX는 별도 범위. 이 결정에서 대체 표기·새 게임 정책·새 수치를 정하지 않음 |
-| SSOT | XP 수치·레벨 계산은 [systems.md §6.3](../systems.md), 홈 상단 구성은 [nest.md §5.1](../nest.md) |
+| SSOT | 당시 [systems.md §6.3](../systems.md)과 `nest.md` (Git history) |
 
 ### v14 — 하단 내비 5개 목적지와 둥지·설정 분리 (2026-07-30, PR #1366)
 
@@ -462,7 +462,7 @@
 |---|---|
 | 성장 모델 | 현행 **1,600 XP 무한 주기** 유지. 완성 뒤 다음 둥지를 Lv1부터 시작하며 전체 XP는 리셋하지 않음. 홈 상단 사용자 Lv 노출은 v16이 대체함 |
 | 화면·콘셉트 | 전용 둥지 탭과 현행 참새·둥지의 귀여움 콘셉트 유지 |
-| 최소 설명 | 한 화면에서 `N번째 둥지`·현재 단계, 다음 단계와 남은 XP, 완성된 둥지 누적을 확인([nest.md §5.2.2](../nest.md)) |
+| 최소 설명 | 한 화면에서 `N번째 둥지`·현재 단계, 다음 단계와 남은 XP, 완성된 둥지 누적을 확인(당시 `nest.md`, Git history) |
 | 관찰 | 탭 진입·성장 안내 열기·완성 이력 확인을 기존 Analytics 계약으로 주간 관찰([analytics.md §3.1.3](../analytics.md)). 사전 목표치·자동 판정선 없음 |
 | 비범위 | 시즌제·성장 상한·대규모 보상·새 캐릭터는 도입하지 않음. 구 사용자 Lv 계산 계약은 v16이 명시적으로 대체함 |
 
@@ -476,7 +476,7 @@
 | 완성 둥지 수 | `C = floor(totalXp / 1600)`. 0~1,599 XP는 `🪺 둥지 0개` |
 | 유지 | XP 누적·차감 없음, 현재 주기 단계·진척·세리머니, 전용 둥지 탭 |
 | 제거 | 사용자 레벨 계산 `floor(sqrt(totalXp / 100)) + 1`과 그 표시 |
-| SSOT | [systems.md §6.3](../systems.md), [nest.md §5.1·§5.2.2](../nest.md), [profile.md §5.8](../profile.md) |
+| SSOT | 당시 [systems.md §6.3](../systems.md), `nest.md` (Git history), [profile.md §5.8](../profile.md) |
 
 ### v18 — 서재 중심 IA와 은유 폐기 (#1389·#1515, 2026-08-25)
 
@@ -554,3 +554,13 @@
 | 전달 게이트 | DEV 구현·합성 검증은 허용. **#1373 전 OFF/ON 최종 품질 인수, Production route/flag·실사용자 opt-in·Production 승격 금지** |
 
 SSOT는 [companion.md §4.7](../companion.md#47-내-기록-기반-관련-맥락-retrieval-1309-목표-계약), 인증/API/RLS는 [backend.md §7.9.3](../backend.md#793-개인화-context-retrieval--post-apicompanion-context-1309), 개인정보·분석은 [privacy-policy.md §0.1](../privacy-policy.md#01-내-기록-기반-ai-개인화-안전-계약-1309-목표)과 [analytics.md §3.1.5](../analytics.md#315-개인화-context-이벤트-allowlist-1309-목표)을 따른다.
+
+### v18.8 — `둥지/nest` 제품명 완전 퇴역 (#1535, 2026-08-31)
+
+- 현재 제품의 정식 용어는 홈 독서 화면 **홈**, 한 번의 읽기·쪽수 기록 **독서 세션**, 저장 문장과 문장별 생각의 일반 개념 **문장 기록**, 문장별 성찰 행동 **내 생각**이다. 홈 canonical route는 `home`이다. 현재 중립적인 사용자 카피는 유지할 수 있으며 별도 개명을 요구하지 않는다.
+- `nest.md`는 `home-reading.md`로 퇴역한다. 구현 PR에서는 활성 module·component·test·workflow 파일명과 식별자, 사용자 카피·접근성 이름·주석·분석 이벤트에서 `둥지/nest`를 제거한다.
+- 과거 URL·history·영속 내비게이션 입력의 `nest`·`nest-grow`만 단일 정규화 경계에서 각각 `home`·`library`로 즉시 바꾸는 임시 alias로 허용한다. alias를 새 상태·출력·history·analytics에 생성하지 않는다.
+- 구 APK·제거 API·XP 모델의 호환은 지원하지 않는다. 적용 migration과 DB 감사·rollback에 필요한 레거시 객체/데이터의 물리 삭제는 별도 DB 게이트를 따른다.
+- 회의 원문, Git/PR/닫힌 이슈, archive 문서, 적용 migration은 역사 증거로 보존한다. 이름 퇴역은 책 선택, 독서 세션, 문장·생각 저장, 완료 후 행동, 공개범위와 기록 비손실을 바꾸지 않는다.
+
+상세 SSOT는 [home-reading.md §5.1](../home-reading.md#51-용어route호환-경계)이다.

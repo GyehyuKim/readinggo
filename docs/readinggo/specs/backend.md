@@ -155,7 +155,7 @@ books.search(query)                        → Book[]          // DB ilike(즉�
 // 외서 보강(#302·#1544): 검색이면 제품 총 상한 10 안에서 주 공급자 결과를 먼저 보존하고, 부족한 슬롯만 Google Books가 실시간 보강한다. isbn13/title 중복제거. Google 키는 `GOOGLE_BOOKS_API_KEY`(무키 시 레이트리밋). ISBN 단건 조회엔 미적용.
 // 책 소개·풀 메타(#316→#489): 검색·ISBN 조회 응답에 알라딘 풀 메타(`description` 등) 첨부. **#489: `normalize()` 가 books 풀 메타 컬럼(위 테이블)을 채워 upsert** → archive·검색 양 경로 공통 반영(이전엔 description 컬럼 부재로 미반영).
 // 검색 도서 자동 저장(#489): `aladinProxy` 가 알라딘 결과를 `ctx.waitUntil` 백그라운드로 books upsert(`on_conflict=isbn13`). 검색(ItemSearch)은 itemPage 누락 잦아 **저장 직전 ISBN 보강**(위 QA7). **`upsertBook` 단일 게이트(#1117): 진짜 ISBN-13(`^97[89]\d{10}$`)만 적재 — Aladin 묶음상품 K-id(`[세트]…전2권`)·EAN 바코드·ISBN-10 차단**(세트는 단일 쪽수가 없어 영구 null + 검색 노이즈. 검색·archive·seed 전 경로 공통 적용. 과거 유입분 83권 1회 정리). ~~Google 외서는 우리 컬럼 매핑분만 + `source='google'`~~ **(#1044 제거)** — Google ToS §5.e 영구 캐시 금지로 검색 보강 Google 결과 upsert 를 삭제, Google 은 실시간 응답 표시만. 응답 지연 0(upsert는 응답과 분리).
-// 외서·빈필드 폴백 체인(#489): 등록 시 **알라딘 → Google Books → OpenLibrary** 순으로 빈 필드만 non-destructive merge(표지: Google thumbnail → OpenLibrary covers). 끝내 빈 `description`은 **LLM 보강 허용**(solar-pro3/Gemini, **결과를 books DB ISBN 매칭해 환각 필터**, 사실성 부담 큰 쪽수·가격엔 미적용). `source`·`enriched_at` 로 출처·재보강 추적. 신뢰 카피 차등은 [nest.md/library 추천 #496] 참조.
+// 외서·빈필드 폴백 체인(#489): 등록 시 **알라딘 → Google Books → OpenLibrary** 순으로 빈 필드만 non-destructive merge(표지: Google thumbnail → OpenLibrary covers). 끝내 빈 `description`은 **LLM 보강 허용**(solar-pro3/Gemini, **결과를 books DB ISBN 매칭해 환각 필터**, 사실성 부담 큰 쪽수·가격엔 미적용). `source`·`enriched_at` 로 출처·재보강 추적.
 // 인기도서 사전 아카이브(#239): `worker/index.mjs` `scheduled()`(cron 0 18 * * *) — 알라딘 베스트셀러→ItemLookUp→books upsert(service_role). 등록 지연 0·API 의존 감소. env: SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY·ARCHIVE_DAILY_CAP(기본3000). **(#1044 격리)** 신규 provider 키(KAKAO_REST_KEY/NLK_CERT_KEY) 설치 시 자동 중지(`aladinSeedActive`) — 인기 시드 소스 재설계는 P2 별도 이슈.
 books.get(bookId)                          → Book
 myBooks.list()                             → UserBook[]      // 읽는 중 + 완독 + 중단(aborted). publisher/total_pages는 override 병합값(#431)
@@ -169,7 +169,7 @@ activeBook.set(userBookId)                                  // = users.active_us
 // 일일 기록 (세션 + 한 문장)
 sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 진도 + 독서 세션 + 내부 리듬 카운터. duration_sec(#430): 읽기 세션 시간(초) 누적. **Supabase: 원자 RPC `checkin_atomic(p_user_book_id, p_page, p_duration, p_today)`(#1161, 43_checkin_atomic.sql)** — user_books.current_page + reading_sessions upsert + streak bump를 한 트랜잭션으로 묶어 구 순차 3-write 부분상태를 막는다. 내부 카운터 규칙은 `_nextStreak`과 SQL을 동기화하며, p_today는 클라이언트 로컬 날짜를 사용한다. XP 호출은 없고 문장 저장은 별도 `sentences.add` 계약이다.
 sessions.list(userBookId)                  → Session[]
-sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): 사실상 **quote 단일**. '내 생각'(thought) 폐기(#596, [nest.md §147]) — 입력 경로 제거·add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
+sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): 사실상 **quote 단일**. 별도 thought 입력은 폐기(#596) — add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
 //   ↳ #1474 신규 문장은 저장 시점의 settings.default_sentence_visibility를 단일 정본으로 사용한다.
 //      작성 UI는 문장별 selector를 노출하지 않고 호출부 visibility override는 adapter가 무시한다.
 //      키 없음='public', friends='followers', unknown='private'. DB DEFAULT 'public'은 레거시 방어선으로 유지한다.
@@ -716,7 +716,7 @@ OAuth 콜백 직후 동기화 → localStorage 비움:
 - `user_books` 다수 행 보유 가능 (status='reading' 여러 권)
 - `users.active_user_book_id`가 현재 활성 책 가리킴 (NULL 가능: 책 없을 때)
 - 활성 책 전환 = `users.active_user_book_id` UPDATE만으로 끝 (`DataStore.activeBook.set`)
-- 둥지 진화 배너는 활성 책 진척률(`current_page/total_pages`)을 그린다 ([§5.2](./nest.md))
+- 홈은 활성 책 진척률(`current_page/total_pages`)을 그린다([home-reading.md §5.2](./home-reading.md#52-홈과-활성-책))
 - **각 책의 진척·세션·문장은 `user_book_id` 단위로 분리 저장되므로 책 전환 시 데이터 손실 없음**
 
 Phase 0 (localStorage, `rg_v41`):

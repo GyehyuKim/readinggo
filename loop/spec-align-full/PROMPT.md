@@ -2,7 +2,7 @@ Goal: docs/readinggo/specs/ 의 모든 SSOT 스펙을 **조항(clause) 단위로
 
 Source (스펙 정본 — 이 순서로 한 파일씩 완주):
 - docs/readinggo/specs/meta/decisions.md (§8 결정 이력 — 충돌 시 최신 §이 우선; 매칭의 기준 컨텍스트)
-- docs/readinggo/specs/nest.md (§5.1-5.5)
+- docs/readinggo/specs/home-reading.md (§5 홈·활성 책·독서 세션·문장 기록·OCR)
 - docs/readinggo/specs/social.md (§5.6-5.7)
 - docs/readinggo/specs/profile.md (§5.8-5.9)
 - docs/readinggo/specs/systems.md (§6 스트릭·XP·휴식)
