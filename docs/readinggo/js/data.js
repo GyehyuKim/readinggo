@@ -34,7 +34,7 @@ const INITIAL_PROGRESS = {
 // 신규 게스트 = 빈 시작 (#1136, 출시 결정) — 구 데모 시드(데미안 102p·스트릭 12·XP 340·문장 2)는
 // Phase 0 시연용이었다. 스토어 유입이 "남의 기록"을 첫 화면에서 만나면 신뢰를 깎고, 빈 상태는
 // 이제 약속+기능 예고 카드(#1134)라 휑하지 않다. book 은 Supabase 무책 하이드레이션과 동일한
-// 빈 센티널({id:'', _empty:true}) — nest 빈 상태 가드(!book.id)·effect deps 접근이 그대로 안전.
+// 빈 센티널({id:'', _empty:true}) — 홈 빈 상태 가드(!book.id)·effect deps 접근이 그대로 안전.
 const INITIAL_STATE = {
   book: { id: '', title: '', author: '', pub: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true },
   streak: 0,
@@ -283,7 +283,7 @@ function extractBookSummary(book, quotes) {
 }
 
 /* 공유 OCR 헬퍼 (#939) — 책 사진 한 장 → worker /api/ocr(Upstage Document OCR + solar-pro3 보정)
-   → 한 문장 텍스트. 읽기모드 빠른입력(#498 nest.js runOcrQuick)이 이 호출을 쓴다(인라인 중복 구현 금지).
+   → 한 문장 텍스트. 읽기모드 빠른입력(#498 home.js runOcrQuick)이 이 호출을 쓴다(인라인 중복 구현 금지).
    반환: { text } | { empty, code, stage } | { error, stage, status } (배타).
    호출측이 토스트·busy·tracking 을 담당하고 provider 원문은 보존하지 않는다. */
 const OCR_MAX_BYTES = 8 * 1024 * 1024;   // 8MB — ocrProxy OCR_MAX_BYTES 와 동일

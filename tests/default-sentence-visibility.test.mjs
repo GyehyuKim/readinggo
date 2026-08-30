@@ -51,7 +51,7 @@ assert.equal(nullChanged.visibility, 'private', '사후 명시적 null 공개범
 ds.drafts.save('book-1', [{ text: '열린 초안', visibility: 'public' }]);
 assert.deepEqual(JSON.parse(JSON.stringify(ds.drafts.load('book-1'))), [{ text: '열린 초안', visibility: 'public' }], '레거시 초안 원본은 보존');
 
-const surfaces = Object.fromEntries(['nest.js', 'batch-quote-import.js', 'book-detail-modal.js', 'data-import.js']
+const surfaces = Object.fromEntries(['home.js', 'batch-quote-import.js', 'book-detail-modal.js', 'data-import.js']
   .map((file) => [file, fs.readFileSync(path.join(root, 'docs/readinggo/js', file), 'utf8')]));
 for (const [file, text] of Object.entries(surfaces)) {
   assert.doesNotMatch(text, /<SentenceVisibilitySelect\b/, `${file}: 신규 문장별 공개범위 selector 제거`);

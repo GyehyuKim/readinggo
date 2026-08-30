@@ -1,6 +1,6 @@
 /* =========================================================
-   ReadingGo — nest.js
-   둥지 탭(HomeView): 책 카드, 체크인 CTA(짹), 내 한 문장, 같은 책 피드 + 책정보 수정(BookEditModal).
+   ReadingGo — home.js
+   홈 탭(HomeView): 책 카드, 체크인 CTA(짹), 내 한 문장, 같은 책 피드 + 책정보 수정(BookEditModal).
    Ceremony·CompanionModal·OcrCropOverlay는 #761로 별도 모듈 분리, CheckinModal은 #252 폐기 후 제거.
    ========================================================= */
 const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _useMemo } = React;
@@ -137,7 +137,7 @@ window._retainUnsavedDrafts = _retainUnsavedDrafts;
 
 /* ── HomeView ─────────────────────────────────────────── */
 
-// 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 둥지 진척 즉시 반영.
+// 책 정보 수정 모달 (#410) — 출판사·총 페이지수 편집. updateBook 후 onSaved(total)로 홈 진척 즉시 반영.
 function BookEditModal({ book, onClose, onSaved }) {
   const [pub, setPub] = _useState((book.pub || book.publisher || '').trim());
   const [total, setTotal] = _useState(String(book.total || 0));
@@ -216,7 +216,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   // 세리머니 문장 카드 → 현재 책 입력으로 잠시 이동하고, 브라우저/Android 뒤로가기로 결과 화면 복원(#1403).
   const _sentenceCeremonyRef = _useRef(null);
   const [showConfetti, setShowConfetti] = _useState(false);
-  // 둥지 단계 = 활성 책 진척률(book.cur/book.total). 체력/days 추적 없음.
+  // 홈 단계 = 활성 책 진척률(book.cur/book.total). 체력/days 추적 없음.
   const _pctOf = (bk) => bk && bk.total ? Math.round(bk.cur / bk.total * 100) : 0;
   const [homeState, setHomeState] = _useState({
     streak: state.streak,
@@ -225,7 +225,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   });
   // 마일스톤 회고 대기 (#938, A2) — 세리머니가 닫힌 뒤 띄울 마일스톤(겹침 방지). 게이트(빈도)는 DataStore.milestone.
   const pendingMilestoneRef = _useRef(null);
-  // 한 문장 삭제(#1)·종류변경(#381) 이벤트 → 둥지 '내 한 문장' 목록 즉시 반영.
+  // 한 문장 삭제(#1)·종류변경(#381) 이벤트 → 홈 '내 한 문장' 목록 즉시 반영.
   _useEffect(() => {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
     const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
@@ -358,7 +358,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     if (_swipe.current.dragged) { e.preventDefault(); e.stopPropagation(); _swipe.current.dragged = false; return true; }
     return false;
   };
-  // 시간차 되감기 (#346, resurface.md) — 둥지 진입 시 백그라운드 체크, 1일 1회, 비침습 카드.
+  // 시간차 되감기 (#346, resurface.md) — 홈 진입 시 백그라운드 체크, 1일 1회, 비침습 카드.
   const [resurfaceCard, setResurfaceCard] = _useState(null);
   _useEffect(() => {
     let alive = true;
@@ -732,7 +732,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
           });
         }
       } catch (e) {
-        console.warn('[nest] 완독 기록 저장 실패:', (e && e.message) || e);
+        console.warn('[home] 완독 기록 저장 실패:', (e && e.message) || e);
       }
     })();
     showToast('완독 기록을 저장했어요!');
@@ -915,7 +915,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
               </div>
             </div>
             {/* 온보딩 승격(#1134): 부정문("없어요") → 약속 선언 + 기능 예고 3줄.
-                스토어 유입은 앱의 약속을 모른 채 이 화면을 만난다 — 둥지·재키·타인 문장의 존재를
+                스토어 유입은 앱의 약속을 모른 채 이 화면을 만난다 — 홈·재키·타인 문장의 존재를
                 등록 전에 알린다. §A 슬라이드 없음 원칙 유지: 화면 추가 없이 이 카드 하나만 승격. */}
             <div style={{ fontWeight: 900, fontSize: 19, color: 'var(--ink)', marginBottom: 14 }}>하루 한 쪽, 한 문장이면 돼요</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', maxWidth: 290, margin: '0 auto 20px' }}>
@@ -1271,7 +1271,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
           </div>
           {othersQuotes.map((s) => {
             const u = s.user || {};
-            const _dec = window.decodeEntities || ((x) => x); // nest.js 스코프엔 alias 없음 → window 참조(미정의 폴백)
+            const _dec = window.decodeEntities || ((x) => x); // home.js 스코프엔 alias 없음 → window 참조(미정의 폴백)
             return (
               <window.SentenceCard key={s.id} bookId={homeState.book.id} noBlind
                 item={{ id: s.id, q: _dec(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: window.rgIcon('user', 20),
@@ -1314,7 +1314,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
         <Confetti active={showConfetti} />,
         document.body
       )}
-      {/* 책 정보 수정 (#410) — ⚙️ 진입. 저장 시 둥지 진척(total) 즉시 반영 */}
+      {/* 책 정보 수정 (#410) — ⚙️ 진입. 저장 시 홈 진척(total) 즉시 반영 */}
       {bookEditOpen && homeState.book && homeState.book.id && (
         <BookEditModal book={homeState.book} onClose={() => setBookEditOpen(false)}
           onSaved={({ pub, total }) => setHomeState((ns) => ({ ...ns, book: { ...ns.book, pub: pub, total: total || ns.book.total } }))} />

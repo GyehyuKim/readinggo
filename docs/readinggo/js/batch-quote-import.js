@@ -1,6 +1,6 @@
 /* =========================================================
    ReadingGo — batch-quote-import.js  (#848 PR1)
-   BatchQuoteImport: 비정형 문장 텍스트 일괄 입력 (spec nest.md §5.8).
+   BatchQuoteImport: 비정형 문장 텍스트 일괄 입력 (spec home-reading.md §5.8).
    텍스트 뭉치 → 줄 단순 분리(1차) → 검토(편집/삭제/스킵) → onSave(quotes[]).
    자립적(자체 훅, cross-file 의존 없음). book-detail-modal.js **이전** 로드(BookDetailModal이 <BatchQuoteImport> 소비).
    LLM 파싱(2차, §5.8)·OCR 배치(#844)는 후속 PR. 저장은 app onBatchSave.

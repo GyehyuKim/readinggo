@@ -1,5 +1,5 @@
 /* =========================================================
-   ReadingGo — companion.js  (#761 모듈화: nest.js에서 추출)
+   ReadingGo — companion.js  (#761 모듈화: home.js에서 추출)
    재키(Jacky) 한 문장 대화 — CompanionModal + 헬퍼(질문 생성·아카이브·노트 파싱).
    app.js **이전** 로드(app.js가 <CompanionModal> 소비). 순수 이동:
    DataStore·rgTrack·showToast 등 window 전역은 bare 유지(런타임 재할당 반영), lexical 훅만 재선언.
@@ -245,7 +245,7 @@ function CompanionModal({ sentence, onClose }) {
       showToast(free ? '내 감상을 저장했어요' : '감상을 비웠어요');
     }).catch(() => { setNoteSaving(false); showToast('저장 실패 — 잠시 후 다시'); });
   };
-  // 한 문장 삭제 (#1) — 둥지 한 문장 상세에도 삭제. 이벤트로 둥지·서재 목록 즉시 반영.
+  // 한 문장 삭제 (#1) — 홈 한 문장 상세에도 삭제. 이벤트로 홈·서재 목록 즉시 반영.
   const delQuote = () => {
     if (!sentence.id || !(DataStore.sentences && DataStore.sentences.remove)) { onClose(); return; }
     if (!window.confirm('이 한 문장을 삭제할까요? 되돌릴 수 없어요.')) return;

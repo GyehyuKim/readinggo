@@ -28,7 +28,7 @@ JS_DIR = ROOT / "docs" / "readinggo" / "js"
 
 # Feature files: v6 residue and direct localStorage are forbidden here.
 FEATURE_FILES = [
-    "app.js", "components.js", "nest.js", "social.js",
+    "app.js", "components.js", "home.js", "social.js",
     "library.js", "search.js",
     # #761 모듈화 — components.js에서 추출한 모듈. 추출 시 여기 등록(invariant 파일 범위).
     "icons.js", "admin-dashboard.js", "sentence-card.js", "book-info-modal.js", "book-detail-modal.js",
@@ -93,8 +93,8 @@ INVARIANTS = [
     ("S2", "present", "좋아요 단일 리액션 (#641 — 짹+책갈피 → claps 좋아요)", FEATURE_FILES, r"좋아요"),
     # #641 영구 가드: '책갈피' 단어 재유입 차단(좋아요/claps 단일화). 리액션 짹은 문맥 한정이라 absent 처리하지 않음(문장등록 동사 '짹' 보존).
     ("S2", "absent", "'책갈피' 단어 잔재 — 좋아요(claps) 단일화 (#641 영구 가드)", FEATURE_FILES, r"책갈피"),
-    # #684: 동반자 캐릭터 호칭은 '재키'로 분리. nest.js의 '짹'은 이제 문장등록 동사("오늘의 짹"·"짹 등록"·"내일도 짹")로만 존재 — present 유지.
-    ("S2", "present", "문장등록 동사 '짹' 보존 (#684 — 캐릭터 호칭은 '재키'로 분리, 액션 동사만 잔존)", ["nest.js"], r"짹"),
+    # #684: 동반자 캐릭터 호칭은 '재키'로 분리. home.js의 '짹'은 이제 문장등록 동사("오늘의 짹"·"짹 등록"·"내일도 짹")로만 존재 — present 유지.
+    ("S2", "present", "문장등록 동사 '짹' 보존 (#684 — 캐릭터 호칭은 '재키'로 분리, 액션 동사만 잔존)", ["home.js"], r"짹"),
 
     # ── S3: 구조 제거 (The Path, 주간 리그) ────────────────────
     ("S3", "absent", "The Path / 세션 노드 지그재그 잔재", None,
@@ -102,18 +102,18 @@ INVARIANTS = [
     ("S3", "absent", "주간 리그 잔재 (league/리그)", None, r"league|리그"),
 
     # ── S4/S5: Phase 4 물리 삭제 — 책나무가 내부 nest-grow route를 대체 ────
-    ("S4", "absent", "레거시 XP/둥지 진화 계산·기하",
+    ("S4", "absent", "레거시 XP/홈 진화 계산·기하",
         None, r"NEST_STAGES|NEST_CYCLE_XP|getNestStageByXp|nestXpProgress|nestCastleCount|NEST_TWIGS|drawNest"),
-    ("S4", "absent", "레거시 둥지 시어터/성장 컴포넌트",
+    ("S4", "absent", "레거시 홈 시어터/성장 컴포넌트",
         None, r"NestTheatre|NestGrowView|nest-health|nest-progress|nest-evo"),
     ("S5", "absent", "레거시 성 컬렉션 DataStore 계약",
         ["datastore.js", "datastore-supabase.js"], r"castles\s*:\s*\{"),
     ("S4", "present", "세리머니 한 문장 카드 정직 표시 — bookQuoteCount (#549)",
-        ["nest.js"], r"bookQuoteCount"),
+        ["home.js"], r"bookQuoteCount"),
     ("S4", "present", "빠른입력 페이지/한 문장 독립 제출 (#497)",
-        ["nest.js"], r"submitPage[\s\S]*submitSentence|submitSentence[\s\S]*submitPage"),
+        ["home.js"], r"submitPage[\s\S]*submitSentence|submitSentence[\s\S]*submitPage"),
     ("S4", "present", "이 책 한 문장 전체기간 + 액션(SentenceActions 경유) (#499→#610)",
-        ["nest.js"], r"bookQuotes[\s\S]*<SentenceActions|<SentenceActions[\s\S]*bookQuotes"),
+        ["home.js"], r"bookQuotes[\s\S]*<SentenceActions|<SentenceActions[\s\S]*bookQuotes"),
 
     # ── S6: 완독 별점 + 소감 ──────────────────────────────────
     ("S6", "present", "완독 별점/소감 (rating + review_text)", FEATURE_FILES,
@@ -201,9 +201,9 @@ INVARIANTS = [
     # 읽기 모드(ReadingMode/타이머) invariant 폐기 (#505) — 홈 빠른입력으로 일원화, 독서시간 측정 폐기
     # 책정보 수정(BookEditModal) → 서재 갱신 신호 (#512). 신호 누락 시 LibraryView stale → 미반영 회귀.
     ("C", "present", "책정보 수정 후 서재 갱신 신호 (#512)",
-        ["nest.js"], r"rg:wish-changed"),
-    ("C", "present", "활성 책 캐러셀 전환 (nest.md §5.3, #185)",
-        ["nest.js"], r"switchBook"),
+        ["home.js"], r"rg:wish-changed"),
+    ("C", "present", "활성 책 캐러셀 전환 (home-reading.md §5.2, #185)",
+        ["home.js"], r"switchBook"),
     ("C", "present", "운영 대시보드 (profile.md §5.8.9, #161)",
         ["admin-dashboard.js"], r"AdminDashboardModal"),  # #761 모듈화: components.js → admin-dashboard.js
     ("C", "present", "운영자 문의 (profile.md 설정, #문의)",
@@ -222,7 +222,7 @@ INVARIANTS = [
         ["book-info-modal.js"], r"mySents\.map"),
     # #610 표면 통일 락 — 홈·책장 내 문장 카드도 공용 SentenceActions 경유(자체 버튼 렌더 금지).
     ("C", "present", "홈 '이 책 한 문장' 카드 SentenceActions 경유 (#610 표면 통일)",
-        ["nest.js"], r"<SentenceActions sentence=\{\{ id: q\.id"),
+        ["home.js"], r"<SentenceActions sentence=\{\{ id: q\.id"),
     ("C", "present", "책장 BookDetailModal 한 문장 카드 SentenceActions 경유 (#610 표면 통일)",
         ["book-detail-modal.js"], r"<SentenceActions"),
     # ── 2단 동의 게이팅 (analytics.md §5.4, #752) — 비필수(리플레이·식별)는 'yes'만. PIPA 회귀 락 ──
@@ -236,7 +236,7 @@ INVARIANTS = [
     # ── D: Phase 4에서 스트릭 만회는 물리 삭제, 마일스톤 회고는 유지 ──────
     ("D", "absent", "스트릭 복구 정책·DataStore 계약 제거",
         ["datastore.js", "datastore-supabase.js"], r"_streakRepairStatus|repairStatus\s*\(|last_repair_date"),
-    # A2 — 마일스톤 회고: 빈도 게이트 + 회고 모달 + nest 트리거.
+    # A2 — 마일스톤 회고: 빈도 게이트 + 회고 모달 + home trigger.
     ("D", "present", "마일스톤 회고 빈도 게이트 — milestone.shouldShow/markShown (#938 A2)",
         ["datastore.js"], r"shouldShow\(key\)[\s\S]*markShown|markShown[\s\S]*shouldShow\(key\)"),
     ("D", "present", "마일스톤 회고 모달 — MilestoneRecap + RG_openMilestoneRecap (#938 A2)",
@@ -244,7 +244,7 @@ INVARIANTS = [
     ("D", "present", "마일스톤 회고는 기존 한 문장 자산 재사용 — listByBook/listMine (#938 A2)",
         ["milestone-recap.js"], r"listByBook[\s\S]*listMine|listMine[\s\S]*listByBook"),
     ("D", "present", "홈 마일스톤 트리거 — 세리머니 닫힘 시 게이트 통과분 1개 (#938 A2)",
-        ["nest.js"], r"_pickMilestone[\s\S]*RG_openMilestoneRecap|RG_openMilestoneRecap[\s\S]*_pickMilestone"),
+        ["home.js"], r"_pickMilestone[\s\S]*RG_openMilestoneRecap|RG_openMilestoneRecap[\s\S]*_pickMilestone"),
     # 가드: 새 점수·랭킹·데일리미션 시스템을 더하지 않았는지(#911 외적 보상 배제). 새 모듈에 점수/랭킹 변수 금지.
     ("D", "absent", "외적 보상 신설 금지 — 점수/포인트/랭킹/리더보드 변수 잔재 (#938 가드)",
         ["milestone-recap.js"], r"leaderboard|ranking|\bpoints\b|\bscore\b"),

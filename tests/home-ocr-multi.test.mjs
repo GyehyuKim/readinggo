@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(root, 'docs/readinggo/js/nest.js'), 'utf8');
+const src = fs.readFileSync(path.join(root, 'docs/readinggo/js/home.js'), 'utf8');
 
 const helperStart = src.indexOf('function _mergeOcrDrafts');
 const helperEnd = src.indexOf('function _retainUnsavedDrafts', helperStart);

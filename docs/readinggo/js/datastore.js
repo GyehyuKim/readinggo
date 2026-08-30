@@ -438,7 +438,7 @@ const DataStore = {
   },
 
   /* 내 책 목록 / 추가 (Supabase 어댑터 표면 일치 §7.2) ──────
-     localStorage 모드(게스트/Phase0)에서 LibraryView·둥지 캐러셀이 호출.
+     localStorage 모드(게스트/Phase0)에서 LibraryView·홈 캐러셀이 호출.
      누락 시 DataStore.myBooks.list() 가 throw → 서재 탭 전체 크래시(무가드). */
   myBooks: {
     list() {
@@ -516,7 +516,7 @@ const DataStore = {
       });
     },
     // 읽던 책 중단 (#593) — status='aborted'. current_page 보존(되돌리기 가능),
-    // 활성 책이면 active 해제 → "읽는 중"·둥지 캐러셀에서 빠지고 "중단" 탭으로 이동.
+    // 활성 책이면 active 해제 → "읽는 중"·홈 캐러셀에서 빠지고 "중단" 탭으로 이동.
     // 활성 책 중단 시 남은 '읽는 중' 책으로 active 승계 (#643) — 홈이 빈 상태로 떨어지지 않게.
     // 남은 reading 책이 없을 때만 null 유지(빈 상태가 올바름). 승계 대상은 캐러셀 순서(저장 순)의 첫 책.
     abort(userBookId) {
@@ -809,7 +809,7 @@ const DataStore = {
     markToday() { try { localStorage.setItem('rg_resurface_last', _today()); } catch (e) {} },
   },
 
-  /* 마일스톤 회고 노출 게이트 (#938, A2, nest.md §5.4) — 기기 로컬 빈도 가드(서버 저장 불필요, 양 어댑터 동일).
+  /* 마일스톤 회고 노출 게이트 (#938, A2, home-reading.md §5.4) — 기기 로컬 빈도 가드(서버 저장 불필요, 양 어댑터 동일).
      절제 규칙(피로 방지): ① 같은 마일스톤 key 는 1회만 ② 하루 최대 1회(여러 마일스톤이 한 세션에 겹쳐도 1개만).
      key 예: 'complete:<ubId>', 'streak:7', 'streak:30', 'castle:2'. rg_milestone_seen(JSON map) + rg_milestone_last(YYYY-MM-DD). */
   milestone: {
@@ -1120,7 +1120,7 @@ const DataStore = {
         joined_at: r.created_at,
         user: {
           id: me.id || 'me', handle: me.handle || 'me', display_name: me.display_name || me.handle || '나',
-          nest_emoji: me.nest_emoji || null, streak: me.streak ? [{ current: me.streak }] : [],
+          streak: me.streak ? [{ current: me.streak }] : [],
           cumulativePage: (myUb && myUb.current_page) || 0,
           todayRecorded: !!recordedToday,
           todaySentence: lastSent ? { text: lastSent.text, page: lastSent.page } : null,

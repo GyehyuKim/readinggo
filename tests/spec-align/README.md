@@ -13,7 +13,7 @@
 ## 사용
 
 ```bash
-python tests/spec-align/nest.py        # nest 영역 (v7 둥지 존재 invariant)
+python tests/spec-align/home.py        # 홈 영역 (v18 route·독서 invariant)
 python tests/spec-align/align_v7.py    # v7 전환 게이트 (#124 S1-S7, 부재/존재)
 python tests/spec-align/align_v7.py S2 # 특정 스토리만
 python tests/spec-align/drift.py       # drift defense (CI workflow 존재 검증)

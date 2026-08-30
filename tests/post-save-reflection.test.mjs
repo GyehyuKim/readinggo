@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const app = fs.readFileSync('docs/readinggo/js/app.js', 'utf8');
-const nest = fs.readFileSync('docs/readinggo/js/nest.js', 'utf8');
+const home = fs.readFileSync('docs/readinggo/js/home.js', 'utf8');
 const ceremony = fs.readFileSync('docs/readinggo/js/ceremony.js', 'utf8');
 const html = fs.readFileSync('docs/readinggo/index.html', 'utf8');
 
@@ -13,17 +13,17 @@ assert.match(app, /mineDb\.find\(x => x\.id === savedSentenceRow\.id\)[\s\S]*ref
 assert.match(app, /completion\.onSuccess\(\{ reflectionSentence \}\)/,
   '저장 완료 콜백에 정확한 성찰 문장을 전달해야 한다');
 
-assert.match(nest, /reflectionPending: sentenceCount === 1/,
+assert.match(home, /reflectionPending: sentenceCount === 1/,
   '단일 문장 완료만 성찰 연결을 기다려야 한다');
-assert.match(nest, /onSuccess: \(result\) =>[\s\S]*reflectionSentence: result && result\.reflectionSentence/,
+assert.match(home, /onSuccess: \(result\) =>[\s\S]*reflectionSentence: result && result\.reflectionSentence/,
   '저장 성공 결과를 현재 완료 화면에 연결해야 한다');
-assert.match(nest, /saveReflectionFromCeremony[\s\S]*DataStore\.sentences\.setNote\(sentence\.id, note \|\| null\)/,
+assert.match(home, /saveReflectionFromCeremony[\s\S]*DataStore\.sentences\.setNote\(sentence\.id, note \|\| null\)/,
   'inline 생각은 방금 저장한 정확한 sentence ID에 setNote로 저장해야 한다');
-assert.match(nest, /rgJoinNote\(draft\.trim\(\), rgSplitNote\(sentence\.note\)\.qa\)/,
+assert.match(home, /rgJoinNote\(draft\.trim\(\), rgSplitNote\(sentence\.note\)\.qa\)/,
   'inline 생각 저장은 기존 재키 Q/A를 보존해야 한다');
-assert.match(nest, /talkToJackyFromCeremony[\s\S]*RG_openCompanion\(sentence, \{ mode: 'jacky' \}\)/,
+assert.match(home, /talkToJackyFromCeremony[\s\S]*RG_openCompanion\(sentence, \{ mode: 'jacky' \}\)/,
   '재키 대화는 방금 문장을 jacky 모드로 열어야 한다');
-assert.match(nest, /onSaveReflection=\{saveReflectionFromCeremony\}[\s\S]*onTalkToJacky=\{talkToJackyFromCeremony\}/,
+assert.match(home, /onSaveReflection=\{saveReflectionFromCeremony\}[\s\S]*onTalkToJacky=\{talkToJackyFromCeremony\}/,
   '완료 화면에 inline 저장과 재키 대화 콜백을 전달해야 한다');
 
 assert.match(ceremony, /reflectionReady[\s\S]*className="ceremony-reflection"/,

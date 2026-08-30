@@ -43,12 +43,17 @@ test('production graph keeps library canonical while retired routes and modules 
 
   const graph = productionModuleGraph(path.join(appRoot, 'main.js'));
   const relativeGraph = graph.map((file) => path.relative(appRoot, file));
-  for (const legacy of ['js/nest-theatre.js', 'js/nest-grow.js', 'js/streak-repair-copy.js', 'js/book-tree-selector.js', 'js/book-tree-home-ui.js', 'js/friend-book-tree-view.js']) {
+  for (const legacy of ['js/nest.js', 'js/nest-theatre.js', 'js/nest-grow.js', 'js/streak-repair-copy.js', 'js/book-tree-selector.js', 'js/book-tree-home-ui.js', 'js/friend-book-tree-view.js']) {
     assert.equal(fs.existsSync(path.join(appRoot, legacy)), false, `${legacy} must be physically removed`);
     assert.equal(relativeGraph.includes(legacy), false, `${legacy} must not be production-reachable`);
   }
 
-  const productionSource = graph.map((file) => stripComments(read(file))).join('\n');
+  const productionSource = graph.map((file) => {
+    const source = read(file);
+    return file === path.join(jsRoot, 'app.js')
+      ? source.replace(/function normalizeTab\(tab\) \{[\s\S]*?\n\}/, '')
+      : source;
+  }).join('\n');
   const forbidden = [
     /\bNEST_CYCLE_XP\b/, /\bNEST_STAGES\b/, /\bXP_RULES\b/,
     /\bcomputeCheckinXp\b/, /\breactionXpFor\b/, /\bgrantXp\b/,
@@ -57,6 +62,7 @@ test('production graph keeps library canonical while retired routes and modules 
     /DataStore\.xp\b/, /\bcastles\s*:/, /\brepairStatus\s*\(/,
     /\bstreak_repair(?:ed|_failed|_viewed)?\b/,
     /\bnest_(?:tab_viewed|growth_guide_opened|completion_viewed)\b/,
+    /\bnest\b|\bNest[A-Z]|\bnest_[a-z]|rg-room-nest|둥지/,
   ];
   for (const pattern of forbidden) assert.doesNotMatch(productionSource, pattern);
 });

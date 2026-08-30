@@ -36,7 +36,7 @@ SQL 인젝션 없음(PostgREST 파라미터화) · 저장형 XSS 없음(React �
 ## 3. 상시 규칙 (개발 시 준수)
 1. **시크릿**: `service_role`·Management PAT·Google Secret·알라딘 TTBKey 는 `.env`/Netlify env/`process.env`에서만. 채팅·깃·클라 번들 금지. 클라엔 publishable(anon) 키만(RLS 보호).
 2. **DB 접근**: 항상 supabase-js 빌더(`.eq/.insert/...` 파라미터화). 동적 문자열 SQL 금지. `admin-cli` 인라인 SQL은 운영자 전용(입력 신뢰).
-3. **렌더**: 사용자 콘텐츠는 JSX 표현식(자동 이스케이프). `dangerouslySetInnerHTML`/`innerHTML`/`eval`에 사용자 입력 **절대 금지**(현재 SVG 둥지는 내부 상수만 — 회귀 주의).
+3. **렌더**: 사용자 콘텐츠는 JSX 표현식(자동 이스케이프). `dangerouslySetInnerHTML`/`innerHTML`/`eval`에 사용자 입력 **절대 금지**. 내부 SVG·아이콘 상수에도 사용자 입력을 결합하지 않는다.
 4. **공개 데이터**: 레거시 `select using(true)` 또는 broad authenticated-read 정책을 retained surface의 권한 경계로 사용하지 않는다. viewer 관계·차단·문장 공개범위는 서버의 owner/current-viewer 최소 projection이 판정하고, base table은 §7.0.3 컷오버 뒤 owner/minimum-field로 축소한다. private 문장은 본문뿐 아니라 존재·개수·오류 차이·clap/report/count도 숨긴다. 책나무 전용 API·grant는 제거 대상이다.
 
 ## 4. 공개 전환 전 체크리스트

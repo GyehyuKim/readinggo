@@ -1,7 +1,7 @@
 /* =========================================================
-   ReadingGo — ocr-crop-overlay.js  (#761 모듈화: nest.js에서 추출)
+   ReadingGo — ocr-crop-overlay.js  (#761 모듈화: home.js에서 추출)
    OcrCropOverlay: 책 사진 OCR 드래그 영역 선택 v2 (#396). 자립적(자체 훅 선언, cross-file 의존 없음).
-   nest.js **이전** 로드(NestView가 <OcrCropOverlay> bare 소비). 순수 이동.
+   home.js **이전** 로드(HomeView가 <OcrCropOverlay> bare 소비). 순수 이동.
    ========================================================= */
 
 // 책 사진 OCR — 드래그 영역 선택 v2 (#396). 사진에서 원하는 구절만 사각형으로 골라
@@ -104,7 +104,7 @@ function OcrCropOverlay({ file, onCancel, onCrop }) {
     cv.toBlob((blob) => { if (blob) onCrop(blob); }, 'image/jpeg', 0.92);
   };
   const hasSel = sel && sel.w >= 8 && sel.h >= 8;
-  // #1255: body 포털 + z 10001(전면 오버레이 컨벤션, 바코드 모달과 동일) — NestView 안에 그리면
+  // #1255: body 포털 + z 10001(전면 오버레이 컨벤션, 바코드 모달과 동일) — HomeView 안에 그리면
   // fixed/z-index 가 앱 레이아웃(조상 containing block)에 갇혀 헤더·탭바를 못 덮고, 사진 하단
   // 핸들이 탭바에 가려 선택 불가에 이른다(실기기 #1255). #728 상단 버튼 배치는 유지(이중 안전).
   return ReactDOM.createPortal(

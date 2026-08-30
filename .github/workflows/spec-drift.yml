@@ -26,7 +26,7 @@ jobs:
       - name: spec-align gates
         run: |
           python3 tests/spec-align/align_v7.py
-          python3 tests/spec-align/nest.py
+          python3 tests/spec-align/home.py
           python3 tests/spec-align/drift.py
           python3 tests/spec-align/architecture_current.py
 
@@ -36,7 +36,7 @@ jobs:
       - name: 관련 도서 ISBN 환각 필터 (#496)
         run: node tests/related-filter.test.mjs
 
-      - name: XP·둥지·성·하루 만회 물리 삭제 (#1453 Phase 4)
+      - name: 퇴역 보상 표면 물리 삭제 (#1453 Phase 4)
         run: |
           node tests/user-facing-book-tree-copy.test.mjs
           node tests/phase4-legacy-absence.test.mjs

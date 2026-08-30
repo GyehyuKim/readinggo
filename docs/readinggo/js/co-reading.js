@@ -8,7 +8,7 @@
    - RoomModal      : 숲 내부 — 멤버 진척 그리드 + 한 문장 (§5.3)
    - P2(§7.5): 책 등록 시 기본 = 같이+공개(opt-out). rgCoReadMode/rgAutoJoinPublicRoom.
    데이터는 DataStore.rooms.* (어댑터 추상화, 직접 저장소 호출 금지 — backend.md §7.2).
-   둥지(개인 홈)에서 나와 같은 책의 "숲"으로 모인다 (명칭 확정 #987, §8).
+   개인 홈에서 나와 같은 책의 "숲"으로 모인다 (명칭 확정 #987, §8).
    ⚠ 코드 식별자(rooms.*·CSS .rg-room-*·함수명·RG_openRoom)는 방→숲 명칭 변경 대상 아님
      (회귀·churn 방지). 화면에 보이는 텍스트만 "숲".
    ========================================================= */
@@ -75,7 +75,7 @@ async function rgAutoJoinPublicRoom(book, opts) {
 
 /* ── 멤버별 책 진척 아이콘 ──
    제품 아이콘 최종 결정 전까지 진척률과 무관한 중립 책 아이콘을 사용한다. */
-function rgRoomNestEmoji(pct) {
+function rgRoomBookIcon(pct) {
   void pct;
   return window.rgIcon('book', 18);
 }
@@ -1048,7 +1048,7 @@ function RoomModal({ roomId, onClose }) {
                     <button key={u.id || i} className="rg-room-membercard"
                       onClick={() => { if (u.handle && window.RG_openProfile) window.RG_openProfile(u.handle); }}>
                       <div className="rg-room-membertop">
-                        <span className="rg-room-nest">{rgRoomNestEmoji(pct)}</span>
+                        <span className="rg-room-book-icon">{rgRoomBookIcon(pct)}</span>
                         <span className="rg-room-light" style={{ color: u.todayRecorded ? 'var(--gold)' : 'var(--line)' }}>●</span>
                       </div>
                       <div className="rg-room-membername">{u.handle || u.display_name || '독자'}</div>
@@ -1080,7 +1080,7 @@ function RoomModal({ roomId, onClose }) {
 window.RoomsView = RoomsView;
 window.RoomPreviewSheet = RoomPreviewSheet;   // #1094: 초대 딥링크가 앱 최상위에서 미리보기를 띄우는 데 사용
 window.RoomModal = RoomModal;
-window.rgRoomNestEmoji = rgRoomNestEmoji;
+window.rgRoomBookIcon = rgRoomBookIcon;
 // P2(§7.5) 같이읽기 모드 + 공개 숲 자동합류 — 등록 글루(app.js)·토글에서 사용.
 window.rgCoReadMode = rgCoReadMode;
 window.rgSetCoReadMode = rgSetCoReadMode;

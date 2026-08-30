@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a course project folder for **BIZ.69911 — IT경영 특수논제: AI 기반 비즈니스 진화, 전략 및 실습** (KAIST IMMS, Spring 2026, instructor: 이지수).
 
-The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가는 독서 습관 앱. **v18 목표**는 3번째 탭의 서재에서 읽고 싶은 책·읽는 중·읽은 책·중단한 책을 하나의 연속 흐름으로 검색·필터·정렬하는 것이다. 기존 카드는 유한한 가로 `scroll-snap` 레일로 빠르게 넘기며, 넘기기만으로 활성 책을 바꾸지 않는다. 4번째 탭은 **프로필**을 유지하고 사용자 로컬 기준 페이지 세션·내 문장 저장일의 합집합을 월간 활동 캘린더와 비징벌적 연속일 요약으로 보여준다. 기록 비손실·최근 14일 리듬·누적 성장일·문장 공개범위·RLS 안전 계약은 유지한다. XP·둥지·성·방패·하루 만회 전용 표면은 구 APK 호환을 요구하지 않고 단계 삭제한다. 활성 정본은 `docs/readinggo/specs/README.md`, 데모 엔트리포인트는 `docs/readinggo/index.html`이다.
+The project is **ReadingGo** — "하루 한 페이지, 한 문장"의 낮은 마찰로 독서를 이어가는 독서 습관 앱. **v18 목표**는 3번째 탭의 서재에서 읽고 싶은 책·읽는 중·읽은 책·중단한 책을 하나의 연속 흐름으로 검색·필터·정렬하는 것이다. 기존 카드는 유한한 가로 `scroll-snap` 레일로 빠르게 넘기며, 넘기기만으로 활성 책을 바꾸지 않는다. 4번째 탭은 **프로필**을 유지하고 사용자 로컬 기준 페이지 세션·내 문장 저장일의 합집합을 월간 활동 캘린더와 비징벌적 연속일 요약으로 보여준다. 기록 비손실·최근 14일 리듬·누적 성장일·문장 공개범위·RLS 안전 계약은 유지한다. 퇴역한 XP·성장 단계·성·방패·하루 만회 전용 표면은 구 APK 호환을 요구하지 않고 단계 삭제한다. 활성 정본은 `docs/readinggo/specs/README.md`, 데모 엔트리포인트는 `docs/readinggo/index.html`이다.
 
 ## Governance — MANDATORY
 
@@ -119,12 +119,12 @@ Key routing rules:
 `/health` 가 측정하는 도구 등록. 자동 감지 우회 — 이 섹션이 source of truth.
 
 - lint: `npx -y markdownlint-cli2`
-- test: `python tests/spec-align/nest.py`
+- test: `python tests/spec-align/home.py`
 
 ### 현재 측정 표면
 
 - **lint (md)** — `.markdownlint-cli2.jsonc` globs 범위 (active spec + 루트 docs, 18 files)
-- **test (spec-align)** — `tests/spec-align/nest.py` 13개 invariant
+- **test (spec-align)** — `tests/spec-align/home.py` 8개 invariant
 - TYPECHECK / 코드 LINT / DEADCODE / SHELL → SKIPPED (Phase 0 정적 HTML/JS, 빌드 도구 미도입 — Stack Lock)
 
 ### 추가 등록 후보 (도입 시)

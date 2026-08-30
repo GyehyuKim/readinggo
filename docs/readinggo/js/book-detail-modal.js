@@ -17,7 +17,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 삭제(#325 후속): 낙관적 제거 — bookQuotes 는 prop 파생이라 삭제분을 로컬에서 즉시 거름.
   const [removedIds, setRemovedIds] = _useState({});
   const bookQuotes = (allQuotes || []).filter(q => q.bookId === book.id && !removedIds[q.id])
-    // 페이지 내림차순(#737) — 미상(null)은 맨 아래, 동일 페이지는 최신순. 둥지(nest.js)와 정책 일치.
+    // 페이지 내림차순(#737) — 미상(null)은 맨 아래, 동일 페이지는 최신순. 홈(home.js)와 정책 일치.
     .slice()
     .sort((a, b) => {
       const pa = (typeof a.page === 'number') ? a.page : -Infinity;
@@ -312,7 +312,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (!window.confirm(msg)) return;
     Promise.resolve(DataStore.myBooks.remove(book.ubId))
       .then(() => {
-        // 삭제된 책의 한 문장을 홈(nest)·서재 피드에서 즉시 제거 (rg:sentence-removed 리스너, app.js/nest.js).
+        // 삭제된 책의 한 문장을 홈·서재 피드에서 즉시 제거 (rg:sentence-removed 리스너, app.js/home.js).
         bookQuotes.forEach(q => { if (q.id) window.dispatchEvent(new CustomEvent('rg:sentence-removed', { detail: { id: q.id } })); });
         window.dispatchEvent(new CustomEvent('rg:wish-changed'));
         onClose();
@@ -774,7 +774,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                             "{q.text}"
                           </div>
                         )}
-                        {/* 문장별 "내 감상만" vs "재키와 대화" (#1070) — 둥지와 동일 진입(CompanionModal, 모드 명시).
+                        {/* 문장별 "내 감상만" vs "재키와 대화" (#1070) — 홈와 동일 진입(CompanionModal, 모드 명시).
                             과거(#404) 자유 감상 편집 폐지는 my_note 덮어쓰기 충돌 탓이었고, 이제 감상/Q/A 를
                             블록 분리(rgSplitNote/rgJoinNote)해 서로 보존하므로 자유 감상을 다시 둔다. */}
                         {q.id && (() => {

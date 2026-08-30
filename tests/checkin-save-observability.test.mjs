@@ -8,7 +8,7 @@ import { createCheckinCorrelationId, normalizeCheckinFailure, trackCheckinSaveFa
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const app = read('docs/readinggo/js/app.js');
-const nest = read('docs/readinggo/js/nest.js');
+const home = read('docs/readinggo/js/home.js');
 
 const captured = [];
 const correlationId = '123e4567-e89b-42d3-a456-426614174000';
@@ -34,12 +34,12 @@ assert.equal(normalizeCheckinFailure(new Error('anything'), 'readback'), 'readba
 assert.equal(normalizeCheckinFailure(new Error('jwt expired'), 'sentence'), 'auth_expired');
 assert.match(createCheckinCorrelationId(), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
 
-assert.match(nest, /const correlationId = window\.RG_createCheckinCorrelationId\(\)/, '시도 시작에서 canonical correlation_id를 만든다');
-assert.match(nest, /onCheckin\([^\n]+\{ source, correlationId, itemCount \}\)/, 'preflight ID를 persistence까지 전달한다');
-assert.ok(nest.indexOf('RG_validateSentenceText') < nest.indexOf('checkinResult = onCheckin('), '문장 preflight는 persistence보다 앞선다');
-assert.ok(nest.indexOf("rg:ugc-terms-required") < nest.indexOf('checkinResult = onCheckin('), 'UGC preflight는 persistence보다 앞선다');
-assert.doesNotMatch(nest.slice(nest.indexOf('const saveOcrReview'), nest.indexOf('// 입력 페이지 정규화')), /rgTrack\('checkin_save_failed'/, 'OCR은 공통 실패 계측을 중복 호출하지 않는다');
-assert.doesNotMatch(`${app}\n${nest}`, /stage:\s*['\"]xp['\"]/, '허용 stage에 xp를 되살리지 않는다');
+assert.match(home, /const correlationId = window\.RG_createCheckinCorrelationId\(\)/, '시도 시작에서 canonical correlation_id를 만든다');
+assert.match(home, /onCheckin\([^\n]+\{ source, correlationId, itemCount \}\)/, 'preflight ID를 persistence까지 전달한다');
+assert.ok(home.indexOf('RG_validateSentenceText') < home.indexOf('checkinResult = onCheckin('), '문장 preflight는 persistence보다 앞선다');
+assert.ok(home.indexOf("rg:ugc-terms-required") < home.indexOf('checkinResult = onCheckin('), 'UGC preflight는 persistence보다 앞선다');
+assert.doesNotMatch(home.slice(home.indexOf('const saveOcrReview'), home.indexOf('// 입력 페이지 정규화')), /rgTrack\('checkin_save_failed'/, 'OCR은 공통 실패 계측을 중복 호출하지 않는다');
+assert.doesNotMatch(`${app}\n${home}`, /stage:\s*['\"]xp['\"]/, '허용 stage에 xp를 되살리지 않는다');
 assert.match(app, /reportFailure\('session'/, '세션 경계에서 실패를 기록한다');
 assert.match(app, /reportFailure\('sentence'/, '문장 경계에서 실패를 기록한다');
 assert.match(app, /reportFailure\('readback'/, 'readback 실패를 별도 기록한다');
@@ -47,6 +47,6 @@ assert.match(app, /!ubId[\s\S]+reportFailure\('preflight', new Error\('missing_u
 assert.match(app, /'checkin_atomic'[\s\S]+'sentences'[\s\S]+'streak\+sentences'/, '실패 payload는 실제 RPC·endpoint allowlist를 쓴다');
 assert.match(app, /window\.RG_createCheckinCorrelationId\(\)/, '내부 호출도 persistence 경계에서 ID를 보완한다');
 assert.match(app, /withInquiryCode[\s\S]+세션이 만료됐어요/, '인증 만료를 포함한 최종 실패 UI에 문의 코드를 표시한다');
-assert.match(nest, /checkinFailureStage === 'preflight'[\s\S]+문의 코드/, 'app 호출 전 preflight 실패도 문의 코드를 표시한다');
+assert.match(home, /checkinFailureStage === 'preflight'[\s\S]+문의 코드/, 'app 호출 전 preflight 실패도 문의 코드를 표시한다');
 
 console.log('✅ check-in save observability contract passed');
