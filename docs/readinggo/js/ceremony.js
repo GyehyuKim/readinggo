@@ -14,9 +14,11 @@ function finishCeremony(options) {
 }
 
 /* ── Ceremony ─────────────────────────────────────────── */
-function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibrary }) {
+function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibrary, onSaveReflection, onTalkToJacky }) {
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
+  const [reflectionDraft, setReflectionDraft] = _useState('');
+  const [reflectionStatus, setReflectionStatus] = _useState('idle');
   // 게스트 여부(#1134) — 성공적으로 기록한 뒤 계정 저장을 조용히 제안한다.
   const [isGuest, setIsGuest] = _useState(false);
   _useEffect(() => {
@@ -26,6 +28,12 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
     }
     return () => { alive = false; };
   }, []);
+  const reflectionId = data && data.reflectionSentence && data.reflectionSentence.id;
+  _useEffect(() => {
+    const note = data && data.reflectionSentence && data.reflectionSentence.note;
+    setReflectionDraft(note && window.rgSplitNote ? window.rgSplitNote(note).free : '');
+    setReflectionStatus('idle');
+  }, [reflectionId]);
 
   if (!data) return null;
   const { sentence, sentenceCount, pagesAdded, isComplete } = data;
@@ -33,6 +41,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
     ? sentenceCount
     : (sentence && String(sentence).trim() ? 1 : 0);
   const savedSentence = savedCount > 0;
+  const reflectionReady = !isComplete && savedCount === 1 && !!reflectionId;
   let leadText;
   if (savedCount > 1) {
     leadText = `문장 ${savedCount}개를 저장했어요${pagesAdded > 0 ? ` · ${pagesAdded}쪽 기록` : ''}`;
@@ -46,6 +55,16 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
 
   // 기존 순서 보존: 완독 별점·소감 저장 진입을 먼저 호출한 뒤 세리머니를 닫는다.
   const finish = () => finishCeremony({ isComplete, onComplete, onClose, rating, reviewText });
+  const saveReflection = async () => {
+    if (!reflectionReady || !onSaveReflection || reflectionStatus === 'saving') return;
+    setReflectionStatus('saving');
+    try {
+      await onSaveReflection(reflectionDraft);
+      setReflectionStatus('saved');
+    } catch (error) {
+      setReflectionStatus('error');
+    }
+  };
 
   return (
     <div className="ceremony show">
@@ -95,9 +114,34 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
         {isComplete && (
           <button className="next-btn" onClick={finish}>완독 기록 남기기 →</button>
         )}
+        {!isComplete && data.reflectionPending && (
+          <div className="ceremony-reflection-pending" role="status" aria-live="polite">저장한 문장을 연결하고 있어요…</div>
+        )}
+        {reflectionReady && (
+          <section className="ceremony-reflection" aria-labelledby="ceremony-reflection-label">
+            <label id="ceremony-reflection-label" htmlFor="ceremony-reflection-input">이 문장이 나에게 남긴 생각</label>
+            <textarea id="ceremony-reflection-input" placeholder="이 문장이 나에게 남긴 생각"
+              value={reflectionDraft} maxLength={1000}
+              disabled={reflectionStatus === 'saving'} aria-busy={reflectionStatus === 'saving'}
+              onChange={(event) => { setReflectionDraft(event.target.value); if (reflectionStatus !== 'saving') setReflectionStatus('idle'); }} />
+            <div className="ceremony-reflection-meta">
+              <span role="status" aria-live="polite">
+                {reflectionStatus === 'saved' ? '내 생각을 저장했어요.' : reflectionStatus === 'error' ? '저장하지 못했어요. 내용은 그대로 두었어요.' : ''}
+              </span>
+              <span>{Array.from(reflectionDraft).length}/1,000</span>
+            </div>
+            <button type="button" className="ceremony-reflection-save" onClick={saveReflection}
+              disabled={!reflectionDraft.trim() || reflectionStatus === 'saving'}>
+              {reflectionStatus === 'saving' ? '저장 중…' : '내 생각 저장하기'}
+            </button>
+            <button type="button" className="ceremony-reflection-jacky" onClick={onTalkToJacky}>
+              {window.rgIcon('chat', 16)} 재키와 대화하기
+            </button>
+          </section>
+        )}
         {!isComplete && (
           <div className="ceremony-actions">
-            <button type="button" className="ceremony-action-primary" onClick={onContinue}>
+            <button type="button" className="ceremony-action-continue" onClick={onContinue}>
               이 책에서 계속 기록하기
             </button>
             <div className="ceremony-action-secondary">

@@ -1171,19 +1171,51 @@ select{ font-size: 16px !important; min-width: 0; }
   font-weight: 400; color: var(--brand-3); letter-spacing: 1.2px;
   margin-bottom: 6px; text-transform: uppercase;
 }
-.ceremony-actions{ display:flex; flex-direction:column; gap:10px; margin-top:2px; }
-.ceremony-action-primary{
-  width:100%; min-height:54px; padding:13px 16px; border:0; border-bottom:5px solid var(--brand-shadow);
-  border-radius:var(--r-lg); background:var(--brand); color:#fff; font-size:15px; font-weight:900;
-  cursor:pointer; transition:transform .08s ease,border-bottom-width .08s ease;
+.ceremony-reflection-pending{
+  margin:0 0 14px; padding:12px; border-radius:var(--r-sm); background:var(--paper-2);
+  color:var(--ink-3); font-size:12.5px; font-weight:700;
 }
-.ceremony-action-primary:active{ transform:translateY(3px); border-bottom-width:2px; }
-.ceremony-action-secondary{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.ceremony-reflection{
+  margin:0 0 14px; padding:14px; border:1.5px solid var(--brand-soft); border-radius:var(--r-md);
+  background:var(--card); text-align:left;
+}
+.ceremony-reflection label{ display:block; margin-bottom:8px; color:var(--ink); font-size:13px; font-weight:900; }
+.ceremony-reflection textarea{
+  display:block; width:100%; min-height:88px; resize:vertical; padding:11px 12px;
+  border:1.5px solid var(--line); border-radius:var(--r-sm); background:var(--paper-2);
+  color:var(--ink); font:400 14px/1.55 'Noto Sans KR',-apple-system,system-ui,sans-serif;
+}
+.ceremony-reflection-meta{
+  min-height:22px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px;
+  padding:5px 2px 2px; color:var(--ink-3); font-size:11px; line-height:1.4;
+}
+.ceremony-reflection-meta span:first-child{ color:var(--brand-3); font-weight:700; text-align:left; }
+.ceremony-reflection-save,.ceremony-reflection-jacky{
+  width:100%; min-height:48px; border-radius:var(--r-md); font-size:14px; font-weight:900; cursor:pointer;
+}
+.ceremony-reflection-save{
+  border:0; border-bottom:4px solid var(--brand-shadow); background:var(--brand); color:#fff;
+}
+.ceremony-reflection-save:disabled{ border-bottom-color:var(--ink-4); background:var(--line); color:var(--ink-3); cursor:not-allowed; }
+.ceremony-reflection-jacky{
+  margin-top:8px; border:1.5px solid var(--brand-soft); background:var(--brand-tint); color:var(--brand-3);
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+}
+.ceremony-actions{ display:flex; flex-direction:column; gap:4px; margin-top:0; }
+.ceremony-action-continue{
+  width:100%; min-height:44px; padding:10px 12px; border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink-2); font-size:13px; font-weight:800; cursor:pointer;
+}
+.ceremony-action-secondary{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
 .ceremony-action-secondary button{
-  min-height:48px; padding:10px 8px; border:1.5px solid var(--brand-soft); border-radius:var(--r-md);
-  background:var(--brand-tint); color:var(--brand-3); font-size:12.5px; font-weight:800; cursor:pointer;
+  min-height:44px; padding:9px 6px; border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink-3); font-size:12px; font-weight:700; cursor:pointer;
 }
-.ceremony-action-primary:focus-visible,.ceremony-action-secondary button:focus-visible{
+.ceremony-reflection textarea:focus-visible,
+.ceremony-reflection-save:focus-visible,
+.ceremony-reflection-jacky:focus-visible,
+.ceremony-action-continue:focus-visible,
+.ceremony-action-secondary button:focus-visible{
   outline:3px solid var(--brand); outline-offset:2px;
 }
 .complete-review{

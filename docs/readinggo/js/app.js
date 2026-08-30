@@ -1041,6 +1041,7 @@ function App() {
     const qPage = (typeof sentPage === 'number') ? sentPage : ((ns.book && ns.book.cur) || 0);
     // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
     const batch = Array.isArray(sentences) ? sentences.filter(s => s && s.text && String(s.text).trim()) : null;
+    let savedSentenceRow = null;
     setAppState(s => ({
       ...s,
       book: ns.book,
@@ -1127,7 +1128,7 @@ function App() {
               throw error;
             }
           } else if (sentence) {
-            await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));
+            savedSentenceRow = await Promise.resolve(DataStore.sentences.add({ userBookId: ubId, page: qPage, text: sentence, kind: kind || 'quote', visibility }));
             if (window.rgTrack) window.rgTrack('sentence_added', { book_id: ns.book.id || '', kind: kind || 'quote', source: 'home' });
           }
         } catch (error) {
@@ -1149,6 +1150,21 @@ function App() {
           reportedError.checkinReadbackFailed = true;
           throw reportedError;
         }
+        const savedReadbackRow = savedSentenceRow && savedSentenceRow.id && Array.isArray(mineDb)
+          ? mineDb.find(x => x.id === savedSentenceRow.id)
+          : null;
+        const savedReadbackBook = savedReadbackRow && savedReadbackRow.user_book && savedReadbackRow.user_book.book;
+        const reflectionSentence = savedReadbackRow ? {
+          id: savedReadbackRow.id,
+          text: savedReadbackRow.text || sentence || '',
+          bookId: (savedReadbackRow.user_book && savedReadbackRow.user_book.book_id) || savedReadbackRow.book_id || (ns.book && ns.book.id) || '',
+          bookTitle: (savedReadbackBook && savedReadbackBook.title) || (ns.book && ns.book.title) || '',
+          author: (savedReadbackBook && savedReadbackBook.author) || (ns.book && ns.book.author) || '',
+          page: savedReadbackRow.page,
+          note: savedReadbackRow.my_note || '',
+          kind: savedReadbackRow.kind || kind || 'quote',
+          visibility: window.RG_normalizeStoredSentenceVisibility(savedReadbackRow.visibility),
+        } : null;
         setAppState(s => ({
           ...s,
           streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
@@ -1156,7 +1172,7 @@ function App() {
             ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(x.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(x.visibility) === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
         }));
-        if (completion && completion.onSuccess) completion.onSuccess();
+        if (completion && completion.onSuccess) completion.onSuccess({ reflectionSentence });
       } catch (e) {
         if (e && e.checkinFailureCode === 'ugc_terms_required') {
           window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
