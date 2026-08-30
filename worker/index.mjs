@@ -301,7 +301,7 @@ export default {
   },
 };
 
-/* ── LLM 독서 파트너 — 참새 질문 생성 (#287) ──────────────
+/* ── LLM 독서 파트너 — 참새 대화 응답 생성 (#287, #1568) ─────────
    provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
    키 없거나 실패 시 목 질문으로 graceful fallback (데모/피치 무중단). */
 const COMPANION_SYSTEM = '당신은 사용자와 그 책을 *함께 읽은* 친구 재키입니다. 독서모임 진행자나 평가자, 선생님이 아니라 — 같은 책을 읽고 곁에서 담백하게 이야기 나누는 동료입니다. 사용자가 방금 남긴 한 문장을 보고, 훈수나 분석·평가 없이 사람처럼 짧게 반응하세요. 입력의 역할을 혼동하지 마세요(#359): "책에서 옮겨 적은 한 문장(인용)"은 작품 속 문장이고, "내 메모(감상)"는 사용자 자신의 생각입니다. 인용을 사용자의 감상으로 단정하지 마세요. 만약 한 문장이 책 속 인용으로 보기 어렵거나(예: "즐거웠다"처럼 짧은 감상형) 작품 속 맥락을 알 수 없다면, 함부로 해석하지 말고 — 그 문장이 책의 어떤 장면·맥락에서 나온 것인지, 혹은 본인의 생각을 적은 것인지를 먼저 가볍게 물어보세요. 사용자가 다른 작품이나 작가를 언급하거나 두 작품을 비교하면(예: "○○와 닮았다"), 그 연결 자체를 두고 물으세요. 다른 작품의 줄거리·인물을 현재 책의 인물·사건에 억지로 끼워 맞추거나 두 작품을 뒤섞지 마세요. 그 책·작가에 대해 확실히 아는 것만 자연스럽게 한 조각 곁들이고, 모르는 것은 지어내지 마세요. 톤 — 이게 가장 중요합니다: 따뜻하고 담백한 친구처럼. 분석을 늘어놓거나 가르치려 들지 말고, 칭찬으로 운을 뗀 뒤 캐묻는 방식("정말 좋은 문장이네요! 왜 그렇게 느꼈어요?")이나 취조하듯 몰아붙이는 되물음은 하지 마세요. 물을 때는 진짜 궁금해서 혼잣말하듯, 부담 없이 답할 수 있는 열린 질문 하나면 충분합니다. 때로는 질문을 억지로 붙이기보다 그 문장에 짧게 공감하며 여운을 남기는 편이 더 따뜻합니다. 2~3문장 이내로 짧고 자연스럽게. 마크다운 서식(별표 **, #, 목록 기호 등)을 절대 쓰지 말고 일반 문장으로만 쓰세요.';
@@ -341,6 +341,26 @@ function stripMd(s) {
 function companionMock(sentence) {
   const qs = ['왜 이 문장이 마음에 걸렸어요?', '이 문장, 지금 내 상황이랑 연결되는 게 있어요?', '이 문장에서 어떤 장면이나 기억이 떠올랐어요?', '이 문장을 누군가에게 들려준다면 누구일까요?'];
   return qs[(sentence ? sentence.length : 0) % qs.length];
+}
+
+// #1568: 대화 입력은 이전 질문에 대한 답변뿐 아니라 사용자의 질문·요청일 수 있다.
+// LLM을 쓸 수 없을 때 직접 질문에 무관한 목 질문을 돌려 대화가 이어진 척하지 않는다.
+function isDirectCompanionRequest(value) {
+  const text = String(value || '').trim();
+  return !!text && (/[?？]/u.test(text)
+    || /(?:몇|얼마|무엇|뭐|어떻게|왜|계산|유추|추론|구해|알려|설명|말해|답해|해줘|해\s*봐)/u.test(text));
+}
+
+function companionResult(value, extra = {}) {
+  const message = stripMd(value) || '';
+  return { message, question: message, ...extra }; // question은 구 클라이언트 호환 alias
+}
+
+function companionFallback(sentence, latestUserMessage = '') {
+  if (isDirectCompanionRequest(latestUserMessage)) {
+    return '지금은 그 질문에 정확히 답하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  }
+  return companionMock(sentence);
 }
 
 async function callLLM({ messages, env, maxTokens, temperature }) {
@@ -1106,10 +1126,12 @@ async function companionProxy(request, env) {
     return json(result, 200);
   } catch (e) {
     const sentence = String((body && body.sentence) || '').slice(0, 1000).trim();
+    const rawExchanges = Array.isArray(body && body.exchanges) ? body.exchanges : [];
+    const latestUserMessage = rawExchanges.length ? String((rawExchanges[rawExchanges.length - 1] || {}).a || '').slice(0, 1000) : '';
     if (e && e.status === 422) return json({ error: 'sentence 필요' }, 422);
     if (e && e.status === 409) return json({ error: 'turn limit reached' }, 409);
     // 일반 사용자 경로의 기존 graceful fallback 보존.
-    return json({ question: companionMock(sentence), demo: true, error: String((e && e.message) || e) }, 200);
+    return json(companionResult(companionFallback(sentence, latestUserMessage), { demo: true, error: String((e && e.message) || e) }), 200);
   }
 }
 
@@ -1138,7 +1160,8 @@ async function generateCompanionQuestion(body, env, systemPrompt, strictLab, per
   // 키/설정 없으면 목 질문 폴백 (데모 안전 — companion.md §4)
   if (!env.UPSTAGE_API_KEY || !env.LLM_BASE_URL || !env.LLM_MODEL) {
     if (strictLab) { const e = new Error('lab execution unavailable'); e.status = 503; throw e; }
-    return { question: companionMock(sentence), demo: true };
+    const latestUserMessage = exchanges.length ? exchanges[exchanges.length - 1].a : '';
+    return companionResult(companionFallback(sentence, latestUserMessage), { demo: true });
   }
   // 책 문학 브리프 (#656) — "같이 읽은 진행자"용 작품 맥락. 모든 턴에 주입(첫 턴 한정 제거 —
   // 2턴부터 책 잊던 문제 해소). 책별 캐시라 첫 생성 후 후속 턴은 LLM 재호출 없음. best-effort.
@@ -1159,14 +1182,14 @@ async function generateCompanionQuestion(body, env, systemPrompt, strictLab, per
   }
   let instr = exchanges.length === 0
     ? '이 문장에 대해 담백하게 한국어로 반응하세요. 부담 없이 답할 수 있는 열린 질문 하나가 자연스러우면 하나만 던지고, 질문이 억지스러우면 짧게 공감하며 여운을 남겨도 됩니다. 작품 맥락을 한 조각만 가볍게 곁들이되 짧게(2~3문장).'
-    : '사용자가 방금 한 답변에 먼저 한 문장으로 짧게 공감·반응한 뒤, 그 답을 실마리로 한 걸음 더 들어가는 질문 하나만 한국어로. 사용자의 답이 짧거나 가벼워도(예: 농담) 그 답을 무시하지 말고 거기서 자연스럽게 이어가세요. 새 작품 분석을 길게 늘어놓지 말 것. 전체 2~3문장, 질문 하나.';
-  if (avoid) instr += ` 다음 질문은 이미 했으니 반드시 피하고 다르게 물으세요: "${avoid}"`;
-  if (presetTone) instr += ` 질문의 결(사용자 선호): ${presetTone}`;
+    : '최신 사용자 발화는 이전 질문에 대한 답변일 수도 있고, 재키에게 묻는 질문·계산·설명 요청일 수도 있습니다. 질문·계산·설명 요청이면 본문과 대화에서 근거를 찾아 직접 답부터 하세요. 요청한 답을 관련 없는 상상이나 되물음으로 대체하지 마세요. 본문의 수량을 계산할 때는 짧은 식과 전제를 밝히고, 주어진 정보로 판단할 수 없으면 지어내지 말고 무엇이 부족한지 말하세요. 감상·경험을 말한 경우에는 먼저 짧게 반응하고 그 실마리에서 자연스러운 질문 하나를 이어갈 수 있습니다. 직접 답 뒤의 후속 질문은 도움이 될 때만 선택적으로 붙이세요. 전체 2~3문장을 기본으로 하되 식·필수 조건을 생략할 정도로 억지로 줄이지 마세요.';
+  if (avoid) instr += ` 직전 재키 응답은 그대로 반복하지 말고 다른 방식으로 응답하세요: "${avoid}" 직접 질문·계산 요청이라면 질문으로 돌리지 말고 답의 정확성과 근거를 개선하세요.`;
+  if (presetTone) instr += ` 직접 답변이 필요한 경우에는 먼저 답을 완결하고, 후속 질문이 자연스러울 때만 다음 결을 적용하세요. 질문의 결(사용자 선호, 직접 답변보다 후순위): ${presetTone}`;
   if (strictLab) instr += ' 이 입력은 Prompt Lab의 합성 fixture이며 실제 사용자 기록이나 장기 기억을 사용하거나 암시하지 마세요.';
   messages.push({ role: 'user', content: instr });
   if (beforeProviderSend) await beforeProviderSend();
   const q = await callLLM({ messages, env });
-  return { question: stripMd(q) || companionMock(sentence) };
+  return companionResult(stripMd(q) || companionFallback(sentence, exchanges.length ? exchanges[exchanges.length - 1].a : ''));
 }
 
 /* ── 관련 도서 추천 — 이 책과 함께 읽을 책 (#496) ──────────────

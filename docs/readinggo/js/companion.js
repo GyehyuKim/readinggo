@@ -21,7 +21,20 @@ function pickCompanionQ(text) {
   const i = (text ? text.length : 0) % COMPANION_QS.length;
   return COMPANION_QS[i];
 }
-// 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 목 질문 폴백 — 데모 무중단.
+function readCompanionMessage(data) {
+  return String((data && (data.message || data.question)) || '').trim();
+}
+function isDirectCompanionRequest(value) {
+  const text = String(value || '').trim();
+  return !!text && (/[?？]/u.test(text)
+    || /(?:몇|얼마|무엇|뭐|어떻게|왜|계산|유추|추론|구해|알려|설명|말해|답해|해줘|해\s*봐)/u.test(text));
+}
+function pickCompanionFallback(sentence, latestUserMessage) {
+  return isDirectCompanionRequest(latestUserMessage)
+    ? '지금은 그 질문에 정확히 답하지 못했어요. 잠시 후 다시 시도해 주세요.'
+    : pickCompanionQ(sentence);
+}
+// 실 LLM 호출 (solar-pro3, 서버 프록시). 네트워크/프록시 실패 시 첫 턴 목 질문 폴백 — 데모 무중단.
 async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid, record) {
   if (record && record.id && record.bookId && window.RG_personalization && window.RG_personalization.isEnabled()) {
     const proof = await window.RG_personalization.requestQuestion({
@@ -36,17 +49,17 @@ async function genCompanionQuestion(sentence, bookTitle, author, kind, avoid, re
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', kind: kind || 'quote', avoid: avoid || '', preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : '') }),
     });
-    if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
+    if (r.ok) { const d = await r.json(); const message = readCompanionMessage(d); if (message) return message; }
   } catch (e) { /* 폴백 */ }
   return pickCompanionQ(sentence);
 }
-// 멀티턴 후속 질문 (#327) — 이전 대화(exchanges) 전달 → 한 걸음 더 깊은 되물음. 실패 시 목 폴백. avoid(#372) 재생성용.
+// 멀티턴 재키 응답 (#327, #1568) — 답변뿐 아니라 사용자 질문·요청도 전달. avoid(#372) 재생성용.
 async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind, avoid, record) {
+  const lastUserMessage = exchanges && exchanges.length ? exchanges[exchanges.length - 1].a : '';
   if (record && record.id && record.bookId && window.RG_personalization && window.RG_personalization.isEnabled()) {
-    const last = exchanges && exchanges.length ? exchanges[exchanges.length - 1].a : '';
     const proof = await window.RG_personalization.requestQuestion({
       sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote', avoid: avoid || '',
-      current_sentence_id: record.id, book_id: record.bookId, query_text: `${sentence || ''}\n${last || ''}`,
+      current_sentence_id: record.id, book_id: record.bookId, query_text: `${sentence || ''}\n${lastUserMessage || ''}`,
       preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : ''),
     }).catch(() => null);
     if (proof) return { personalizationProof: proof };
@@ -56,14 +69,14 @@ async function genCompanionFollowup(sentence, exchanges, bookTitle, author, kind
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sentence, bookTitle: bookTitle || '', author: author || '', exchanges, kind: kind || 'quote', avoid: avoid || '', preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : '') }),
     });
-    if (r.ok) { const d = await r.json(); if (d && d.question) return d.question; }
+    if (r.ok) { const d = await r.json(); const message = readCompanionMessage(d); if (message) return message; }
   } catch (e) { /* 폴백 */ }
-  return '그 답에서 한 걸음 더 들어가면, 무엇이 떠오르나요?';
+  return pickCompanionFallback(sentence, lastUserMessage);
 }
 function commitCompanionQuestion(value, setter, setSources) {
   if (value && value.personalizationProof && window.RG_personalization) {
     return window.RG_personalization.commit(value.personalizationProof, {
-      display: (data) => { setter(data.question); if (setSources) setSources(Array.isArray(data.sources) ? data.sources : []); },
+      display: (data) => { setter(readCompanionMessage(data)); if (setSources) setSources(Array.isArray(data.sources) ? data.sources : []); },
       analytics: (data) => { if (window.rgTrack && data.sources && data.sources.length) window.rgTrack('personalized_context_applied', { source_count_bucket: data.sources.length === 1 ? '1' : data.sources.length <= 3 ? '2_3' : '4_5', source_type_set: [...new Set(data.sources.map((s) => s.type))], preset: (window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'), outcome: 'applied' }); },
     });
   }
@@ -257,7 +270,7 @@ function CompanionModal({ sentence, onClose }) {
     setLoading(true); setQuestion(null); setRated(null);
     genCompanionFollowup(sentence.text, ex, bt, au, sentence.kind, '', sentence).then((q) => { commitCompanionQuestion(q, setQuestion, setPersonalizationSources); setLoading(false); });
   };
-  // 질문 재생성 (#372) / 평가 (#371)
+  // 재키 답변 다시 받기 (#372, #1568) / 평가 (#371)
   const regen = () => {
     if (loading || !question) return;
     const cur = question;
@@ -462,13 +475,13 @@ function CompanionModal({ sentence, onClose }) {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>{question}</div>
                   <div style={{ flex: '0 0 auto', display: 'flex', gap: 2 }}>
-                    <button onClick={() => rate('up')} title="좋은 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: rated === 'up' ? 1 : 0.4, display: 'flex', color: rated === 'up' ? 'var(--brand-3)' : 'currentColor' }}>
+                    <button onClick={() => rate('up')} title="도움됐어요" aria-label="도움됐어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: rated === 'up' ? 1 : 0.4, display: 'flex', color: rated === 'up' ? 'var(--brand-3)' : 'currentColor' }}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 13V7h2L7 1.5v2.5h4a1 1 0 0 1 1 1l-1 4.5H7V13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </button>
-                    <button onClick={() => rate('down')} title="별로예요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: rated === 'down' ? 1 : 0.4, display: 'flex', color: rated === 'down' ? 'var(--ink-2)' : 'currentColor' }}>
+                    <button onClick={() => rate('down')} title="도움되지 않았어요" aria-label="도움되지 않았어요" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: rated === 'down' ? 1 : 0.4, display: 'flex', color: rated === 'down' ? 'var(--ink-2)' : 'currentColor' }}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12 1v6h-2L7 12.5V10H3a1 1 0 0 1-1-1l1-4.5H7V1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </button>
-                    <button onClick={regen} title="다른 질문" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: 0.5, display: 'flex' }}>
+                    <button onClick={regen} title="재키 답변 다시 받기" aria-label="재키 답변 다시 받기" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, opacity: 0.5, display: 'flex' }}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12 7a5 5 0 1 1-1.5-3.5L12 2v3.5H8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </button>
                   </div>
@@ -517,7 +530,7 @@ function CompanionModal({ sentence, onClose }) {
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && answer.trim()) { e.preventDefault(); submit(); } }}
-                placeholder="떠오르는 대로 답해보세요" rows={2}
+                placeholder="답하거나 궁금한 걸 물어보세요" rows={2}
                 style={{ flex: 1, border: '1.5px solid var(--line)', borderRadius: 12, padding: '9px 12px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, resize: 'none', background: 'var(--paper-2)', outline: 'none', boxSizing: 'border-box' }} />
               <button onClick={submit} disabled={!answer.trim()} aria-label="전송"
                 style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: answer.trim() ? 'var(--brand)' : 'var(--line)', color: '#fff', cursor: answer.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}>
