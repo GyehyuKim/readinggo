@@ -1,9 +1,9 @@
 /* =========================================================
-   ReadingGo — milestone-recap.js  (#938, A2 — nest.md §5.4)
-   MilestoneRecap: 마일스톤(완독·연속 7/30일·둥지 성)에서 '그동안 내가 남긴 한 문장·순간'을 따뜻하게 돌아보는 회고 모달.
+   ReadingGo — milestone-recap.js  (#938, A2 — home-reading.md §5.4)
+   MilestoneRecap: 마일스톤(완독·연속 7/30일·홈 성)에서 '그동안 내가 남긴 한 문장·순간'을 따뜻하게 돌아보는 회고 모달.
    숫자가 아니라 서사로 고양감(uplift)을 증폭한다. 점수·경쟁·미션을 새로 더하지 않고 기존 sentences·my_note 자산을 재사용.
-   빈도 절제: DataStore.milestone 게이트(마일스톤별 1회 + 하루 1회)로 피로를 막는다. nest.js 가 RG_openMilestoneRecap 으로 호출.
-   nest.js **이전** 로드(ceremony.js 처럼) — window.RG_openMilestoneRecap 전역 노출.
+   빈도 절제: DataStore.milestone 게이트(마일스톤별 1회 + 하루 1회)로 피로를 막는다. home.js 가 RG_openMilestoneRecap 으로 호출.
+   home.js **이전** 로드(ceremony.js 처럼) — window.RG_openMilestoneRecap 전역 노출.
    ========================================================= */
 
 const { useState: _mrUseState, useEffect: _mrUseEffect } = React;
@@ -125,8 +125,8 @@ function MilestoneRecap({ milestone, onClose }) {
 
 window.MilestoneRecap = MilestoneRecap;
 
-// 외부(nest.js) 진입점 — 빈도 게이트 통과 시에만 모달 마운트. 한 번에 하나만.
-// nest.js 가 마일스톤 도달 시 호출: window.RG_openMilestoneRecap({ type, value, bookId, ubId, bookTitle }).
+// 외부(home.js) 진입점 — 빈도 게이트 통과 시에만 모달 마운트. 한 번에 하나만.
+// home.js 가 마일스톤 도달 시 호출: window.RG_openMilestoneRecap({ type, value, bookId, ubId, bookTitle }).
 // 게이트(마일스톤별 1회 + 하루 1회)는 DataStore.milestone 이 강제 — 여기서는 마운트만 담당.
 (function () {
   let _root = null;

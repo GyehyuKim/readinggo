@@ -5,11 +5,11 @@ Source:
 - `docs/readinggo/specs/backend.md` — DataStore·세션·문장 계약
 - `docs/readinggo/specs/profile.md` — `library`·프로필 계약
 - `docs/readinggo/main.js` — Vite entry와 module graph
-- `docs/readinggo/js/nest.js` — 전환 시작 시 존재하는 홈 구현 본체. 구현 결과에서 `home.js`로 퇴역·rename한다
+- `docs/readinggo/js/home.js` — 홈 구현 본체
 - `docs/readinggo/js/app.js` — route 정규화와 앱 셸
 
 Output:
-- `docs/readinggo/js/nest.js`를 `docs/readinggo/js/home.js`로 rename하고 import·component·test·workflow 참조를 함께 갱신한다.
+- `docs/readinggo/js/home.js`와 import·component·test·workflow의 중립 홈 이름을 함께 유지한다.
 - 그 밖의 활성 홈 runtime·test·workflow는 필요한 파일만 수정한다.
 - spec 자체는 수정하지 않는다. 계약이 모호하면 중단하고 `loop/home-align/BLOCKED.md`에 기록한다.
 - Git history, archive 문서, 닫힌 이슈·PR, 적용 migration은 수정하지 않는다.

@@ -33,7 +33,7 @@ window.RG_CONFIG = {
   // 저장 위치 fork(아래 'seedCollectorTrigger'를 worker [vars]/원격 설정에 둘지)는 검토 대상이나,
   //   3인·Phase 0 규모에선 config.js 단일이 최소·추적 용이 → 채택(대안은 ops.md §1.3 한 줄).
   FLAGS: {
-    // 같은 책 타인 한 문장 — 콜드스타트 사회적 증거(nest.md §5, #926 in-flight).
+    // 같은 책 타인 한 문장 — 콜드스타트 사회적 증거(home-reading.md §5, #926 in-flight).
     //   neighbor seed(/api/seed) 트리거를 동반하는 신규 기능 → 출시 시 이 플래그 뒤에 둔다(예시 주석).
     socialProofSentences: true,
     // 마중물 시드 트리거 (#774) — 빈 책에서 collector(맥미니) /api/seed 큐잉+폴링.

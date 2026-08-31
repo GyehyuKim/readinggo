@@ -257,7 +257,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   );
 }
 
-/* ── QuoteCard (통일): '내 한 문장' 카드 단일 렌더. 홈(nest)·책장(library) 공용 —
+/* ── QuoteCard (통일): '내 한 문장' 카드 단일 렌더. 홈·서재(library) 공용 —
    생각(말풍선 SVG)·날짜('오늘'/YYYY-MM-DD)·메타·인용(이탤릭) 렌더를 한 곳으로(불일치 제거).
    variant 로 동작만 분기: 'home'=인라인 액션(SentenceActions)+전체 텍스트, 'library'=카드 탭→책상세+3줄 줄임. ── */
 function _rgQuoteDate(q) {

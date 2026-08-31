@@ -18,11 +18,11 @@ const clientWindow = { RG_apiFetch: async () => clientResponse };
 vm.runInNewContext(`${dataSource.slice(helperStart, helperEnd)}\nwindow.ocrExtractSentence = ocrExtractSentence;`, {
   window: clientWindow, FormData, Promise, String,
 });
-const nestSource = readFileSync(join(root, 'docs', 'readinggo', 'js', 'nest.js'), 'utf8');
-const messageStart = nestSource.indexOf('function _ocrFailureMessage');
-const messageEnd = nestSource.indexOf('\nwindow._ocrFailureMessage', messageStart);
+const homeSource = readFileSync(join(root, 'docs', 'readinggo', 'js', 'home.js'), 'utf8');
+const messageStart = homeSource.indexOf('function _ocrFailureMessage');
+const messageEnd = homeSource.indexOf('\nwindow._ocrFailureMessage', messageStart);
 if (messageStart < 0 || messageEnd < 0) throw new Error('OCR message helper not found');
-vm.runInNewContext(`${nestSource.slice(messageStart, messageEnd)}\nwindow._ocrFailureMessage = _ocrFailureMessage;`, { window: clientWindow });
+vm.runInNewContext(`${homeSource.slice(messageStart, messageEnd)}\nwindow._ocrFailureMessage = _ocrFailureMessage;`, { window: clientWindow });
 
 let passed = 0;
 function check(name, condition) {

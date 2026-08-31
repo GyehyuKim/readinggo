@@ -552,7 +552,7 @@
           .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author))')
           .in('user_id', ids).order('created_at', { ascending: false }).limit(limit || 30));
       },
-      // 같은 책 피드 — 특정 책의 *다른* 사용자 한 문장 (둥지 '같은 책 읽는 사람들', NPC 포함, #1)
+      // 같은 책 피드 — 특정 책의 *다른* 사용자 한 문장 (홈 '같은 책 읽는 사람들', NPC 포함, #1)
       async byBook(bookId, { limit, sort } = {}) {
         // 데모 book id('b008' 등) 비-UUID 방어 — uuid 컬럼 질의 400 방지.
         if (!bookId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookId)) return [];
@@ -1093,7 +1093,7 @@
         const vRow = unwrap(await sb().from('villages').select('book_id').eq('id', roomId).maybeSingle());
         const bookId = vRow && vRow.book_id;
         const memberRows = unwrap(await sb().from('village_members')
-          .select('joined_at, user:users(id, handle, display_name, nest_emoji, streak:streak(current))')
+          .select('joined_at, user:users(id, handle, display_name, streak:streak(current))')
           .eq('village_id', roomId)) || [];
         if (!memberRows.length || !bookId) return memberRows;
         const memberIds = memberRows.map(r => r.user && r.user.id).filter(Boolean);

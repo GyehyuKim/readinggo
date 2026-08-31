@@ -768,7 +768,7 @@ function App() {
     };
     return () => { window.RG_openBookshelfRecord = null; };
   }, []);
-  // 한 문장 모아보기(#171) — 둥지 '전체 보기'로 열림.
+  // 한 문장 모아보기(#171) — 홈 '전체 보기'로 열림.
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState(null); // 저장(❤️) 진입 시 'fav' (#510)
   const [collectionMode, setCollectionMode] = useState(null); // 책장 상시 진입점은 묻기 모드로 바로 열기 (#1274)
@@ -1011,13 +1011,13 @@ function App() {
   // 멀티 디바이스 정합(#191) — 탭이 다시 보일 때 Supabase 상태 재로드(다른 기기 변경 반영, stale view 방지)
   // ⚠️ 가드(장시간 세션 버그 — 1h QA 재현): 게스트/세션만료 상태에서 재로드하면 모든 fetch가
   // 401→catch 폴백 → "빈 상태"가 기존 상태를 덮어 홈이 빈 화면이 되고, HomeView가
-  // 빈 둥지 UI로 갈아끼워지며 portal(ReadingMode)이 언마운트 → 타이머·세션 소멸 + 콘솔 400 에러.
+  // 빈 홈 UI로 갈아끼워지며 portal(ReadingMode)이 언마운트 → 타이머·세션 소멸 + 콘솔 400 에러.
   useEffect(() => {
     if (!_supa || reviewMode) return;
     let busy = false;
     const onVis = async () => {
       if (document.hidden || busy || !window.SupabaseDataStore) return;
-      // 읽기 세션 중엔 보류 — 백그라운드 갱신이 둥지/읽기모드를 교체하지 않도록.
+      // 읽기 세션 중엔 보류 — 백그라운드 갱신이 홈/읽기모드를 교체하지 않도록.
       if (window.RG_READING_OPEN) return;
       // 인증 세션 없으면(게스트·만료 직후) 재로드 금지 — 빈 상태 덮어쓰기 사고 방지.
       try {
@@ -1253,7 +1253,7 @@ function App() {
           showToast(`'${book.title}' 완독 책장에 — 서재에서 별점·소감을 남겨보세요`);
           return;
         }
-        // 읽는중(기존) — 활성 책 + 둥지 반영. 원본 검색 row가 아니라 저장된 user_book을
+        // 읽는중(기존) — 활성 책 + 홈 반영. 원본 검색 row가 아니라 저장된 user_book을
         // 다시 매핑해 canonical 첫 결과·로컬 생성 ID도 화면 상태와 같은 데이터 계약을 쓰게 한다(#1221).
         switchTab('home');
         await Promise.resolve(DataStore.activeBook.set(ub.id));
@@ -1294,7 +1294,7 @@ function App() {
     return () => { window.RG_registerBook = null; };
   }, [handleSearchSelectBook]);
 
-  // 소셜 랭킹 등 책 카드 → 책장 선택(찜/읽는중/완독) 추가 경로 재사용 (#525). shelf 분기·토스트·둥지반영은 handleSearchSelectBook 이 처리.
+  // 소셜 랭킹 등 책 카드 → 책장 선택(찜/읽는중/완독) 추가 경로 재사용 (#525). shelf 분기·토스트·홈반영은 handleSearchSelectBook 이 처리.
   useEffect(() => {
     window.RG_addBookToShelf = (b, shelf) => handleSearchSelectBook({ book_id: b.bookId || b.book_id || b.id, isbn13: b.isbn13 || b.isbn, title: b.title, author: b.author, publisher: b.publisher, total_pages: b.total_pages, cover_url: b.cover_url }, shelf);
     return () => { window.RG_addBookToShelf = null; };
@@ -1317,7 +1317,7 @@ function App() {
         cur: item.cur || 0, total: item.total || 0, days: 1,
         cover: item.cover, fb: item.fb || ['#9AA7B2', '#C7D0D8'], toc: [],
       },
-      // 둥지는 책과 무관 — 유지 (#313). ubId(#822): 체크인 저장 귀속 직결.
+      // 홈 기록은 책과 무관 — 유지 (#313). ubId(#822): 체크인 저장 귀속 직결.
     }));
     showToast(`${item.title} — 활성 책으로 변경`);
     switchTab('home');
@@ -1331,7 +1331,7 @@ function App() {
     }
     if (window.rgTrack) window.rgTrack('book_opened', { book_id: item.id || '', entry_point: 'switch' }); // 퍼널 시작 — 서재 활성전환 (#736)
   }, [switchTab, handleSearchSelectBook]);
-  // 활성 책 전환을 전역 노출 — 둥지 캐러셀(#185)이 호출
+  // 활성 책 전환을 전역 노출 — 홈 캐러셀(#185)이 호출
   useEffect(() => { window.RG_activateBook = handleActivateUserBook; return () => { window.RG_activateBook = null; }; }, [handleActivateUserBook]);
 
   // 뒤로가기로 최상위 오버레이 닫기 (#1199, nav.js). 각 오버레이 상태가 열리면 합성 history

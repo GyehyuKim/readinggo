@@ -221,7 +221,7 @@ export default {
       return parseBooksProxy(request, env);
     }
     // 계정 삭제 (#875, Apple 심사 필수) — 호출자 토큰으로 본인 확인 후 service_role 로 admin 삭제.
-    // public.users → auth.users(id) on delete cascade 라 전 데이터(서재·문장·둥지) 일괄 삭제. 동일출처만.
+    // public.users → auth.users(id) on delete cascade 라 전 데이터(서재·문장·독서 기록) 일괄 삭제. 동일출처만.
     if (p === '/api/delete-account') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
@@ -459,7 +459,7 @@ const PRESET_TONE = {
 };
 
 // 계정 삭제 (#875) — 호출자 access token 으로 본인 uid 확인 → service_role 로 admin 삭제.
-//   auth.users 삭제 → public.users(on delete cascade) → 서재·문장·둥지 등 전 데이터 일괄 삭제.
+//   auth.users 삭제 → public.users(on delete cascade) → 서재·문장·독서 기록 등 전 데이터 일괄 삭제.
 //   본인 토큰만 받으므로 타인 계정 삭제 불가(uid 는 토큰에서 도출).
 async function deleteAccountProxy(request, env) {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);

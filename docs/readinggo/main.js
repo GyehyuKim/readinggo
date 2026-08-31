@@ -28,7 +28,7 @@ import './js/batch-quote-import.js';
 import './js/data-import.js';
 import './js/ceremony.js';
 import './js/milestone-recap.js';
-import './js/nest.js';
+import './js/home.js';
 import './js/companion.js';
 import './js/co-reading.js';
 import './js/activity-inbox.js';

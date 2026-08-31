@@ -16,7 +16,7 @@
 - **비손실 성장** — 최근 14일 독서 리듬과 누적 성장일을 분리한다. 빈 날·중단·재독을 실패나 손상으로 표현하지 않는다.
 - **개인 활동 방향** — 4번째 탭은 그날 읽은 책을 돌아보는 방향으로 재검토하되 명칭·스트릭·달력 집계는 별도 결정 전 확정하지 않는다.
 - **공개 안전** — 허용된 공개 문장만 서버에서 판정하고 private 문장의 존재·개수·상호작용을 숨긴다.
-- **폐기 대상** — XP·둥지 진화·스트릭 상실·방패·성 컬렉션을 신규 제품 보상으로 사용하지 않는다.
+- **폐기 대상** — XP·성장 단계·스트릭 상실·방패·성 컬렉션을 신규 제품 보상으로 사용하지 않는다.
 
 > 한 줄: **"하루 한 페이지, 한 문장에서 시작해요."**
 
@@ -27,7 +27,7 @@
 ## 지금 상태 (v18 목표 · 2026-08)
 
 - **플랫폼 = Capacitor 채택**(런칭 결정, 2026-06). 같은 React 코드베이스로 **웹·iOS·Android 동시 출시**. 빌드는 **Vite 전환 완료**(#871 — 런타임 Babel 폐기, `main.js` 진입). *이전 web-first·Capacitor Phase 3 보류는 해제.* 상세: [`CLAUDE.md` Stack Lock](./CLAUDE.md) · [`iOS-PLAN.md`](./docs/readinggo/iOS-PLAN.md).
-- **현행 as-built** — 웹·모바일 데모에는 3번째 레거시 `nest-grow`, 4번째 `프로필`과 XP·스트릭·둥지·broad 공개 경로가 남아 있다. 이는 v18 완료가 아니라 전환·삭제 대상이다.
+- **현행 as-built** — 웹·모바일 데모는 5탭 홈·함께·서재·프로필·설정 구조와 canonical route를 사용한다.
 - **스펙 경계** — 피처별 문서는 `목표 계약 / 현행 as-built / 전환 게이트`를 분리한다. 실제 구현·DB·Production 상태는 코드와 검증된 release receipt로 확인한다.
 - 저장소는 **DataStore 계약**([backend.md §7.2](./docs/readinggo/specs/backend.md))으로 추상화 → 어댑터 교체만으로 Phase 0(localStorage)↔1(Supabase) 이행.
 - 책 데이터 canonical = **Supabase `books`**(#490). 구 정적 `books.tsv`는 **제거됨**(#972) — 폴백은 인라인 `RG_BOOKS`(12)뿐.
@@ -61,7 +61,7 @@ docs/
   readinggo/                 ← ReadingGo (현재 메인 프로젝트)
     index.html               HTML 셸 (CSS 토큰·부트) — main.js 로드
     main.js                   Vite 진입 (#871) — js/* import + 마운트
-    js/                       데모 코드 (data·datastore·nest·social·library·co-reading·…)
+    js/                       데모 코드 (data·datastore·home·social·library·co-reading·…)
     (도서 데이터)             Supabase books — canonical (#490, 정적 TSV 제거 #972)
     specs/                    ★ 스펙 (정본) — README.md가 인덱스
     ROADMAP.md                Phase 매트릭스 + 북모리 채택 결정

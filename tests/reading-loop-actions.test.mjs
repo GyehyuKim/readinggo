@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const library = fs.readFileSync('docs/readinggo/js/library.js', 'utf8');
 const ceremony = fs.readFileSync('docs/readinggo/js/ceremony.js', 'utf8');
-const nest = fs.readFileSync('docs/readinggo/js/nest.js', 'utf8');
+const home = fs.readFileSync('docs/readinggo/js/home.js', 'utf8');
 const app = fs.readFileSync('docs/readinggo/js/app.js', 'utf8');
 const html = fs.readFileSync('docs/readinggo/index.html', 'utf8');
 
@@ -32,9 +32,9 @@ assert.match(ceremony, /className="ceremony-dismiss"[\s\S]*aria-label="완료 �
   '행동과 별개인 단순 닫기를 제공해야 한다');
 assert.match(ceremony, /isComplete && \([\s\S]*className="complete-review"[\s\S]*완독 기록 남기기/,
   '완독 별점·소감 흐름은 일반 행동으로 대체하면 안 된다');
-assert.match(nest, /onContinue=\{openSentenceFromCeremony\}[\s\S]*onViewSaved=\{viewSavedFromCeremony\}[\s\S]*onGoLibrary=\{goLibraryFromCeremony\}/,
+assert.match(home, /onContinue=\{openSentenceFromCeremony\}[\s\S]*onViewSaved=\{viewSavedFromCeremony\}[\s\S]*onGoLibrary=\{goLibraryFromCeremony\}/,
   'HomeView가 세 행동을 각각 현재 책 문맥에 연결해야 한다');
-assert.match(nest, /_bookQuotesRef\.current[\s\S]*scrollIntoView/,
+assert.match(home, /_bookQuotesRef\.current[\s\S]*scrollIntoView/,
   '저장한 문장 보기는 현재 책 문장 영역으로 이동해야 한다');
 assert.match(app, /<HomeView[\s\S]*onNavigate=\{switchTab\}/,
   '내 서재 이동은 기존 canonical tab 전환 함수를 재사용해야 한다');

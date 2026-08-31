@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const nestSource = readFileSync(new URL('../docs/readinggo/js/nest.js', import.meta.url), 'utf8');
+const homeSource = readFileSync(new URL('../docs/readinggo/js/home.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../docs/readinggo/js/app.js', import.meta.url), 'utf8');
 const batchSource = readFileSync(new URL('../docs/readinggo/js/batch-quote-import.js', import.meta.url), 'utf8');
 
@@ -28,15 +28,15 @@ assert.deepEqual(Array.from(batchResult.truncatedIndices), [2], '성공한 1001�
 assert.equal(batchResult.saved, 2, '0건 fallback 없이 실제 저장 수 반환');
 assert.deepEqual(Array.from(batchSandbox.window.RG_retainFailedBatchItems(batchItems, batchResult.failedIndices), (item) => item.text), ['둘째', '넷째'], '실패 초안만 검토 화면에 남김');
 
-const nestSandbox = { window: {}, Set, Array };
-vm.createContext(nestSandbox);
-vm.runInContext(section(nestSource, 'function _retainUnsavedDrafts', '/* ── HomeView'), nestSandbox);
-const retainedDrafts = nestSandbox.window._retainUnsavedDrafts([
+const homeSandbox = { window: {}, Set, Array };
+vm.createContext(homeSandbox);
+vm.runInContext(section(homeSource, 'function _retainUnsavedDrafts', '/* ── HomeView'), homeSandbox);
+const retainedDrafts = homeSandbox.window._retainUnsavedDrafts([
   { text: '첫째' }, { text: '' }, { text: '둘째' }, { text: '셋째' },
 ], [0, 2]);
 assert.deepEqual(Array.from(retainedDrafts, (draft) => draft.text), ['', '둘째'], '홈은 성공한 초안만 제거하고 빈 행·실패 초안을 보존');
 
-const submit = section(nestSource, 'const submitSentence', '// 쪽수 stepper');
+const submit = section(homeSource, 'const submitSentence', '// 쪽수 stepper');
 const successClear = submit.indexOf("setDrafts([{ text: '' }])");
 const pageClear = submit.indexOf("setQuickSentPage('')");
 const persistenceWait = submit.indexOf('await Promise.resolve(handleCheckin(');
@@ -55,7 +55,7 @@ assert.ok(failureCatch > successClear && !submit.slice(failureCatch).includes("s
 assert.ok(/_retainUnsavedDrafts\(prev, saved\)/.test(submit.slice(failureCatch)), '부분 성공 시 검증된 helper로 성공 초안만 제거해야 한다');
 assert.ok(!submit.slice(failureCatch).includes('setQuickSentPage('), '저장 실패 시 문장별 페이지를 보존해야 한다');
 assert.ok(guardUnlock > failureCatch && submit.includes('} finally {'), '성공·실패 모두 제출 락을 해제해 실패 후 재시도할 수 있어야 한다');
-assert.ok(/disabled=\{sentenceSubmitting\} aria-busy=\{sentenceSubmitting\}/.test(nestSource), '제출 중 버튼 비활성·busy 상태를 알려야 한다');
+assert.ok(/disabled=\{sentenceSubmitting\} aria-busy=\{sentenceSubmitting\}/.test(homeSource), '제출 중 버튼 비활성·busy 상태를 알려야 한다');
 
 const appCheckin = section(appSource, 'const handleCheckin = useCallback', '// 읽기모드 한 문장 저장');
 assert.ok(appCheckin.includes('window.RG_saveSentenceBatch(batch'), '홈은 실행 검증된 공용 batch 저장 함수를 사용해야 한다');

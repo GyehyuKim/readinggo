@@ -7,7 +7,7 @@ const app = read('docs/readinggo/js/app.js');
 const ceremony = read('docs/readinggo/js/ceremony.js');
 const reminder = read('docs/readinggo/js/streak-reminder.js');
 const settings = read('docs/readinggo/js/settings-modal.js');
-const nest = read('docs/readinggo/js/nest.js');
+const home = read('docs/readinggo/js/home.js');
 const library = read('docs/readinggo/js/library.js');
 const datastore = read('docs/readinggo/js/datastore.js');
 const indexHtml = read('docs/readinggo/index.html');
@@ -21,13 +21,13 @@ assert.ok(bookshelfRecordEnd > bookshelfRecordStart, '재키 책장 기록 CTA c
 const bookshelfRecord = app.slice(bookshelfRecordStart, bookshelfRecordEnd);
 assert.match(tabbar, /id:\s*'library',\s*label:\s*'서재'/,
   '3번째 탭은 canonical library route와 서재 라벨을 사용해야 한다');
-assert.doesNotMatch(tabbar, /id:\s*'nest-grow'|label:\s*'책나무'/,
-  'legacy nest-grow와 책나무 라벨은 사용자 탭 표면에 남으면 안 된다');
+assert.doesNotMatch(tabbar, /id:\s*'home-grow'|label:\s*'책나무'/,
+  'legacy home-grow와 책나무 라벨은 사용자 탭 표면에 남으면 안 된다');
 assert.match(tabbar, /aria-label=\{t\.label\}/,
   '하단 탭 접근성 이름은 표시 라벨과 같아야 한다');
 assert.doesNotMatch(tabbar, /label:\s*'둥지'/,
   '하단 탭에 구 둥지 라벨이 남으면 안 된다');
-assert.doesNotMatch(appWithoutTabAliases, /nest-grow|bookTree|BookTree|책나무/,
+assert.doesNotMatch(appWithoutTabAliases, /home-grow|bookTree|BookTree|책나무/,
   '호환 정규화 경계 밖 app runtime에 은퇴한 route·projection·사용자 카피가 남으면 안 된다');
 assert.match(bookshelfRecord, /setActiveTab\('library'\)/,
   '재키 책장 기록 CTA는 canonical 서재로 이동해야 한다');
@@ -73,12 +73,12 @@ for (const forbidden of [
   'N번째 둥지', '완성 둥지', '완성된 둥지', '성 획득', '성을 완성', '다음 둥지', '1,600 XP',
   '아직이에요', '기다려요', '둥지가 오늘을 기다려요',
 ]) {
-  // nest.js는 호환 계산·주석을 보존하므로 실제 과거 토스트/세리머니 문자열만 별도 검증한다.
+  // home.js는 호환 계산·주석을 보존하므로 실제 과거 토스트/세리머니 문자열만 별도 검증한다.
   if (forbidden === '성 획득') continue;
   assert.equal([topbar, ceremony, reminderLines, deleteCopy].join('\n').includes(forbidden), false,
     `전환 대상 사용자 카피에 ${forbidden}가 남으면 안 된다`);
 }
-assert.doesNotMatch(nest, /showToast\(`🏰 전설의 재키 성주|showToast\('🏰 성 컬렉션/,
+assert.doesNotMatch(home, /showToast\(`🏰 전설의 재키 성주|showToast\('🏰 성 컬렉션/,
   '저장·완독 흐름에서 레거시 성 토스트를 노출하면 안 된다');
 assert.match(deleteCopy, /모든 독서 기록\(책·문장·대화\)이 영구 삭제/,
   '계정 삭제는 실제 책·문장·대화 기록을 평이하게 설명해야 한다');
@@ -156,7 +156,7 @@ sandbox.finishCeremony({
 assert.deepEqual(normalCalls, ['close'], '일반 저장은 완료 mutation 없이 modal을 닫아야 한다');
 assert.match(ceremony, /className="rating-stars"[\s\S]*className="review-area"/,
   '완독 별점·소감 review 진입은 유지해야 한다');
-assert.doesNotMatch(ceremony, /className="stat xp"|xp-breakdown|nest-progress|nest-evo|NEST_STAGES/,
+assert.doesNotMatch(ceremony, /className="stat xp"|xp-breakdown|home-progress|home-evo|NEST_STAGES/,
   '세리머니 UI에 XP·성장 단계·둥지 진화가 남으면 안 된다');
 
 console.log('✓ #1518 canonical 서재 route·비중복 profile/library 회귀 계약');

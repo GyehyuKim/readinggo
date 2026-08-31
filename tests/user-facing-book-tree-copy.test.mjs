@@ -26,7 +26,7 @@ for (const forbidden of [
 
 assert.match(activeSurface, /문장으로 남겨요/, '게스트 Home onboarding은 익숙한 문장 용어를 써야 한다');
 assert.match(activeSurface, /rgIcon\('book', 30\)/, '완독 회고는 현 중립 book 아이콘을 유지해야 한다');
-assert.match(activeSurface, /rgRoomNestEmoji[\s\S]*rgIcon\('book', 18\)/,
+assert.match(activeSurface, /rgRoomBookIcon[\s\S]*rgIcon\('book', 18\)/,
   '같이읽기 멤버 진척은 중립 book 아이콘이어야 한다');
 
 console.log('✓ #1453 Phase 3-B 사용자 금지 표면 전역 회귀 계약');

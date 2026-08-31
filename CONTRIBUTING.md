@@ -32,7 +32,7 @@
 
 **좋은 예**
 - `gyehyu/backend-datastore-contract`
-- `seungwon/nest-castle-collection`
+- `seungwon/library-filter-polish`
 - `yunji/feed-empty-state`
 
 **나쁜 예 (금지)**
@@ -161,7 +161,7 @@ claude --resume <name>        # 이름으로 재개 (다른 worktree 에서도)
 
 **강제 (CI 게이트)** — 두 층:
 
-1. **`spec-align`** (`tests/spec-align/align_v7.py`·`nest.py`·`drift.py`) — **기능별 invariant**(존재/부재 grep)를 검사한다. 현재 검사는 v7~v16과 레거시 XP·둥지 구현의 기준선이며 **v18 서재·개인 활동 완료를 보증하지 않는다**. 새 목표는 해당 invariant와 role-based 권한 검사를 추가하기 전까지 green을 구현 완료 증거로 사용하지 않는다. 단 *그 invariant가 있는 기능만* 잡는다 → 새 기능이 invariant 없이 들어오면 **못 잡는다**(2026-06 드리프트의 빈틈: 코드 42커밋 중 spec 동반 ~1/3인데 이 게이트는 통과했음).
+1. **`spec-align`** (`tests/spec-align/align_v7.py`·`home.py`·`drift.py`) — **기능별 invariant**(존재/부재 grep)를 검사한다. 현재 검사는 v7~v16과 퇴역 보상 표면 부재의 기준선이며 **v18 서재·개인 활동 완료를 보증하지 않는다**. 새 목표는 해당 invariant와 role-based 권한 검사를 추가하기 전까지 green을 구현 완료 증거로 사용하지 않는다. 단 *그 invariant가 있는 기능만* 잡는다 → 새 기능이 invariant 없이 들어오면 **못 잡는다**(2026-06 드리프트의 빈틈: 코드 42커밋 중 spec 동반 ~1/3인데 이 게이트는 통과했음).
 2. **`spec-coverage`** (`.github/workflows/test.yml`, #spec-coverage) — **일반 케이스를 막는 바닥선**: PR이 `docs/readinggo/js/**` 를 바꿨으면 **`docs/readinggo/specs/**` 변경이 같은 PR에 있거나**, PR 본문에 **`no-spec: <사유>`** 가 있어야 통과. 둘 다 없으면 빨간불(머지 차단). honor-system 을 끝내 — spec 스킵을 *의식적·가시적* 행위로 만든다.
 
 > **경계 (spec 필요 vs `no-spec:`)**: **동작·계약·플로우·새 화면 = spec 필수**(해당 `.md` 갱신). **순수 시각·카피·CI·동작불변 리팩터·스펙대로 복구하는 버그픽스 = `no-spec: <사유>`** 로 면제. 애매하면 spec 쪽. — spec-coverage 가 강제하는 건 *spec 존재*(같은 PR 허용 = 바닥선)이고, **위 spec-only PR 먼저(2-PR)는 큰 기능의 *이상*으로 유지**(CI 강제 아님). 새 기능은 `align_v7.py` invariant도 같이 추가해 락. PR 본문 상단 **스펙 동기화 체크리스트**(pull_request_template.md)도 확인.
@@ -180,7 +180,7 @@ claude --resume <name>        # 이름으로 재개 (다른 worktree 에서도)
 
 ### 4.3 이슈 작성 가이드
 
-**제목**: 커밋과 같은 `<type>(<area>): <한 줄>` (예: `feat(profile): 무작위 한 문장 회상 카드`, `fix(nest): 완독 시 둥지 단계 미갱신`).
+**제목**: 커밋과 같은 `<type>(<area>): <한 줄>` (예: `feat(profile): 무작위 한 문장 회상 카드`, `fix(home): 완독 시 진도 미갱신`).
 
 **본문 섹션** (이 프로젝트 톤 — 한국어·간결·근거+담당+수용기준+링크):
 
@@ -207,7 +207,7 @@ feat(profile): 무작위 한 문장 회상 카드
 
 ## 범위
 - IN: 프로필 회상 카드 + DataStore.sentences.random
-- OUT: 홈(둥지 영역), 위젯(Phase 2)
+- OUT: 홈 독서 영역, 위젯(Phase 2)
 
 ## 담당 / Phase
 gyehyu · Phase 1 · P1
@@ -252,7 +252,7 @@ UI(레이아웃·컴포넌트·스타일)를 바꾸는 PR은 런타임 크래시
 **예**
 ```
 docs(spec): Redefine phases for web-first v7
-feat: Add nest castle collection to 둥지 탭
+feat: Improve library collection filtering
 chore: Rename legacy spec file
 ```
 

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const src = fs.readFileSync(path.join(root, 'docs/readinggo/js/nest.js'), 'utf8');
+const src = fs.readFileSync(path.join(root, 'docs/readinggo/js/home.js'), 'utf8');
 const start = src.indexOf('function _validateOcrReview');
 const end = src.indexOf('window._validateOcrReview', start);
 if (start < 0 || end < 0) throw new Error('OCR 검토 validator를 찾지 못함');

@@ -466,7 +466,7 @@ function LibraryView({ state, onActivateUserBook, mode = 'combined' }) {
 
   return (
     <section className="view active" data-library-mode={mode}>
-      {/* 프로필 정보 (#508) — 닉네임·한 줄 소개·팔로잉/팔로워/저장을 최상단으로(#428 '둥지 최상단' → 재배치, SNS 표준 UX) */}
+      {/* 프로필 정보 (#508) — 닉네임·한 줄 소개·팔로잉/팔로워/저장을 최상단으로(#428 '홈 최상단' → 재배치, SNS 표준 UX) */}
       {showProfile && <div style={{padding:'16px 16px 20px', position:'relative', textAlign:'center'}}>
         <div style={{position:'absolute', top:0, right:12, display:'flex', gap:8}}>
           {/* 설정 ⚙️는 하단 '설정' 탭으로 이전 (#488). 운영 대시보드(📊)만 헤더 유지. */}

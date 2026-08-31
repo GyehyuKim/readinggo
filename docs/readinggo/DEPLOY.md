@@ -33,10 +33,10 @@ node admin-cli.mjs auth-seturl <url>   # 배포 origin 을 site_url+redirect 로
 git fetch origin && git checkout <이 PR 브랜치>
 npx serve docs/readinggo -l 8888       # http://localhost:8888
 ```
-- [ ] 로그인(구글 또는 이메일) → 둥지 진입
+- [ ] 로그인(구글 또는 이메일) → 홈 진입
 - [ ] 설정 ⚙️ → **아이디(@) 변경 + 중복검사**(남이 쓰는 핸들 입력 시 거부) / 표시 이름 변경
 - [ ] 책 검색 → 등록 → 체크인(한 문장) → **하드리로드 후 유지**
-- [ ] 소셜 피드(@아이디 표시) / 서재(읽는중·완독·🏰성컬렉션) / 책상세 ✏️감상 / 타인 프로필
+- [ ] 소셜 피드(@아이디 표시) / 서재(읽는중·완독·중단·다시읽기) / 책상세 ✏️감상 / 타인 프로필
 통과 시 GitHub 에서 **squash 머지 → main**, 관련 이슈 닫기.
 
 ## 3. Netlify 배포

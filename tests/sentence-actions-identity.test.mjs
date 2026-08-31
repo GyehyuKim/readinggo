@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const datastoreSrc = fs.readFileSync(path.join(root, 'docs/readinggo/js/datastore.js'), 'utf8');
-const nestSrc = fs.readFileSync(path.join(root, 'docs/readinggo/js/nest.js'), 'utf8');
+const homeSrc = fs.readFileSync(path.join(root, 'docs/readinggo/js/home.js'), 'utf8');
 const actionsSrc = fs.readFileSync(path.join(root, 'docs/readinggo/js/sentence-card.js'), 'utf8');
 const supabaseSrc = fs.readFileSync(path.join(root, 'docs/readinggo/js/datastore-supabase.js'), 'utf8');
 
@@ -67,7 +67,7 @@ assert.equal(rows[0].id, created.id, '리로드 후에도 생성 시 반환한 i
 // 홈은 id 없는 낙관 행에 권한을 부여하지 않고, app의 권위 행 교체만 받아 액션을 연다.
 assert.match(actionsSrc, /if \(!id\) return null;/, '안정 id 없는 행의 액션 가드를 유지해야 한다');
 assert.match(
-  nestSrc,
+  homeSrc,
   /setHomeState\(\(ns\) => \(\{ \.\.\.ns, myQuotes: state\.myQuotes \}\)\);\s*\}, \[state\.myQuotes\]\);/,
   '영속 완료 후 id 포함 부모 문장 목록을 홈에 동기화해야 한다',
 );

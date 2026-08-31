@@ -35,8 +35,8 @@ def main() -> int:
         check_present("v18", "canonical home route·component를 렌더", "app.js", r"useState\('home'\)[\s\S]*activeTab === 'home'[\s\S]*<HomeView[\s\S]*key=\"home\""),
         check_present("v18", "legacy tab 입력은 단일 경계에서 canonical route로 정규화", "app.js", r"function\s+normalizeTab\(tab\)\s*\{\s*if \(tab === 'nest'\) return 'home';\s*if \(tab === 'nest-grow'\) return 'library';\s*return tab;\s*\}[\s\S]*setActiveTab\(normalizeTab\(tab\)\)"),
         check_absent("v18", "은퇴한 projection·사용자 표면 부재", ["app.js"], r"bookTree|BookTree|책나무"),
-        check_present("v18", "홈 체크인·활성책 전환 유지", "nest.js", r"function\s+HomeView\b[\s\S]*RG_activateBook"),
-        check_absent("P4", "XP/둥지 진화 계산 제거", ["data.js", "nest.js", "app.js", "datastore.js", "datastore-supabase.js"], r"NEST_STAGES|NEST_CYCLE_XP|getNestStageByXp|nestXpProgress|nestCastleCount|XP_RULES|computeCheckinXp|grantXp"),
+        check_present("v18", "홈 체크인·활성책 전환 유지", "home.js", r"function\s+HomeView\b[\s\S]*RG_activateBook"),
+        check_absent("P4", "XP/둥지 진화 계산 제거", ["data.js", "home.js", "app.js", "datastore.js", "datastore-supabase.js"], r"NEST_STAGES|NEST_CYCLE_XP|getNestStageByXp|nestXpProgress|nestCastleCount|XP_RULES|computeCheckinXp|grantXp"),
         check_absent("P4", "레거시 UI 모듈 제거", ["nest-theatre.js", "nest-grow.js", "streak-repair-copy.js"], r"."),
         check_absent("P4", "DataStore XP/성/만회 계약 제거", ["datastore.js", "datastore-supabase.js"], r"\bxp\s*:\s*\{|\bcastles\s*:\s*\{|repairStatus\s*\(|last_repair_date"),
     ]

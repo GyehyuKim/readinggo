@@ -58,7 +58,7 @@ const config = fs.readFileSync(path.join(root, 'docs/readinggo/js/config.js'), '
 const batchImport = fs.readFileSync(path.join(root, 'docs/readinggo/js/batch-quote-import.js'), 'utf8');
 const dataImport = fs.readFileSync(path.join(root, 'docs/readinggo/js/data-import.js'), 'utf8');
 const bookDetail = fs.readFileSync(path.join(root, 'docs/readinggo/js/book-detail-modal.js'), 'utf8');
-const nest = fs.readFileSync(path.join(root, 'docs/readinggo/js/nest.js'), 'utf8');
+const home = fs.readFileSync(path.join(root, 'docs/readinggo/js/home.js'), 'utf8');
 const companion = fs.readFileSync(path.join(root, 'docs/readinggo/js/companion.js'), 'utf8');
 const sentenceCard = fs.readFileSync(path.join(root, 'docs/readinggo/js/sentence-card.js'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'docs/readinggo/js/app.js'), 'utf8');
@@ -70,12 +70,12 @@ assert.match(dataImport, /RG_saveSentenceBatch\(list[\s\S]+result\.failedIndices
 assert.match(bookDetail, /RG_saveSentenceBatch\(list[\s\S]+return result/, '책 상세 batch는 공용 helper의 부분 실패 결과를 반환한다');
 assert.doesNotMatch(bookDetail, /r\.saved \|\| quotes\.length/, '0건 저장을 전체 성공으로 오인하지 않는다');
 assert.match(bookDetail, /onChange=\{e => setAddText\(e\.target\.value\)\}/, '책 상세 직접 입력은 1001자 원문도 state에 보존');
-assert.match(nest, /onChange=\{\(e\) => setDraft\(0, \{ text: e\.target\.value \}\)\}/, '홈 직접 입력은 1001자 원문도 초안에 보존');
-assert.match(nest, /_retainUnsavedDrafts\(prev, saved\)/, '홈 부분 실패는 실행 검증된 helper로 성공 초안만 제거한다');
+assert.match(home, /onChange=\{\(e\) => setDraft\(0, \{ text: e\.target\.value \}\)\}/, '홈 직접 입력은 1001자 원문도 초안에 보존');
+assert.match(home, /_retainUnsavedDrafts\(prev, saved\)/, '홈 부분 실패는 실행 검증된 helper로 성공 초안만 제거한다');
 assert.match(app, /RG_saveSentenceBatch\(batch[\s\S]+result\.failedIndices\.length[\s\S]+throw error[\s\S]+completion\.onSuccess/, '홈 batch 실패는 공용 helper를 거쳐 성공 콜백 전에 reject한다');
 assert.match(companion, /wasTruncated = Array\.from\(v\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '기존 문장 편집은 Unicode 절단 후 실제 저장값과 알림을 반영한다');
 assert.match(sentenceCard, /wasTruncated = Array\.from\(text\)\.length > 1000[\s\S]+savedText[\s\S]+앞부분만 저장했어요/, '공용 인라인 편집도 Unicode 절단 후 실제 저장값과 알림을 반영한다');
-assert.match(nest, /hadTruncation[\s\S]+앞부분만 저장했어요/, '홈 직접입력은 저장 성공 후 절단 알림을 표시한다');
-assert.match(nest, /savedSentence = sentence \? normalizeText\(sentence, defaultVisibility\)[\s\S]+savedSentences = Array\.isArray\(sentences\)[\s\S]+ns\.myQuotes = \[\{ text: savedSentence[\s\S]+onCheckin\(ns, savedSentence, kind, quotePage, batch, defaultVisibility/, '홈 낙관 UI·게스트 pending·영속 payload는 계정 기본값과 같은 절단값을 쓴다');
+assert.match(home, /hadTruncation[\s\S]+앞부분만 저장했어요/, '홈 직접입력은 저장 성공 후 절단 알림을 표시한다');
+assert.match(home, /savedSentence = sentence \? normalizeText\(sentence, defaultVisibility\)[\s\S]+savedSentences = Array\.isArray\(sentences\)[\s\S]+ns\.myQuotes = \[\{ text: savedSentence[\s\S]+onCheckin\(ns, savedSentence, kind, quotePage, batch, defaultVisibility/, '홈 낙관 UI·게스트 pending·영속 payload는 계정 기본값과 같은 절단값을 쓴다');
 
 console.log('sentence visibility limits: ok');
