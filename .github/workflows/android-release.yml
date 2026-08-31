@@ -19,6 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Verify release source branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Android Play release는 main에서만 빌드할 수 있습니다: $GITHUB_REF"
+            exit 1
+          fi
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22   # Capacitor 8 CLI 는 Node >=22 요구(cap sync). android-apk.yml 과 동일.
@@ -65,6 +72,37 @@ jobs:
           npm ci
           npm run build
 
+      # 업로드 전에 packaged web assets의 환경과 source lineage를 fail-closed로 고정한다.
+      - name: Verify production bundle and embed provenance
+        working-directory: docs/readinggo
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          function files(dir) {
+            return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+              const full = path.join(dir, entry.name);
+              return entry.isDirectory() ? files(full) : [full];
+            });
+          }
+          const bundle = files('dist')
+            .filter((file) => /\.(?:html|js|css|json)$/.test(file))
+            .map((file) => fs.readFileSync(file, 'utf8'))
+            .join('\n');
+          const productionApi = 'https://readinggo.hyuniverse.workers.dev';
+          if (!bundle.includes(productionApi)) {
+            throw new Error(`production API가 packaged assets에 없습니다: ${productionApi}`);
+          }
+          for (const forbidden of ['https://readinggo-dev.hyuniverse.workers.dev', '개발 검수 모드']) {
+            if (bundle.includes(forbidden)) throw new Error(`DEV 문자열이 packaged assets에 포함됨: ${forbidden}`);
+          }
+          fs.writeFileSync('dist/release-provenance.json', JSON.stringify({
+            environment: 'production',
+            sourceSha: process.env.GITHUB_SHA,
+            workflowRunId: process.env.GITHUB_RUN_ID,
+          }, null, 2) + '\n');
+          NODE
+
       # dist → android 동기화 + 네이티브 플러그인 반영.
       - name: Capacitor sync (android)
         working-directory: docs/readinggo
@@ -87,7 +125,7 @@ jobs:
       - name: Upload AAB artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: readinggo-release-aab
+          name: readinggo-release-aab-${{ github.sha }}
           path: docs/readinggo/android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
@@ -95,7 +133,7 @@ jobs:
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: readinggo-release-apk
+          name: readinggo-release-apk-${{ github.sha }}
           path: docs/readinggo/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
