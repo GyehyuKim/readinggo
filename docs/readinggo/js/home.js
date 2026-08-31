@@ -779,10 +779,11 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     }, 0);
   };
 
-  const goLibraryFromCeremony = () => {
+  const goHomeFromCeremony = () => {
     _sentenceCeremonyRef.current = null;
+    pendingMilestoneRef.current = null;
     setCeremony(null);
-    if (onNavigate) onNavigate('library');
+    if (onNavigate) onNavigate('home');
   };
 
   const saveReflectionFromCeremony = (draft) => {
@@ -1302,7 +1303,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
           onComplete={handleComplete}
           onContinue={openSentenceFromCeremony}
           onViewSaved={viewSavedFromCeremony}
-          onGoLibrary={goLibraryFromCeremony}
+          onGoHome={goHomeFromCeremony}
           onSaveReflection={saveReflectionFromCeremony}
           onTalkToJacky={talkToJackyFromCeremony}
         />,
