@@ -1090,8 +1090,10 @@ select{ font-size: 16px !important; min-width: 0; }
 .ceremony.show{ display: flex; animation: fadeIn .2s ease both; }
 .ceremony .inner{
   width: 100%; max-width: 380px;
-  max-height: 100dvh; overflow-y:auto; box-sizing:border-box; position:relative;
-  padding: 52px 22px 28px;
+  max-height: var(--app-h, 100dvh); overflow-y:auto; overscroll-behavior:contain;
+  scrollbar-gutter:stable; -webkit-overflow-scrolling:touch;
+  box-sizing:border-box; position:relative;
+  padding:calc(52px + var(--safe-top)) 22px calc(28px + var(--safe-bottom));
   text-align:center;
   animation: popIn .5s cubic-bezier(.2,.8,.2,1.2) both;
 }
@@ -1161,13 +1163,22 @@ select{ font-size: 16px !important; min-width: 0; }
   font-size: 14px; line-height: 1.55; color: var(--ink);
   text-align: left;
   margin-bottom: 18px;
-  max-height: 120px; overflow:hidden;
+  max-height: min(180px, 28dvh); overflow-y:auto; overscroll-behavior:contain;
+  scrollbar-width:thin; scrollbar-color:var(--brand) var(--brand-soft); -webkit-overflow-scrolling:touch;
   letter-spacing: -0.1px;
+}
+.ceremony .saved-quote:focus-visible{ outline:3px solid var(--brand); outline-offset:2px; }
+.ceremony .saved-quote-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;
 }
 .ceremony .saved-quote .label{
   display:block; font-family: 'Moneygraphy Pixel'; font-size: 10px;
   font-weight: 400; color: var(--brand-3); letter-spacing: 1.2px;
-  margin-bottom: 6px; text-transform: uppercase;
+  text-transform: uppercase;
+}
+.ceremony .saved-quote-hint{
+  color:var(--brand-3); font-family:'Noto Sans KR',-apple-system,system-ui,sans-serif;
+  font-size:10px; font-weight:700; letter-spacing:-0.1px; white-space:nowrap;
 }
 .ceremony-reflection-pending{
   margin:0 0 14px; padding:12px; border-radius:var(--r-sm); background:var(--paper-2);
@@ -1199,20 +1210,51 @@ select{ font-size: 16px !important; min-width: 0; }
   margin-top:8px; border:1.5px solid var(--brand-soft); background:var(--brand-tint); color:var(--brand-3);
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
 }
-.ceremony-actions{ display:flex; flex-direction:column; gap:4px; margin-top:0; }
-.ceremony-action-continue{
-  width:100%; min-height:44px; padding:10px 12px; border:0; border-radius:var(--r-sm);
-  background:transparent; color:var(--ink-2); font-size:13px; font-weight:800; cursor:pointer;
+.ceremony-reflection-saved{
+  margin:0 0 16px; padding:16px; border:1.5px solid var(--brand-soft); border-radius:var(--r-md);
+  background:var(--brand-tint); text-align:left;
 }
-.ceremony-action-secondary{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+.ceremony-reflection-saved-head{
+  display:flex; align-items:center; gap:8px; margin-bottom:10px; color:var(--brand-3);
+  font-size:13px; font-weight:900;
+}
+.ceremony-reflection-saved-icon{
+  display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; flex:0 0 24px;
+  border-radius:50%; background:var(--brand); color:#fff; font-size:15px; font-weight:900;
+}
+.ceremony-reflection-saved-text{
+  max-height:140px; overflow-y:auto; overscroll-behavior:contain; padding:12px;
+  border-radius:var(--r-sm); background:var(--card); color:var(--ink);
+  font-size:14px; line-height:1.55; white-space:pre-wrap; -webkit-overflow-scrolling:touch;
+}
+.ceremony-actions{ display:flex; flex-direction:column; gap:8px; margin-top:0; }
+.ceremony-actions.is-saved{ padding-top:2px; }
+.ceremony-actions-label{ margin-bottom:2px; color:var(--ink); font-size:14px; font-weight:900; text-align:left; }
+.ceremony-action-next,.ceremony-action-home{
+  width:100%; min-height:48px; padding:11px 14px; border-radius:var(--r-md);
+  font-size:14px; font-weight:900; cursor:pointer;
+}
+.ceremony-action-next{
+  border:0; border-bottom:4px solid var(--brand-shadow); background:var(--brand); color:#fff;
+}
+.ceremony-action-home{
+  border:1.5px solid var(--brand-soft); background:var(--brand-tint); color:var(--brand-3);
+}
+.ceremony-action-secondary{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:4px; }
 .ceremony-action-secondary button{
   min-height:44px; padding:9px 6px; border:0; border-radius:var(--r-sm);
   background:transparent; color:var(--ink-3); font-size:12px; font-weight:700; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; gap:5px;
+}
+.ceremony button:disabled{
+  opacity:.48; cursor:not-allowed !important; box-shadow:none; transform:none;
 }
 .ceremony-reflection textarea:focus-visible,
 .ceremony-reflection-save:focus-visible,
 .ceremony-reflection-jacky:focus-visible,
-.ceremony-action-continue:focus-visible,
+.ceremony-reflection-saved-text:focus-visible,
+.ceremony-action-next:focus-visible,
+.ceremony-action-home:focus-visible,
 .ceremony-action-secondary button:focus-visible{
   outline:3px solid var(--brand); outline-offset:2px;
 }

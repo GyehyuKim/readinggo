@@ -779,10 +779,11 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     }, 0);
   };
 
-  const goLibraryFromCeremony = () => {
+  const goHomeFromCeremony = () => {
     _sentenceCeremonyRef.current = null;
+    pendingMilestoneRef.current = null;
     setCeremony(null);
-    if (onNavigate) onNavigate('library');
+    if (onNavigate) onNavigate('home');
   };
 
   const saveReflectionFromCeremony = (draft) => {
@@ -793,9 +794,11 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     const note = rgJoinNote(draft.trim(), rgSplitNote(sentence.note).qa);
     return Promise.resolve(DataStore.sentences.setNote(sentence.id, note || null)).then(() => {
       sentence.note = note;
-      setCeremony(current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
-        ? { ...current, reflectionSentence: { ...current.reflectionSentence, note } }
-        : current);
+      const markReflectionSaved = current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
+        ? { ...current, reflectionSaved: true, reflectionSentence: { ...current.reflectionSentence, note } }
+        : current;
+      _sentenceCeremonyRef.current = markReflectionSaved(_sentenceCeremonyRef.current);
+      setCeremony(markReflectionSaved);
       setHomeState(current => ({
         ...current,
         myQuotes: (current.myQuotes || []).map(q => q.id === sentence.id ? { ...q, note } : q),
@@ -1302,7 +1305,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
           onComplete={handleComplete}
           onContinue={openSentenceFromCeremony}
           onViewSaved={viewSavedFromCeremony}
-          onGoLibrary={goLibraryFromCeremony}
+          onGoHome={goHomeFromCeremony}
           onSaveReflection={saveReflectionFromCeremony}
           onTalkToJacky={talkToJackyFromCeremony}
         />,

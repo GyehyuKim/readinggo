@@ -31,7 +31,40 @@ assert.match(ceremony, /reflectionReady[\s\S]*className="ceremony-reflection"/,
 assert.match(ceremony, /textarea[\s\S]*placeholder="이 문장이 나에게 남긴 생각"[\s\S]*value=\{reflectionDraft\}[\s\S]*disabled=\{reflectionStatus === 'saving'\}/,
   '완료 화면 안에 제어된 생각 입력칸이 있고 저장 중에는 초안 변경을 막아야 한다');
 assert.match(ceremony, /await onSaveReflection\(reflectionDraft\)[\s\S]*setReflectionStatus\('saved'\)/,
-  '생각 저장 성공을 입력칸 가까이 표시해야 한다');
+  '생각 저장 성공을 완료 상태로 전환해야 한다');
+assert.match(ceremony, /const \[reflectionStatus, setReflectionStatus\] = _useState\(data && data\.reflectionSaved \? 'saved' : 'idle'\)/,
+  'history 복원으로 remount돼도 저장 완료 상태로 초기화해야 한다');
+assert.match(ceremony, /reflectionWasSaved[\s\S]*setReflectionStatus\(reflectionWasSaved \? 'saved' : 'idle'\)[\s\S]*\[reflectionId, reflectionWasSaved\]/,
+  '동일 문장 payload의 저장 완료 marker 갱신을 반영해야 한다');
+assert.match(home, /const markReflectionSaved = current[\s\S]*reflectionSaved: true[\s\S]*reflectionSentence: \{ \.\.\.current\.reflectionSentence, note \}[\s\S]*_sentenceCeremonyRef\.current = markReflectionSaved\(_sentenceCeremonyRef\.current\)[\s\S]*setCeremony\(markReflectionSaved\)/,
+  '저장 성공 시 현재 화면과 history ref에 완료 marker·최신 note를 함께 보존해야 한다');
+assert.match(ceremony, /const reflectionSaving = reflectionReady && reflectionStatus === 'saving'/,
+  '저장 요청 중 이탈 행동을 하나의 상태로 막아야 한다');
+for (const actionPattern of [
+  /className="ceremony-dismiss"[\s\S]*disabled=\{reflectionSaving\}/,
+  /className="ceremony-reflection-jacky"[\s\S]*disabled=\{reflectionSaving\}/,
+  /className="ceremony-action-next"[\s\S]*disabled=\{reflectionSaving\}/,
+  /className="ceremony-action-home"[\s\S]*disabled=\{reflectionSaving\}/,
+  /onClick=\{onViewSaved\} disabled=\{reflectionSaving\}/,
+  /RG_login[\s\S]*disabled=\{reflectionSaving\}/,
+]) {
+  assert.match(ceremony, actionPattern, '저장 중에는 완료 화면 이탈·보조 행동을 비활성화해야 한다');
+}
+assert.match(html, /\.ceremony button:disabled\{[\s\S]*cursor:not-allowed/,
+  '저장 중 비활성 버튼은 시각적으로 구분해야 한다');
+
+assert.match(ceremony, /const reflectionSaved = reflectionReady && \(reflectionWasSaved \|\| reflectionStatus === 'saved'\)/,
+  '정확한 문장의 생각 저장 성공만 결과 화면을 열어야 한다');
+assert.match(ceremony, /reflectionReady && !reflectionSaved[\s\S]*className="ceremony-reflection"/,
+  '저장 전에는 생각 입력 폼을 보여야 한다');
+assert.match(ceremony, /reflectionSaved && \([\s\S]*className="ceremony-reflection-saved"[\s\S]*내가 남긴 생각[\s\S]*reflectionDraft\.trim\(\)/,
+  '저장 뒤에는 입력 폼 대신 저장한 생각 결과를 다시 보여야 한다');
+assert.match(ceremony, /reflectionSaved \? '내 생각을 저장했어요'[\s\S]*저장한 내용을 확인하고 다음을 선택하세요/,
+  '저장 성공 제목과 안내가 화면 중심에 명확히 보여야 한다');
+assert.doesNotMatch(ceremony, /reflectionStatus === 'saved' \? '내 생각을 저장했어요\.'/,
+  '저장 성공을 작은 meta 상태 문구로만 표시하면 안 된다');
+assert.match(ceremony, /className=\{`ceremony-actions\$\{reflectionSaved \? ' is-saved' : ''\}`\}[\s\S]*이제 무엇을 할까요\?/,
+  '저장 결과 뒤에는 다음 행동 선택을 명시해야 한다');
 assert.match(ceremony, /catch \(error\)[\s\S]*setReflectionStatus\('error'\)/,
   '생각 저장 실패는 입력을 지우지 않고 오류 상태를 표시해야 한다');
 assert.match(ceremony, /onClick=\{onTalkToJacky\}[\s\S]*재키와 대화하기/,

@@ -14,11 +14,14 @@ function finishCeremony(options) {
 }
 
 /* ── Ceremony ─────────────────────────────────────────── */
-function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibrary, onSaveReflection, onTalkToJacky }) {
+function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome, onSaveReflection, onTalkToJacky }) {
+  const initialReflectionNote = data && data.reflectionSentence && data.reflectionSentence.note;
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
-  const [reflectionDraft, setReflectionDraft] = _useState('');
-  const [reflectionStatus, setReflectionStatus] = _useState('idle');
+  const [reflectionDraft, setReflectionDraft] = _useState(() => initialReflectionNote && window.rgSplitNote
+    ? window.rgSplitNote(initialReflectionNote).free
+    : '');
+  const [reflectionStatus, setReflectionStatus] = _useState(data && data.reflectionSaved ? 'saved' : 'idle');
   // 게스트 여부(#1134) — 성공적으로 기록한 뒤 계정 저장을 조용히 제안한다.
   const [isGuest, setIsGuest] = _useState(false);
   _useEffect(() => {
@@ -29,11 +32,12 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
     return () => { alive = false; };
   }, []);
   const reflectionId = data && data.reflectionSentence && data.reflectionSentence.id;
+  const reflectionWasSaved = !!(data && data.reflectionSaved);
   _useEffect(() => {
     const note = data && data.reflectionSentence && data.reflectionSentence.note;
     setReflectionDraft(note && window.rgSplitNote ? window.rgSplitNote(note).free : '');
-    setReflectionStatus('idle');
-  }, [reflectionId]);
+    setReflectionStatus(reflectionWasSaved ? 'saved' : 'idle');
+  }, [reflectionId, reflectionWasSaved]);
 
   if (!data) return null;
   const { sentence, sentenceCount, pagesAdded, isComplete } = data;
@@ -42,6 +46,9 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
     : (sentence && String(sentence).trim() ? 1 : 0);
   const savedSentence = savedCount > 0;
   const reflectionReady = !isComplete && savedCount === 1 && !!reflectionId;
+  const reflectionSaved = reflectionReady && (reflectionWasSaved || reflectionStatus === 'saved');
+  const reflectionSaving = reflectionReady && reflectionStatus === 'saving';
+  const sentenceNeedsScrollHint = Array.from(String(sentence || '')).length > 140;
   let leadText;
   if (savedCount > 1) {
     leadText = `문장 ${savedCount}개를 저장했어요${pagesAdded > 0 ? ` · ${pagesAdded}쪽 기록` : ''}`;
@@ -69,15 +76,18 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
   return (
     <div className="ceremony show">
       <div className="inner">
-        <button type="button" className="ceremony-dismiss" aria-label="완료 화면 닫기" onClick={onClose}>
+        <button type="button" className="ceremony-dismiss" aria-label="완료 화면 닫기" onClick={onClose} disabled={reflectionSaving}>
           {window.rgIcon('close', 18)}
         </button>
-        <h2>{isComplete ? '완독을 축하해요!' : '기록을 남겼어요'}</h2>
-        <div className="lead">{leadText}</div>
+        <h2>{isComplete ? '완독을 축하해요!' : reflectionSaved ? '내 생각을 저장했어요' : '기록을 남겼어요'}</h2>
+        <div className="lead">{reflectionSaved ? '저장한 내용을 확인하고 다음을 선택하세요' : leadText}</div>
 
         {sentence && (
-          <div className="saved-quote">
-            <span className="label">저장한 문장</span>
+          <div className="saved-quote" role="region" aria-label="저장한 문장 전체 내용" tabIndex={0}>
+            <div className="saved-quote-head">
+              <span className="label">저장한 문장</span>
+              {sentenceNeedsScrollHint && <span className="saved-quote-hint">스크롤해서 전체 보기</span>}
+            </div>
             "{sentence}"
           </div>
         )}
@@ -117,7 +127,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
         {!isComplete && data.reflectionPending && (
           <div className="ceremony-reflection-pending" role="status" aria-live="polite">저장한 문장을 연결하고 있어요…</div>
         )}
-        {reflectionReady && (
+        {reflectionReady && !reflectionSaved && (
           <section className="ceremony-reflection" aria-labelledby="ceremony-reflection-label">
             <label id="ceremony-reflection-label" htmlFor="ceremony-reflection-input">이 문장이 나에게 남긴 생각</label>
             <textarea id="ceremony-reflection-input" placeholder="이 문장이 나에게 남긴 생각"
@@ -126,7 +136,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
               onChange={(event) => { setReflectionDraft(event.target.value); if (reflectionStatus !== 'saving') setReflectionStatus('idle'); }} />
             <div className="ceremony-reflection-meta">
               <span role="status" aria-live="polite">
-                {reflectionStatus === 'saved' ? '내 생각을 저장했어요.' : reflectionStatus === 'error' ? '저장하지 못했어요. 내용은 그대로 두었어요.' : ''}
+                {reflectionStatus === 'error' ? '저장하지 못했어요. 내용은 그대로 두었어요.' : ''}
               </span>
               <span>{Array.from(reflectionDraft).length}/1,000</span>
             </div>
@@ -134,24 +144,39 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoLibr
               disabled={!reflectionDraft.trim() || reflectionStatus === 'saving'}>
               {reflectionStatus === 'saving' ? '저장 중…' : '내 생각 저장하기'}
             </button>
-            <button type="button" className="ceremony-reflection-jacky" onClick={onTalkToJacky}>
+            <button type="button" className="ceremony-reflection-jacky" onClick={onTalkToJacky} disabled={reflectionSaving}>
               {window.rgIcon('chat', 16)} 재키와 대화하기
             </button>
           </section>
         )}
+        {reflectionSaved && (
+          <section className="ceremony-reflection-saved" role="status" aria-live="polite" aria-labelledby="ceremony-reflection-saved-label">
+            <div className="ceremony-reflection-saved-head" id="ceremony-reflection-saved-label">
+              <span className="ceremony-reflection-saved-icon" aria-hidden="true">✓</span>
+              내가 남긴 생각
+            </div>
+            <div className="ceremony-reflection-saved-text" tabIndex={0}>{reflectionDraft.trim()}</div>
+          </section>
+        )}
         {!isComplete && (
-          <div className="ceremony-actions">
-            <button type="button" className="ceremony-action-continue" onClick={onContinue}>
-              이 책에서 계속 기록하기
+          <div className={`ceremony-actions${reflectionSaved ? ' is-saved' : ''}`}>
+            {reflectionSaved && <div className="ceremony-actions-label">이제 무엇을 할까요?</div>}
+            <button type="button" className="ceremony-action-next" onClick={onContinue} disabled={reflectionSaving}>
+              다음 문장 기록하기
+            </button>
+            <button type="button" className="ceremony-action-home" onClick={onGoHome} disabled={reflectionSaving}>
+              홈으로 돌아가기
             </button>
             <div className="ceremony-action-secondary">
-              <button type="button" onClick={onViewSaved}>저장한 문장 보기</button>
-              <button type="button" onClick={onGoLibrary}>내 서재로 가기</button>
+              {reflectionSaved && (
+                <button type="button" onClick={onTalkToJacky} disabled={reflectionSaving}>{window.rgIcon('chat', 15)} 재키와 대화하기</button>
+              )}
+              <button type="button" onClick={onViewSaved} disabled={reflectionSaving}>저장한 문장 보기</button>
             </div>
           </div>
         )}
         {isGuest && (
-          <button type="button" onClick={() => { onClose(); if (window.RG_login) window.RG_login(); }}
+          <button type="button" onClick={() => { onClose(); if (window.RG_login) window.RG_login(); }} disabled={reflectionSaving}
             style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--brand-3)', textDecoration: 'underline', padding: 6 }}>
             이 기록, 계정에 저장하기
           </button>
