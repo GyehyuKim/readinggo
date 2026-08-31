@@ -1,4 +1,4 @@
-// BarcodeScanModal — 바코드(뒤표지 EAN-13 = ISBN-13) 스캔으로 책 등록 (#943)
+// BarcodeScanModal — 뒤표지의 978/979 ISBN-13 바코드 스캔으로 책 등록 (#943)
 // 무의존(Stack Lock OK): 브라우저 네이티브 BarcodeDetector + getUserMedia. 새 npm 0.
 // 흐름: 카메라 뷰파인더 → EAN-13 검출 → normalizeIsbn13 → BOOK_BY_ID/카탈로그/알라딘 매칭 →
 //       onSelectBook(book, shelf) (검색 모달 책장 시트 재사용). 자세한 설계: specs/barcode-scan.md.
@@ -24,14 +24,45 @@ function barcodeScanSupported() {
   return _bcSupportCache;
 }
 
+function classifyIsbn13(raw) {
+  const value = String(raw == null ? '' : raw).replace(/[^0-9]/g, '');
+  if (value.length !== 13) return { value, kind: 'length' };
+  const expected = (10 - (value.slice(0, 12).split('').reduce((sum, digit, index) => (
+    sum + Number(digit) * (index % 2 === 0 ? 1 : 3)
+  ), 0) % 10)) % 10;
+  if (expected !== Number(value[12])) return { value, kind: 'checksum' };
+  if (!value.startsWith('978') && !value.startsWith('979')) return { value, kind: 'product' };
+  return { value, kind: 'isbn' };
+}
+
+function selectPreferredBarcode(codes) {
+  const candidates = (Array.isArray(codes) ? codes : []).filter((code) => code && code.rawValue);
+  return candidates.find((code) => classifyIsbn13(code.rawValue).kind === 'isbn')
+    || candidates.find((code) => code.format === 'ean_13')
+    || candidates[0]
+    || null;
+}
+
+function barcodeDetectionAction(raw, nativeScanner = false) {
+  const decision = classifyIsbn13(raw);
+  const shouldLookup = decision.kind === 'isbn';
+  return {
+    decision,
+    shouldLookup,
+    continueScanning: !shouldLookup && !nativeScanner,
+    nextStatus: shouldLookup ? 'resolving' : nativeScanner ? 'rejected' : 'scanning',
+  };
+}
+
 // ISBN-13 → 책 1권 해석 (오탐 0 — 정규화 ISBN 정확 일치만, fuzzy 금지). spec §2.1.
 //   1) 로컬 즉시: BOOK_BY_ID[isbn] (부팅 캐시, 동기)
 //   2) 카탈로그:  loadBooks() 중 isbn 일치
 //   3) 원격 단건: ALADIN_PROXY?isbn=<isbn> (ItemLookUp)
 // 반환: { book, matched: 'local'|'catalog'|'aladin'|'none' }. book 은 등록 경로(onSelectBook)가 받는 형태.
 async function resolveBookByIsbn(isbn13) {
-  const isbn = (window.normalizeIsbn13 ? window.normalizeIsbn13(isbn13) : String(isbn13 || '').replace(/[^0-9]/g, ''));
-  if (!isbn || isbn.length !== 13) return { book: null, matched: 'none' };
+  const decision = classifyIsbn13(isbn13);
+  if (decision.kind !== 'isbn') return { book: null, matched: 'none' };
+  const isbn = decision.value;
 
   // 1) 로컬 즉시 (data.js _indexBooks 가 isbn13 키로 채움 — #490 A)
   const local = window.BOOK_BY_ID && window.BOOK_BY_ID[isbn];
@@ -121,8 +152,10 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
   const focusTimerRef = React.useRef(0);
   const lockRef = React.useRef(false);  // 검출/해석 중 재진입 방지
   const tokenRef = React.useRef(0);     // 열림 세대 토큰(#1162) — 닫힘/재열림 시 대기 중 async 결과 폐기
-  const [status, setStatus] = React.useState('starting'); // starting | scanning | denied | error | resolving | manual
+  const lastRejectedRef = React.useRef('');
+  const [status, setStatus] = React.useState('starting'); // starting | scanning | denied | error | resolving | rejected | manual
   const [pendingBook, setPendingBook] = React.useState(null); // 책장 선택 대기 (search.js 와 동일 UX)
+  const [scanFeedback, setScanFeedback] = React.useState(null); // { value, kind } — 인식값과 검색 여부
   const [manualIsbn, setManualIsbn] = React.useState('');     // 수동 ISBN 입력값 (폴백)
   const [showManual, setShowManual] = React.useState(false);  // 스캔 중 "직접 입력" 펼침
   const [scanNonce, setScanNonce] = React.useState(0);        // 예외 후 디코드 루프 재시작 트리거(#1162)
@@ -159,7 +192,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
         setPendingBook(book);  // 책장 선택 시트로
       } else {
         // 유효 ISBN 이나 책 못 찾음 — 검색에 ISBN 프리필(수동 확인). 자동 등록 금지.
-        if (window.showToast) window.showToast('이 바코드의 책을 찾지 못했어요 — 검색으로 확인해요');
+        if (window.showToast) window.showToast(`ISBN ${isbn}로 검색했지만 찾지 못했어요`);
         handleClose();
         if (window.RG_openSearchWith) window.RG_openSearchWith(isbn);
       }
@@ -173,23 +206,42 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     }
   }, [stopCamera, handleClose, cameraSupported]);
 
-  // 카메라 검출 콜백 — 잡 바코드는 조용히 무시하고 계속 스캔.
-  const onDetectedIsbn = React.useCallback(async (raw) => {
-    if (lockRef.current) return;
-    const isbn = (window.normalizeIsbn13 ? window.normalizeIsbn13(raw) : String(raw || '').replace(/[^0-9]/g, ''));
-    if (!isbn || isbn.length !== 13) return;  // 잡 바코드 — 무시하고 계속(토스트 스팸 금지)
-    resolveAndRoute(isbn);
+  // 카메라/네이티브 검출 콜백 — 유효 ISBN만 조회하고 나머지는 숫자·이유를 보여준다.
+  const onDetectedIsbn = React.useCallback((raw) => {
+    if (lockRef.current) return null;
+    const action = barcodeDetectionAction(raw, Boolean(window.RG_NATIVE && window.CapBarcodeScanner));
+    const decision = action.decision;
+    if (!action.shouldLookup) {
+      const feedbackKey = `${decision.kind}:${decision.value}`;
+      if (lastRejectedRef.current !== feedbackKey) {
+        lastRejectedRef.current = feedbackKey;
+        setScanFeedback(decision);
+      }
+      // 네이티브 scanner는 one-shot이라 결과 화면에서 명시적으로 다시 연다. 웹은 현재 stream을 계속 쓴다.
+      if (action.nextStatus === 'rejected') setStatus(action.nextStatus);
+      return action;
+    }
+    lastRejectedRef.current = '';
+    setScanFeedback(decision);
+    resolveAndRoute(decision.value);
+    return action;
   }, [resolveAndRoute]);
 
-  // 수동 입력 제출 — 13자리 검증 후 공용 경로. Enter·버튼 공통.
+  // 수동 입력 제출 — 카메라와 같은 ISBN validator를 통과한 뒤 공용 경로. Enter·버튼 공통.
   const submitManual = React.useCallback(() => {
     if (lockRef.current) return;
-    const isbn = (window.normalizeIsbn13 ? window.normalizeIsbn13(manualIsbn) : String(manualIsbn || '').replace(/[^0-9]/g, ''));
-    if (!isbn || isbn.length !== 13) {
-      if (window.showToast) window.showToast('ISBN 13자리를 정확히 입력해주세요');
+    const decision = classifyIsbn13(manualIsbn);
+    if (decision.kind !== 'isbn') {
+      const message = decision.kind === 'product'
+        ? '책 ISBN은 978 또는 979로 시작해요'
+        : decision.kind === 'checksum'
+          ? 'ISBN 숫자를 정확히 확인해주세요'
+          : 'ISBN 13자리를 정확히 입력해주세요';
+      if (window.showToast) window.showToast(message);
       return;
     }
-    resolveAndRoute(isbn);
+    setScanFeedback(decision);
+    resolveAndRoute(decision.value);
   }, [manualIsbn, resolveAndRoute]);
 
   const showFocusFeedback = React.useCallback((next) => {
@@ -222,7 +274,10 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     if (!cameraSupported) return;
     tokenRef.current += 1;
     stopCamera();
+    lastRejectedRef.current = '';
+    setScanFeedback(null);
     setFocusFeedback('');
+    setStatus('starting');
     setScanNonce((n) => n + 1);
   }, [cameraSupported, stopCamera]);
 
@@ -232,7 +287,9 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     let cancelled = false;
     tokenRef.current += 1;   // 새 세대 — 직전 대기 async 결과 폐기(#1162)
     lockRef.current = false;
+    lastRejectedRef.current = '';
     setPendingBook(null);
+    setScanFeedback(null);
     setManualIsbn('');
     setShowManual(false);
     if (!cameraSupported) { setStatus('manual'); return undefined; }
@@ -294,8 +351,9 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
           try {
             const codes = await det.detect(v);
             if (!cancelled && !lockRef.current && codes && codes.length) {
-              const ean = codes.find((c) => c.format === 'ean_13') || codes[0];
-              if (ean && ean.rawValue) { onDetectedIsbn(ean.rawValue); return; }
+              const ean = selectPreferredBarcode(codes);
+              const action = ean && ean.rawValue ? onDetectedIsbn(ean.rawValue) : null;
+              if (action && !action.continueScanning) return;
             }
           } catch (e) { /* 일시적 detect 실패 — 다음 프레임 */ }
         }
@@ -321,7 +379,7 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
     : status === 'error'
       ? '카메라를 열 수 없어요'
       : status === 'resolving'
-        ? '책을 찾는 중…'
+        ? `ISBN ${scanFeedback ? scanFeedback.value : ''}로 책을 검색하고 있어요`
         : status === 'starting'
           ? '카메라를 준비하는 중…'
           : status === 'manual'
@@ -351,6 +409,16 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
   );
 
   const showManualView = status === 'denied' || status === 'error' || status === 'manual';
+  const rejectedMessage = scanFeedback && scanFeedback.kind === 'product'
+    ? '책 ISBN이 아닌 상품 바코드예요'
+    : '바코드를 정확히 읽지 못했어요';
+  const statusAnnouncement = !scanFeedback
+    ? ''
+    : status === 'resolving'
+      ? `ISBN ${scanFeedback.value}로 책을 검색하고 있어요`
+      : scanFeedback.kind !== 'isbn'
+        ? `바코드 ${scanFeedback.value}를 인식했어요. ${rejectedMessage}. 이 번호로는 검색하지 않았어요.`
+        : '';
 
   return (
     <div onClick={(e) => e.stopPropagation()}
@@ -360,6 +428,10 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
         <button onClick={handleClose} aria-label="닫기" style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: 34, height: 34, borderRadius: 999, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{window.rgIcon('close', 18)}</button>
         <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.2px' }}>{cameraSupported ? '바코드로 등록' : 'ISBN으로 등록'}</span>
         <span style={{ width: 34 }} />
+      </div>
+      <div role="status" aria-live="polite" aria-atomic="true"
+        style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap', border: 0 }}>
+        {statusAnnouncement}
       </div>
 
       {/* 뷰파인더 — 탭 위치를 지원 track의 focus/exposure point로 전달(#1290). */}
@@ -373,6 +445,18 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
         {status === 'scanning' && focusFeedback && (
           <div aria-live="polite" style={{ position: 'absolute', left: `${focusPoint.x * 100}%`, top: `${focusPoint.y * 100}%`, transform: 'translate(-50%,-50%)', width: 54, height: 54, borderRadius: 12, border: `2px solid ${focusFeedback === 'unsupported' ? 'rgba(255,255,255,0.55)' : 'var(--brand)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 800, background: 'rgba(0,0,0,0.28)', pointerEvents: 'none' }}>
             {focusFeedback === 'focusing' ? '초점…' : focusFeedback === 'focused' ? '초점' : '미지원'}
+          </div>
+        )}
+        {status === 'rejected' && scanFeedback && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, textAlign: 'center', color: '#fff' }}>
+            <div style={{ display: 'inline-flex' }}>{window.rgIcon('search', 40)}</div>
+            <div style={{ fontSize: 14, fontWeight: 800 }}>바코드 {scanFeedback.value}를 인식했어요</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>{rejectedMessage}<br />이 번호로는 검색하지 않았어요.</div>
+            <button onClick={restartCamera}
+              style={{ border: 'none', borderRadius: 12, background: 'var(--brand)', color: 'var(--ink)', padding: '12px 18px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+              다시 스캔하기
+            </button>
+            {manualBlock}
           </div>
         )}
         {/* 카메라 미지원·거부·오류 — ISBN 직접 입력 폴백(전면). */}
@@ -396,6 +480,11 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
       {(status === 'scanning' || status === 'resolving' || status === 'starting') && (
         <div style={{ width: '100%', maxWidth: 430, padding: '16px max(16px, var(--safe-right)) calc(28px + var(--safe-bottom)) max(16px, var(--safe-left))', textAlign: 'center', color: 'rgba(255,255,255,0.92)', zIndex: 2 }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{overlayMsg}</div>
+          {status === 'scanning' && scanFeedback && scanFeedback.kind !== 'isbn' && (
+            <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.5, color: 'rgba(255,255,255,0.72)' }}>
+              바코드 {scanFeedback.value}를 인식했어요 · {rejectedMessage}<br />이 번호로는 검색하지 않았어요.
+            </div>
+          )}
           {status === 'scanning' && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
               <button onClick={() => focusAt({ x: 0.5, y: 0.5 })}
@@ -443,6 +532,9 @@ const BarcodeScanModal = ({ isOpen, onClose, onSelectBook, cameraSupported = tru
 };
 
 window.barcodeScanSupported = barcodeScanSupported;
+window.classifyIsbn13 = classifyIsbn13;
+window.selectPreferredBarcode = selectPreferredBarcode;
+window.barcodeDetectionAction = barcodeDetectionAction;
 window.resolveBookByIsbn = resolveBookByIsbn;
 window.barcodeApplyContinuousFocus = barcodeApplyContinuousFocus;
 window.barcodeApplyPointFocus = barcodeApplyPointFocus;
