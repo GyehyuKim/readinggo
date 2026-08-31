@@ -1,6 +1,6 @@
 # 시간차 되감기 (Resurface) 스펙
 
-> ✅ **구현됨 (#346, 드리프트 정정 2026-07-09)**: 이전 "보류(#639)" 상태는 낡음 — Resurface는 **출시됨**. 홈 둥지 카드(`nest.js` `resurfaceCard`), `DataStore.sentences.resurfaceCandidate()`/`markResurfaced()`(양 어댑터), 1일 1회 게이트(localStorage `rg_resurface_last`, `shownToday`/`markToday`), 분석 `resurface_shown`/`resurface_answered`/`resurface_skipped`, 마이그레이션 `21_resurface.sql`(`sentences.last_resurfaced_at`)까지 반영됐다. **미구현 잔여**: §2.1 "같은 책 7일" 2차 트리거(14일 트리거만 빌드됨).
+> ✅ **구현됨 (#346, 드리프트 정정 2026-07-09)**: 이전 "보류(#639)" 상태는 낡음 — Resurface는 **출시됨**. 홈 카드(현행 `nest.js` `resurfaceCard`, #1535 후속 구현 PR에서 `home.js`로 rename), `DataStore.sentences.resurfaceCandidate()`/`markResurfaced()`(양 어댑터), 1일 1회 게이트(localStorage `rg_resurface_last`, `shownToday`/`markToday`), 분석 `resurface_shown`/`resurface_answered`/`resurface_skipped`, 마이그레이션 `21_resurface.sql`(`sentences.last_resurfaced_at`)까지 반영됐다. **미구현 잔여**: §2.1 "같은 책 7일" 2차 트리거(14일 트리거만 빌드됨).
 >
 > **신규 (v7.4, 2026-06-10)**: companion.md §5 플레이스홀더 구체화.
 > 근거: whytree-team-synthesis.md ("ChatGPT·북모리가 줄 수 없는 edge"), companion.md §5.
@@ -20,7 +20,7 @@
 ## 2. 트리거 조건
 
 ### 2.1 발동 시점
-- 앱 진입(둥지 로드) 시 백그라운드 체크
+- 앱 진입(홈 로드) 시 백그라운드 체크
 - **발동 조건**: 아래 중 하나 이상 충족한 문장·대화가 있을 때
   - 대화(Q/A)가 저장된 문장 중 마지막 대화로부터 **14일 이상** 경과 ✅ 구현(#346)
   - ~~같은 책의 다른 문장과 대화한 이후 **7일 이상** 경과 (책 안에서 생각 연결)~~ ⚠️ **미구현** (14일 트리거만 빌드됨 — 후속, 드리프트 정정 2026-07-09)
@@ -36,7 +36,7 @@
 
 ## 3. UI
 
-### 3.1 둥지 홈 카드 (비침습적)
+### 3.1 홈 카드 (비침습적)
 
 ```
 ┌─────────────────────────────┐
@@ -58,7 +58,7 @@
 └─────────────────────────────┘
 ```
 
-- 둥지 메인 카드 영역에 **조용히** 삽입 — 전체 화면 팝업 아님
+- 홈 메인 카드 영역에 **조용히** 삽입 — 전체 화면 팝업 아님
 - "나중에" 탭 시 오늘 하루 숨김 (내일 다시 체크)
 - 스크롤로 지나칠 수 있음 (강요 없음)
 
@@ -109,5 +109,5 @@ resurface_skipped   — 나중에 탭
 
 1. 이 spec PR 머지
 2. `sentences` 테이블 `last_resurfaced_at` 마이그레이션 PR
-3. 둥지 카드 UI + 트리거 로직 코드 PR
+3. 홈 카드 UI + 트리거 로직 코드 PR
 4. CompanionModal 재개 연동 PR

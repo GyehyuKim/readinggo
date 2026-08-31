@@ -70,7 +70,7 @@ setup-globals → config → supabase-client → datastore-supabase →
 | `batch-quote-import.js` | 91 | `BatchQuoteImport` | 사진 밑줄 일괄 가져오기 |
 | `ceremony.js` | 197 | `Ceremony` | 체크인/진화 세리머니 |
 | `milestone-recap.js` | 151 | `MilestoneRecap`·`RG_openMilestoneRecap` | 마일스톤 회고 |
-| `nest.js` | 631 | `NestView` | 홈 탭(읽기·체크인) |
+| 현행 `nest.js` → 후속 `home.js` | 1326 | `HomeView` | 홈 탭(읽기·체크인). #1535 후속 구현 PR에서 파일명만 중립 이름으로 전환 |
 | `nest-theatre.js` | 151 | `NestTheatre` | 둥지 캐릭터(프로필) |
 | `companion.js` | 276 | `CompanionModal` | 재키(LLM 독서 파트너) |
 | `co-reading.js` | 1096 | `RoomsView`·`RoomModal`·`CoReadModeToggle` 등 | 함께 읽기(방·파트) |

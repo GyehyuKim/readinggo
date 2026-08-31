@@ -545,18 +545,18 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 
 ---
 
-## 8. 이름 (확정)
+## 8. 이름 (역사 — superseded)
 
-> **방 단위 정식 명칭 = "숲" (확정, owner #987 후속).** 메타포 계보: 마을은 "둥지(nest)가 모인 것"이었다 → 많은 둥지가 사는 곳 = **"숲"**. 서사: 둥지(내 개인 홈)에서 나와 같은 책의 "숲"으로 모인다. **화면에 보이는 텍스트는 모두 "숲"** 으로 통일(방 만들기→숲 만들기, 방 찾기→숲 찾기 등). **탭 라벨은 "함께" 유지**(변경 금지). placeholder "방" 폐기.
+> **과거 결정(#987)**: 방 단위 명칭을 "숲"으로 정하며 당시 개인 홈의 둥지 서사와 연결했다. 이 제품 서사는 v17 결정(#1410·#1452)과 #1535에서 superseded됐다. 현재 목표 계약은 문서 상단 §0의 **같이읽기/읽기방**이며, 아래 표와 §10은 과거 as-built 감사 이력이다.
 >
-> **본문 표기 규약**: §1–6 의 설계 산문에 남은 "방"(P1 작성 시 placeholder)은 모두 **"숲"으로 읽는다**(정식 명칭 = 숲, 위 확정). 산문 일괄 치환은 churn·회귀 위험이 커 화면 텍스트(코드)와 §7.5·§8·§10 만 "숲"으로 갱신했고, §1–6 placeholder 는 이 규약으로 해소한다(구현은 화면 텍스트 기준).
+> **과거 본문 표기 규약**: §1–6의 "방" placeholder를 당시 구현명 "숲"으로 읽었다. 현재 제품 명칭 결정으로 사용하지 않는다.
 
 | 항목 | 상태 |
 |---|---|
 | 탭 라벨 | **"함께"** — 확정(변경 금지) |
 | 방 단위 명칭 | **"숲"** — 확정. 화면 텍스트 전부 "숲" |
 | 내부 탭 키 | `social` 유지(코드 호환) |
-| 코드 식별자 | `rooms.*`·CSS `.rg-room-*`·함수명(`RoomsView`/`RoomModal`/`rgRoomNestEmoji`)·`RG_openRoom` **변경 안 함**(회귀·churn 방지). 명칭 변경은 화면 텍스트만 |
+| 코드 식별자 | 현행 `rooms.*`·CSS `.rg-room-*`·함수명(`RoomsView`/`RoomModal`/`rgRoomNestEmoji`)·`RG_openRoom`. 후속 구현 PR에서 중립 아이콘 식별자로 rename |
 
 ---
 
@@ -611,13 +611,13 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
 - `js/book-info-modal.js` — "📖 이 책 N명 같이 읽는 중" badge(§4.4, N≥2 일 때만 카운트) → 숲 진입.
 - `index.html` — `.rg-btn-primary`/`.rg-btn-tonal`(DESIGN.md 버튼 위계: 1차 솔리드/2차 tonal, ghost 금지) + `.rg-room-*` + `.rg-coread-*` 클래스.
 - `render-smoke.mjs` — 탭 라벨(함께) 검증. 탭은 "함께"라 명칭 변경 무관.
-- **멤버 그리드 둥지 이모지** = 숲 책 진척% 5구간 매핑(🌿🪹🪺🐣🏰, `NEST_STAGES` 이모지 재사용, `rgRoomNestEmoji`). 오늘 불빛(●/○) = 오늘 어떤 책이든 기록(스트릭 동일 기준).
-- **방 UI 아이콘 rgIcon 통일(#1062)** — `RoomModal` 설정 메뉴·탭·세그먼트의 반쯤 변환된 기능 이모지(🔢→hash·🚪→logout·👥→users·🗓→calendar·🌐→globe·🔐/🔒→lock)를 `rgIcon` 모노라인으로 통일(`icons.js` `RG_ICONS` 에 hash·logout·users·calendar·lock·globe 6개 추가, Feather 지오메트리). 둥지 단계(🌿🪹🪺🐣🏰)·🌳숲·💪응원·비밀번호 `placeholder` 🔒(텍스트 장식, SVG 불가)는 KEEP — `tests/spec-align/design_lint.py` denylist 동반 갱신.
+- **멤버 그리드 책 아이콘** = 진척률과 무관하게 중립 책 아이콘을 사용한다. 현행 함수명은 `rgRoomNestEmoji`지만 반환값은 `rgIcon('book')`이며, 후속 구현 PR에서 `rgRoomBookIcon`으로 rename한다. 오늘 불빛(●/○) = 오늘 어떤 책이든 기록(연속일 집계와 동일 기준).
+- **방 UI 아이콘 rgIcon 통일(#1062, 역사)** — 당시 `RoomModal` 설정 메뉴·탭·세그먼트의 기능 이모지를 `rgIcon` 모노라인으로 통일했다. 당시 KEEP으로 기록한 둥지 단계 예외는 이후 퇴역 결정으로 superseded됐으며 현재 계약이 아니다.
 
 ### 10.4 명칭 "숲" 확정 (이 PR, §8)
 
 - **화면 텍스트 전부 "방" → "숲"**: `js/co-reading.js`(숲 만들기/찾기/발견 버튼·헤더·토스트·에러·빈상태·섹션) · `js/social.js`(세그먼트 `숲`). 탭 라벨 "함께"는 유지.
-- **코드 식별자는 불변**: `rooms.*` 계약·CSS `.rg-room-*`·함수명(`RoomsView`/`RoomModal`/`rgRoomNestEmoji`/`FindRoomSheet`…)·`RG_openRoom`·내부 탭 키 `social` 그대로(회귀·churn 방지).
+- **코드 식별자 계약**: 현행 `rooms.*`·CSS `.rg-room-*`·함수명(`RoomsView`/`RoomModal`/`rgRoomNestEmoji`/`FindRoomSheet`…)·`RG_openRoom`·내부 탭 키 `social`을 사용한다. 후속 구현 PR에서 `rgRoomNestEmoji`와 관련 CSS만 중립 이름으로 rename한다.
 - badge 카피("📖 이 책 N명 같이 읽는 중")는 "방" 단어를 안 써 변경 불필요.
 
 ### 10.5 P2-1 — 같이 기본(opt-out) + 공개 자동합류 (이 PR, §7.5)
@@ -628,7 +628,7 @@ coReadMode.set('together' | 'solo')      → 'together' | 'solo'             // 
   - `rgAutoJoinPublicRoom(book)` — together 모드 시 `rooms.byBook`→없으면 `rooms.create({visibility:'public'})`. `myRooms` 교차 확인으로 멱등(중복 숲 방지). `window.RG_autoJoinPublicRoom`.
   - `CoReadModeToggle` — 2차 tonal 카드 + 스위치(ghost 금지). 프라이버시 트레이드오프 안내문 포함. `window.CoReadModeToggle`.
 - `js/app.js` — `handleSearchSelectBook`(읽는중 등록 단일 퍼널)에서 등록 성공 후 `RG_autoJoinPublicRoom` **fire-and-forget**(solo·실패는 no-op, 등록 안 막음). 합류 시 토스트. **#1035 P2: 로그인 유저만** — call-time 에 `RG_SB.currentUser()` 로 세션 확인, 게스트(미로그인)면 자동합류·토스트 skip(유령 1인 로컬 숲·오해 토스트 방지, §7.5).
-- `js/nest.js` — **드리프트 정정 2026-07-09**: 홈 빈 상태의 `CoReadModeToggle` 노출은 **#1056 에서 제거됨**(온보딩 단순화 — 책도 없는 신규 유저에게 "숲/공개"는 이르다, §7.5). opt-out 토글은 이제 숲 탭 상단(`RoomsView`)·등록 후 책 상세/숲에서만.
+- 현행 `js/nest.js` — **드리프트 정정 2026-07-09**: 홈 빈 상태의 `CoReadModeToggle` 노출은 **#1056 에서 제거됨**(온보딩 단순화 — 책도 없는 신규 유저에게 "숲/공개"는 이르다, §7.5). opt-out 토글은 이제 숲 탭 상단(`RoomsView`)·등록 후 책 상세/숲에서만. 후속 구현 PR에서 파일명을 `home.js`로 전환한다.
 - `js/co-reading.js` `RoomsView` 상단 상주 토글 + `RG_roomsChanged`/`rg:rooms-changed` 수신해 자동합류·나가기 후 목록 갱신.
 - `index.html` — `.rg-coread-mode*`/`.rg-coread-switch`/`.rg-coread-knob` CSS.
 - **검증**(로컬 게스트, render-smoke + 브라우저 JS): together 자동 create 공개 숲 ✅ · 기존 공개 숲 있으면 join(새로 안 만듦) ✅ · 멱등(같은 책 2회 호출 1개) ✅ · solo no-op ✅ · 토글 together↔solo 되돌림·스위치 반영 ✅.
