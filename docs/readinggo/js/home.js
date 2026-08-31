@@ -795,7 +795,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     return Promise.resolve(DataStore.sentences.setNote(sentence.id, note || null)).then(() => {
       sentence.note = note;
       setCeremony(current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
-        ? { ...current, reflectionSentence: { ...current.reflectionSentence, note } }
+        ? { ...current, reflectionSaved: true, reflectionSentence: { ...current.reflectionSentence, note } }
         : current);
       setHomeState(current => ({
         ...current,

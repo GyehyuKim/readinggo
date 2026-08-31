@@ -15,10 +15,13 @@ function finishCeremony(options) {
 
 /* ── Ceremony ─────────────────────────────────────────── */
 function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome, onSaveReflection, onTalkToJacky }) {
+  const initialReflectionNote = data && data.reflectionSentence && data.reflectionSentence.note;
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
-  const [reflectionDraft, setReflectionDraft] = _useState('');
-  const [reflectionStatus, setReflectionStatus] = _useState('idle');
+  const [reflectionDraft, setReflectionDraft] = _useState(() => initialReflectionNote && window.rgSplitNote
+    ? window.rgSplitNote(initialReflectionNote).free
+    : '');
+  const [reflectionStatus, setReflectionStatus] = _useState(data && data.reflectionSaved ? 'saved' : 'idle');
   // 게스트 여부(#1134) — 성공적으로 기록한 뒤 계정 저장을 조용히 제안한다.
   const [isGuest, setIsGuest] = _useState(false);
   _useEffect(() => {
@@ -29,11 +32,12 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
     return () => { alive = false; };
   }, []);
   const reflectionId = data && data.reflectionSentence && data.reflectionSentence.id;
+  const reflectionWasSaved = !!(data && data.reflectionSaved);
   _useEffect(() => {
     const note = data && data.reflectionSentence && data.reflectionSentence.note;
     setReflectionDraft(note && window.rgSplitNote ? window.rgSplitNote(note).free : '');
-    setReflectionStatus('idle');
-  }, [reflectionId]);
+    setReflectionStatus(reflectionWasSaved ? 'saved' : 'idle');
+  }, [reflectionId, reflectionWasSaved]);
 
   if (!data) return null;
   const { sentence, sentenceCount, pagesAdded, isComplete } = data;
@@ -42,7 +46,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
     : (sentence && String(sentence).trim() ? 1 : 0);
   const savedSentence = savedCount > 0;
   const reflectionReady = !isComplete && savedCount === 1 && !!reflectionId;
-  const reflectionSaved = reflectionReady && reflectionStatus === 'saved';
+  const reflectionSaved = reflectionReady && (reflectionWasSaved || reflectionStatus === 'saved');
   const sentenceNeedsScrollHint = Array.from(String(sentence || '')).length > 140;
   let leadText;
   if (savedCount > 1) {

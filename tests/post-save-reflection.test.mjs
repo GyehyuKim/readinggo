@@ -32,7 +32,14 @@ assert.match(ceremony, /textarea[\s\S]*placeholder="이 문장이 나에게 남�
   '완료 화면 안에 제어된 생각 입력칸이 있고 저장 중에는 초안 변경을 막아야 한다');
 assert.match(ceremony, /await onSaveReflection\(reflectionDraft\)[\s\S]*setReflectionStatus\('saved'\)/,
   '생각 저장 성공을 완료 상태로 전환해야 한다');
-assert.match(ceremony, /const reflectionSaved = reflectionReady && reflectionStatus === 'saved'/,
+assert.match(ceremony, /const \[reflectionStatus, setReflectionStatus\] = _useState\(data && data\.reflectionSaved \? 'saved' : 'idle'\)/,
+  'history 복원으로 remount돼도 저장 완료 상태로 초기화해야 한다');
+assert.match(ceremony, /reflectionWasSaved[\s\S]*setReflectionStatus\(reflectionWasSaved \? 'saved' : 'idle'\)[\s\S]*\[reflectionId, reflectionWasSaved\]/,
+  '동일 문장 payload의 저장 완료 marker 갱신을 반영해야 한다');
+assert.match(home, /setCeremony\(current[\s\S]*reflectionSaved: true[\s\S]*reflectionSentence: \{ \.\.\.current\.reflectionSentence, note \}/,
+  '저장 성공 payload에 완료 marker와 최신 note를 함께 보존해야 한다');
+
+assert.match(ceremony, /const reflectionSaved = reflectionReady && \(reflectionWasSaved \|\| reflectionStatus === 'saved'\)/,
   '정확한 문장의 생각 저장 성공만 결과 화면을 열어야 한다');
 assert.match(ceremony, /reflectionReady && !reflectionSaved[\s\S]*className="ceremony-reflection"/,
   '저장 전에는 생각 입력 폼을 보여야 한다');
