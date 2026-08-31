@@ -794,9 +794,11 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     const note = rgJoinNote(draft.trim(), rgSplitNote(sentence.note).qa);
     return Promise.resolve(DataStore.sentences.setNote(sentence.id, note || null)).then(() => {
       sentence.note = note;
-      setCeremony(current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
+      const markReflectionSaved = current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
         ? { ...current, reflectionSaved: true, reflectionSentence: { ...current.reflectionSentence, note } }
-        : current);
+        : current;
+      _sentenceCeremonyRef.current = markReflectionSaved(_sentenceCeremonyRef.current);
+      setCeremony(markReflectionSaved);
       setHomeState(current => ({
         ...current,
         myQuotes: (current.myQuotes || []).map(q => q.id === sentence.id ? { ...q, note } : q),

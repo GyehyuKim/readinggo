@@ -47,6 +47,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
   const savedSentence = savedCount > 0;
   const reflectionReady = !isComplete && savedCount === 1 && !!reflectionId;
   const reflectionSaved = reflectionReady && (reflectionWasSaved || reflectionStatus === 'saved');
+  const reflectionSaving = reflectionReady && reflectionStatus === 'saving';
   const sentenceNeedsScrollHint = Array.from(String(sentence || '')).length > 140;
   let leadText;
   if (savedCount > 1) {
@@ -75,7 +76,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
   return (
     <div className="ceremony show">
       <div className="inner">
-        <button type="button" className="ceremony-dismiss" aria-label="완료 화면 닫기" onClick={onClose}>
+        <button type="button" className="ceremony-dismiss" aria-label="완료 화면 닫기" onClick={onClose} disabled={reflectionSaving}>
           {window.rgIcon('close', 18)}
         </button>
         <h2>{isComplete ? '완독을 축하해요!' : reflectionSaved ? '내 생각을 저장했어요' : '기록을 남겼어요'}</h2>
@@ -143,7 +144,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
               disabled={!reflectionDraft.trim() || reflectionStatus === 'saving'}>
               {reflectionStatus === 'saving' ? '저장 중…' : '내 생각 저장하기'}
             </button>
-            <button type="button" className="ceremony-reflection-jacky" onClick={onTalkToJacky}>
+            <button type="button" className="ceremony-reflection-jacky" onClick={onTalkToJacky} disabled={reflectionSaving}>
               {window.rgIcon('chat', 16)} 재키와 대화하기
             </button>
           </section>
@@ -160,22 +161,22 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
         {!isComplete && (
           <div className={`ceremony-actions${reflectionSaved ? ' is-saved' : ''}`}>
             {reflectionSaved && <div className="ceremony-actions-label">이제 무엇을 할까요?</div>}
-            <button type="button" className="ceremony-action-next" onClick={onContinue}>
+            <button type="button" className="ceremony-action-next" onClick={onContinue} disabled={reflectionSaving}>
               다음 문장 기록하기
             </button>
-            <button type="button" className="ceremony-action-home" onClick={onGoHome}>
+            <button type="button" className="ceremony-action-home" onClick={onGoHome} disabled={reflectionSaving}>
               홈으로 돌아가기
             </button>
             <div className="ceremony-action-secondary">
               {reflectionSaved && (
-                <button type="button" onClick={onTalkToJacky}>{window.rgIcon('chat', 15)} 재키와 대화하기</button>
+                <button type="button" onClick={onTalkToJacky} disabled={reflectionSaving}>{window.rgIcon('chat', 15)} 재키와 대화하기</button>
               )}
-              <button type="button" onClick={onViewSaved}>저장한 문장 보기</button>
+              <button type="button" onClick={onViewSaved} disabled={reflectionSaving}>저장한 문장 보기</button>
             </div>
           </div>
         )}
         {isGuest && (
-          <button type="button" onClick={() => { onClose(); if (window.RG_login) window.RG_login(); }}
+          <button type="button" onClick={() => { onClose(); if (window.RG_login) window.RG_login(); }} disabled={reflectionSaving}
             style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--brand-3)', textDecoration: 'underline', padding: 6 }}>
             이 기록, 계정에 저장하기
           </button>

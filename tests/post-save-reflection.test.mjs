@@ -36,8 +36,22 @@ assert.match(ceremony, /const \[reflectionStatus, setReflectionStatus\] = _useSt
   'history 복원으로 remount돼도 저장 완료 상태로 초기화해야 한다');
 assert.match(ceremony, /reflectionWasSaved[\s\S]*setReflectionStatus\(reflectionWasSaved \? 'saved' : 'idle'\)[\s\S]*\[reflectionId, reflectionWasSaved\]/,
   '동일 문장 payload의 저장 완료 marker 갱신을 반영해야 한다');
-assert.match(home, /setCeremony\(current[\s\S]*reflectionSaved: true[\s\S]*reflectionSentence: \{ \.\.\.current\.reflectionSentence, note \}/,
-  '저장 성공 payload에 완료 marker와 최신 note를 함께 보존해야 한다');
+assert.match(home, /const markReflectionSaved = current[\s\S]*reflectionSaved: true[\s\S]*reflectionSentence: \{ \.\.\.current\.reflectionSentence, note \}[\s\S]*_sentenceCeremonyRef\.current = markReflectionSaved\(_sentenceCeremonyRef\.current\)[\s\S]*setCeremony\(markReflectionSaved\)/,
+  '저장 성공 시 현재 화면과 history ref에 완료 marker·최신 note를 함께 보존해야 한다');
+assert.match(ceremony, /const reflectionSaving = reflectionReady && reflectionStatus === 'saving'/,
+  '저장 요청 중 이탈 행동을 하나의 상태로 막아야 한다');
+for (const actionPattern of [
+  /className="ceremony-dismiss"[\s\S]*disabled=\{reflectionSaving\}/,
+  /className="ceremony-reflection-jacky"[\s\S]*disabled=\{reflectionSaving\}/,
+  /className="ceremony-action-next"[\s\S]*disabled=\{reflectionSaving\}/,
+  /className="ceremony-action-home"[\s\S]*disabled=\{reflectionSaving\}/,
+  /onClick=\{onViewSaved\} disabled=\{reflectionSaving\}/,
+  /RG_login[\s\S]*disabled=\{reflectionSaving\}/,
+]) {
+  assert.match(ceremony, actionPattern, '저장 중에는 완료 화면 이탈·보조 행동을 비활성화해야 한다');
+}
+assert.match(html, /\.ceremony button:disabled\{[\s\S]*cursor:not-allowed/,
+  '저장 중 비활성 버튼은 시각적으로 구분해야 한다');
 
 assert.match(ceremony, /const reflectionSaved = reflectionReady && \(reflectionWasSaved \|\| reflectionStatus === 'saved'\)/,
   '정확한 문장의 생각 저장 성공만 결과 화면을 열어야 한다');

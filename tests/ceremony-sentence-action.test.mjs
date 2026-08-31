@@ -11,8 +11,8 @@ assert.match(ceremony, /className="ceremony-action-next" onClick=\{onContinue\}[
   '저장 완료 화면의 1차 행동은 다음 문장 기록이어야 한다');
 assert.match(ceremony, /className="ceremony-action-home" onClick=\{onGoHome\}[\s\S]*홈으로 돌아가기/,
   '저장 완료 화면에서 홈 복귀를 선택할 수 있어야 한다');
-assert.match(ceremony, /onClick=\{onViewSaved\}>저장한 문장 보기<\/button>/,
-  '방금 저장한 문장 영역으로 이동할 수 있어야 한다');
+assert.match(ceremony, /onClick=\{onViewSaved\} disabled=\{reflectionSaving\}>저장한 문장 보기<\/button>/,
+  '방금 저장한 문장 영역으로 이동할 수 있고 저장 중에는 이탈을 막아야 한다');
 assert.doesNotMatch(ceremony, /내 서재로 가기|onGoLibrary|ceremony-action-continue/,
   '퇴역한 완료 행동 카피와 prop을 다시 만들면 안 된다');
 assert.doesNotMatch(ceremony, /reward-card|onAddSentence/,
