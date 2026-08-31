@@ -24,10 +24,11 @@
 카메라 뷰파인더 (getUserMedia, facingMode:environment)
    │  BarcodeDetector.detect(video) 폴링 루프 (≈ rAF/250ms)
    ▼
-EAN-13 rawValue 검출 → normalizeIsbn13() (숫자 13자리 검증)
-   │     └ 실패(13자리 아님·체크섬 불일치)면 계속 스캔
+EAN-13 rawValue 검출 → ISBN-13 검증 (숫자 13자리 + 978/979 prefix + 체크섬)
+   │     ├─ 검출 즉시 "바코드 <숫자>를 인식했어요" 상태 표시
+   │     └ 실패(일반 상품 EAN·체크섬 불일치)면 이유와 숫자를 표시하고 계속 스캔
    ▼
-ISBN 해석 (§2.1)
+"ISBN <숫자>로 책을 검색하고 있어요" → ISBN 해석 (§2.1)
    ├─ 1) 로컬 즉시:  BOOK_BY_ID[isbn]            (부팅 캐시 — 동기, 오프라인 OK)
    ├─ 2) 카탈로그:   loadBooks() 중 isbn 일치       (Supabase/인라인 폴백)
    └─ 3) 원격 단건:  ALADIN_PROXY?isbn=<isbn>       (ItemLookUp — 외서 보강 포함)
@@ -44,7 +45,15 @@ ISBN 해석 (§2.1)
 1. **로컬 즉시 히트** — `window.BOOK_BY_ID[isbn]`. `data.js _indexBooks` 가 부팅 시 `id`·`isbn13` 양쪽 키로 채운다(#490 A). 동기·오프라인. 가장 빠름.
 2. **카탈로그 스캔** — 1) 미스 시 `loadBooks()`(Supabase canonical / 장애 시 인라인 `RG_BOOKS` 12권 최소 폴백) 결과에서 ISBN 정확 일치를 탐색한다. 구 `books.tsv` 폴백은 #972로 제거됐다.
 3. **원격 단건 조회** — 1·2 미스 시 `ALADIN_PROXY?isbn=<isbn>`(worker `aladinProxy` → `ItemLookUp`, 외서는 Google→OpenLibrary 보강 #529). 결과를 `{isbn13,title,author,publisher,total_pages,cover_url}` 로 매핑해 등록.
-4. **모두 미스** — "이 바코드의 책을 찾지 못했어요" 토스트 + 검색 모달에 ISBN 프리필(수동 확인). **자동 등록 금지**(잘못된 책 등록 방지).
+4. **모두 미스** — "ISBN `<숫자>`로 검색했지만 찾지 못했어요"를 표시하고 검색 모달에 ISBN 프리필(수동 확인). **자동 등록 금지**(잘못된 책 등록 방지).
+
+검출값은 다음 조건을 모두 통과해야 ISBN으로 해석한다.
+
+1. 숫자 13자리
+2. 출판 ISBN prefix `978` 또는 `979`
+3. ISBN-13(EAN-13) 체크섬 일치
+
+EAN-13 체크섬은 맞지만 `978`/`979`가 아닌 값은 **일반 상품 바코드**다. 도서 조회를 호출하지 않고 "책 ISBN이 아닌 상품 바코드예요"와 인식 숫자를 `aria-live` 상태로 보여준 뒤 스캔을 계속한다. 체크섬 불일치도 검색하지 않고 "바코드를 정확히 읽지 못했어요"로 구분한다. 수동 입력도 같은 validator를 사용한다.
 
 > **fuzzy 금지**: 매칭은 항상 **정규화 ISBN-13 정확 일치**만. 제목/저자 fuzzy 로 떨어지지 않는다 — 바코드의 본질(정확성)을 흐리지 않기 위함. (#944 가 본문→제목 fuzzy 의 실패를 보여줬다.)
 
@@ -64,8 +73,9 @@ ISBN 해석 (§2.1)
 | **네이티브 권한 선언 누락 (#1103)** | AndroidManifest `CAMERA` + iOS `NSCameraUsageDescription` 가 없으면 시스템이 권한 요청을 **띄우지 못한다**(증상: "권한 요청 자체를 안 함") → 둘 다 **선언 필수**. |
 | 카메라 권한 거부 | 명확한 안내 + **ISBN 직접 입력** + "제목·저자로 검색하기"(검색 모달로 폴백). 무한 로딩 금지. |
 | `getUserMedia` 실패(HTTPS 아님·장치 없음) | 동일 — ISBN 직접 입력 폴백. (프로덕션은 `https://readinggo.hyuniverse.workers.dev` — secure context OK.) |
-| 검출은 됐으나 ISBN 13자리 아님(잡 바코드) | 무시하고 스캔 계속(토스트 스팸 금지). |
-| ISBN 직접 입력이 13자리 아님 | "ISBN 13자리를 정확히 입력해주세요" 토스트, 재입력 대기(자동 검색 안 함). |
+| 일반 상품 EAN-13 (`978`/`979` 아님) | 인식 숫자 + "책 ISBN이 아닌 상품 바코드예요" 상태를 표시하고 검색 없이 계속 스캔. 동일 값 연속 검출은 상태만 유지해 토스트 스팸을 만들지 않음. |
+| ISBN prefix이나 체크섬 불일치 | 인식 숫자 + "바코드를 정확히 읽지 못했어요" 상태를 표시하고 검색 없이 계속 스캔. |
+| ISBN 직접 입력이 유효하지 않음 | 길이·prefix·체크섬에 맞는 안내를 표시하고 재입력 대기(자동 검색 안 함). |
 | ISBN 유효하나 책 못 찾음(§2.1-4) | 토스트 + 검색에 ISBN 프리필. |
 | 모달 닫힘/언마운트 | `track`/`getUserMedia` 스트림 **반드시 stop**(카메라 LED·배터리 누수 방지) + 폴링 루프 취소. |
 | **해석 중 닫힘/재열림 (#1162)** | `resolveAndRoute`가 세대 토큰(`tokenRef`)을 잡고 await 후 재확인 — 닫힘/재열림이면 결과 폐기(닫힌 모달에 setState 금지). `handleClose`·open effect 가 토큰 증가. |
@@ -144,7 +154,7 @@ async function barcodeScanSupported() {
 - 온보딩 첫 책 단계 진입점 추가(§3) — 별도 PR.
 - iOS 셸 (c) 플러그인 도입 + capability 분기(셸=네이티브, 웹=BarcodeDetector) — Phase 2, Stack Lock 결정 동반.
 - ISBN-10(구간 도서) 입력 시 → ISBN-13 변환(978 prefix + 체크섬) 후 매칭 — 현재는 EAN-13(=ISBN-13)만. 필요 판명 시 추가.
-- 다중 검출(한 프레임에 여러 바코드) 시 가장 큰/중앙 우선 — 현재 첫 EAN-13 채택. 실사용 데이터로 튜닝.
+- 다중 검출(한 프레임에 여러 바코드) 시 **유효한 ISBN-13을 일반 EAN·EAN-5 부가 코드보다 우선**한다. 유효 ISBN이 여러 개면 중앙·크기 우선은 실사용 데이터로 후속 튜닝한다.
 - Android Chrome/Capacitor Android의 실제 기기별 autofocus·tap-to-focus 지원 편차는 실기기 검증표로 남긴다. 웹 API 미지원 기기는 ISBN 직접입력이 최종 폴백이다.
 
 ## 9. Android 네이티브 스캐너 및 시스템 바 계약 (#1420)
