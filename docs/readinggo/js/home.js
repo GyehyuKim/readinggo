@@ -519,7 +519,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
     // 이 책에서 모은 한 문장 수 (#549) — 세리머니가 거짓 '저장됨' 대신 정직한 누적/독려 표시.
     const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
-    setCeremony({ streak: ns.streak, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete, reflectionPending: sentenceCount === 1 && !isComplete, reflectionSentence: null });
+    setCeremony({ streak: ns.streak, currentPage: ns.book.cur, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete, reflectionPending: sentenceCount === 1 && !isComplete, reflectionSentence: null });
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 3500);
     const persistenceResult = completionPromise || checkinResult;

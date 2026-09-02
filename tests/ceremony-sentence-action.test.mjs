@@ -17,6 +17,18 @@ assert.doesNotMatch(ceremony, /내 서재로 가기|onGoLibrary|ceremony-action-
   '퇴역한 완료 행동 카피와 prop을 다시 만들면 안 된다');
 assert.doesNotMatch(ceremony, /reward-card|onAddSentence/,
   '저장 개수를 별도 보상 카드로 반복하지 않아야 한다');
+assert.match(ceremony, /const pageOnly = !isComplete && !savedSentence;/,
+  '페이지 진척만 저장한 완료 상태를 문장 저장과 명시적으로 구분해야 한다');
+assert.match(ceremony, /pageOnly \? '오늘도 읽었어요' : '문장을 저장했어요'/,
+  '페이지 전용과 문장 저장 완료 제목이 달라야 한다');
+assert.match(ceremony, /currentPage[^\n]*streak[\s\S]*현재 \$\{streak\}일 연속 읽기/,
+  '페이지 전용 완료는 현재 쪽과 실제 streak를 표시해야 한다');
+assert.match(ceremony, /pageOnly \? '한 문장 남기기' : '다음 문장 기록하기'/,
+  '페이지 전용 완료 행동은 저장하지 않은 문장을 다음 기록으로 표현하지 않아야 한다');
+assert.match(ceremony, /\{savedSentence && \([\s\S]*onViewSaved[\s\S]*저장한 문장 보기/,
+  '저장한 문장 보기는 실제 문장을 저장한 경우에만 노출해야 한다');
+assert.match(home, /setCeremony\(\{[^}]*currentPage: ns\.book\.cur/,
+  '완료 화면에는 증가량이 아니라 저장된 현재 쪽을 전달해야 한다');
 assert.match(ceremony, /className="saved-quote" role="region" aria-label="저장한 문장 전체 내용" tabIndex=\{0\}/,
   '긴 저장 문장은 키보드로 진입 가능한 영역이어야 한다');
 assert.match(ceremony, /sentenceNeedsScrollHint = Array\.from\(String\(sentence \|\| ''\)\)\.length > 140[\s\S]*스크롤해서 전체 보기/,
