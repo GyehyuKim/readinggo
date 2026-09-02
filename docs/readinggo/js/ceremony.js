@@ -40,7 +40,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
   }, [reflectionId, reflectionWasSaved]);
 
   if (!data) return null;
-  const { sentence, sentenceCount, pagesAdded, currentPage, streak, isComplete } = data;
+  const { sentence, sentenceCount, pagesAdded, currentPage, isComplete } = data;
   const savedCount = (typeof sentenceCount === 'number' && sentenceCount > 0)
     ? sentenceCount
     : (sentence && String(sentence).trim() ? 1 : 0);
@@ -57,8 +57,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
     leadText = '문장 1개를 저장했어요';
   } else if (pageOnly) {
     const progressText = Number.isFinite(currentPage) ? `${currentPage}쪽까지 읽었어요` : '읽기 진척을 저장했어요';
-    const streakText = Number.isFinite(streak) && streak > 0 ? ` · 현재 ${streak}일 연속 읽기` : '';
-    leadText = `${progressText}${streakText}`;
+    leadText = progressText;
   } else {
     leadText = '읽은 기록을 저장했어요';
   }

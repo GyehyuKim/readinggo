@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const ceremony = fs.readFileSync('docs/readinggo/js/ceremony.js', 'utf8');
 const home = fs.readFileSync('docs/readinggo/js/home.js', 'utf8');
+const app = fs.readFileSync('docs/readinggo/js/app.js', 'utf8');
 const html = fs.readFileSync('docs/readinggo/index.html', 'utf8');
 
 assert.match(ceremony, /className="ceremony-reflection-save" onClick=\{saveReflection\}[\s\S]*내 생각 저장하기/,
@@ -21,14 +22,33 @@ assert.match(ceremony, /const pageOnly = !isComplete && !savedSentence;/,
   '페이지 진척만 저장한 완료 상태를 문장 저장과 명시적으로 구분해야 한다');
 assert.match(ceremony, /pageOnly \? '오늘도 읽었어요' : '문장을 저장했어요'/,
   '페이지 전용과 문장 저장 완료 제목이 달라야 한다');
-assert.match(ceremony, /currentPage[^\n]*streak[\s\S]*현재 \$\{streak\}일 연속 읽기/,
-  '페이지 전용 완료는 현재 쪽과 실제 streak를 표시해야 한다');
+assert.match(ceremony, /Number\.isFinite\(currentPage\) \? `\$\{currentPage\}쪽까지 읽었어요`/,
+  '페이지 전용 완료는 저장된 현재 쪽을 표시해야 한다');
+assert.doesNotMatch(ceremony, /streakText|현재 \$\{streak\}일 연속 읽기/,
+  '페이지 전용 완료에서 레거시 streak를 다시 노출하면 안 된다');
 assert.match(ceremony, /pageOnly \? '한 문장 남기기' : '다음 문장 기록하기'/,
   '페이지 전용 완료 행동은 저장하지 않은 문장을 다음 기록으로 표현하지 않아야 한다');
 assert.match(ceremony, /\{savedSentence && \([\s\S]*onViewSaved[\s\S]*저장한 문장 보기/,
   '저장한 문장 보기는 실제 문장을 저장한 경우에만 노출해야 한다');
-assert.match(home, /setCeremony\(\{[^}]*currentPage: ns\.book\.cur/,
+assert.match(home, /const ceremonyData = \{[^}]*currentPage: ns\.book\.cur/,
   '완료 화면에는 증가량이 아니라 저장된 현재 쪽을 전달해야 한다');
+const submitPageStart = home.indexOf('const submitPage =');
+const submitPageEnd = home.indexOf('// 한 문장 섹션', submitPageStart);
+const submitPage = home.slice(submitPageStart, submitPageEnd);
+assert.ok(submitPage.startsWith('const submitPage = async'),
+  '페이지 저장은 비동기 영속화를 기다려야 한다');
+assert.match(submitPage, /_pageSubmittingRef\.current[\s\S]*await Promise\.resolve\(handleCheckin\(\{[\s\S]*awaitPersistence: true/,
+  '페이지 저장은 중복 제출을 막고 완료 callback을 요청해야 한다');
+assert.ok(submitPage.indexOf("setQuickPage('')") > submitPage.indexOf('await Promise.resolve(handleCheckin'),
+  '페이지 입력은 영속 성공 후에만 비워야 한다');
+assert.match(home, /const deferCeremony = awaitPersistence && sentenceCount === 0;/,
+  '문장이 없는 체크인은 영속 성공 전 완료 화면을 미뤄야 한다');
+assert.match(app, /savedSessionRow[\s\S]*authoritativeCurrentPage[\s\S]*completion\.onSuccess\(\{ reflectionSentence, currentPage: authoritativeCurrentPage \}\)/,
+  '완료 callback은 저장 RPC가 반환한 권위 현재 쪽을 전달해야 한다');
+assert.match(home, /if \(deferCeremony\) \{[\s\S]*setCeremony\(resolvedCeremony\)[\s\S]*\} else \{[\s\S]*setCeremony\(current =>/,
+  '지연한 페이지 완료는 성공 callback에서만 열어야 한다');
+assert.match(home, /if \(!deferCeremony\) \{[\s\S]*setCeremony\(ceremonyData\)/,
+  '문장 저장 완료의 기존 낙관 세리머니는 유지해야 한다');
 assert.match(ceremony, /className="saved-quote" role="region" aria-label="저장한 문장 전체 내용" tabIndex=\{0\}/,
   '긴 저장 문장은 키보드로 진입 가능한 영역이어야 한다');
 assert.match(ceremony, /sentenceNeedsScrollHint = Array\.from\(String\(sentence \|\| ''\)\)\.length > 140[\s\S]*스크롤해서 전체 보기/,
