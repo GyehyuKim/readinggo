@@ -667,7 +667,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   };
   // 페이지 섹션 [업데이트] (#497) — 페이지만 독립 저장. 문장 입력(quickText)은 보존.
   const submitPage = async () => {
-    if (_pageSubmittingRef.current) return;
+    if (_pageSubmittingRef.current || _sentenceSubmittingRef.current) return;
     if (quickPage === '') { showToast('쪽수를 입력해주세요'); return; }
     const p = _quickTargetPage();
     _pageSubmittingRef.current = true;
@@ -698,7 +698,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     if (total) sp = Math.min(total, sp);
     // 진도(current_page)는 문장 저장으로 뒤로 밀지 않음 — 문장이 앞쪽이면 현재 유지, 뒤쪽이면 따라 올림.
     const progressPage = Math.max(cur, sp);
-    if (_sentenceSubmittingRef.current) return;
+    if (_sentenceSubmittingRef.current || _pageSubmittingRef.current) return;
     _sentenceSubmittingRef.current = true;
     setSentenceSubmitting(true);
     try {
@@ -1045,8 +1045,8 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
               {Math.min(100, Math.round((parseInt(quickPage,10)||homeState.book.cur||0) / homeState.book.total * 100))}%
             </span>
           )}
-          <button onClick={submitPage} disabled={pageSubmitting}
-            style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: 999, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 14, cursor: pageSubmitting ? 'wait' : 'pointer', opacity: pageSubmitting ? 0.7 : 1, flexShrink: 0, letterSpacing: '-0.2px' }}>
+          <button onClick={submitPage} disabled={pageSubmitting || sentenceSubmitting}
+            style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: 999, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 14, cursor: (pageSubmitting || sentenceSubmitting) ? 'wait' : 'pointer', opacity: (pageSubmitting || sentenceSubmitting) ? 0.7 : 1, flexShrink: 0, letterSpacing: '-0.2px' }}>
             {pageSubmitting ? '저장 중…' : '저장하기'}
           </button>
         </div>
@@ -1113,9 +1113,9 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
             <button onClick={() => _stepPage(setQuickSentPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtnSm}>+</button>
             {homeState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {homeState.book.total}</span>}
           </span>
-          <button onClick={() => { setSentFlip(true); setTimeout(() => { submitSentence(); setSentFlip(false); }, 280); }}
-            disabled={sentenceSubmitting} aria-busy={sentenceSubmitting}
-            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: sentenceSubmitting ? 'default' : 'pointer', opacity: sentenceSubmitting ? 0.6 : 1, letterSpacing: '-0.2px', flexShrink: 0 }}>
+          <button onClick={() => { setSentFlip(true); submitSentence(); setTimeout(() => setSentFlip(false), 280); }}
+            disabled={sentenceSubmitting || pageSubmitting} aria-busy={sentenceSubmitting || pageSubmitting}
+            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: (sentenceSubmitting || pageSubmitting) ? 'default' : 'pointer', opacity: (sentenceSubmitting || pageSubmitting) ? 0.6 : 1, letterSpacing: '-0.2px', flexShrink: 0 }}>
             {_draftCount > 1 ? `${_draftCount}개 한번에 기록` : '남기기'}
           </button>
         </div>

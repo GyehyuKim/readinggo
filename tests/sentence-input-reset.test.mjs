@@ -41,7 +41,7 @@ const successClear = submit.indexOf("setDrafts([{ text: '' }])");
 const pageClear = submit.indexOf("setQuickSentPage('')");
 const persistenceWait = submit.indexOf('await Promise.resolve(handleCheckin(');
 const failureCatch = submit.indexOf('} catch (e) {');
-const guardCheck = submit.indexOf('if (_sentenceSubmittingRef.current) return;');
+const guardCheck = submit.indexOf('if (_sentenceSubmittingRef.current || _pageSubmittingRef.current) return;');
 const guardLock = submit.indexOf('_sentenceSubmittingRef.current = true;');
 const guardUnlock = submit.indexOf('_sentenceSubmittingRef.current = false;');
 
@@ -55,7 +55,7 @@ assert.ok(failureCatch > successClear && !submit.slice(failureCatch).includes("s
 assert.ok(/_retainUnsavedDrafts\(prev, saved\)/.test(submit.slice(failureCatch)), '부분 성공 시 검증된 helper로 성공 초안만 제거해야 한다');
 assert.ok(!submit.slice(failureCatch).includes('setQuickSentPage('), '저장 실패 시 문장별 페이지를 보존해야 한다');
 assert.ok(guardUnlock > failureCatch && submit.includes('} finally {'), '성공·실패 모두 제출 락을 해제해 실패 후 재시도할 수 있어야 한다');
-assert.ok(/disabled=\{sentenceSubmitting\} aria-busy=\{sentenceSubmitting\}/.test(homeSource), '제출 중 버튼 비활성·busy 상태를 알려야 한다');
+assert.ok(/disabled=\{sentenceSubmitting \|\| pageSubmitting\} aria-busy=\{sentenceSubmitting \|\| pageSubmitting\}/.test(homeSource), '페이지·문장 제출 중 버튼 비활성·busy 상태를 알려야 한다');
 
 const appCheckin = section(appSource, 'const handleCheckin = useCallback', '// 읽기모드 한 문장 저장');
 assert.ok(appCheckin.includes('window.RG_saveSentenceBatch(batch'), '홈은 실행 검증된 공용 batch 저장 함수를 사용해야 한다');

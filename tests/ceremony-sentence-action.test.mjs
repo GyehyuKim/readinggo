@@ -37,8 +37,19 @@ const submitPageEnd = home.indexOf('// 한 문장 섹션', submitPageStart);
 const submitPage = home.slice(submitPageStart, submitPageEnd);
 assert.ok(submitPage.startsWith('const submitPage = async'),
   '페이지 저장은 비동기 영속화를 기다려야 한다');
-assert.match(submitPage, /_pageSubmittingRef\.current[\s\S]*await Promise\.resolve\(handleCheckin\(\{[\s\S]*awaitPersistence: true/,
-  '페이지 저장은 중복 제출을 막고 완료 callback을 요청해야 한다');
+assert.match(submitPage, /if \(_pageSubmittingRef\.current \|\| _sentenceSubmittingRef\.current\) return;/,
+  '페이지 저장은 진행 중인 문장 저장과 교차 실행되면 안 된다');
+assert.match(submitPage, /await Promise\.resolve\(handleCheckin\(\{[\s\S]*awaitPersistence: true/,
+  '페이지 저장은 완료 callback을 요청해야 한다');
+const submitSentenceStart = home.indexOf('const submitSentence =');
+const submitSentenceEnd = home.indexOf('// 쪽수 stepper', submitSentenceStart);
+const submitSentence = home.slice(submitSentenceStart, submitSentenceEnd);
+assert.match(submitSentence, /if \(_sentenceSubmittingRef\.current \|\| _pageSubmittingRef\.current\) return;/,
+  '문장 저장은 진행 중인 페이지 저장과 교차 실행되면 안 된다');
+assert.match(home, /disabled=\{pageSubmitting \|\| sentenceSubmitting\}[\s\S]*disabled=\{sentenceSubmitting \|\| pageSubmitting\}/,
+  '한 저장이 진행 중이면 페이지와 문장 저장 버튼을 모두 비활성화해야 한다');
+assert.doesNotMatch(home, /setTimeout\(\(\) => \{ submitSentence\(\)/,
+  '문장 저장 락은 페이지 전환 애니메이션 뒤로 미루면 안 된다');
 assert.ok(submitPage.indexOf("setQuickPage('')") > submitPage.indexOf('await Promise.resolve(handleCheckin'),
   '페이지 입력은 영속 성공 후에만 비워야 한다');
 assert.match(home, /const deferCeremony = awaitPersistence && sentenceCount === 0;/,
