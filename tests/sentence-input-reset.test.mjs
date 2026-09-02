@@ -59,7 +59,7 @@ assert.ok(/disabled=\{sentenceSubmitting\} aria-busy=\{sentenceSubmitting\}/.tes
 
 const appCheckin = section(appSource, 'const handleCheckin = useCallback', '// 읽기모드 한 문장 저장');
 assert.ok(appCheckin.includes('window.RG_saveSentenceBatch(batch'), '홈은 실행 검증된 공용 batch 저장 함수를 사용해야 한다');
-assert.ok(appCheckin.includes('if (completion && completion.onSuccess) completion.onSuccess({ reflectionSentence });'), '영속 성공 신호가 정확한 성찰 문맥을 전달해야 한다');
+assert.ok(appCheckin.includes('if (completion && completion.onSuccess) completion.onSuccess({ reflectionSentence, currentPage: authoritativeCurrentPage });'), '영속 성공 신호가 정확한 성찰 문맥과 권위 현재 쪽을 전달해야 한다');
 assert.ok(appCheckin.includes('if (completion && completion.onFailure) completion.onFailure(e);'), '영속 실패 신호가 있어야 한다');
 assert.ok(/result\.failedIndices\.length[\s\S]+throw error[\s\S]+completion\.onSuccess/.test(appCheckin), 'batch 실패는 성공 콜백 전에 reject해야 한다');
 
