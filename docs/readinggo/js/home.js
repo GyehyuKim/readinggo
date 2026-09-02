@@ -185,6 +185,8 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const [modalOpen, setModalOpen] = _useState(false);
   // 빠른 입력 (#462) — '읽기 시작' 버튼 없이 홈에서 페이지·한 문장 상시 입력. 타이머는 [⏱시작]으로 선택.
   const [quickPage, setQuickPage] = _useState('');
+  const [pageSubmitting, setPageSubmitting] = _useState(false);
+  const _pageSubmittingRef = _useRef(false);
   // 한 문장 배치 입력 (#1198) — 여러 문장을 초안으로 쌓아 한번에 기록. 초안은 localStorage 임시저장(미확정).
   // drafts[0] = 기존 단일 입력창(OCR·포커스 대상). drafts[1..] = (+)로 추가된 행. 항상 최소 1행.
   const [drafts, setDrafts] = _useState(() => _loadDrafts(state.book.id));
@@ -482,17 +484,30 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     }
 
     setHomeState(ns);
+    // 실제 저장 결과와 완료 화면을 일치시킨다. 문장이 없는 페이지 체크인은
+    // DB 영속·권위 현재 쪽 readback이 끝난 뒤에만 세리머니를 연다 (#1584).
+    const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
+    const ceremonyData = { currentPage: ns.book.cur, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete, reflectionPending: sentenceCount === 1 && !isComplete, reflectionSentence: null };
+    const deferCeremony = awaitPersistence && sentenceCount === 0;
     let completionPromise = null, completion = null;
     if (awaitPersistence) {
       completionPromise = new Promise((resolve, reject) => {
         completion = {
           rollback: { book: previousHomeState.book, streak: previousHomeState.streak, myQuotes: previousHomeState.myQuotes },
           onSuccess: (result) => {
-            setCeremony(current => current ? {
-              ...current,
+            const resolvedCeremony = {
+              ...ceremonyData,
+              currentPage: result && Number.isFinite(result.currentPage) ? result.currentPage : ceremonyData.currentPage,
               reflectionPending: false,
               reflectionSentence: result && result.reflectionSentence,
-            } : current);
+            };
+            if (deferCeremony) {
+              setCeremony(resolvedCeremony);
+              setShowConfetti(true);
+              setTimeout(() => setShowConfetti(false), 3500);
+            } else {
+              setCeremony(current => current ? resolvedCeremony : current);
+            }
             resolve(result);
           },
           onFailure: (error) => {
@@ -517,11 +532,11 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     // 빈도 게이트(마일스톤별 1회 + 하루 1회)는 DataStore.milestone 이 강제. 점수·미션 아님 — 기존 한 문장 자산으로 서사 증폭.
     pendingMilestoneRef.current = _pickMilestone({ isComplete, newStreak: ns.streak, book: ns.book });
 
-    // 이 책에서 모은 한 문장 수 (#549) — 세리머니가 거짓 '저장됨' 대신 정직한 누적/독려 표시.
-    const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
-    setCeremony({ streak: ns.streak, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete, reflectionPending: sentenceCount === 1 && !isComplete, reflectionSentence: null });
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 3500);
+    if (!deferCeremony) {
+      setCeremony(ceremonyData);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3500);
+    }
     const persistenceResult = completionPromise || checkinResult;
     return persistenceResult;
   };
@@ -651,15 +666,23 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     return total ? Math.min(total, p) : p;
   };
   // 페이지 섹션 [업데이트] (#497) — 페이지만 독립 저장. 문장 입력(quickText)은 보존.
-  const submitPage = () => {
+  const submitPage = async () => {
+    if (_pageSubmittingRef.current || _sentenceSubmittingRef.current) return;
     if (quickPage === '') { showToast('쪽수를 입력해주세요'); return; }
     const p = _quickTargetPage();
-    Promise.resolve(handleCheckin({ page: p, sentence: null, kind: 'quote' })).catch((error) => {
+    _pageSubmittingRef.current = true;
+    setPageSubmitting(true);
+    try {
+      await Promise.resolve(handleCheckin({ page: p, sentence: null, kind: 'quote', awaitPersistence: true }));
+      setQuickPage(''); // quickText 보존 — 실제 페이지 저장이 확인된 뒤에만 입력을 비운다.
+    } catch (error) {
       if (error && error.checkinFailureStage === 'preflight' && error.checkinFailureCode !== 'ugc_terms_required') {
         showToast(`기록을 시작하지 못했어요.${error.correlationId ? ` 문의 코드 ${String(error.correlationId).slice(0, 8)}` : ''}`);
       }
-    });
-    setQuickPage(''); // quickText 보존 — 페이지만 업데이트해도 문장 입력창 유지
+    } finally {
+      _pageSubmittingRef.current = false;
+      setPageSubmitting(false);
+    }
   };
   // 한 문장 섹션 [저장/한번에 기록] (#497·#1198) — 초안(drafts) 1개면 단일 저장(기존 경로 그대로),
   //   2개 이상이면 배치로 한번에 기록(세리머니·독서 리듬 갱신은 1회, 문장만 N개 영속).
@@ -675,7 +698,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     if (total) sp = Math.min(total, sp);
     // 진도(current_page)는 문장 저장으로 뒤로 밀지 않음 — 문장이 앞쪽이면 현재 유지, 뒤쪽이면 따라 올림.
     const progressPage = Math.max(cur, sp);
-    if (_sentenceSubmittingRef.current) return;
+    if (_sentenceSubmittingRef.current || _pageSubmittingRef.current) return;
     _sentenceSubmittingRef.current = true;
     setSentenceSubmitting(true);
     try {
@@ -1022,9 +1045,9 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
               {Math.min(100, Math.round((parseInt(quickPage,10)||homeState.book.cur||0) / homeState.book.total * 100))}%
             </span>
           )}
-          <button onClick={submitPage}
-            style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: 999, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 14, cursor: 'pointer', flexShrink: 0, letterSpacing: '-0.2px' }}>
-            저장하기
+          <button onClick={submitPage} disabled={pageSubmitting || sentenceSubmitting}
+            style={{ marginLeft: 'auto', padding: '7px 20px', borderRadius: 999, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 14, cursor: (pageSubmitting || sentenceSubmitting) ? 'wait' : 'pointer', opacity: (pageSubmitting || sentenceSubmitting) ? 0.7 : 1, flexShrink: 0, letterSpacing: '-0.2px' }}>
+            {pageSubmitting ? '저장 중…' : '저장하기'}
           </button>
         </div>
       </div>
@@ -1090,9 +1113,9 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
             <button onClick={() => _stepPage(setQuickSentPage, 1)} aria-label="쪽수 1 늘리기" style={_stepBtnSm}>+</button>
             {homeState.book.total > 0 && <span className="home-page-total" style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700 }}>/ {homeState.book.total}</span>}
           </span>
-          <button onClick={() => { setSentFlip(true); setTimeout(() => { submitSentence(); setSentFlip(false); }, 280); }}
-            disabled={sentenceSubmitting} aria-busy={sentenceSubmitting}
-            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: sentenceSubmitting ? 'default' : 'pointer', opacity: sentenceSubmitting ? 0.6 : 1, letterSpacing: '-0.2px', flexShrink: 0 }}>
+          <button onClick={() => { setSentFlip(true); submitSentence(); setTimeout(() => setSentFlip(false), 280); }}
+            disabled={sentenceSubmitting || pageSubmitting} aria-busy={sentenceSubmitting || pageSubmitting}
+            style={{ marginLeft: 'auto', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 999, padding: '7px 20px', fontSize: 14, fontWeight: 800, cursor: (sentenceSubmitting || pageSubmitting) ? 'default' : 'pointer', opacity: (sentenceSubmitting || pageSubmitting) ? 0.6 : 1, letterSpacing: '-0.2px', flexShrink: 0 }}>
             {_draftCount > 1 ? `${_draftCount}개 한번에 기록` : '남기기'}
           </button>
         </div>

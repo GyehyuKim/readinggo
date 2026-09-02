@@ -1048,6 +1048,7 @@ function App() {
     // 배치 초안(#1198) — 여러 문장이면 N개 모두 영속(공유 페이지). null 이면 단일 경로.
     const batch = Array.isArray(sentences) ? sentences.filter(s => s && s.text && String(s.text).trim()) : null;
     let savedSentenceRow = null;
+    let savedSessionRow = null;
     setAppState(s => ({
       ...s,
       book: ns.book,
@@ -1110,7 +1111,7 @@ function App() {
           throw await reportFailure('preflight', new Error('missing_user_book'));
         }
         try {
-          await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
+          savedSessionRow = await Promise.resolve(DataStore.sessions.addToday({ userBookId: ubId, page: ns.book.cur }));
         } catch (error) {
           throw await reportFailure('session', error, 'checkin_atomic');
         }
@@ -1171,14 +1172,18 @@ function App() {
           kind: savedReadbackRow.kind || kind || 'quote',
           visibility: window.RG_normalizeStoredSentenceVisibility(savedReadbackRow.visibility),
         } : null;
+        const authoritativeStreak = (stDb && typeof stDb.current === 'number') ? stDb.current : ns.streak;
+        const authoritativeCurrentPage = (savedSessionRow && typeof savedSessionRow.current_page === 'number')
+          ? savedSessionRow.current_page
+          : ns.book.cur;
         setAppState(s => ({
           ...s,
-          streak: (stDb && typeof stDb.current === 'number') ? stDb.current : s.streak,
+          streak: authoritativeStreak,
           myQuotes: Array.isArray(mineDb)
             ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(x.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(x.visibility) === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
         }));
-        if (completion && completion.onSuccess) completion.onSuccess({ reflectionSentence });
+        if (completion && completion.onSuccess) completion.onSuccess({ reflectionSentence, currentPage: authoritativeCurrentPage });
       } catch (e) {
         if (e && e.checkinFailureCode === 'ugc_terms_required') {
           window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
