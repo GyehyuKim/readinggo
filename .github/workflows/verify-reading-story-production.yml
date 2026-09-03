@@ -1,0 +1,168 @@
+name: audit-reading-story-production-catalog
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Production에 배포되고 검증할 exact main SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    name: require Production owner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow only GyehyuKim
+        run: test "$GITHUB_ACTOR" = GyehyuKim
+
+  verify:
+    name: read-only Production story catalog parity
+    needs: authorize
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.sha }}
+      - name: Verify exact receipts and read catalog boundary
+        env:
+          APPROVED_SHA: ${{ inputs.sha }}
+          DEV_URL: https://readinggo-dev.hyuniverse.workers.dev
+          PROD_URL: https://readinggo.hyuniverse.workers.dev
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          PROD_SUPABASE_URL: ${{ vars.PROD_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$APPROVED_SHA"
+          test "$(git rev-parse origin/main)" = "$APPROVED_SHA"
+          curl -fsS "$DEV_URL/api/release" > /tmp/dev-release.json
+          test "$(jq -r .environment /tmp/dev-release.json)" = development
+          test "$(jq -r .sha /tmp/dev-release.json)" = "$APPROVED_SHA"
+          curl -fsS "$PROD_URL/api/release" > /tmp/prod-release.json
+          test "$(jq -r .environment /tmp/prod-release.json)" = production
+          test "$(jq -r .sha /tmp/prod-release.json)" = "$APPROVED_SHA"
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          def canonical_ref(url, environment):
+              match = re.fullmatch(r'https://([a-z0-9]+)\.supabase\.co', url.rstrip('/'))
+              if not match:
+                  raise SystemExit(f'{environment} Supabase URL is not canonical')
+              return match.group(1)
+
+          refs = {
+              'development': canonical_ref(os.environ['DEV_SUPABASE_URL'], 'development'),
+              'production': canonical_ref(os.environ['PROD_SUPABASE_URL'], 'production'),
+          }
+          if refs['development'] == refs['production']:
+              raise SystemExit('DEV and Production Supabase projects must differ')
+          for environment, path in (
+              ('development', '/tmp/dev-release.json'),
+              ('production', '/tmp/prod-release.json'),
+          ):
+              receipt = json.loads(Path(path).read_text())
+              if receipt.get('supabaseHost') != f"{refs[environment]}.supabase.co":
+                  raise SystemExit(f'{environment} receipt targets another Supabase project')
+
+          def query(project_ref, statement):
+              request = urllib.request.Request(
+                  f'https://api.supabase.com/v1/projects/{project_ref}/database/query',
+                  data=json.dumps({'query': statement}).encode(),
+                  headers={
+                      'Authorization': f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+                      'Content-Type': 'application/json',
+                      'User-Agent': 'readinggo-production-boundary-audit/1.0',
+                  },
+                  method='POST',
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  detail = error.read().decode(errors='replace')[:1000]
+                  raise SystemExit(f'Story catalog parity query failed ({error.code}): {detail}')
+
+          definitions_query = r'''
+          select
+            p.oid::regprocedure::text as identity,
+            pg_get_functiondef(p.oid) as definition,
+            p.prosecdef as security_definer,
+            p.proconfig as config,
+            p.provolatile as volatility
+          from pg_proc p
+          where p.oid in (
+            'public.reading_story_save_draft(uuid,jsonb)'::regprocedure,
+            'public.reading_story_owner(uuid)'::regprocedure,
+            'public.reading_story_publish(uuid)'::regprocedure,
+            'public.reading_story_unpublish(uuid)'::regprocedure,
+            'public.reading_story_public(text)'::regprocedure
+          )
+          order by identity;
+          '''
+          dev_definitions = query(refs['development'], definitions_query)
+          prod_definitions = query(refs['production'], definitions_query)
+          if not isinstance(dev_definitions, list) or len(dev_definitions) != 5:
+              raise SystemExit('DEV story RPC definition set is incomplete')
+          if prod_definitions != dev_definitions:
+              raise SystemExit('Production story RPC definitions or execution attributes differ from DEV')
+          if any(row.get('security_definer') is not True for row in prod_definitions):
+              raise SystemExit('Production story RPC SECURITY DEFINER attribute missing')
+          if any(row.get('config') != ['search_path=public, pg_temp'] for row in prod_definitions):
+              raise SystemExit('Production story RPC search_path differs from approved definition')
+
+          boundary_query = r'''
+          select json_build_object(
+            'tables_present',
+              to_regclass('public.reading_stories') is not null
+              and to_regclass('public.reading_story_pages') is not null
+              and to_regclass('public.moderation_hidden_stories') is not null,
+            'rls_enabled',
+              (select count(*) = 3 and bool_and(c.relrowsecurity)
+               from pg_class c join pg_namespace n on n.oid=c.relnamespace
+               where n.nspname='public' and c.relname in ('reading_stories','reading_story_pages','moderation_hidden_stories')),
+            'base_tables_hidden',
+              not has_table_privilege('anon','public.reading_stories','select,insert,update,delete')
+              and not has_table_privilege('authenticated','public.reading_stories','select,insert,update,delete')
+              and not has_table_privilege('anon','public.reading_story_pages','select,insert,update,delete')
+              and not has_table_privilege('authenticated','public.reading_story_pages','select,insert,update,delete')
+              and not has_table_privilege('anon','public.moderation_hidden_stories','select,insert,update,delete')
+              and not has_table_privilege('authenticated','public.moderation_hidden_stories','select,insert,update,delete'),
+            'public_rpc_grants',
+              has_function_privilege('anon','public.reading_story_public(text)','execute')
+              and has_function_privilege('authenticated','public.reading_story_public(text)','execute'),
+            'owner_rpc_grants',
+              not has_function_privilege('anon','public.reading_story_save_draft(uuid,jsonb)','execute')
+              and has_function_privilege('authenticated','public.reading_story_save_draft(uuid,jsonb)','execute')
+              and not has_function_privilege('anon','public.reading_story_owner(uuid)','execute')
+              and has_function_privilege('authenticated','public.reading_story_owner(uuid)','execute')
+              and not has_function_privilege('anon','public.reading_story_publish(uuid)','execute')
+              and has_function_privilege('authenticated','public.reading_story_publish(uuid)','execute')
+              and not has_function_privilege('anon','public.reading_story_unpublish(uuid)','execute')
+              and has_function_privilege('authenticated','public.reading_story_unpublish(uuid)','execute')
+          ) as checks;
+          '''
+          rows = query(refs['production'], boundary_query)
+          if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0].get('checks'), dict):
+              raise SystemExit('Production story catalog audit returned an invalid shape')
+          checks = rows[0]['checks']
+          failed = sorted(name for name, passed in checks.items() if passed is not True)
+          if failed:
+              raise SystemExit(f'Production story catalog audit failed checks: {failed}')
+          print(json.dumps({
+              'status': 'passed_read_only_catalog_parity',
+              'sha': os.environ['APPROVED_SHA'],
+              'rpc_definitions_equal_to_dev': True,
+              'checks': checks,
+          }))
+          PY
