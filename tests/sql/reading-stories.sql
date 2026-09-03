@@ -145,6 +145,22 @@ begin
   perform set_config('request.jwt.claim.sub',v_owner::text,true); set local role authenticated;
   perform public.reading_story_publish(v_story);
 
+  -- Failed atomic republish preserves the existing published row and five-page public version.
+  reset role; update public.sentences set visibility='private' where id=v_quote;
+  perform set_config('request.jwt.claim.sub',v_owner::text,true); set local role authenticated;
+  begin
+    perform public.reading_story_republish(v_owner_ub,
+      jsonb_build_array(jsonb_build_object('type','quote','sentenceId',v_quote,'isCover',true)));
+    raise exception 'private_quote_republished';
+  exception when insufficient_privilege then null; end;
+  reset role; update public.sentences set visibility='public' where id=v_quote;
+  if (select status from public.reading_stories where id=v_story)<>'published'
+     or (select count(*) from public.reading_story_pages where story_id=v_story)<>5 then
+    raise exception 'failed_republish_changed_public_story';
+  end if;
+  perform set_config('request.jwt.claim.sub','',true); set local role anon;
+  if public.reading_story_public(v_slug) is null then raise exception 'failed_republish_removed_public_story'; end if;
+
   -- Anonymous sees only the bounded public object and never internal ids.
   perform set_config('request.jwt.claim.sub','',true); set local role anon;
   v_result := public.reading_story_public(v_slug);

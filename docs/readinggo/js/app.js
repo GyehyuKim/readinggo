@@ -650,6 +650,105 @@ function normalizeTab(tab) {
   return tab;
 }
 
+function _readingStoryReferrer() {
+  try {
+    if (!document.referrer) return 'direct';
+    const host = new URL(document.referrer).hostname;
+    if (host === location.hostname) return 'internal';
+    if (/instagram|facebook|threads|twitter|t\.co|kakao/i.test(host)) return 'social';
+    if (/google|naver|daum|bing/i.test(host)) return 'search';
+  } catch (e) {}
+  return 'other';
+}
+
+const _readingStoryReportReasons = [
+  ['sexual', '성적인 콘텐츠'],
+  ['violence', '폭력적인 콘텐츠'],
+  ['hate_or_harassment', '혐오 또는 괴롭힘'],
+  ['spam', '스팸'],
+  ['illegal', '불법 콘텐츠'],
+  ['other', '기타'],
+];
+
+function PublicReadingStory({ slug }) {
+  const { useState, useEffect } = React;
+  const [state, setState] = useState({ status:'loading', story:null });
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetail, setReportDetail] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [reportNeedsLogin, setReportNeedsLogin] = useState(false);
+  const load = () => {
+    setState({ status:'loading', story:null });
+    if (!/^[0-9a-f]{36}$/.test(slug)) { setState({ status:'unavailable', story:null }); return; }
+    // 공개 route는 active owner adapter나 base table로 우회하지 않고 좁은 public RPC만 사용한다.
+    const store = window.SupabaseDataStore;
+    if (!(store && store.readingStories && store.readingStories.getPublic)) { setState({ status:'error', story:null }); return; }
+    Promise.resolve(store.readingStories.getPublic(slug)).then(story => {
+      if (!story) { setState({ status:'unavailable', story:null }); return; }
+      setState({ status:'ready', story });
+      document.title = `${story.title || (story.book && story.book.title) || '독서 이야기'} · ReadingGo`;
+      if (window.rgTrack) window.rgTrack('reading_story_landing_viewed', { referrer_group:_readingStoryReferrer() });
+    }).catch(() => setState({ status:'error', story:null }));
+  };
+  useEffect(load, [slug]);
+  const submitReport = async () => {
+    if (reportBusy) return;
+    const allowed = _readingStoryReportReasons.some(([value]) => value === reportReason);
+    if (!allowed) { setReportError('신고 이유를 선택해 주세요.'); return; }
+    if (Array.from(reportDetail).length > 500) { setReportError('상세 내용은 500자까지 입력할 수 있어요.'); return; }
+    setReportBusy(true); setReportError(''); setReportNeedsLogin(false);
+    try {
+      const store = window.SupabaseDataStore;
+      const user = window.RG_SB && window.RG_SB.currentUser ? await window.RG_SB.currentUser() : null;
+      if (!user) throw new Error('reading_story_authentication_required');
+      if (!(store && store.readingStories && store.readingStories.report)) throw new Error('reading_story_report_unavailable');
+      await store.readingStories.report({ slug, reason:reportReason, detail:reportDetail.trim() });
+      if (window.rgTrack) window.rgTrack('reading_story_reported', { reason:reportReason });
+      setReportOpen(false);
+      setState({ status:'unavailable', story:null });
+    } catch (e) {
+      if (/authentication_required|jwt|not authenticated/i.test((e && e.message) || '')) {
+        setReportNeedsLogin(true);
+        setReportError('신고하려면 로그인이 필요해요.');
+      } else {
+        setReportError('신고를 접수하지 못했어요. 다시 시도해 주세요.');
+      }
+    } finally { setReportBusy(false); }
+  };
+  const startReportLogin = () => {
+    if (window.RG_SB && window.RG_SB.signInWithOAuth) window.RG_SB.signInWithOAuth('google', { redirectTo:window.location.origin + window.location.pathname }).catch(() => setReportError('로그인을 시작하지 못했어요.'));
+  };
+  if (state.status === 'loading') return <div className="stage"><main className="app" aria-busy="true" style={{padding:'80px 24px',textAlign:'center'}}><window.SparrowMark size={42}/><h1 style={{fontSize:18}}>독서 이야기를 불러오는 중…</h1></main></div>;
+  if (state.status === 'error') return <div className="stage"><main className="app" style={{padding:'80px 24px',textAlign:'center'}}><h1 style={{fontSize:19}}>이야기를 불러오지 못했어요</h1><p style={{color:'var(--ink-3)',lineHeight:1.6}}>공개 상태와는 별개인 네트워크 오류예요.</p><button onClick={load} style={{minWidth:140,minHeight:48,border:0,borderRadius:12,background:'var(--brand)',color:'#fff',fontWeight:800}}>다시 시도</button></main></div>;
+  if (state.status === 'unavailable') return <div className="stage"><main className="app" style={{padding:'80px 24px',textAlign:'center'}}><window.SparrowMark size={42}/><h1 style={{fontSize:19}}>이 이야기는 지금 공개되어 있지 않아요</h1><p style={{color:'var(--ink-3)',lineHeight:1.6}}>작성자가 공개를 취소했거나 볼 수 없는 이야기예요.</p><a href="/" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minHeight:48,padding:'0 20px',borderRadius:12,background:'var(--brand)',color:'#fff',fontWeight:800,textDecoration:'none'}}>ReadingGo 둘러보기</a></main></div>;
+  const story = state.story, book = story.book || {}, author = story.author || {};
+  const copy = async () => { try { await navigator.clipboard.writeText(location.href); showToast('공개 링크를 복사했어요'); if(window.rgTrack)window.rgTrack('reading_story_link_copied',{entry:'landing'}); } catch(e) { showToast('링크를 복사하지 못했어요'); } };
+  const share = async () => { try { if(navigator.share){await navigator.share({title:story.title||book.title,url:location.href});}else await copy(); } catch(e) { if(e&&e.name!=='AbortError')showToast('공유하지 못했어요'); } };
+  const cta = () => { if(window.rgTrack)window.rgTrack('reading_story_cta_clicked',{destination:'book_record'}); };
+  return <div className="stage"><div className="app" style={{overflowY:'auto',background:'var(--paper)'}}><main style={{width:'min(100%,620px)',margin:'0 auto',padding:'calc(28px + var(--safe-top, 0px)) 18px calc(40px + var(--safe-bottom, 0px))',boxSizing:'border-box'}}>
+    <header style={{textAlign:'center',marginBottom:24}}>{book.coverUrl&&<img src={book.coverUrl} alt={`${book.title || '책'} 표지`} style={{width:132,height:184,objectFit:'cover',borderRadius:'var(--r-sm)',boxShadow:'0 8px 24px rgba(0,0,0,.16)'}}/>}<p style={{fontSize:12,fontWeight:800,color:'var(--brand-3)',margin:'18px 0 6px'}}>완독 독서 이야기</p><h1 style={{fontSize:24,lineHeight:1.35,margin:'0 0 7px'}}>{story.title||book.title}</h1><p style={{margin:0,color:'var(--ink-2)'}}>{book.author}</p>{story.completedAt&&<p style={{fontSize:12,color:'var(--ink-3)'}}>완독 {String(story.completedAt).slice(0,10)}</p>}</header>
+    <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:22}}><button onClick={share} style={{minHeight:44,padding:'0 16px',border:0,borderRadius:12,background:'var(--brand)',color:'#fff',fontWeight:800}}>공유</button><button onClick={copy} style={{minHeight:44,padding:'0 16px',border:0,borderRadius:12,background:'var(--brand-soft)',color:'var(--brand-3)',fontWeight:800}}>링크 복사</button></div>
+    <article aria-label={`${book.title || '책'} 독서 이야기`}>{(story.pages||[]).slice().sort((a,b)=>a.position-b.position).map((page,index)=><section key={index} style={{padding:'18px 16px',marginBottom:12,borderRadius:'var(--r-md)',background:page.type==='quote'?'var(--brand-tint)':page.type==='note'?'var(--violet-soft, #ECE2FB)':'var(--card)',boxShadow:'0 1px 0 var(--line)'}}><div style={{fontSize:11,fontWeight:900,color:'var(--ink-3)',marginBottom:7}}>{page.type==='quote'?'인용':page.type==='note'?'독자의 생각':page.type==='review'?'완독 소감':page.type==='intro'?'읽기 시작':'마무리'}</div><div style={{fontFamily:page.type==='quote'?'var(--font-quote)':'inherit',fontStyle:page.type==='quote'?'italic':'normal',fontSize:page.type==='quote'?18:15,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{page.type==='quote'?'“'+page.text+'”':page.text}</div>{page.page!=null&&<div style={{fontSize:11,color:'var(--ink-3)',marginTop:8}}>{page.page}쪽</div>}</section>)}</article>
+    <section style={{display:'flex',alignItems:'center',gap:10,padding:'18px 4px',borderTop:'1px solid var(--line)'}}>{author.avatarUrl&&<img src={author.avatarUrl} alt="" style={{width:44,height:44,borderRadius:'50%',objectFit:'cover'}}/>}<div style={{flex:1}}><div style={{fontWeight:800}}>{author.displayName||'ReadingGo 독자'}</div>{author.handle&&<a href={`/?profile=${encodeURIComponent(author.handle)}`} style={{fontSize:12,color:'var(--brand-3)'}}>@{author.handle} 프로필</a>}</div><button type="button" onClick={()=>{setReportError('');setReportNeedsLogin(false);setReportOpen(true);}} style={{minWidth:64,minHeight:44,border:0,background:'transparent',color:'var(--ink-3)'}}>신고</button></section>
+    <a href="/" onClick={cta} style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:52,borderRadius:'var(--r-md)',background:'var(--brand)',color:'#fff',fontWeight:900,textDecoration:'none'}}>나도 이 책의 문장을 기록하기</a>
+  </main>
+  {reportOpen && <div role="presentation" onClick={()=>!reportBusy&&setReportOpen(false)} style={{position:'fixed',inset:0,zIndex:1600,background:'rgba(19,24,20,.45)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <section role="dialog" aria-modal="true" aria-labelledby="story-report-title" onClick={e=>e.stopPropagation()} style={{width:'min(100%,620px)',background:'var(--card)',borderRadius:'20px 20px 0 0',padding:'20px 18px calc(20px + var(--safe-bottom, 0px))',boxSizing:'border-box'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}><h2 id="story-report-title" style={{fontSize:18,margin:0,flex:1}}>이 이야기 신고</h2><button type="button" aria-label="신고 닫기" disabled={reportBusy} onClick={()=>setReportOpen(false)} style={{width:44,height:44,border:0,background:'transparent',fontSize:24}}>×</button></div>
+      <p style={{fontSize:13,color:'var(--ink-3)',margin:'4px 0 14px'}}>신고 이유와 필요한 설명만 전달돼요.</p>
+      <label style={{display:'block',fontWeight:800,fontSize:13}}>신고 이유<select value={reportReason} onChange={e=>setReportReason(e.target.value)} disabled={reportBusy} style={{display:'block',width:'100%',minHeight:48,marginTop:7,padding:'0 12px',border:'1.5px solid var(--line)',borderRadius:12,background:'var(--card)',font:'inherit'}}><option value="">선택해 주세요</option>{_readingStoryReportReasons.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+      <label style={{display:'block',fontWeight:800,fontSize:13,marginTop:14}}>상세 내용 <span style={{fontWeight:500,color:'var(--ink-3)'}}>(선택)</span><textarea value={reportDetail} onChange={e=>setReportDetail(e.target.value)} maxLength={500} disabled={reportBusy} rows={4} style={{display:'block',width:'100%',boxSizing:'border-box',marginTop:7,padding:12,border:'1.5px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
+      <div style={{fontSize:11,color:'var(--ink-3)',textAlign:'right'}}>{Array.from(reportDetail).length}/500</div>
+      {reportError&&<div role="alert" style={{fontSize:13,color:'var(--danger)',fontWeight:700,marginTop:8}}>{reportError}</div>}
+      {reportNeedsLogin&&<button type="button" onClick={startReportLogin} style={{width:'100%',minHeight:48,marginTop:10,border:0,borderRadius:12,background:'var(--brand-soft)',color:'var(--brand-3)',fontWeight:800}}>Google로 로그인</button>}
+      <button type="button" onClick={submitReport} disabled={reportBusy||!reportReason} style={{width:'100%',minHeight:50,marginTop:14,border:0,borderRadius:12,background:'var(--danger)',color:'#fff',fontWeight:900,opacity:(reportBusy||!reportReason)?0.55:1}}>{reportBusy?'접수 중…':'신고 접수'}</button>
+    </section>
+  </div>}
+  </div></div>;
+}
+
 function App() {
   const { useState, useCallback, useMemo, useEffect } = React;
   // Phase 1: Supabase 설정 시 로그인 게이트 + 실데이터. 미설정/미로그인은 localStorage 폴백.
@@ -715,7 +814,7 @@ function App() {
   const [bookDetailId, setBookDetailId] = useState(null);        // 미소유 책 → BookInfoModal(canonical book id)
   const [bookDetailItem, setBookDetailItem] = useState(null);    // 소유 책 → BookDetailModal(리치 user_book 아이템)
   useEffect(() => {
-    window.RG_openBook = (id) => {
+    window.RG_openBook = (id, options) => {
       const DS = window.DataStore || {};
       // 소유 여부를 먼저 확인한 뒤 알맞은 모달을 연다(정보→상세 깜빡임 방지). 실패 시 정보 모달 폴백.
       Promise.resolve((DS.myBooks && DS.myBooks.list) ? DS.myBooks.list() : [])
@@ -724,7 +823,7 @@ function App() {
           if (ub) {
             const b = ub.book || {};
             // library.js allItems 와 동일한 리치 아이템 매핑(단일 소스 일치 — BookDetailModal 계약).
-            setBookDetailItem({ ubId: ub.id, id: ub.book_id || id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, recap: ub.companion_recap || '', description: (b.description || '').trim(), source: b.source || '' });
+            setBookDetailItem({ ubId: ub.id, id: ub.book_id || id, title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '', cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'], total: b.total_pages || 0, isbn: b.isbn13 || '', cur: ub.current_page || 0, status: ub.status, rating: ub.rating, comment: ub.review_text, completedAt: ub.completed_at, recap: ub.companion_recap || '', description: (b.description || '').trim(), source: b.source || '', openReadingStory: !!(options && options.openReadingStory), storyEntry: (options && options.storyEntry) || 'book_detail' });
             setBookDetailId(null);
           } else {
             setBookDetailId(id); setBookDetailItem(null);
@@ -1596,4 +1695,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+const _publicStoryMatch = location.pathname.match(/^\/s\/([^/]+)\/?$/);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  _publicStoryMatch ? <PublicReadingStory slug={_publicStoryMatch[1]} /> : <App />
+);

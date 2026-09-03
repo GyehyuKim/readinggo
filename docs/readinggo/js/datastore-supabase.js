@@ -622,6 +622,79 @@
       },
     },
 
+    /* 완독 독서 이야기 (#1590) — base table을 건드리지 않고 제한 RPC만 사용한다. */
+    readingStories: {
+      async _localDraftKey(userBookId) {
+        if (!userBookId) return null;
+        let userId = null;
+        try { userId = await uid(); } catch (e) { return null; }
+        if (!userId) return null;
+        return 'rg_reading_story_draft_v1:' + encodeURIComponent(String(userId)) + ':' + encodeURIComponent(String(userBookId));
+      },
+      async readLocalDraft(userBookId) {
+        const key = await this._localDraftKey(userBookId); if (!key) return null;
+        try {
+          const value = JSON.parse(localStorage.getItem(key) || 'null');
+          return value && Array.isArray(value.pages) ? value : null;
+        } catch (e) { return null; }
+      },
+      async writeLocalDraft(userBookId, pages, revision) {
+        const key = await this._localDraftKey(userBookId); if (!key) return false;
+        try {
+          localStorage.setItem(key, JSON.stringify({ pages, revision, updatedAt:new Date().toISOString() }));
+          return true;
+        } catch (e) { return false; }
+      },
+      async removeLocalDraft(userBookId) {
+        const key = await this._localDraftKey(userBookId); if (!key) return false;
+        try { localStorage.removeItem(key); return true; } catch (e) { return false; }
+      },
+      async getByBook(userBookId) {
+        return unwrap(await sb().rpc('reading_story_owner', { p_user_book_id: userBookId }));
+      },
+      async saveDraft({ userBookId, pages }) {
+        return unwrap(await sb().rpc('reading_story_save_draft', {
+          p_user_book_id: userBookId,
+          p_pages: Array.isArray(pages) ? pages.map((page) => {
+            const out = { type: page.type };
+            if (page.type === 'quote' || page.type === 'note') out.sentenceId = page.sentenceId;
+            else out.text = page.text;
+            if (page.isCover) out.isCover = true;
+            return out;
+          }) : pages,
+        }));
+      },
+      async republish({ userBookId, pages }) {
+        return unwrap(await sb().rpc('reading_story_republish', {
+          p_user_book_id: userBookId,
+          p_pages: Array.isArray(pages) ? pages.map((page) => {
+            const out = { type: page.type };
+            if (page.type === 'quote' || page.type === 'note') out.sentenceId = page.sentenceId;
+            else out.text = page.text;
+            if (page.isCover) out.isCover = true;
+            return out;
+          }) : pages,
+        }));
+      },
+      async publish(storyId) {
+        return unwrap(await sb().rpc('reading_story_publish', { p_story_id: storyId }));
+      },
+      async unpublish(storyId) {
+        return unwrap(await sb().rpc('reading_story_unpublish', { p_story_id: storyId }));
+      },
+      async report({ slug, reason, detail }) {
+        return unwrap(await sb().rpc('reading_story_report', {
+          p_slug: slug,
+          p_reason: reason,
+          p_detail: String(detail || '').slice(0, 500),
+        }));
+      },
+      async getPublic(slug) {
+        // anonymous/public 화면의 유일한 read 경계. 내부 ID·visibility·moderation 필드는 RPC가 제거한다.
+        return unwrap(await sb().rpc('reading_story_public', { p_slug: slug }));
+      },
+    },
+
     /* 시간차 되감기 노출 게이트 (#346, resurface.md §2.1·§4.2) — 1일 1회.
        기기 로컬 넛지 억제라 localStorage 키 rg_resurface_last 사용(서버 저장 불필요). */
     resurface: {

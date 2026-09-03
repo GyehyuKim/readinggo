@@ -6,8 +6,293 @@
    lexical 훅만 재선언. decodeEntities는 window 전역(components.js)으로 해소(library 로컬 중복 제거).
    ========================================================= */
 
-const { useState: _useState, useEffect: _useEffect } = React;
+const { useState: _useState, useEffect: _useEffect, useRef: _useRef } = React;
 const _bookSentenceLength = (value) => Array.from(String(value == null ? '' : value).trim()).length;
+
+const _storyButton = { minHeight:48, border:'none', borderRadius:12, padding:'10px 14px', fontWeight:800, cursor:'pointer' };
+const _storyPublicQuote = (q) => q && q.id && q.visibility === 'public' && !q.isPrivate;
+const _storyPublicNote = (q) => _storyPublicQuote(q) && !q.notePrivate && !q.note_private && !!String(q.note || q.my_note || '').trim();
+const _storyBucket = (count) => count <= 0 ? '0' : count <= 3 ? '1_3' : count <= 6 ? '4_6' : '7_plus';
+const _storyLink = (slug) => {
+  const origin = ((window.RG_CONFIG && (window.RG_CONFIG.SHARE_ORIGIN || window.RG_CONFIG.API_ORIGIN)) || location.origin).replace(/\/$/, '');
+  return origin + '/s/' + slug;
+};
+
+function _createReadingStorySaveQueue() {
+  let tail = Promise.resolve();
+  let savedRevision = 0;
+  const pending = new Map();
+  return {
+    enqueue(revision, task) {
+      if (revision <= savedRevision) return Promise.resolve({ skipped:true, revision });
+      if (pending.has(revision)) return pending.get(revision);
+      const run = tail.catch(() => {}).then(task).then(value => {
+        savedRevision = Math.max(savedRevision, revision);
+        return { value, revision };
+      });
+      pending.set(revision, run);
+      tail = run.then(
+        () => { pending.delete(revision); },
+        () => { pending.delete(revision); },
+      );
+      return run;
+    },
+    savedRevision() { return savedRevision; },
+  };
+}
+
+function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onClose, onStory }) {
+  const [story, setStory] = _useState(initialStory || null);
+  const [items, setItems] = _useState([]);
+  const [intro, setIntro] = _useState('');
+  const [outro, setOutro] = _useState('');
+  const [coverId, setCoverId] = _useState('');
+  const [ready, setReady] = _useState(false);
+  const [dirty, setDirty] = _useState(0);
+  const [saveState, setSaveState] = _useState('불러오는 중…');
+  const [error, setError] = _useState('');
+  const [busy, setBusy] = _useState(false);
+  const [preview, setPreview] = _useState(false);
+  const revisionRef = _useRef(0);
+  const storyRef = _useRef(initialStory || null);
+  const reviewTextRef = _useRef(String(reviewText || '').trim());
+  const saveQueueRef = _useRef(null);
+  if (!saveQueueRef.current) saveQueueRef.current = _createReadingStorySaveQueue();
+  const available = (quotes || []).filter(_storyPublicQuote);
+  const byId = new Map(available.map(q => [q.id, q]));
+  const mark = () => {
+    revisionRef.current += 1;
+    setDirty(revisionRef.current);
+  };
+
+  _useEffect(() => {
+    let active = true;
+    setReady(false);
+    (async () => {
+      const store = window.DataStore;
+      const fallback = store && store.readingStories && store.readingStories.readLocalDraft
+        ? await store.readingStories.readLocalDraft(book.ubId)
+        : null;
+      if (!active) return;
+      const fallbackTime = fallback ? Date.parse(fallback.updatedAt || '') : NaN;
+      const serverTime = initialStory ? Date.parse(initialStory.updatedAt || '') : NaN;
+      const recovered = !!fallback && (!initialStory || (Number.isFinite(fallbackTime) && (!Number.isFinite(serverTime) || fallbackTime > serverTime)));
+      if (fallback && !recovered && store && store.readingStories && store.readingStories.removeLocalDraft) {
+        await store.readingStories.removeLocalDraft(book.ubId);
+        if (!active) return;
+      }
+      const source = recovered ? fallback.pages : initialStory && Array.isArray(initialStory.pages) ? initialStory.pages : [];
+      setItems(source.filter(p => (p.type === 'quote' || p.type === 'note') && byId.has(p.sentenceId))
+        .map(p => ({ type:p.type, sentenceId:p.sentenceId })));
+      setIntro((source.find(p => p.type === 'intro') || {}).text || '');
+      setOutro((source.find(p => p.type === 'outro') || {}).text || '');
+      setCoverId(((source.find(p => p.type === 'quote' && p.isCover) || {}).sentenceId) || '');
+      setSaveState(recovered ? '기기에 보관된 초안 복구됨 · 동기화 대기' : initialStory ? '저장됨' : '새 비공개 초안');
+      storyRef.current = initialStory || null;
+      const normalizedReview = String(reviewText || '').trim();
+      const storyReview = String(((source.find(p => p.type === 'review') || {}).text) || '').trim();
+      reviewTextRef.current = normalizedReview;
+      revisionRef.current = recovered ? Math.max(1, Number(fallback.revision) || 1) : normalizedReview !== storyReview ? 1 : 0;
+      saveQueueRef.current = _createReadingStorySaveQueue();
+      setDirty(revisionRef.current);
+      setReady(true);
+      if (window.rgTrack) window.rgTrack('reading_story_editor_opened', { entry:entry || 'book_detail' });
+    })();
+    return () => { active = false; };
+  }, [book.ubId]);
+  _useEffect(() => {
+    if (!ready) return;
+    const normalizedReview = String(reviewText || '').trim();
+    if (normalizedReview === reviewTextRef.current) return;
+    reviewTextRef.current = normalizedReview;
+    mark();
+  }, [reviewText, ready]);
+
+  const pages = () => {
+    const result = [];
+    if (intro.trim()) result.push({ type:'intro', text:intro.trim() });
+    items.forEach(item => result.push({ type:item.type, sentenceId:item.sentenceId, ...(item.type === 'quote' && item.sentenceId === coverId ? { isCover:true } : {}) }));
+    if (String(reviewText || '').trim()) result.push({ type:'review', text:String(reviewText).trim() });
+    if (outro.trim()) result.push({ type:'outro', text:outro.trim() });
+    return result;
+  };
+  const saveNow = async () => {
+    const revision = revisionRef.current;
+    if (!ready || !revision || revision <= saveQueueRef.current.savedRevision()) return storyRef.current;
+    const draftPages = pages();
+    const store = window.DataStore;
+    setSaveState('저장 중…'); setError('');
+    try {
+      const saved = await saveQueueRef.current.enqueue(revision, () => {
+        if (!(store && store.readingStories && store.readingStories.saveDraft)) throw new Error('reading_story_store_unavailable');
+        return Promise.resolve(store.readingStories.saveDraft({ userBookId:book.ubId, pages:draftPages }));
+      });
+      if (saved.skipped) return storyRef.current;
+      const next = saved.value;
+      if (store.readingStories.removeLocalDraft) await store.readingStories.removeLocalDraft(book.ubId);
+      storyRef.current = next;
+      setStory(next);
+      if (revisionRef.current === saved.revision) {
+        setDirty(0);
+        setSaveState('비공개 초안 저장됨');
+      } else {
+        setSaveState('저장 대기 중…');
+      }
+      if (window.rgTrack) window.rgTrack('reading_story_draft_saved', { page_count_bucket:_storyBucket(draftPages.length) });
+      if (onStory) onStory(next);
+      return next;
+    } catch (e) {
+      const locallyStored = !!(store && store.readingStories && store.readingStories.writeLocalDraft && await store.readingStories.writeLocalDraft(book.ubId, draftPages, revision));
+      if (revisionRef.current === revision) {
+        setSaveState(locallyStored ? '기기에 비공개 초안 보관됨' : '저장 실패');
+        setError(locallyStored ? '서버에 동기화하지 못해 이 계정의 기기에 초안을 보관했어요. 다시 저장해 주세요.' : '초안을 저장하지 못했어요. 입력과 순서는 그대로 두었어요.');
+      }
+      if (locallyStored && e && typeof e === 'object') e.readingStoryDraftStored = true;
+      throw e;
+    }
+  };
+  _useEffect(() => {
+    if (!ready || !dirty) return undefined;
+    if (story && story.status === 'published') {
+      setSaveState('변경됨 · 다시 발행 전까지 기존 공개본 유지');
+      return undefined;
+    }
+    setSaveState('저장 대기 중…');
+    const timer = window.setTimeout(() => { saveNow().catch(() => {}); }, 700);
+    return () => window.clearTimeout(timer);
+  }, [dirty, story && story.status]);
+
+  const addItem = (type, sentenceId) => {
+    if (items.length >= 16 || (type === 'quote' && items.filter(x => x.type === 'quote').length >= 8)) return;
+    if (items.some(x => x.type === type && x.sentenceId === sentenceId)) return;
+    setItems(v => [...v, { type, sentenceId }]);
+    if (type === 'quote' && !coverId) setCoverId(sentenceId);
+    mark();
+  };
+  const removeItem = (index) => {
+    const removed = items[index];
+    const next = items.filter((_, i) => i !== index);
+    setItems(next);
+    if (removed.type === 'quote' && removed.sentenceId === coverId) setCoverId(((next.find(x => x.type === 'quote') || {}).sentenceId) || '');
+    mark();
+  };
+  const move = (index, delta) => {
+    const target = index + delta; if (target < 0 || target >= items.length) return;
+    const next = items.slice(); [next[index], next[target]] = [next[target], next[index]]; setItems(next); mark();
+  };
+  const publish = async () => {
+    if (busy) return;
+    if (!items.some(x => x.type === 'quote')) { setError('공개할 문장을 하나 이상 선택해 주세요.'); return; }
+    setBusy(true); setError('');
+    try {
+      const store = window.DataStore;
+      const publishedPages = pages();
+      if (!(store && store.readingStories)) throw new Error('reading_story_store_unavailable');
+      let merged;
+      if (dirty && story && story.status === 'published') {
+        if (!store.readingStories.republish) throw new Error('reading_story_store_unavailable');
+        const next = await Promise.resolve(store.readingStories.republish({ userBookId:book.ubId, pages:publishedPages }));
+        merged = { ...story, ...next, pages:publishedPages };
+        if (store.readingStories.removeLocalDraft) await store.readingStories.removeLocalDraft(book.ubId);
+        setDirty(0);
+      } else {
+        const saved = dirty ? await saveNow() : story;
+        if (!saved || !saved.id) throw new Error('reading_story_draft_required');
+        if (!store.readingStories.publish) throw new Error('reading_story_store_unavailable');
+        const next = await Promise.resolve(store.readingStories.publish(saved.id));
+        merged = { ...saved, ...next, pages:publishedPages };
+      }
+      storyRef.current = merged; setStory(merged); setSaveState('공개됨');
+      if (onStory) onStory(merged);
+      if (window.rgTrack) window.rgTrack('reading_story_published', { page_count_bucket:_storyBucket(pages().length), quote_count_bucket:_storyBucket(items.filter(x => x.type === 'quote').length) });
+    } catch (e) {
+      if (/authentication_required/.test((e && e.message) || '')) { if (window.RG_login) window.RG_login(); setError('로그인하면 이야기를 발행할 수 있어요. 초안은 비공개로 보관돼요.'); }
+      else if (/terms_required/.test((e && e.message) || '')) { window.dispatchEvent(new CustomEvent('rg:ugc-terms-required')); setError('공개 콘텐츠 약관 동의 후 발행해 주세요.'); }
+      else setError('발행하지 못했어요. 초안과 선택 순서는 그대로예요. 다시 시도해 주세요.');
+    } finally { setBusy(false); }
+  };
+  const unpublish = async () => {
+    if (!story || busy || !window.confirm('공개를 취소할까요? 링크에서는 즉시 보이지 않게 돼요.')) return;
+    setBusy(true); setError('');
+    try {
+      const store = window.DataStore;
+      if (!(store && store.readingStories && store.readingStories.unpublish)) throw new Error('reading_story_store_unavailable');
+      const next = await Promise.resolve(store.readingStories.unpublish(story.id));
+      const merged = { ...story, ...next }; storyRef.current = merged; setStory(merged); setSaveState('공개 취소됨'); if (onStory) onStory(merged);
+      if (window.rgTrack) window.rgTrack('reading_story_unpublished', { reason_code:'owner_request' });
+    } catch (e) { setError('공개를 취소하지 못했어요. 다시 시도해 주세요.'); }
+    finally { setBusy(false); }
+  };
+  const copyLink = async () => {
+    if (!story || story.status !== 'published') return;
+    try { await navigator.clipboard.writeText(_storyLink(story.slug)); showToast('공개 링크를 복사했어요'); if (window.rgTrack) window.rgTrack('reading_story_link_copied', { entry:'editor' }); }
+    catch (e) { setError('링크를 복사하지 못했어요. 브라우저 권한을 확인해 주세요.'); }
+  };
+  const shareImage = async (format) => {
+    const quoteItem = items.find(x => x.type === 'quote' && x.sentenceId === coverId) || items.find(x => x.type === 'quote');
+    const quote = quoteItem && byId.get(quoteItem.sentenceId); if (!quote || busy) return;
+    setBusy(true); setError('');
+    try {
+      const noteItem = items.find(x => x.type === 'note' && x.sentenceId === quote.id);
+      const blob = await window.renderSentenceCardBlob({ ...quote, bookId:book.id, bookTitle:book.title, author:book.author, note:noteItem ? quote.note : '', entry:'reading_story' }, { format, includeNote:!!noteItem });
+      const file = new File([blob], format === '9:16' ? 'readinggo-story-9x16.png' : 'readinggo-story-square.png', { type:'image/png' });
+      let method = 'download';
+      if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], url:story && story.status === 'published' ? _storyLink(story.slug) : undefined }); method = 'web_share'; }
+      else { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast('PNG 이미지를 저장했어요'); }
+      if (window.rgTrack) window.rgTrack('reading_story_share_image_sent', { method });
+    } catch (e) { if (!(e && e.name === 'AbortError')) setError('공유 이미지를 만들지 못했어요. 다시 시도해 주세요.'); }
+    finally { setBusy(false); }
+  };
+  const close = async () => {
+    try {
+      if (dirty && story && story.status === 'published') {
+        const store = window.DataStore;
+        const locallyStored = !!(store && store.readingStories && store.readingStories.writeLocalDraft && await store.readingStories.writeLocalDraft(book.ubId, pages(), revisionRef.current));
+        if (!locallyStored) { setSaveState('저장 실패'); setError('변경사항을 기기에 보관하지 못했어요. 다시 시도해 주세요.'); return; }
+      } else if (dirty) await saveNow();
+      onClose();
+    }
+    catch (e) { if (e && e.readingStoryDraftStored) onClose(); }
+  };
+  const renderedPages = pages().map((p, position) => ({ ...p, position, text:(p.type === 'quote' ? (byId.get(p.sentenceId) || {}).text : p.type === 'note' ? ((byId.get(p.sentenceId) || {}).note || '') : p.text) }));
+
+  // BookDetailModal보다 나중에 등록하고 preview를 마지막에 등록해 system/browser back이
+  // preview → save-aware editor → underlying book modal 순으로 정확히 한 겹씩 닫게 한다.
+  const _storyOverlayBack = window.useOverlayBack || (() => {});
+  _storyOverlayBack(true, close);
+  _storyOverlayBack(preview, () => setPreview(false));
+
+  return <div role="presentation" style={{position:'fixed', inset:0, zIndex:1400, background:'var(--paper)'}}>
+    <section role="dialog" aria-modal="true" aria-labelledby="story-editor-title" style={{width:'min(100%, 620px)', height:'100%', margin:'0 auto', display:'flex', flexDirection:'column', background:'var(--card)'}}>
+      <header style={{padding:'calc(12px + var(--safe-top, 0px)) 14px 10px', borderBottom:'1px solid var(--line)', display:'flex', alignItems:'center', gap:10}}>
+        <button type="button" aria-label="독서 이야기 닫기" onClick={close} style={{..._storyButton, width:44, minHeight:44, padding:0, background:'var(--paper-2)', color:'var(--ink)'}}>←</button>
+        <div style={{flex:1,minWidth:0}}><h2 id="story-editor-title" style={{fontSize:17,margin:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{book.title} 독서 이야기</h2><div role="status" aria-live="polite" style={{fontSize:11,color:error?'var(--danger)':'var(--ink-3)',marginTop:3}}>{saveState}</div></div>
+        <button type="button" onClick={() => setPreview(v => !v)} style={{..._storyButton,minHeight:44,background:'var(--brand-soft)',color:'var(--brand-3)'}}>{preview?'편집':'미리보기'}</button>
+      </header>
+      <div style={{flex:1,overflowY:'auto',padding:'16px 16px calc(120px + var(--safe-bottom, 0px))'}}>
+        {error && <div role="alert" style={{padding:12,marginBottom:12,borderRadius:12,background:'var(--danger-soft, #FDECEC)',color:'var(--danger)',fontSize:13,fontWeight:700}}>{error} {saveState === '저장 실패' && <button onClick={() => saveNow().catch(()=>{})} style={{marginLeft:6}}>다시 저장</button>}</div>}
+        {!ready ? <div aria-busy="true">초안을 불러오는 중…</div> : preview ? <ReadingStoryPages pages={renderedPages} book={book} /> : <>
+          <label style={{display:'block',fontWeight:800,fontSize:13}}>도입 <span style={{color:'var(--ink-3)'}}>(선택)</span><textarea value={intro} maxLength={1200} onChange={e=>{setIntro(e.target.value);mark();}} rows={3} placeholder="이 책을 읽은 이유" style={{width:'100%',boxSizing:'border-box',marginTop:7,padding:12,border:'1.5px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
+          <h3 style={{fontSize:15,margin:'20px 0 4px'}}>공개할 문장과 생각 선택</h3><p style={{fontSize:12,color:'var(--ink-3)',margin:'0 0 10px'}}>public 문장만 선택할 수 있어요. 비공개·팔로워 공개 문장과 비공개 생각은 제외돼요.</p>
+          {available.length === 0 ? <div style={{padding:14,background:'var(--paper-2)',borderRadius:12,fontSize:13}}>먼저 기억할 문장을 공개로 남겨보세요.</div> : available.map(q => <div key={q.id} style={{padding:12,border:'1px solid var(--line)',borderRadius:12,marginBottom:8}}>
+            <div style={{fontFamily:'var(--font-quote)',lineHeight:1.55}}>“{q.text}”</div><div style={{fontSize:11,color:'var(--ink-3)',marginTop:4}}>{q.page != null ? q.page+'쪽' : '페이지 미상'}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}><button type="button" aria-pressed={items.some(x=>x.type==='quote'&&x.sentenceId===q.id)} onClick={()=>items.some(x=>x.type==='quote'&&x.sentenceId===q.id)?removeItem(items.findIndex(x=>x.type==='quote'&&x.sentenceId===q.id)):addItem('quote',q.id)} style={{..._storyButton,minHeight:44,background:'var(--brand-soft)',color:'var(--brand-3)'}}>문장 {items.some(x=>x.type==='quote'&&x.sentenceId===q.id)?'선택됨':'선택'}</button>
+            {_storyPublicNote(q) && <button type="button" aria-pressed={items.some(x=>x.type==='note'&&x.sentenceId===q.id)} onClick={()=>items.some(x=>x.type==='note'&&x.sentenceId===q.id)?removeItem(items.findIndex(x=>x.type==='note'&&x.sentenceId===q.id)):addItem('note',q.id)} style={{..._storyButton,minHeight:44,background:'var(--paper-2)',color:'var(--ink-2)'}}>생각 {items.some(x=>x.type==='note'&&x.sentenceId===q.id)?'선택됨':'선택'}</button>}</div>
+          </div>)}
+          <h3 style={{fontSize:15,margin:'20px 0 8px'}}>카드 순서</h3>{items.length===0?<p style={{fontSize:13,color:'var(--ink-3)'}}>아직 선택한 카드가 없어요.</p>:items.map((item,i)=>{const q=byId.get(item.sentenceId)||{};return <div key={item.type+item.sentenceId} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center',padding:'9px 10px',background:'var(--paper-2)',borderRadius:12,marginBottom:6}}><div><b>{item.type==='quote'?'문장':'내 생각'}</b><div style={{fontSize:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:300}}>{item.type==='quote'?q.text:q.note}</div>{item.type==='quote'&&<label style={{display:'inline-flex',alignItems:'center',minHeight:44,gap:6,fontSize:12}}><input type="radio" name="story-cover" checked={coverId===item.sentenceId} onChange={()=>{setCoverId(item.sentenceId);mark();}} /> 대표 카드</label>}</div><div style={{display:'flex'}}><button aria-label={`${i+1}번 카드를 위로`} disabled={i===0} onClick={()=>move(i,-1)} style={{width:44,height:44}}>↑</button><button aria-label={`${i+1}번 카드를 아래로`} disabled={i===items.length-1} onClick={()=>move(i,1)} style={{width:44,height:44}}>↓</button><button aria-label={`${i+1}번 카드 제거`} onClick={()=>removeItem(i)} style={{width:44,height:44}}>×</button></div></div>})}
+          {items.some(x=>x.type==='quote')&&!items.some(x=>x.type==='note')&&<p style={{fontSize:12,color:'var(--brand-3)'}}>내 생각을 더하면 나만의 독서 이야기가 돼요.</p>}
+          <label style={{display:'block',fontWeight:800,fontSize:13,marginTop:18}}>마무리 <span style={{color:'var(--ink-3)'}}>(선택)</span><textarea value={outro} maxLength={1200} onChange={e=>{setOutro(e.target.value);mark();}} rows={3} placeholder="누구에게 추천하고 싶은지 남겨보세요" style={{width:'100%',boxSizing:'border-box',marginTop:7,padding:12,border:'1.5px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
+        </>}
+        {story && story.status === 'published' && <div style={{marginTop:20,padding:12,background:'var(--brand-tint)',borderRadius:12}}><b>이야기가 공개 중이에요.</b><div style={{display:'grid',gap:8,marginTop:10}}><button onClick={copyLink} style={{..._storyButton,background:'var(--brand-soft)',color:'var(--brand-3)'}}>공개 링크 복사</button><button onClick={()=>shareImage('9:16')} disabled={busy} style={{..._storyButton,background:'var(--brand)',color:'#fff'}}>Instagram 스토리용 9:16 PNG</button><button onClick={()=>shareImage('1:1')} disabled={busy} style={{..._storyButton,background:'var(--brand-soft)',color:'var(--brand-3)'}}>Instagram 피드용 1:1 PNG</button><p style={{fontSize:12,color:'var(--ink-3)',margin:0}}>Instagram에서 링크 스티커에 복사한 링크를 붙여 넣으세요.</p><button onClick={unpublish} disabled={busy} style={{..._storyButton,background:'transparent',color:'var(--danger)'}}>공개 취소</button></div></div>}
+      </div>
+      <footer style={{position:'absolute',left:0,right:0,bottom:0,maxWidth:620,margin:'0 auto',padding:'10px 16px calc(10px + var(--safe-bottom, 0px))',background:'var(--card)',borderTop:'1px solid var(--line)'}}><button type="button" onClick={publish} disabled={busy||!ready||!items.some(x=>x.type==='quote')} style={{..._storyButton,width:'100%',background:'var(--brand)',color:'#fff',opacity:(busy||!items.some(x=>x.type==='quote'))?0.55:1}}>{busy?'처리 중…':story&&story.status==='published'?'변경사항 저장 후 다시 발행':'발행하기'}</button></footer>
+    </section>
+  </div>;
+}
+
+function ReadingStoryPages({ pages, book }) {
+  return <article aria-label={`${book.title} 독서 이야기 미리보기`}><div style={{textAlign:'center',marginBottom:20}}>{book.cover&&<img src={book.cover} alt={`${book.title} 표지`} style={{width:120,height:168,objectFit:'cover',borderRadius:'var(--r-sm)'}} />}<h2>{book.title}</h2><p style={{color:'var(--ink-2)'}}>{book.author}</p></div>{(pages||[]).map((p,i)=><section key={i} style={{padding:16,marginBottom:10,borderRadius:12,background:p.type==='quote'?'var(--brand-tint)':p.type==='note'?'var(--violet-soft, #ECE2FB)':'var(--paper-2)'}}><div style={{fontSize:11,fontWeight:800,color:'var(--ink-3)',marginBottom:6}}>{p.type==='quote'?'인용':p.type==='note'?'내 생각':p.type==='review'?'완독 소감':p.type==='intro'?'시작':'마무리'}</div><div style={{fontFamily:p.type==='quote'?'var(--font-quote)':'inherit',fontStyle:p.type==='quote'?'italic':'normal',whiteSpace:'pre-wrap',lineHeight:1.65}}>{p.type==='quote'?'“'+(p.text||'')+'”':p.text}</div>{p.page!=null&&<div style={{fontSize:11,color:'var(--ink-3)',marginTop:6}}>{p.page}쪽</div>}</section>)}</article>;
+}
 
 /* ── BookDetailModal ─────────────────────────────────────── */
 function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
@@ -115,6 +400,23 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // #610: 자체 삭제/좋아요/공개범위 핸들러 폐기 → 공용 SentenceActions 가 담당(아래 한 문장 카드).
   const [savedRating, setSavedRating] = _useState(book.rating);
   const [savedReview, setSavedReview] = _useState(book.comment || '');
+  const [storyOpen, setStoryOpen] = _useState(false);
+  const [readingStory, setReadingStory] = _useState(null);
+  const [storyLoading, setStoryLoading] = _useState(book.status === 'completed');
+  const [storyLoadError, setStoryLoadError] = _useState(false);
+  const loadReadingStory = () => {
+    const store = window.DataStore;
+    if (book.status !== 'completed' || !book.ubId || !(store && store.readingStories && store.readingStories.getByBook)) return;
+    setStoryLoading(true); setStoryLoadError(false);
+    Promise.resolve(store.readingStories.getByBook(book.ubId))
+      .then(value => { setReadingStory(value || null); setStoryLoading(false); })
+      .catch(() => { setStoryLoadError(true); setStoryLoading(false); });
+  };
+  _useEffect(() => { loadReadingStory(); }, [book.ubId, book.status]);
+  const publicStoryQuoteCount = bookQuotes.filter(_storyPublicQuote).length;
+  _useEffect(() => {
+    if (book.openReadingStory && !storyLoading && !storyLoadError && publicStoryQuoteCount > 0) setStoryOpen(true);
+  }, [book.openReadingStory, storyLoading, storyLoadError, publicStoryQuoteCount]);
   const bookshelfEntry = (book.status === 'completed') ? { rating: savedRating, comment: savedReview } : null;
   // 스포일러 전역 토글 + 카드별 탭 공개 (§5.7.1)
   const revealAll = React.useContext(SpoilerContext);
@@ -501,6 +803,17 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                 </>
               )}
             </div>
+          )}
+
+          {/* 완독 독서 이야기 (#1590) — 공개 가능한 문장을 사용자가 직접 고른다. */}
+          {bookshelfEntry && (
+            <section data-section="secondary-reading-story" aria-labelledby="reading-story-heading" style={{order:2,background:'var(--paper-2)',borderRadius:12,padding:'12px 14px',marginBottom:14}}>
+              <h3 id="reading-story-heading" style={{fontSize:14,margin:'0 0 5px'}}>내 독서 이야기</h3>
+              {storyLoading ? <div role="status" aria-busy="true" style={{fontSize:12,color:'var(--ink-3)'}}>이야기 상태를 불러오는 중…</div>
+                : storyLoadError ? <div role="alert" style={{fontSize:12,color:'var(--danger)'}}>이야기 상태를 불러오지 못했어요. <button onClick={loadReadingStory}>다시 시도</button></div>
+                : bookQuotes.filter(_storyPublicQuote).length === 0 ? <><p style={{fontSize:12,color:'var(--ink-2)',margin:'0 0 8px'}}>먼저 기억할 문장을 공개로 남겨보세요.</p><button type="button" onClick={()=>{const target=document.querySelector('[data-section="secondary-add-quote"]');if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}} style={{..._storyButton,minHeight:44,background:'var(--brand-soft)',color:'var(--brand-3)'}}>문장 남기러 가기</button></>
+                : <><p style={{fontSize:12,color:'var(--ink-2)',margin:'0 0 8px'}}>{readingStory&&readingStory.status==='published'?'공개 중인 이야기를 보고 공유하거나 편집할 수 있어요.':readingStory?'비공개 초안을 이어서 완성해 보세요.':'문장과 생각을 골라 나만의 완독 이야기를 만들어요.'}</p><button type="button" onClick={()=>setStoryOpen(true)} style={{..._storyButton,minHeight:44,background:'var(--brand)',color:'#fff'}}>{readingStory&&readingStory.status==='published'?'이야기 보기·공유하기':readingStory?'이야기 이어서 만들기':'독서 이야기 만들기'}</button></>}
+            </section>
           )}
 
           {/* 참새의 완독 회고 (§5.8.6, #259) — 내 한 문장들을 참새(solar-pro3)가 엮어 회고 한 단락 */}
@@ -904,6 +1217,11 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </div>
           </div>
         </div>
+      )}
+
+      {storyOpen && (
+        <ReadingStoryEditor book={book} quotes={bookQuotes.filter(_storyPublicQuote)} initialStory={readingStory}
+          reviewText={savedReview} entry={book.storyEntry || 'book_detail'} onClose={()=>setStoryOpen(false)} onStory={setReadingStory} />
       )}
     </div>
   );

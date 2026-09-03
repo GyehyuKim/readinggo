@@ -197,6 +197,7 @@ const localStorageAdapter = (function () {
       wish_books: Array.isArray(window.WISHLIST) ? window.WISHLIST.slice() : [],
       wish_book_created_at: {}, // local wish 생성 시각. legacy id 배열은 거짓 시각을 만들지 않고 결측 유지.
       settings: {},    // 사용자 설정. default_sentence_visibility 미설정은 public 으로 해석(#1261)
+      reading_stories: [], // 완독 독서 이야기 private draft/published 로컬 계약(#1590)
       pending: {},    // 가입 전 임시 (rg_pending_*)
     };
   }
@@ -800,6 +801,112 @@ const DataStore = {
     // 같은 책 피드 (Supabase 어댑터와 표면 일치) — 로컬(Phase 0)엔 타 사용자 없음 → 빈 배열.
     // (bookId, {limit?, sort?}) 시그니처는 supabase 표면 일치용 — 게스트는 sort='likes'(#594)도 빈 폴백.
     byBook(bookId, opts) { return []; },
+  },
+
+  /* 완독 독서 이야기 (#1590) — Supabase RPC와 같은 메서드 표면.
+     local은 private draft/미리보기만 영속한다. 공개 발행은 인증 어댑터가 담당한다. */
+  readingStories: {
+    _localDraftKey(userBookId) {
+      if (!userBookId) return null;
+      return 'rg_reading_story_draft_v1:local:' + encodeURIComponent(String(userBookId));
+    },
+    readLocalDraft(userBookId) {
+      const key = this._localDraftKey(userBookId); if (!key) return null;
+      try {
+        const value = JSON.parse(localStorage.getItem(key) || 'null');
+        return value && Array.isArray(value.pages) ? value : null;
+      } catch (e) { return null; }
+    },
+    writeLocalDraft(userBookId, pages, revision) {
+      const key = this._localDraftKey(userBookId); if (!key) return false;
+      try {
+        localStorage.setItem(key, JSON.stringify({ pages, revision, updatedAt:new Date().toISOString() }));
+        return true;
+      } catch (e) { return false; }
+    },
+    removeLocalDraft(userBookId) {
+      const key = this._localDraftKey(userBookId); if (!key) return false;
+      try { localStorage.removeItem(key); return true; } catch (e) { return false; }
+    },
+    getByBook(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        const story = (s.reading_stories || []).find(x => x.userBookId === userBookId);
+        return story ? JSON.parse(JSON.stringify(story)) : null;
+      });
+    },
+    saveDraft({ userBookId, pages }) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub || ub.status !== 'completed') throw new Error('reading_story_completed_book_required');
+        if (!Array.isArray(pages) || pages.length > 20) throw new Error('reading_story_page_limit');
+        let quotes = 0, covers = 0;
+        const normalized = pages.map((page, position) => {
+          if (!page || !['intro', 'quote', 'note', 'review', 'outro'].includes(page.type)) throw new Error('reading_story_invalid_page_type');
+          if (page.type === 'quote' || page.type === 'note') {
+            const sentence = (ub.sentences || []).find(x => x.id === page.sentenceId);
+            if (!sentence) throw new Error('reading_story_sentence_mismatch');
+            if (page.type === 'quote') quotes++;
+            if (page.isCover) covers++;
+            return { type: page.type, position, sentenceId: sentence.id, text: page.type === 'quote' ? sentence.text : sentence.my_note, page: sentence.page, isCover: !!page.isCover };
+          }
+          const text = String(page.text || '').trim();
+          if (!text || Array.from(text).length > 1200 || page.isCover) throw new Error('reading_story_text_length');
+          return { type: page.type, position, text, isCover: false };
+        });
+        if (quotes > 8) throw new Error('reading_story_quote_limit');
+        if (covers > 1) throw new Error('reading_story_cover_limit');
+        s.reading_stories = s.reading_stories || [];
+        let story = s.reading_stories.find(x => x.userBookId === userBookId);
+        const now = new Date().toISOString();
+        if (!story) {
+          const bytes = new Uint8Array(18);
+          try { (window.crypto || window.msCrypto).getRandomValues(bytes); }
+          catch (e) { for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256); }
+          const slug = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+          story = { id: _dsId('story'), userBookId, slug, status: 'draft', publishedAt: null };
+          s.reading_stories.push(story);
+        }
+        Object.assign(story, { status: 'draft', publishedAt: null, updatedAt: now, pages: normalized });
+        return JSON.parse(JSON.stringify(story));
+      });
+    },
+    async republish() {
+      // 공개본의 원자적 교체는 인증된 서버 RPC만 수행한다.
+      throw new Error('reading_story_authentication_required');
+    },
+    async publish() {
+      // 게스트 local adapter는 공개 URL을 만들지 않는다(reading-story.md §7.2).
+      throw new Error('reading_story_authentication_required');
+    },
+    unpublish(storyId) {
+      return localStorageAdapter.mutate(s => {
+        const story = (s.reading_stories || []).find(x => x.id === storyId);
+        if (!story) throw new Error('reading_story_not_found');
+        story.status = 'unpublished'; story.updatedAt = new Date().toISOString();
+        return JSON.parse(JSON.stringify(story));
+      });
+    },
+    async report() {
+      // 신고는 인증된 서버 RPC만 성공할 수 있다. 로컬은 성공을 흉내 내지 않는다.
+      throw new Error('reading_story_authentication_required');
+    },
+    getPublic(slug) {
+      return localStorageAdapter.mutate(s => {
+        const story = (s.reading_stories || []).find(x => x.slug === slug && x.status === 'published');
+        if (!story) return null;
+        const ub = _ubById(s, story.userBookId);
+        if (!ub || ub.status !== 'completed') return null;
+        const pages = [];
+        for (const page of story.pages || []) {
+          if (page.type === 'quote' || page.type === 'note') {
+            const sentence = (ub.sentences || []).find(x => x.id === page.sentenceId);
+            if (!sentence || sentence.visibility !== 'public' || (page.type === 'note' && (sentence.note_private || !String(sentence.my_note || '').trim()))) return null;
+            pages.push({ type: page.type, position: page.position, text: page.type === 'quote' ? String(sentence.text || '').slice(0, 500) : sentence.my_note, page: sentence.page, isCover: !!page.isCover });
+          } else pages.push({ type: page.type, position: page.position, text: page.text, page: null, isCover: false });
+        }
+        return { slug: story.slug, title: (ub.book && ub.book.title) || '', publishedAt: story.publishedAt, completedAt: ub.completed_at, book: { title: (ub.book && ub.book.title) || '', author: (ub.book && ub.book.author) || '', coverUrl: (ub.book && ub.book.cover_url) || '' }, author: { displayName: 'ReadingGo 독자', handle: '', avatarUrl: '' }, pages };
+      });
+    },
   },
 
   /* 시간차 되감기 노출 게이트 (#346, resurface.md §2.1·§4.2) — 1일 1회.
