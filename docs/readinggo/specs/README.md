@@ -23,6 +23,7 @@
 |  | [`systems.md`](./systems.md) | 성장일·레거시 스트릭·XP 전환·NPC 시스템 |
 | **기록·탐색** | [`resurface.md`](./resurface.md) | 저장 문장 되감기 |
 |  | [`share.md`](./share.md) | 문장 외부 공유 카드 |
+|  | [`reading-story.md`](./reading-story.md) | 한 문장 공유와 완독 독서 이야기·공개 링크 |
 |  | [`barcode-scan.md`](./barcode-scan.md) | ISBN 스캔 책 등록 |
 |  | [`integrated-shelf.md`](./integrated-shelf.md) | 서가 복원·검토함·시드 문장 |
 |  | [`flexible-import.md`](./flexible-import.md) | 텍스트·파일 도서 기록 임포트 |
