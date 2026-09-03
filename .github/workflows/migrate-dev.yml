@@ -186,7 +186,7 @@ jobs:
           print('activity inbox DEV regression passed and rolled back')
           PY
       - name: Verify reading story role matrix with rollback
-        if: inputs.migration == '60_reading_stories.sql' || inputs.migration == '61_reading_story_slug_schema.sql' || inputs.migration == '62_reading_story_publish_terms.sql'
+        if: inputs.migration == '63_reading_story_report_slug.sql'
         env:
           DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

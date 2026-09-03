@@ -178,12 +178,17 @@ begin
   update public.sentences set visibility='private' where id=v_quote;
   perform set_config('request.jwt.claim.sub','',true); set local role anon;
   if public.reading_story_public(v_slug) is not null then raise exception 'private_source_visible'; end if;
+  perform set_config('request.jwt.claim.sub',v_viewer::text,true); set local role authenticated;
+  begin perform public.reading_story_report(v_slug,'spam',null); raise exception 'private_source_story_reported';
+  exception when no_data_found then null; end;
   reset role; update public.sentences set visibility='public' where id=v_quote;
 
   -- Either direction of an authenticated block hides the story; anonymous has no block context.
   insert into public.user_blocks(blocker_id,blocked_id) values(v_owner,v_viewer);
   perform set_config('request.jwt.claim.sub',v_viewer::text,true); set local role authenticated;
   if public.reading_story_public(v_slug) is not null then raise exception 'owner_to_viewer_block_failed'; end if;
+  begin perform public.reading_story_report(v_slug,'spam',null); raise exception 'blocked_story_reported';
+  exception when no_data_found then null; end;
   perform set_config('request.jwt.claim.sub','',true); set local role anon;
   if public.reading_story_public(v_slug) is null then raise exception 'anonymous_inherited_block_context'; end if;
   reset role; delete from public.user_blocks where blocker_id=v_owner and blocked_id=v_viewer;
@@ -192,10 +197,15 @@ begin
   if public.reading_story_public(v_slug) is not null then raise exception 'viewer_to_owner_block_failed'; end if;
   reset role; delete from public.user_blocks where blocker_id=v_viewer and blocked_id=v_owner;
 
-  -- A viewer can report a published story but cannot report self or turn that into admin power.
+  -- Anonymous cannot report; an authenticated viewer reports by slug without receiving the story UUID.
+  perform set_config('request.jwt.claim.sub','',true); set local role anon;
+  begin perform public.reading_story_report(v_slug,'spam',null); raise exception 'anon_story_report_allowed';
+  exception when insufficient_privilege then null; end;
   perform set_config('request.jwt.claim.sub',v_viewer::text,true); set local role authenticated;
-  v_result:=public.moderation_report('story',v_story,'spam',null);
+  v_result:=public.reading_story_report(v_slug,'spam',null);
   v_report:=(v_result->>'id')::uuid;
+  v_result:=public.reading_story_report(v_slug,'spam',null);
+  if (v_result->>'id')::uuid <> v_report then raise exception 'story_report_retry_not_idempotent'; end if;
   if public.reading_story_public(v_slug) is not null then raise exception 'reported_story_visible_to_reporter'; end if;
   begin perform public.moderation_admin_action(v_report,'hide_story','self escalation'); raise exception 'reporter_became_admin';
   exception when insufficient_privilege then null; end;
@@ -234,13 +244,15 @@ do $$ begin
   if has_function_privilege('anon','public.reading_story_save_draft(uuid,jsonb)','execute')
     or has_function_privilege('anon','public.reading_story_owner(uuid)','execute')
     or has_function_privilege('anon','public.reading_story_publish(uuid)','execute')
-    or has_function_privilege('anon','public.reading_story_unpublish(uuid)','execute') then
+    or has_function_privilege('anon','public.reading_story_unpublish(uuid)','execute')
+    or has_function_privilege('anon','public.reading_story_report(text,text,text)','execute') then
     raise exception 'anon_mutation_execute_granted';
   end if;
   if not has_function_privilege('authenticated','public.reading_story_save_draft(uuid,jsonb)','execute')
     or not has_function_privilege('authenticated','public.reading_story_owner(uuid)','execute')
     or not has_function_privilege('anon','public.reading_story_public(text)','execute')
-    or not has_function_privilege('authenticated','public.reading_story_public(text)','execute') then
+    or not has_function_privilege('authenticated','public.reading_story_public(text)','execute')
+    or not has_function_privilege('authenticated','public.reading_story_report(text,text,text)','execute') then
     raise exception 'story_rpc_grant_missing';
   end if;
 end $$;
