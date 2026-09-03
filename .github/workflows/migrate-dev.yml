@@ -185,3 +185,43 @@ jobs:
               raise SystemExit(f'activity inbox regression failed ({error.code}): {detail}')
           print('activity inbox DEV regression passed and rolled back')
           PY
+      - name: Verify reading story role matrix with rollback
+        if: inputs.migration == '60_reading_stories.sql' || inputs.migration == '61_reading_story_slug_schema.sql' || inputs.migration == '62_reading_story_publish_terms.sql'
+        env:
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          sql = Path('tests/sql/reading-stories.sql').read_text()
+          executable_sql = re.sub(r'(?m)^\s*--.*$', '', sql)
+          if not re.search(r'(?is)^\s*begin;.*rollback;\s*$', executable_sql):
+              raise SystemExit('reading story role matrix must be transaction-scoped and end in rollback')
+          dev_url = os.environ['DEV_SUPABASE_URL'].rstrip('/')
+          match = re.fullmatch(r'https://([a-z0-9]+)\.supabase\.co', dev_url)
+          if not match:
+              raise SystemExit('DEV_SUPABASE_URL is not a canonical Supabase project URL')
+          request = urllib.request.Request(
+              f'https://api.supabase.com/v1/projects/{match.group(1)}/database/query',
+              data=json.dumps({'query': sql}).encode(),
+              headers={
+                  'Authorization': f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+                  'Content-Type': 'application/json',
+                  'User-Agent': 'readinggo-dev-migration/1.0',
+              },
+              method='POST',
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  json.load(response)
+          except urllib.error.HTTPError as error:
+              detail = error.read().decode(errors='replace')[:1000]
+              raise SystemExit(f'reading story role matrix failed ({error.code}): {detail}')
+          print('reading story DEV role matrix passed and rolled back')
+          PY
