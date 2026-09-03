@@ -289,6 +289,11 @@ export default {
       if (origin && origin !== url.origin && !isAppOrigin(origin)) return json({ error: 'forbidden origin' }, 403);
       return imgProxy(url.searchParams);
     }
+    // 공개 이야기 deep link는 서버가 공개 RPC 결과로만 metadata와 hydration 여부를 판정한다.
+    // 정확한 36자리 slug의 GET/HEAD만 처리하고 API·정적 파일·잘못된 story 경로 404는 보존한다.
+    if ((request.method === 'GET' || request.method === 'HEAD') && /^\/s\/[0-9a-f]{36}$/.test(p)) {
+      return readingStoryPage(request, env, url, p.slice(3));
+    }
     // 그 외는 정적 에셋(docs/readinggo). 매칭 없으면 ASSETS가 404.
     return env.ASSETS.fetch(request);
   },
@@ -301,7 +306,112 @@ export default {
   },
 };
 
-/* ── LLM 독서 파트너 — 참새 대화 응답 생성 (#287, #1568) ─────────
+/* ── 공개 독서 이야기 HTML/OG (#1590) ─────────────────────────
+   Worker에는 anon key 바인딩이 없으므로 기존 service-role secret을 서버 내부에서만 사용한다.
+   권한이 좁은 reading_story_public RPC만 호출하며 base table/API 응답은 절대 브라우저에 노출하지 않는다. */
+function storyEscape(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[ch]);
+}
+
+function storySafeImage(value, origin) {
+  try {
+    const candidate = new URL(String(value || ''));
+    if (candidate.protocol === 'https:' || candidate.protocol === 'http:') return candidate.href;
+  } catch (e) { /* generic card below */ }
+  return origin + '/assets/og-card.png';
+}
+
+function storyMetaTags({ title, description, canonical, image, unavailable = false }) {
+  const t = storyEscape(String(title || '').slice(0, 200));
+  const d = storyEscape(String(description || '').slice(0, 300));
+  const c = storyEscape(canonical);
+  const i = storyEscape(image);
+  return `<title>${t}</title>
+<meta name="description" content="${d}" />
+${unavailable ? '<meta name="robots" content="noindex,nofollow" />\n' : ''}<link rel="canonical" href="${c}" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="ReadingGo" />
+<meta property="og:title" content="${t}" />
+<meta property="og:description" content="${d}" />
+<meta property="og:url" content="${c}" />
+<meta property="og:image" content="${i}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${t}" />
+<meta name="twitter:description" content="${d}" />
+<meta name="twitter:image" content="${i}" />`;
+}
+
+function storyUnavailablePage(request, url, status) {
+  const isError = status >= 500;
+  const title = isError ? '독서 이야기를 불러오지 못했어요 — ReadingGo' : '공개되지 않은 독서 이야기 — ReadingGo';
+  const description = isError ? '잠시 후 다시 시도해 주세요.' : '이 이야기는 공개되어 있지 않거나 더 이상 볼 수 없어요.';
+  const canonical = url.origin + url.pathname;
+  const meta = storyMetaTags({ title, description, canonical, image:url.origin + '/assets/og-card.png', unavailable:true });
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />${meta}</head><body><main><h1>${storyEscape(title.replace(' — ReadingGo', ''))}</h1><p>${storyEscape(description)}</p><a href="/">ReadingGo로 이동</a></main></body></html>`;
+  return new Response(request.method === 'HEAD' ? null : html, { status, headers: {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'private, no-store',
+    'X-Robots-Tag': 'noindex, nofollow',
+  } });
+}
+
+async function readingStoryPublicRpc(slug, env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('supabase unconfigured');
+  const base = String(env.SUPABASE_URL).replace(/\/$/, '');
+  const response = await fetch(`${base}/rest/v1/rpc/reading_story_public`, {
+    method: 'POST',
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: 'Bearer ' + env.SUPABASE_SERVICE_ROLE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ p_slug:slug }),
+    signal: AbortSignal.timeout(3_000),
+  });
+  if (!response.ok) throw new Error('reading story RPC ' + response.status);
+  return response.json();
+}
+
+function storyInjectMeta(shell, meta) {
+  return shell
+    .replace(/<title>[\s\S]*?<\/title>\s*/i, '')
+    .replace(/<meta\s+(?:name="description"|property="og:(?:type|site_name|title|description|url|image(?::(?:width|height))?)"|name="twitter:(?:card|title|description|image)")[^>]*>\s*/gi, '')
+    .replace(/<link\s+rel="canonical"[^>]*>\s*/gi, '')
+    .replace(/<base\s+href="[^"]*"[^>]*>\s*/gi, '')
+    .replace(/<head>/i, '<head>\n<base href="/">\n' + meta + '\n');
+}
+
+async function readingStoryPage(request, env, url, slug) {
+  let story;
+  try { story = await readingStoryPublicRpc(slug, env); }
+  catch (e) { return storyUnavailablePage(request, url, 503); }
+  if (!(story && story.slug === slug && story.book)) return storyUnavailablePage(request, url, 404);
+
+  const bookTitle = String(story.book.title || '독서 이야기').trim().slice(0, 160) || '독서 이야기';
+  const storyTitle = String(story.title || '').trim().slice(0, 160) || bookTitle;
+  const displayName = String(story.author && story.author.displayName || '').trim().slice(0, 80) || 'ReadingGo 독자';
+  const title = `${storyTitle} — ReadingGo`;
+  const description = `${displayName}님이 남긴 ${bookTitle} 독서 이야기`;
+  const canonical = url.origin + '/s/' + slug;
+  const image = storySafeImage(story.book.coverUrl, url.origin);
+  const meta = storyMetaTags({ title, description, canonical, image });
+
+  try {
+    const shellUrl = new URL('/index.html', url);
+    const shellResponse = await env.ASSETS.fetch(new Request(shellUrl, { method:'GET', headers:request.headers }));
+    if (!shellResponse.ok) return storyUnavailablePage(request, url, 503);
+    const html = storyInjectMeta(await shellResponse.text(), meta);
+    const headers = new Headers(shellResponse.headers);
+    headers.set('Content-Type', 'text/html; charset=utf-8');
+    // 공개/비공개 전환과 moderation이 stale cache에 남지 않게 캐시하지 않는다.
+    headers.set('Cache-Control', 'private, no-store');
+    return new Response(request.method === 'HEAD' ? null : html, { status:200, headers });
+  } catch (e) { return storyUnavailablePage(request, url, 503); }
+}
+
+/* ── LLM 독서 파트너 — 참새 대화 응답 생성 (#287) ─────────
    provider-agnostic: base_url/model/key 전부 env. OpenAI 호환 chat completions.
    키 없거나 실패 시 목 질문으로 graceful fallback (데모/피치 무중단). */
 const COMPANION_SYSTEM = '당신은 사용자와 그 책을 *함께 읽은* 친구 재키입니다. 독서모임 진행자나 평가자, 선생님이 아니라 — 같은 책을 읽고 곁에서 담백하게 이야기 나누는 동료입니다. 사용자가 방금 남긴 한 문장을 보고, 훈수나 분석·평가 없이 사람처럼 짧게 반응하세요. 입력의 역할을 혼동하지 마세요(#359): "책에서 옮겨 적은 한 문장(인용)"은 작품 속 문장이고, "내 메모(감상)"는 사용자 자신의 생각입니다. 인용을 사용자의 감상으로 단정하지 마세요. 만약 한 문장이 책 속 인용으로 보기 어렵거나(예: "즐거웠다"처럼 짧은 감상형) 작품 속 맥락을 알 수 없다면, 함부로 해석하지 말고 — 그 문장이 책의 어떤 장면·맥락에서 나온 것인지, 혹은 본인의 생각을 적은 것인지를 먼저 가볍게 물어보세요. 사용자가 다른 작품이나 작가를 언급하거나 두 작품을 비교하면(예: "○○와 닮았다"), 그 연결 자체를 두고 물으세요. 다른 작품의 줄거리·인물을 현재 책의 인물·사건에 억지로 끼워 맞추거나 두 작품을 뒤섞지 마세요. 그 책·작가에 대해 확실히 아는 것만 자연스럽게 한 조각 곁들이고, 모르는 것은 지어내지 마세요. 톤 — 이게 가장 중요합니다: 따뜻하고 담백한 친구처럼. 분석을 늘어놓거나 가르치려 들지 말고, 칭찬으로 운을 뗀 뒤 캐묻는 방식("정말 좋은 문장이네요! 왜 그렇게 느꼈어요?")이나 취조하듯 몰아붙이는 되물음은 하지 마세요. 물을 때는 진짜 궁금해서 혼잣말하듯, 부담 없이 답할 수 있는 열린 질문 하나면 충분합니다. 때로는 질문을 억지로 붙이기보다 그 문장에 짧게 공감하며 여운을 남기는 편이 더 따뜻합니다. 2~3문장 이내로 짧고 자연스럽게. 마크다운 서식(별표 **, #, 목록 기호 등)을 절대 쓰지 말고 일반 문장으로만 쓰세요.';

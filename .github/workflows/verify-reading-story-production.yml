@@ -103,6 +103,7 @@ jobs:
           from pg_proc p
           where p.oid in (
             'public.reading_story_save_draft(uuid,jsonb)'::regprocedure,
+            'public.reading_story_republish(uuid,jsonb)'::regprocedure,
             'public.reading_story_owner(uuid)'::regprocedure,
             'public.reading_story_publish(uuid)'::regprocedure,
             'public.reading_story_unpublish(uuid)'::regprocedure,
@@ -113,7 +114,7 @@ jobs:
           '''
           dev_definitions = query(refs['development'], definitions_query)
           prod_definitions = query(refs['production'], definitions_query)
-          if not isinstance(dev_definitions, list) or len(dev_definitions) != 6:
+          if not isinstance(dev_definitions, list) or len(dev_definitions) != 7:
               raise SystemExit('DEV story RPC definition set is incomplete')
           if prod_definitions != dev_definitions:
               raise SystemExit('Production story RPC definitions or execution attributes differ from DEV')
@@ -141,13 +142,16 @@ jobs:
               and not has_table_privilege('authenticated','public.moderation_hidden_stories','select,insert,update,delete'),
             'public_rpc_grants',
               has_function_privilege('anon','public.reading_story_public(text)','execute')
-              and has_function_privilege('authenticated','public.reading_story_public(text)','execute'),
+              and has_function_privilege('authenticated','public.reading_story_public(text)','execute')
+              and has_function_privilege('service_role','public.reading_story_public(text)','execute'),
             'report_rpc_grants',
               not has_function_privilege('anon','public.reading_story_report(text,text,text)','execute')
               and has_function_privilege('authenticated','public.reading_story_report(text,text,text)','execute'),
             'owner_rpc_grants',
               not has_function_privilege('anon','public.reading_story_save_draft(uuid,jsonb)','execute')
               and has_function_privilege('authenticated','public.reading_story_save_draft(uuid,jsonb)','execute')
+              and not has_function_privilege('anon','public.reading_story_republish(uuid,jsonb)','execute')
+              and has_function_privilege('authenticated','public.reading_story_republish(uuid,jsonb)','execute')
               and not has_function_privilege('anon','public.reading_story_owner(uuid)','execute')
               and has_function_privilege('authenticated','public.reading_story_owner(uuid)','execute')
               and not has_function_privilege('anon','public.reading_story_publish(uuid)','execute')

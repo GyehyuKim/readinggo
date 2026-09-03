@@ -68,7 +68,7 @@
     //   supabase-js 의 자동 location 이동을 막고, 받은 url 을 CapBrowser 가 연다. 복귀는 appUrlOpen 리스너.
     // 웹: redirectTo=origin, detectSessionInUrl 가 ?code= 자동 처리(기존 동작 유지).
     // Google: prompt=select_account (#721) — 미지정 시 브라우저 잔류 세션 자동 선택 → 로그아웃 후 계정 전환 불가.
-    async signInWithOAuth(provider) {
+    async signInWithOAuth(provider, oauthOptions) {
       const c = client();
       if (!c) throw new Error('Supabase 미설정');
       if (!OAUTH_PROVIDERS[provider]) throw new Error('지원하지 않는 로그인 제공자: ' + provider);
@@ -86,10 +86,15 @@
         if (data && data.url && window.CapBrowser) await window.CapBrowser.open({ url: data.url });
         return data;
       }
+      let redirectTo = window.location.origin;
+      try {
+        const requested = oauthOptions && oauthOptions.redirectTo ? new URL(oauthOptions.redirectTo, window.location.origin) : null;
+        if (requested && requested.origin === window.location.origin) redirectTo = requested.href;
+      } catch (e) { /* 잘못된/교차출처 복귀 URL은 origin으로 제한 */ }
       return c.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: window.location.origin,
+          redirectTo,
           ...(qp ? { queryParams: qp } : {}),
         },
       });

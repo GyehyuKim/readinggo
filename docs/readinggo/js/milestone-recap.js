@@ -113,11 +113,19 @@ function MilestoneRecap({ milestone, onClose }) {
           )}
         </div>
 
-        {/* 1차 솔리드 버튼 1개(DESIGN.md 위계) — 닫기는 헤더 ✕(3차) */}
+        {/* 1차 솔리드 + 완독 시 독서 이야기 2차 tonal CTA(DESIGN.md 위계) — 닫기는 헤더 ✕(3차) */}
         <div style={{ padding: '10px 20px 20px', borderTop: '1px solid var(--line)' }}>
           <button className="checkin-cta" onClick={close} style={{ width: '100%' }}>
             계속 읽어가기 →
           </button>
+          {milestone && milestone.type === 'complete' && milestone.bookId && <button type="button"
+            onClick={() => {
+              close();
+              window.setTimeout(() => { if (window.RG_openBook) window.RG_openBook(milestone.bookId, { openReadingStory:true, storyEntry:'completion_recap' }); }, 0);
+            }}
+            style={{ width:'100%', minHeight:48, marginTop:8, border:'none', borderRadius:12, background:'var(--brand-soft)', color:'var(--brand-3)', fontSize:14, fontWeight:900, cursor:'pointer' }}>
+            이 책 독서 이야기 만들기
+          </button>}
         </div>
       </div>
     </div>, document.body);
