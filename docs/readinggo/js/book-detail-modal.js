@@ -811,7 +811,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                         삭제는 rg:sentence-removed 이벤트로 목록 갱신(removedIds 리스너). blind 와 무관하게 내 문장 관리 가능. */}
                     {q.id && window.SentenceActions && (
                       <SentenceActions
-                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, note: q.note || q.my_note || '', kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
+                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, note: q.note || q.my_note || '', notePrivate: q.notePrivate, note_private: q.note_private, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
                         mine fav={!!(bmarks && bmarks.has(q.id))}
                         onRemoved={(rid) => setRemovedIds(m => ({ ...m, [rid]: true }))} />
                     )}

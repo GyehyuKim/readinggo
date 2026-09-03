@@ -16,7 +16,9 @@
    이미지를 내보내느니 표지를 빼는 쪽이 안전하다. (worker 이미지 프록시는 과한 스코프 →
    후속 검토.) */
 
-const RG_SHARE_LINK = ((window.RG_CONFIG && window.RG_CONFIG.API_ORIGIN) || location.origin)
+const RG_SHARE_ORIGIN = ((window.RG_CONFIG && (window.RG_CONFIG.SHARE_ORIGIN || window.RG_CONFIG.API_ORIGIN)) || location.origin)
+  .replace(/\/$/, '');
+const RG_SHARE_LINK = RG_SHARE_ORIGIN
   .replace(/^https?:\/\//, '').replace(/\/$/, '');
 const RG_SHARE_HANDLE = '@readinggo.app';
 const RG_SHARE_LINK_FULL = 'https://' + RG_SHARE_LINK;
@@ -48,21 +50,25 @@ function _normalizeSentence(s) {
   const title = (s.bookTitle || (bookMatch ? bk.title : '') || '').trim();
   const author = (s.author || (bookMatch ? bk.author : '') || '').trim();
   const cover = (bookMatch ? (bk.cover || bk.cover_url) : '') || '';
-  return { text, kind, title, author, cover };
+  const notePrivate = s.notePrivate === true || s.note_private === true;
+  const directNote = String(s.note || '').trim();
+  const note = notePrivate ? '' : (directNote || String(s.my_note || '').trim());
+  return { text, kind, title, author, cover, note, notePrivate };
 }
 
 // 텍스트-only 폴백 포맷 (spec §8). 인용/감상 분기. 마지막 2줄(서비스+링크) 항상 포함.
-function buildShareText(s) {
+function buildShareText(s, opts) {
   const n = _normalizeSentence(s);
+  const includeNote = !!(opts && opts.includeNote && n.note);
   const tail = '\n\n📖 ReadingGo에서 내 한 문장 남기기\n' + RG_SHARE_LINK_FULL;
   if (n.kind === 'thought') {
     const src = [n.author, n.title ? '《' + n.title + '》' : ''].filter(Boolean).join(' ');
     const head = '💭 ' + n.text + (src ? '\n(' + src + '을 읽고)' : '');
-    return head + tail;
+    return head + (includeNote ? '\n\n내 생각: ' + n.note : '') + tail;
   }
   const src = [n.author, n.title ? '《' + n.title + '》' : ''].filter(Boolean).join(', ');
   const head = '"' + n.text + '"' + (src ? '\n— ' + src : '');
-  return head + tail;
+  return head + (includeNote ? '\n\n내 생각: ' + n.note : '') + tail;
 }
 
 // 표지 CORS 선검증 — 성공 시 data-URL(taint-free) 반환, 실패 시 null(→ 이니셜 폴백).
@@ -117,7 +123,7 @@ function _fitStorySentence(sentence) {
 }
 
 // 오프스크린 카드 노드 생성 (시안 .card.r11/.card.r916 구조 재현). coverDataUrl=null 이면 이니셜 블록.
-function _buildCardNode(n, coverDataUrl, format) {
+function _buildCardNode(n, coverDataUrl, format, includeNote) {
   const safeFormat = normalizeShareFormat(format);
   const layout = RG_SHARE_FORMATS[safeFormat];
   const W = layout.width, H = layout.height, PAD_X = Math.round(W * 0.08);
@@ -203,6 +209,22 @@ function _buildCardNode(n, coverDataUrl, format) {
   }
   wrap.appendChild(sentence);
   root.appendChild(wrap);
+
+  // 선택적인 내 생각은 인용과 별도 박스로 구분하고 고정 높이에서 잘라 카드 밖으로 넘치지 않는다.
+  if (includeNote && n.note) {
+    const note = document.createElement('div');
+    Object.assign(note.style, {
+      flexShrink: '0', maxHeight: isStory ? '250px' : '170px', overflow: 'hidden',
+      boxSizing: 'border-box', margin: '0 0 28px', padding: '24px 28px',
+      borderLeft: '8px solid ' + _SC.violet, borderRadius: '16px',
+      background: _SC.violetSoft, color: _SC.ink2, fontSize: isStory ? '38px' : '32px',
+      lineHeight: '1.45', whiteSpace: 'pre-wrap', overflowWrap: 'break-word',
+      display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: isStory ? '4' : '3',
+    });
+    note.setAttribute('data-rg-share-note', 'true');
+    note.textContent = '내 생각  ' + n.note;
+    root.appendChild(note);
+  }
 
   // ③ 출처
   const source = document.createElement('div');
@@ -304,7 +326,7 @@ async function renderSentenceCardBlob(s, opts) {
   const layout = RG_SHARE_FORMATS[format];
   const n = _normalizeSentence(s);
   const coverDataUrl = await _loadCoverSafe(n.cover);
-  const node = _buildCardNode(n, coverDataUrl, format);
+  const node = _buildCardNode(n, coverDataUrl, format, !!opts.includeNote && !!n.note);
   document.body.appendChild(node);
   try {
     // 커스텀 폰트(Moneygraphy) 글리프 누락 방지 (spec §9).
@@ -344,69 +366,66 @@ async function _copyText(text) {
   return false;
 }
 
-/* 외부 공유 실행. 이미지 카드 생성 → Web Share(files) 우선 → 다운로드+텍스트 폴백. */
-async function _shareSentenceOnce(s, format) {
+function _trackSentenceShare(event, props) {
+  if (window.rgTrack) { try { window.rgTrack(event, props); } catch (e) {} }
+}
+
+/* 준비된 이미지를 보내거나 저장한다. 성공 이벤트는 실제 OS 공유 완료/다운로드 뒤에만 보낸다. */
+async function _sendPreparedSentence(s, format, blob, includeNote, entry) {
   format = normalizeShareFormat(format);
   const layout = RG_SHARE_FORMATS[format];
-  const text = buildShareText(s);
+  const text = buildShareText(s, { includeNote });
   const toast = (typeof showToast === 'function') ? showToast : ((m) => {});
-  if (window.rgTrack) { try { window.rgTrack('sentence_shared', { id: s && s.id, kind: s && s.kind === 'thought' ? 'thought' : 'quote', format }); } catch (e) {} }
-
-  let blob = null;
-  try {
-    blob = await renderSentenceCardBlob(s, { format });
-  } catch (e) {
-    console.warn('[ReadingGo] 공유 카드 생성 실패 → 텍스트 폴백:', e && e.message);
-  }
-
-  // 1) Web Share API + files (이미지) 우선
   if (blob && navigator.canShare && navigator.share) {
     const file = new File([blob], layout.filename, { type: 'image/png' });
     if (navigator.canShare({ files: [file] })) {
       try {
-        // #650: url 동반 — 이미지와 함께 서비스 링크 전달(플랫폼이 files+url 동시 지원 시).
-        await navigator.share({ files: [file], text, url: RG_SHARE_LINK_FULL });
-        return;
+        await navigator.share({ files: [file], text });
+        _trackSentenceShare('sentence_share_sent', { format, method: 'web_share', entry: entry || '' });
+        return true;
       } catch (e) {
-        if (e && e.name === 'AbortError') return;  // 사용자가 취소 — 폴백 안 함
+        if (e && e.name === 'AbortError') return false;
         console.warn('[ReadingGo] navigator.share 실패 → 폴백:', e && e.message);
       }
     }
   }
-
-  // 2) 텍스트만이라도 공유 가능하면 (이미지 미지원 환경)
-  if (!blob && navigator.share) {
-    // #921: url 동반 — 텍스트 본문에도 링크가 있지만, url 분리로 플랫폼 링크 프리뷰/유입을 살린다(이미지 경로·shareService 와 동일).
-    try { await navigator.share({ text, url: RG_SHARE_LINK_FULL }); return; }
-    catch (e) { if (e && e.name === 'AbortError') return; }
-  }
-
-  // 3) 폴백: 이미지 다운로드 + 텍스트 클립보드 복사
   if (blob) {
     _downloadBlob(blob, layout.filename);
-    const copied = await _copyText(text);
-    // #921: 텍스트 복사 실패 시에도 최소한 사이트 링크만이라도 복사 — 이미지만 받은 사람도 ReadingGo 로 유입.
-    const linkCopied = copied || await _copyText(RG_SHARE_LINK_FULL);
-    toast(copied ? '🖼 이미지 저장 · 텍스트 복사됨' : (linkCopied ? '🖼 이미지 저장 · 링크 복사됨' : '🖼 이미지를 저장했어요'));
-    return;
+    _trackSentenceShare('sentence_share_sent', { format, method: 'download', entry: entry || '' });
+    toast('🖼 이미지를 저장했어요');
+    return true;
   }
-  // 4) 최후: 텍스트만 복사
-  const copied = await _copyText(text);
-  toast(copied ? '📋 공유 텍스트를 복사했어요' : '공유를 지원하지 않는 환경이에요');
+  toast('공유 이미지를 만들지 못했어요');
+  return false;
+}
+
+async function _shareSentenceOnce(s, format, opts) {
+  format = normalizeShareFormat(format);
+  opts = opts || {};
+  let blob = opts.blob || null;
+  if (!blob) {
+    try {
+      blob = await renderSentenceCardBlob(s, { format, includeNote: !!opts.includeNote });
+      _trackSentenceShare('sentence_share_previewed', { format, entry: opts.entry || '' });
+    } catch (e) {
+      console.warn('[ReadingGo] 공유 카드 생성 실패:', e && e.message);
+    }
+  }
+  return _sendPreparedSentence(s, format, blob, !!opts.includeNote, opts.entry);
 }
 
 // 빠른 연속 탭이 PNG 생성·공유 시트를 중복 실행하지 않도록 한 번의 실행 Promise를 재사용한다.
 let _sentenceShareInFlight = null;
 function shareSentence(s, opts) {
   const format = normalizeShareFormat(typeof opts === 'string' ? opts : opts && opts.format);
+  const config = typeof opts === 'object' && opts ? opts : {};
   if (_sentenceShareInFlight) return _sentenceShareInFlight;
-  _sentenceShareInFlight = _shareSentenceOnce(s || {}, format)
+  _sentenceShareInFlight = _shareSentenceOnce(s || {}, format, config)
     .finally(() => { _sentenceShareInFlight = null; });
   return _sentenceShareInFlight;
 }
 
-// 사용자 진입점: 기존 1:1을 첫/기본 선택으로 유지하면서 9:16 배경화면을 명시적으로 고른다.
-// React 상태에 묶지 않아 피드·책 상세 어느 표면에서도 같은 선택기와 cleanup 계약을 쓴다.
+// 사용자 진입점: 실제 PNG 미리보기를 확인한 뒤 이미지 공유 또는 저장을 실행한다.
 let _formatPickerPromise = null;
 function shareSentenceWithFormatChoice(s) {
   if (_sentenceShareInFlight) return _sentenceShareInFlight;
@@ -423,47 +442,70 @@ function shareSentenceWithFormatChoice(s) {
     dialog.setAttribute('aria-modal', 'true');
     dialog.setAttribute('aria-labelledby', 'rg-share-format-title');
     Object.assign(dialog.style, {
-      width: 'min(100%, 420px)', background: 'var(--card)', color: 'var(--ink)',
-      borderRadius: 'var(--r-lg)', padding: '24px', boxSizing: 'border-box',
+      width: 'min(100%, 420px)', maxHeight: 'calc(100vh - var(--safe-top, 0px) - 16px)', overflowY: 'auto',
+      background: 'var(--card)', color: 'var(--ink)', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', padding: '20px', boxSizing: 'border-box',
       boxShadow: 'var(--shadow-2)', fontFamily: "'Noto Sans KR',sans-serif",
     });
     const title = document.createElement('h2');
     title.id = 'rg-share-format-title';
     Object.assign(title.style, { margin: '0 0 8px', fontSize: '18px' });
-    title.textContent = '공유 이미지 비율';
+    title.textContent = '한 문장 공유 미리보기';
     const description = document.createElement('p');
     Object.assign(description.style, { margin: '0 0 16px', color: 'var(--ink-2)', fontSize: '14px', lineHeight: '1.5' });
-    description.textContent = '정사각형 카드나 잠금화면·스토리용 세로 이미지를 골라 주세요.';
+    description.textContent = '결과를 확인하고 이미지로 공유하거나 저장하세요.';
+    const formats = document.createElement('div');
+    Object.assign(formats.style, { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' });
+    const preview = document.createElement('img');
+    preview.setAttribute('alt', '선택한 한 문장 공유 이미지 미리보기');
+    Object.assign(preview.style, { display: 'block', width: '100%', height: 'min(42vh, 390px)', objectFit: 'contain', background: 'var(--paper)', borderRadius: 'var(--r-sm)', marginBottom: '12px' });
+    const noteLabel = document.createElement('label');
+    Object.assign(noteLabel.style, { minHeight: '44px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: '800' });
+    const noteToggle = document.createElement('input');
+    noteToggle.type = 'checkbox';
+    const normalized = _normalizeSentence(s || {});
+    noteToggle.checked = !!normalized.note;
+    noteToggle.disabled = !normalized.note;
+    noteToggle.setAttribute('aria-label', '내 생각 포함');
+    noteLabel.appendChild(noteToggle); noteLabel.appendChild(document.createTextNode('내 생각 포함'));
     const actions = document.createElement('div');
-    Object.assign(actions.style, { display: 'grid', gap: '8px' });
+    Object.assign(actions.style, { display: 'grid', gap: '8px', marginTop: '12px' });
+    const guidance = document.createElement('p');
+    Object.assign(guidance.style, { margin: '10px 0 4px', color: 'var(--ink-2)', fontSize: '13px', lineHeight: '1.5' });
+    guidance.textContent = '이미지를 올린 뒤 ReadingGo 링크를 Instagram 링크 스티커에 붙여 넣으세요.';
     const focusableButtons = [];
     let settled = false;
+    let selectedFormat = '1:1';
+    let previewBlob = null;
+    let previewUrl = '';
+    let renderVersion = 0;
+    let busy = false;
     const cleanup = () => {
       document.removeEventListener('keydown', onKeyDown);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       _formatPickerPromise = null;
       if (trigger && typeof trigger.focus === 'function') trigger.focus();
     };
-    const finish = (format) => {
+    const finish = (result) => {
       if (settled) return;
       settled = true;
       cleanup();
-      if (!format) { resolve(false); return; }
-      Promise.resolve(shareSentence(s, { format })).then(() => resolve(true), () => resolve(false));
+      resolve(result === true);
     };
     const onKeyDown = (event) => {
       if (event.key === 'Escape') { event.preventDefault(); finish(null); return; }
       if (event.key !== 'Tab') return;
-      const current = focusableButtons.indexOf(document.activeElement);
+      const enabledButtons = focusableButtons.filter((button) => !button.disabled);
+      const current = enabledButtons.indexOf(document.activeElement);
       if (event.shiftKey && current <= 0) {
         event.preventDefault();
-        focusableButtons.at(-1).focus();
-      } else if (!event.shiftKey && current === focusableButtons.length - 1) {
+        enabledButtons.at(-1).focus();
+      } else if (!event.shiftKey && current === enabledButtons.length - 1) {
         event.preventDefault();
-        focusableButtons[0].focus();
+        enabledButtons[0].focus();
       }
     };
-    const addButton = (label, format, primary) => {
+    const addButton = (label, parent, primary) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = label;
@@ -473,21 +515,82 @@ function shareSentenceWithFormatChoice(s) {
         background: primary ? 'var(--brand)' : 'var(--brand-soft)',
         color: primary ? 'var(--card)' : 'var(--brand-3)',
       });
-      button.addEventListener('click', () => finish(format));
-      actions.appendChild(button);
+      parent.appendChild(button);
       focusableButtons.push(button);
       return button;
     };
-    const squareButton = addButton('정사각형 카드 · 1:1', '1:1', true);
-    addButton('배경화면 · 9:16', '9:16', false);
-    const cancel = addButton('취소', null, false);
+    const renderPreview = async () => {
+      const version = ++renderVersion;
+      previewBlob = null;
+      send.disabled = true;
+      preview.removeAttribute && preview.removeAttribute('src');
+      preview.setAttribute('aria-busy', 'true');
+      try {
+        const blob = await renderSentenceCardBlob(s || {}, { format: selectedFormat, includeNote: noteToggle.checked });
+        if (settled || version !== renderVersion) return;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewBlob = blob;
+        previewUrl = URL.createObjectURL(blob);
+        preview.src = previewUrl;
+        preview.setAttribute('alt', '선택한 한 문장 공유 이미지 미리보기');
+        preview.setAttribute('aria-busy', 'false');
+        send.disabled = false;
+        _trackSentenceShare('sentence_share_previewed', { format: selectedFormat, entry: (s && s.entry) || '' });
+      } catch (e) {
+        if (version === renderVersion) {
+          previewBlob = null;
+          preview.setAttribute('aria-busy', 'false');
+          preview.setAttribute('alt', '미리보기를 만들지 못했어요');
+        }
+      }
+    };
+    const formatButton = (label, format) => {
+      const button = addButton(label, formats, format === selectedFormat);
+      button.setAttribute('aria-pressed', String(format === selectedFormat));
+      button.addEventListener('click', () => {
+        selectedFormat = format;
+        Array.from(formats.children).forEach((item) => {
+          const selected = item === button;
+          item.setAttribute('aria-pressed', String(selected));
+          item.style.background = selected ? 'var(--brand)' : 'var(--brand-soft)';
+          item.style.color = selected ? 'var(--card)' : 'var(--brand-3)';
+        });
+        renderPreview();
+      });
+      return button;
+    };
+    const squareButton = formatButton('피드용 정사각형', '1:1');
+    formatButton('스토리용 세로형', '9:16');
+    noteToggle.addEventListener('change', renderPreview);
+    const send = addButton('이미지 공유 또는 다운로드', actions, true);
+    send.disabled = true;
+    send.addEventListener('click', async () => {
+      if (busy || !previewBlob) return;
+      busy = true; send.disabled = true;
+      const sent = await _sendPreparedSentence(s || {}, selectedFormat, previewBlob, noteToggle.checked, (s && s.entry) || '');
+      busy = false; send.disabled = false;
+      if (sent) finish(true);
+    });
+    const copy = addButton('ReadingGo 링크 복사', actions, false);
+    copy.addEventListener('click', async () => {
+      const copied = await _copyText(RG_SHARE_LINK_FULL);
+      if (!copied) return;
+      _trackSentenceShare('sentence_share_sent', { format: selectedFormat, method: 'clipboard', entry: (s && s.entry) || '' });
+      const toast = typeof showToast === 'function' ? showToast : () => {};
+      toast('ReadingGo 링크를 복사했어요');
+    });
+    const cancel = addButton('취소', actions, false);
+    cancel.addEventListener('click', () => finish(false));
     cancel.style.background = 'var(--card-soft)';
     cancel.style.color = 'var(--ink-2)';
-    dialog.appendChild(title); dialog.appendChild(description); dialog.appendChild(actions);
+    dialog.appendChild(title); dialog.appendChild(description); dialog.appendChild(formats); dialog.appendChild(preview);
+    if (normalized.note) dialog.appendChild(noteLabel);
+    dialog.appendChild(guidance); dialog.appendChild(actions);
     overlay.appendChild(dialog); document.body.appendChild(overlay);
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(null); });
     document.addEventListener('keydown', onKeyDown);
     squareButton.focus();
+    renderPreview();
   });
   return _formatPickerPromise;
 }
