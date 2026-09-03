@@ -102,7 +102,7 @@ function BookInfoModal({ bookId, onClose }) {
       .then(rows => {
         if (!alive) return;
         const mine = (Array.isArray(rows) ? rows : []).filter(r => ((r.user_book && r.user_book.book_id) || r.book_id) === bookId);
-        setMySents(mine.map(r => ({ id: r.id, text: r.text || '', page: r.page, bookId, bookTitle: (r.user_book && r.user_book.book && r.user_book.book.title) || '', visibility: r.visibility, isPrivate: r.is_private, note: r.my_note || '', kind: r.kind })));
+        setMySents(mine.map(r => ({ id: r.id, text: r.text || '', page: r.page, bookId, bookTitle: (r.user_book && r.user_book.book && r.user_book.book.title) || '', visibility: r.visibility, isPrivate: r.is_private, note: r.my_note || '', notePrivate: !!r.note_private, note_private: !!r.note_private, kind: r.kind })));
       })
       .catch(() => { if (alive) setMySents([]); });
     return () => { alive = false; };

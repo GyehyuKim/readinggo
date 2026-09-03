@@ -5,6 +5,8 @@ import vm from 'node:vm';
 
 const source = readFileSync(new URL('./share-card.js', import.meta.url), 'utf8');
 const sentenceCardSource = readFileSync(new URL('./sentence-card.js', import.meta.url), 'utf8');
+const bookDetailSource = readFileSync(new URL('./book-detail-modal.js', import.meta.url), 'utf8');
+const bookInfoSource = readFileSync(new URL('./book-info-modal.js', import.meta.url), 'utf8');
 
 class FakeElement {
   constructor(tagName) {
@@ -26,6 +28,7 @@ class FakeElement {
   removeChild(child) { this.children.splice(this.children.indexOf(child), 1); child.parentNode = null; return child; }
   remove() { if (this.parentNode) this.parentNode.removeChild(this); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
+  removeAttribute(name) { delete this.attributes[name]; }
   addEventListener(name, listener) { this.listeners.set(name, listener); }
   click() { const listener = this.listeners.get('click'); if (listener) listener({ target: this }); }
   focus() { this.focused = true; }
@@ -39,7 +42,7 @@ class FakeFileReader {
   readAsDataURL() { this.result = 'data:font/otf;base64,AA=='; queueMicrotask(() => this.onload()); }
 }
 
-function createHarness() {
+function createHarness(toBlob) {
   const body = new FakeElement('body');
   const createdElements = [];
   const documentListeners = new Map();
@@ -68,6 +71,7 @@ function createHarness() {
     htmlToImage: {
       toBlob: async (node, options) => {
         renders.push({ node, options });
+        if (toBlob) return toBlob(node, options);
         return new Blob(['png'], { type: 'image/png' });
       },
     },
@@ -154,14 +158,14 @@ test('1:1 rendering remains 1080 square when format is omitted or invalid', asyn
   assert.equal(harness.renders.at(-1).options.height, 1080);
 });
 
-test('story Web Share uses allowlisted filename and analytics format', async () => {
+test('story Web Share uses allowlisted filename and emits preview then sent after resolution', async () => {
   await harness.window.shareSentence(sentence, { format: '9:16' });
   assert.equal(harness.shares.at(-1).files[0].name, 'readinggo-sentence-9x16.png');
-  assert.equal(harness.tracks.at(-1).event, 'sentence_shared');
+  assert.deepEqual(harness.tracks.slice(-2).map((item) => item.event), ['sentence_share_previewed', 'sentence_share_sent']);
   assert.equal(harness.tracks.at(-1).props.format, '9:16');
 });
 
-test('file-share fallback downloads the format filename and copies accessible text', async () => {
+test('file-share fallback downloads without implicitly copying link or text', async () => {
   const originalCanShare = harness.navigator.canShare;
   harness.navigator.canShare = () => false;
   const originalCreate = URL.createObjectURL;
@@ -176,7 +180,8 @@ test('file-share fallback downloads the format filename and copies accessible te
     assert.equal(harness.shares.length, shareCount);
     assert.equal(createdBlob.type, 'image/png');
     assert.equal(harness.createdElements.filter((element) => element.tagName === 'A').at(-1).download, 'readinggo-sentence-9x16.png');
-    assert.match(harness.copied.at(-1), /ReadingGo에서 내 한 문장 남기기/);
+    assert.equal(harness.copied.length, 0);
+    assert.equal(harness.tracks.at(-1).props.method, 'download');
     assert.equal(harness.document.body.children.length, 0, 'download anchor is removed');
     await new Promise((resolve) => setTimeout(resolve, 1100));
     assert.equal(revokedUrl, 'blob:share-card');
@@ -187,18 +192,73 @@ test('file-share fallback downloads the format filename and copies accessible te
   }
 });
 
-test('format picker is single-instance, cleans up, and forwards the story choice', async () => {
-  const first = harness.window.shareSentenceWithFormatChoice(sentence);
-  const second = harness.window.shareSentenceWithFormatChoice(sentence);
+test('bottom sheet is single-instance, generates an actual preview, and sends the selected story image', async () => {
+  const local = createHarness();
+  const first = local.window.shareSentenceWithFormatChoice({ ...sentence, visibility: 'public' });
+  const second = local.window.shareSentenceWithFormatChoice({ ...sentence, visibility: 'public' });
   assert.equal(first, second);
-  assert.equal(harness.document.body.children.length, 1);
-  const overlay = harness.document.body.children[0];
-  const actions = overlay.children[0].children[2];
-  actions.children[1].click();
-  assert.equal(harness.document.body.children.filter((child) => child === overlay).length, 0);
+  const overlay = local.document.body.children[0];
+  const dialog = overlay.children[0];
+  const formats = dialog.children[2];
+  formats.children[1].click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(formats.children[0].attributes['aria-pressed'], 'false');
+  assert.equal(formats.children[1].attributes['aria-pressed'], 'true');
+  assert.equal(formats.children[1].style.background, 'var(--brand)');
+  const preview = dialog.children[3];
+  assert.match(preview.src, /^blob:/);
+  assert.equal(local.tracks.at(-1).event, 'sentence_share_previewed');
+  const actions = dialog.children.at(-1);
+  await actions.children[0].listeners.get('click')();
   await first;
-  assert.equal(harness.renders.at(-1).options.height, 1920);
-  assert.equal(harness.documentListeners.has('keydown'), false);
+  assert.equal(local.renders.at(-1).options.height, 1920);
+  assert.equal(local.documentListeners.has('keydown'), false);
+  assert.equal(local.document.body.children.length, 0);
+});
+
+test('format change clears stale preview until the latest render finishes', async () => {
+  const pending = [];
+  const local = createHarness(() => new Promise((resolve) => pending.push(resolve)));
+  const choice = local.window.shareSentenceWithFormatChoice({ ...sentence, note: '생각' });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const dialog = local.document.body.children[0].children[0];
+  const formats = dialog.children[2];
+  const actions = dialog.children.at(-1);
+  const send = actions.children[0];
+  assert.equal(send.disabled, true);
+  pending[0](new Blob(['square'], { type: 'image/png' }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(send.disabled, false);
+  formats.children[1].click();
+  assert.equal(send.disabled, true);
+  send.click();
+  assert.equal(local.shares.length, 0, 'stale square blob must not be sent');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  pending[1](new Blob(['story'], { type: 'image/png' }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(send.disabled, false);
+  send.click();
+  assert.equal(await choice, true);
+  assert.equal(local.shares.at(-1).files[0].name, 'readinggo-sentence-9x16.png');
+});
+
+test('preview failure alt text is restored after a successful retry', async () => {
+  let attempts = 0;
+  const local = createHarness(() => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('render failed');
+    return new Blob(['recovered'], { type: 'image/png' });
+  });
+  const choice = local.window.shareSentenceWithFormatChoice(sentence);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const dialog = local.document.body.children[0].children[0];
+  const preview = dialog.children[3];
+  assert.equal(preview.attributes.alt, '미리보기를 만들지 못했어요');
+  dialog.children[2].children[1].click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(preview.attributes.alt, '선택한 한 문장 공유 이미지 미리보기');
+  local.documentListeners.get('keydown')({ key: 'Escape', preventDefault() {} });
+  assert.equal(await choice, false);
 });
 
 test('format picker traps Tab and restores focus to its trigger on Escape', async () => {
@@ -208,19 +268,71 @@ test('format picker traps Tab and restores focus to its trigger on Escape', asyn
   trigger.focus();
   const choice = local.window.shareSentenceWithFormatChoice(sentence);
   const overlay = local.document.body.children.at(-1);
-  const buttons = overlay.children[0].children[2].children;
-  assert.equal(local.document.activeElement, buttons[0]);
+  const dialog = overlay.children[0];
+  const formatButtons = dialog.children[2].children;
+  const actionButtons = dialog.children.at(-1).children.filter((item) => item.tagName === 'BUTTON');
+  assert.equal(local.document.activeElement, formatButtons[0]);
   let prevented = 0;
   const keydown = local.documentListeners.get('keydown');
   keydown({ key: 'Tab', shiftKey: true, preventDefault: () => { prevented += 1; } });
-  assert.equal(local.document.activeElement, buttons.at(-1));
+  assert.equal(local.document.activeElement, actionButtons.at(-1));
   keydown({ key: 'Tab', shiftKey: false, preventDefault: () => { prevented += 1; } });
-  assert.equal(local.document.activeElement, buttons[0]);
+  assert.equal(local.document.activeElement, formatButtons[0]);
   keydown({ key: 'Escape', shiftKey: false, preventDefault: () => { prevented += 1; } });
   assert.equal(await choice, false);
   assert.equal(local.document.activeElement, trigger);
   assert.equal(local.document.body.children.length, 1, 'only the original trigger remains');
   assert.equal(prevented, 3);
+});
+
+test('public note defaults on, opt-out removes it, and private notes are never rendered or shared', async () => {
+  const local = createHarness();
+  const choice = local.window.shareSentenceWithFormatChoice({ ...sentence, note: '천천히 읽고 싶다', visibility: 'public' });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const dialog = local.document.body.children[0].children[0];
+  const noteToggle = dialog.children[4].children[0];
+  assert.equal(noteToggle.checked, true);
+  assert.equal(local.renders.at(-1).node.children.some((child) => child.attributes['data-rg-share-note'] === 'true'), true);
+  assert.match(local.window.buildShareText({ ...sentence, note: '천천히 읽고 싶다' }, { includeNote: true }), /내 생각: 천천히/);
+  noteToggle.checked = false;
+  await noteToggle.listeners.get('change')();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.doesNotMatch(local.window.buildShareText({ ...sentence, note: '천천히 읽고 싶다' }, { includeNote: false }), /천천히/);
+  local.documentListeners.get('keydown')({ key: 'Escape', preventDefault() {} });
+  await choice;
+
+  await local.window.renderSentenceCardBlob({ ...sentence, my_note: '비밀', note_private: true }, { includeNote: true });
+  const privateNode = local.renders.at(-1).node;
+  assert.equal(privateNode.children.some((child) => child.attributes['data-rg-share-note'] === 'true'), false);
+  assert.doesNotMatch(local.window.buildShareText({ ...sentence, my_note: '비밀', note_private: true }, { includeNote: true }), /비밀/);
+});
+
+test('AbortError is cancellation and never emits sent success', async () => {
+  const local = createHarness();
+  local.navigator.share = async () => { const error = new Error('cancel'); error.name = 'AbortError'; throw error; };
+  const result = await local.window.shareSentence(sentence, { format: '1:1' });
+  assert.equal(result, false);
+  assert.equal(local.tracks.filter((item) => item.event === 'sentence_share_sent').length, 0);
+  assert.equal(local.tracks.filter((item) => item.event === 'sentence_share_previewed').length, 1);
+});
+
+test('sentence callers forward only share-safe fields including visibility and note privacy', () => {
+  assert.match(sentenceCardSource, /notePrivate: item\.notePrivate, note_private: item\.note_private, visibility: item\.visibility/);
+  assert.match(sentenceCardSource, /notePrivate: sentence\.notePrivate, note_private: sentence\.note_private, visibility: sentence\.visibility/);
+  assert.match(bookDetailSource, /notePrivate: q\.notePrivate, note_private: q\.note_private/);
+  assert.match(bookInfoSource, /notePrivate: !!r\.note_private, note_private: !!r\.note_private/);
+});
+
+test('link action copies the working ReadingGo service URL separately from the image', async () => {
+  const local = createHarness();
+  const choice = local.window.shareSentenceWithFormatChoice(sentence);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const actions = local.document.body.children[0].children[0].children.at(-1);
+  await actions.children[1].listeners.get('click')();
+  assert.equal(local.copied.at(-1), 'https://readinggo.example');
+  assert.equal(local.tracks.at(-1).props.method, 'clipboard');
+  local.documentListeners.get('keydown')({ key: 'Escape', preventDefault() {} });
+  assert.equal(await choice, false);
 });
 
 test('double submit reuses one in-flight render and share operation', async () => {
