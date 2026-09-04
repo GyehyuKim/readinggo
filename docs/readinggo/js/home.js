@@ -1348,7 +1348,10 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
           onGoHome={goHomeFromCeremony}
           onSaveReflection={saveReflectionFromCeremony}
           onTalkToJacky={talkToJackyFromCeremony}
-          onShareSentence={shareSentenceFromCeremony}
+          onShareSentence={(
+            typeof window.shareSentenceWithFormatChoice === 'function'
+            || typeof window.shareSentence === 'function'
+          ) ? shareSentenceFromCeremony : null}
         />,
         document.body
       )}

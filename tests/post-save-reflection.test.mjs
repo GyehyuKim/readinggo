@@ -29,13 +29,13 @@ assert.match(home, /shareSentenceFromCeremony[\s\S]*shareSentenceWithFormatChoic
   '공유는 권위 ID가 있는 방금 문장을 기존 선택기에 post_save 진입점으로 전달해야 한다');
 assert.match(home, /note: sentence\.note \|\| ''[\s\S]*my_note: sentence\.note \|\| ''/,
   '생각 저장 뒤 공유에는 최신 저장 note를 전달해야 한다');
-assert.match(home, /onSaveReflection=\{saveReflectionFromCeremony\}[\s\S]*onTalkToJacky=\{talkToJackyFromCeremony\}[\s\S]*onShareSentence=\{shareSentenceFromCeremony\}/,
-  '완료 화면에 inline 저장, 재키 대화, 공유 콜백을 전달해야 한다');
+assert.match(home, /onSaveReflection=\{saveReflectionFromCeremony\}[\s\S]*onTalkToJacky=\{talkToJackyFromCeremony\}[\s\S]*typeof window\.shareSentenceWithFormatChoice === 'function'[\s\S]*typeof window\.shareSentence === 'function'[\s\S]*\? shareSentenceFromCeremony : null/,
+  '완료 화면은 inline 저장·재키 callback과 함께 공유 함수가 있을 때만 공유 callback을 전달해야 한다');
 
 assert.match(ceremony, /reflectionReady[\s\S]*className="ceremony-reflection"/,
   '정확한 문장이 준비된 경우에만 성찰 입력을 보여야 한다');
-assert.match(ceremony, /\{reflectionReady && \([\s\S]*className="ceremony-action-share"[\s\S]*onClick=\{onShareSentence\}[\s\S]*이 문장 공유하기/,
-  '권위 있는 단일 문장이 준비된 경우에만 저장 직후 공유 CTA를 보여야 한다');
+assert.match(ceremony, /\{reflectionReady && onShareSentence && \([\s\S]*className="ceremony-action-share"[\s\S]*onClick=\{onShareSentence\}[\s\S]*이 문장 공유하기/,
+  '권위 있는 단일 문장과 공유 handler가 준비된 경우에만 저장 직후 공유 CTA를 보여야 한다');
 assert.match(html, /\.ceremony-action-secondary \.ceremony-action-share\{[\s\S]*background:var\(--brand-tint\)[\s\S]*color:var\(--brand-3\)[\s\S]*font-weight:900/,
   '공유 CTA는 비활성처럼 보이지 않는 brand-tonal 위계를 가져야 한다');
 assert.match(ceremony, /textarea[\s\S]*placeholder="이 문장이 나에게 남긴 생각"[\s\S]*value=\{reflectionDraft\}[\s\S]*disabled=\{reflectionStatus === 'saving'\}/,
