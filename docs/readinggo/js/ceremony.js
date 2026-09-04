@@ -174,7 +174,7 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
                 {reflectionSaved && (
                   <button type="button" onClick={onTalkToJacky} disabled={reflectionSaving}>{window.rgIcon('chat', 15)} 재키와 대화하기</button>
                 )}
-                {reflectionReady && (
+                {reflectionReady && onShareSentence && (
                   <button type="button" className="ceremony-action-share" onClick={onShareSentence} disabled={reflectionSaving}>{window.rgIcon('share', 15)} 이 문장 공유하기</button>
                 )}
                 <button type="button" onClick={onViewSaved} disabled={reflectionSaving}>저장한 문장 보기</button>
