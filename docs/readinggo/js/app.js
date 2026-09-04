@@ -1268,6 +1268,8 @@ function App() {
           author: (savedReadbackBook && savedReadbackBook.author) || (ns.book && ns.book.author) || '',
           page: savedReadbackRow.page,
           note: savedReadbackRow.my_note || '',
+          notePrivate: !!savedReadbackRow.note_private,
+          note_private: !!savedReadbackRow.note_private,
           kind: savedReadbackRow.kind || kind || 'quote',
           visibility: window.RG_normalizeStoredSentenceVisibility(savedReadbackRow.visibility),
         } : null;

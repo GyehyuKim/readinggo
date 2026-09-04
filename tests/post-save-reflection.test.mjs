@@ -12,6 +12,8 @@ assert.match(app, /mineDb\.find\(x => x\.id === savedSentenceRow\.id\)[\s\S]*ref
   'readback에서 같은 ID의 문장을 확인해 성찰 문맥을 만들어야 한다');
 assert.match(app, /completion\.onSuccess\(\{ reflectionSentence, currentPage: authoritativeCurrentPage \}\)/,
   '저장 완료 콜백에 정확한 성찰 문장과 권위 현재 쪽을 전달해야 한다');
+assert.match(app, /notePrivate: !!savedReadbackRow\.note_private,[\s\S]*note_private: !!savedReadbackRow\.note_private/,
+  '저장 완료 readback은 비공개 생각 플래그를 공유 경계까지 전달해야 한다');
 
 assert.match(home, /reflectionPending: sentenceCount === 1/,
   '단일 문장 완료만 성찰 연결을 기다려야 한다');
