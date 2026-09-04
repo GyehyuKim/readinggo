@@ -488,7 +488,10 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     // DB 영속·권위 현재 쪽 readback이 끝난 뒤에만 세리머니를 연다 (#1584).
     const bookQuoteCount = (ns.myQuotes || []).filter(q => q.bookId === ns.book.id).length;
     const ceremonyData = { currentPage: ns.book.cur, sentence: savedSentence, sentenceCount, bookQuoteCount, pagesAdded, isNewDay: true, wasReset, isComplete, reflectionPending: sentenceCount === 1 && !isComplete, reflectionSentence: null };
-    const deferCeremony = awaitPersistence && sentenceCount === 0;
+    // OCR 검토 화면은 저장 동안 최상위 overlay다. 뒤에서 낙관 완료 화면을 먼저 열면
+    // OCR history pop과 권위 sentence readback이 경쟁해 `내 생각` 대상 ID가 누락될 수 있다 (#1602).
+    // OCR 단일 저장은 실제 저장 행을 받은 뒤 resolved ceremony를 한 번만 연다.
+    const deferCeremony = awaitPersistence && (sentenceCount === 0 || source === 'ocr_review');
     let completionPromise = null, completion = null;
     if (awaitPersistence) {
       completionPromise = new Promise((resolve, reject) => {

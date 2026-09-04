@@ -52,8 +52,8 @@ assert.doesNotMatch(home, /setTimeout\(\(\) => \{ submitSentence\(\)/,
   '문장 저장 락은 페이지 전환 애니메이션 뒤로 미루면 안 된다');
 assert.ok(submitPage.indexOf("setQuickPage('')") > submitPage.indexOf('await Promise.resolve(handleCheckin'),
   '페이지 입력은 영속 성공 후에만 비워야 한다');
-assert.match(home, /const deferCeremony = awaitPersistence && sentenceCount === 0;/,
-  '문장이 없는 체크인은 영속 성공 전 완료 화면을 미뤄야 한다');
+assert.match(home, /const deferCeremony = awaitPersistence && \(sentenceCount === 0 \|\| source === 'ocr_review'\);/,
+  '문장이 없는 체크인과 OCR 단일 저장은 영속 성공 전 완료 화면을 미뤄야 한다');
 assert.match(app, /savedSessionRow[\s\S]*authoritativeCurrentPage[\s\S]*completion\.onSuccess\(\{ reflectionSentence, currentPage: authoritativeCurrentPage \}\)/,
   '완료 callback은 저장 RPC가 반환한 권위 현재 쪽을 전달해야 한다');
 assert.match(home, /if \(deferCeremony\) \{[\s\S]*setCeremony\(resolvedCeremony\)[\s\S]*\} else \{[\s\S]*setCeremony\(current =>/,
