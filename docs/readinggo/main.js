@@ -53,8 +53,6 @@ async function boot() {
     try {
       // Prompt Lab 코드와 endpoint 문자열은 production module graph에 넣지 않는다(#1372).
       await import('./js/prompt-lab.js');
-      const { MascotReviewScreen } = await import('./js/mascot-review.js');
-      window.RG_MASCOT_REVIEW = MascotReviewScreen;
       const { devReviewPersonas } = await import('./js/dev-review-personas.js');
       window.RG_DEV_REVIEW = devReviewPersonas;
       devReviewRestored = !!(await devReviewPersonas.restore());

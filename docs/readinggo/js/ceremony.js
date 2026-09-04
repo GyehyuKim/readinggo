@@ -81,6 +81,11 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
         <button type="button" className="ceremony-dismiss" aria-label="완료 화면 닫기" onClick={onClose} disabled={reflectionSaving}>
           {window.rgIcon('close', 18)}
         </button>
+        {isComplete && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '-10px 0 8px' }}>
+            <window.JackyCharacter pose="success" size={120} />
+          </div>
+        )}
         <h2>{isComplete ? '완독을 축하해요!' : reflectionSaved ? '문장과 생각을 저장했어요' : pageOnly ? '오늘도 읽었어요' : '문장을 저장했어요'}</h2>
         <div className="lead">{reflectionSaved ? '다음 문장을 이어서 남겨보세요' : leadText}</div>
 

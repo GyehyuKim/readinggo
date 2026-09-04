@@ -55,41 +55,52 @@ function rgIcon(name, size) {
 window.RG_ICONS = RG_ICONS;
 window.rgIcon = rgIcon;
 
-/* ── SparrowMark (#785 · #924 · 아이콘 리디자인): ReadingGo 참새 브랜드 마크 — 부트·로딩·에러·아바타 공용 인라인 SVG.
-   앱아이콘(assets/icon.png)·favicon(assets/sparrow.svg)과 동일 참새 캐릭터(배지·그라데이션만 제외한 새 본체).
-   세이지 팔레트(DESIGN.md 2026-06-19 리프레시): 몸통 #2EA86A / 날개 #228A57 / 부리 #E8962F / 눈 #2A2D33.
-   고개 든 통통 참새 + 짧은 부리 + 작은 깃(crest). viewBox 0 0 100 100.
-   spark=true 면 골드 스파크(짹!/한 문장) 추가 — 로그인·브랜드 모먼트 전용(아바타엔 미사용, 군더더기 회피).
-   size=픽셀(기본 40). 빌드 도구 없음 → 인라인 SVG(Stack Lock). ── */
-function SparrowMark({ size = 40, style, spark }) {
+/* ── Jacky brand mark: approved raster identity for persistent brand surfaces.
+   Launcher/store artwork and expressive character poses are separate assets; this head-only mark
+   is used for headers, loading, and conversation avatars. Keep general feature/status icons in RG_ICONS. ── */
+function SparrowMark({ size = 40, style, alt = 'ReadingGo 재키' }) {
   const s = size || 40;
   return (
-    <svg width={s} height={s} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ReadingGo 재키" style={{ display: 'block', flexShrink: 0, ...(style || {}) }}>
-      <path d="M66 50 L95 40 L79 65 Z" fill="#2EA86A" />
-      <ellipse cx="56" cy="62" rx="28" ry="24" fill="#2EA86A" />
-      <circle cx="40" cy="40" r="19" fill="#2EA86A" />
-      <path d="M46 23 Q51 12 55 24 Q50 26 46 23 Z" fill="#2EA86A" />
-      <path d="M44 50 Q70 47 80 66 Q60 73 46 65 Q39 57 44 50 Z" fill="#228A57" />
-      <path d="M23 36 L13 39.5 L24 45 Z" fill="#E8962F" />
-      <circle cx="35" cy="38" r="3.4" fill="#2A2D33" />
-      <circle cx="36.3" cy="36.7" r="1.15" fill="#FFFFFF" />
-      {spark && (
-        <g fill="#D9A52E">
-          <path d="M62 12.5 Q63.7 19.3 70.5 21 Q63.7 22.7 62 29.5 Q60.3 22.7 53.5 21 Q60.3 19.3 62 12.5 Z" />
-          <path d="M76 27 Q77.7 30.3 81 32 Q77.7 33.7 76 37 Q74.3 33.7 71 32 Q74.3 30.3 76 27 Z" />
-        </g>
-      )}
-    </svg>
+    <img
+      src="assets/jacky/brand-mark.png"
+      width={s}
+      height={s}
+      alt={alt}
+      aria-hidden={alt ? undefined : true}
+      style={{ display: 'block', flexShrink: 0, objectFit: 'contain', ...(style || {}) }}
+    />
   );
 }
 window.SparrowMark = SparrowMark;
 
-/* ── SparrowInline (#823): 텍스트 흐름 안에 들어가는 작은 참새 마크. 라벨·버튼 prefix·문구 끝의
-   참새 머리 이모지 대체(#864). baseline 정렬(verticalAlign)만 SparrowMark 위에 얹은 래퍼. ── */
+/* Inline occurrences are decorative; the adjacent text carries the meaning. */
 function SparrowInline({ size = 14 }) {
-  return <SparrowMark size={size} style={{ display: 'inline-block', verticalAlign: '-0.15em' }} />;
+  return <SparrowMark size={size} alt="" style={{ display: 'inline-block', verticalAlign: '-0.15em' }} />;
 }
 window.SparrowInline = SparrowInline;
+
+const JACKY_CHARACTER_POSES = new Set(['reading-guide', 'success', 'listening']);
+function JackyCharacter({ pose = 'reading-guide', size = 96, alt, style }) {
+  const safePose = JACKY_CHARACTER_POSES.has(pose) ? pose : 'reading-guide';
+  const labels = {
+    'reading-guide': '펼친 책을 들고 읽기를 안내하는 재키',
+    success: '양 날개를 들고 축하하는 재키',
+    listening: '고개를 기울여 기다리는 재키',
+  };
+  return (
+    <img
+      src={`assets/jacky/${safePose}.png`}
+      width={size}
+      height={size}
+      alt={alt === undefined ? labels[safePose] : alt}
+      aria-hidden={alt === '' ? true : undefined}
+      loading="lazy"
+      decoding="async"
+      style={{ display: 'block', objectFit: 'contain', ...(style || {}) }}
+    />
+  );
+}
+window.JackyCharacter = JackyCharacter;
 
 /* ── SectionLabel (#696): 책 상세 섹션 헤더. 이모지 prefix(📚/🔖/✍️) 폐기 → currentColor 모노라인
    SVG 아이콘 배지 + 라벨. library.js BookDetailModal 과 공유(window 노출). 본문이 텍스트인 섹션은

@@ -977,11 +977,8 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
         <div className="card book-card-wrap">
           {/* '내 서재' 버튼 제거 (#410) — 하단 탭바로 충분. 책 없으면 ⚙️도 없음. */}
           <div style={{ padding: '34px 22px 26px', textAlign: 'center' }}>
-            {/* 새 둘레 헤일로 — 따뜻한 포커스(#1056) */}
             <div style={{ marginBottom: 14, display: 'flex', justifyContent: 'center' }}>
-              <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'radial-gradient(circle, #EAF6EF 0%, #EAF6EF 55%, rgba(234,246,239,0) 72%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <window.SparrowMark size={60} />
-              </div>
+              <window.JackyCharacter pose="listening" size={112} />
             </div>
             {/* 온보딩 승격(#1134): 부정문("없어요") → 약속 선언 + 기능 예고 3줄.
                 스토어 유입은 앱의 약속을 모른 채 이 화면을 만난다 — 홈·재키·타인 문장의 존재를

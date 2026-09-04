@@ -760,7 +760,6 @@ function App() {
   const [reviewPersona] = useState(() => RG_DEV_REVIEW_ENABLED && window.RG_DEV_REVIEW ? window.RG_DEV_REVIEW.current() : null);
   const [reviewPersonas, setReviewPersonas] = useState(null);
   const [reviewBusy, setReviewBusy] = useState(false);
-  const [mascotReviewOpen, setMascotReviewOpen] = useState(false);
   const [authUser, setAuthUser] = useState(reviewMode ? 'local' : (_supa ? undefined : 'local')); // undefined=확인중, null=로그아웃(게스트), 그외=OK
   const [dataReady, setDataReady] = useState(!_supa);
   const [ugcTermsRequired, setUgcTermsRequired] = useState(false); // #1392 로그인 사용자의 공개 UGC 정책 동의
@@ -1478,7 +1477,6 @@ function App() {
             <span style={{ flex: '1 1 100%' }}>DEV 검수 모드 · {reviewPersona ? reviewPersona.name : '합성 페르소나'} · 브라우저 즉시 저장 + DEV DB 동기화 · PRD 미사용</span>
             <button onClick={openDevReviewPicker} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>전환</button>
             <button onClick={resetDevReview} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>초기 데이터로 리셋</button>
-            <button onClick={() => setMascotReviewOpen(true)} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--brand-soft)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>재키 A/B/C 비교</button>
             <button onClick={exitDevReview} disabled={reviewBusy} style={{ border: '1px solid var(--brand-soft)', borderRadius: 999, background: 'var(--paper)', color: 'var(--brand-3)', padding: '4px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>검수 종료</button>
           </div>
         )}
@@ -1523,7 +1521,9 @@ function App() {
         {isGuest && !guestBannerOff && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
             background: 'var(--brand-tint)', borderBottom: '1px solid var(--brand-soft)', fontSize: 12.5, fontWeight: 700, color: 'var(--brand-3)' }}>
-            <window.SparrowMark size={18} />
+            <span aria-hidden="true" style={{ width: 24, height: 24, borderRadius: 999, background: 'var(--paper)', color: 'var(--brand-3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {window.rgIcon('users', 14)}
+            </span>
             <span style={{ flex: 1, lineHeight: 1.35 }}>게스트로 둘러보는 중<br />로그인하면 내 기록이 저장돼요</span>
             {/* #1233: 라벨 '저장하기'는 진도 카드의 저장하기와 동일 라벨·다른 의미(로그인 유도 vs 진도 저장)로
                 오독 경로였고, solid 는 첫 화면 1차 버튼 경쟁(hero CTA·전체 동의와 3개)을 만들었다 → '로그인' + 2차 위계. */}
@@ -1643,10 +1643,6 @@ function App() {
           <UserProfileModal handle={profileHandle} onClose={() => setProfileHandle(null)} />,
           document.body
         )}
-        {RG_DEV_REVIEW_ENABLED && mascotReviewOpen && window.RG_MASCOT_REVIEW && (
-          <window.RG_MASCOT_REVIEW onClose={() => setMascotReviewOpen(false)} />
-        )}
-
         {/* 책 정보 모달 (#11) — 한 문장 책 제목 탭 */}
         {companionSentence && (
           <CompanionModal sentence={companionSentence} onClose={() => setCompanionSentence(null)} />
