@@ -272,8 +272,8 @@ function _buildCardNode(n, coverDataUrl, format, includeNote) {
   });
   const brand = document.createElement('span');
   Object.assign(brand.style, { display: 'flex', alignItems: 'center', gap: '14px', fontSize: '38px', color: _SC.ink });
-  // 참새 마크는 인라인 SVG(#823) — 이모지 대신 SparrowMark 실루엣을 래스터에 박는다(아이콘 리디자인·세이지 팔레트, SparrowMark 동일 path).
-  brand.innerHTML = '<svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0"><path d="M66 50 L95 40 L79 65 Z" fill="#2EA86A"/><ellipse cx="56" cy="62" rx="28" ry="24" fill="#2EA86A"/><circle cx="40" cy="40" r="19" fill="#2EA86A"/><path d="M46 23 Q51 12 55 24 Q50 26 46 23 Z" fill="#2EA86A"/><path d="M44 50 Q70 47 80 66 Q60 73 46 65 Q39 57 44 50 Z" fill="#228A57"/><path d="M23 36 L13 39.5 L24 45 Z" fill="#E8962F"/><circle cx="35" cy="38" r="3.4" fill="#2A2D33"/><circle cx="36.3" cy="36.7" r="1.15" fill="#FFFFFF"/></svg>ReadingGo';
+  // 공유 카드에도 canonical raster 브랜드 마크를 사용해 화면과 내보낸 이미지의 identity를 일치시킨다.
+  brand.innerHTML = '<img src="assets/jacky/brand-mark.png" width="40" height="40" alt="" style="display:block;flex-shrink:0;object-fit:contain">ReadingGo';
   const handle = document.createElement('span');
   Object.assign(handle.style, { fontFamily: _SC.fontPixel, fontSize: '30px', letterSpacing: '1.2px', color: _SC.ink3 });
   handle.textContent = RG_SHARE_HANDLE;

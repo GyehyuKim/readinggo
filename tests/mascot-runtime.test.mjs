@@ -51,11 +51,19 @@ test('runtime uses the raster role split and retired mascot SVG review is absent
   const main = read(path.join(appRoot, 'main.js'));
   const app = read(path.join(jsRoot, 'app.js'));
   const icons = read(path.join(jsRoot, 'icons.js'));
+  const shareCard = read(path.join(jsRoot, 'share-card.js'));
   const index = read(path.join(appRoot, 'index.html'));
   assert.match(icons, /assets\/jacky\/brand-mark\.png/);
   assert.match(index, /assets\/jacky\/favicon-32\.png/);
   assert.match(index, /assets\/jacky\/apple-touch-icon\.png/);
+  assert.match(index, /rg-boot-icon[\s\S]*assets\/jacky\/brand-mark\.png/);
+  assert.match(shareCard, /brand\.innerHTML[\s\S]*assets\/jacky\/brand-mark\.png/);
   assert.doesNotMatch(main + app, /mascot-review|RG_MASCOT_REVIEW|재키 A\/B\/C 비교/);
+  const productionSurfaceSource = [index, ...fs.readdirSync(jsRoot)
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => read(path.join(jsRoot, name)))].join('\n');
+  assert.doesNotMatch(productionSurfaceSource, /M66 50 L95 40 L79 65|SparrowMark 동일 path/,
+    'retired hand-coded mascot SVG signature must stay absent from production surfaces');
   const svgFiles = filesUnder(appRoot).filter((file) => file.endsWith('.svg'));
   assert.deepEqual(svgFiles, [], 'hand-coded mascot SVG assets must stay removed');
 });
