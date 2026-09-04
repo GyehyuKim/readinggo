@@ -67,7 +67,7 @@ test('production graph keeps library canonical while retired routes and modules 
   for (const pattern of forbidden) assert.doesNotMatch(productionSource, pattern);
 });
 
-test('dedicated nest evolution assets and CSS are physically absent; shared sparrow remains', () => {
+test('dedicated nest evolution assets and CSS are physically absent; shared Jacky raster mark remains', () => {
   const html = read(path.join(appRoot, 'index.html'));
   const icons = read(path.join(jsRoot, 'icons.js'));
   for (const selector of ['nest-theatre', 'nest-health', 'nest-progress', 'nest-evo', 'fall-twig', 'crack-overlay', 'demo-decay']) {
@@ -76,8 +76,10 @@ test('dedicated nest evolution assets and CSS are physically absent; shared spar
   for (const asset of ['lv1.png', 'lv2.png', 'lv3.png', 'lv4.png', 'lv5.png']) {
     assert.equal(fs.existsSync(path.join(appRoot, 'public', 'assets', 'nest', asset)), false, `assets/nest/${asset} must be physically removed`);
   }
-  assert.equal(fs.existsSync(path.join(appRoot, 'public', 'assets', 'sparrow.svg')), true);
+  assert.equal(fs.existsSync(path.join(appRoot, 'public', 'assets', 'jacky', 'brand-mark.png')), true);
+  assert.equal(fs.existsSync(path.join(appRoot, 'public', 'assets', 'sparrow.svg')), false);
   assert.match(icons, /function SparrowMark\b/);
+  assert.match(icons, /assets\/jacky\/brand-mark\.png/);
   assert.doesNotMatch(icons, /\bNEST_ART\b|function nestArt\b/);
 });
 

@@ -7,54 +7,57 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const appRoot = path.join(root, 'docs', 'readinggo');
 const jsRoot = path.join(appRoot, 'js');
-const candidatesRoot = path.join(jsRoot, 'mascot-candidates');
+const jackyRoot = path.join(appRoot, 'public', 'assets', 'jacky');
 const read = (file) => fs.readFileSync(file, 'utf8');
 
-const candidateFiles = ['jacky-candidate-a.svg', 'jacky-candidate-b.svg', 'jacky-candidate-c.svg'];
-const previewFiles = ['jacky-candidate-a-48.svg', 'jacky-candidate-b-48.svg', 'jacky-candidate-c-48.svg'];
-const requiredViews = ['face-icon', 'full-body-front', 'full-body-side', 'emotion-calm', 'emotion-welcome', 'emotion-curious', 'emotion-empathy', 'preview-48'];
+function pngInfo(file) {
+  const data = fs.readFileSync(file);
+  assert.deepEqual([...data.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${file} must be PNG`);
+  return {
+    width: data.readUInt32BE(16),
+    height: data.readUInt32BE(20),
+    colorType: data[25],
+  };
+}
 
-test('three candidate SVG model sheets are complete, self-contained, and retain Jacky identity', () => {
-  assert.deepEqual(fs.readdirSync(candidatesRoot).sort(), [...candidateFiles, ...previewFiles].sort());
-  candidateFiles.forEach((name, index) => {
-    const svg = read(path.join(candidatesRoot, name));
-    assert.match(svg, new RegExp(`data-candidate="${String.fromCharCode(65 + index)}"`));
-    assert.match(svg, /Jacky \/ 재키/);
-    assert.match(svg, /~2\.5 heads/);
-    assert.doesNotMatch(svg, /https?:\/\/(?!www\.w3\.org\/2000\/svg)/, `${name} must not reference external assets`);
-    for (const view of requiredViews) assert.match(svg, new RegExp(`id="${view}"`), `${name} is missing ${view}`);
+function filesUnder(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory() && ['node_modules', 'dist'].includes(entry.name)) return [];
+    const target = path.join(dir, entry.name);
+    return entry.isDirectory() ? filesUnder(target) : [target];
   });
-  previewFiles.forEach((name) => {
-    const svg = read(path.join(candidatesRoot, name));
-    assert.match(svg, /viewBox="0 0 100 160"/, `${name} must preserve the full-body aspect ratio`);
-    assert.doesNotMatch(svg, /https?:\/\/(?!www\.w3\.org\/2000\/svg)/, `${name} must be self-contained`);
-  });
+}
+
+test('Jacky production assets are purpose-specific PNGs with required dimensions and alpha', () => {
+  const expected = {
+    'brand-mark.png': [512, 512, true],
+    'launcher.png': [1024, 1024, false],
+    'reading-guide.png': [512, 512, true],
+    'success.png': [512, 512, true],
+    'listening.png': [512, 512, true],
+    'favicon-16.png': [16, 16, true],
+    'favicon-32.png': [32, 32, true],
+    'apple-touch-icon.png': [180, 180, false],
+  };
+  assert.deepEqual(fs.readdirSync(jackyRoot).sort(), Object.keys(expected).sort());
+  for (const [name, [width, height, needsAlpha]] of Object.entries(expected)) {
+    const info = pngInfo(path.join(jackyRoot, name));
+    assert.deepEqual([info.width, info.height], [width, height], `${name} dimensions`);
+    if (needsAlpha) assert.equal(info.colorType, 6, `${name} must be RGBA PNG`);
+  }
 });
 
-test('DEV comparison is gated and exposes equal A/B/C, 48px, auditable criteria, and keyboard-native controls', () => {
+test('runtime uses the raster role split and retired mascot SVG review is absent', () => {
   const main = read(path.join(appRoot, 'main.js'));
   const app = read(path.join(jsRoot, 'app.js'));
-  const review = read(path.join(jsRoot, 'mascot-review.js'));
-  assert.match(main, /VITE_READINGGO_ENV === 'development'[\s\S]*import\('\.\/js\/mascot-review\.js'\)/);
-  assert.match(app, /RG_DEV_REVIEW_ENABLED && mascotReviewOpen && window\.RG_MASCOT_REVIEW/);
-  assert.match(app, /재키 A\/B\/C 비교/);
-  assert.equal([...review.matchAll(/id: '[ABC]'/g)].length, 3);
-  assert.equal([...review.matchAll(/\['(?:small|views|emotion|brand|surface|identity|meaning)'/g)].length, 7);
-  assert.equal([...review.matchAll(/smallSrc: candidate[A-C]48/g)].length, 3);
-  assert.match(review, /width: 48, height: 48/);
-  assert.match(review, /src=\{candidate\.smallSrc\}/);
-  assert.match(review, /objectFit: 'contain'/);
-  assert.doesNotMatch(review, /objectPosition|objectFit: 'cover'/);
-  assert.match(review, /repeat\(auto-fit, minmax/);
-  assert.match(review, /<button[^>]+aria-pressed=/);
-  assert.match(review, /aria-labelledby="mascot-review-title"/);
-  assert.match(review, /role="dialog"[^>]+aria-modal="true"/);
-  assert.match(review, /closeRef\.current\?\.focus\(\)/, 'open 시 modal 내부 initial focus');
-  assert.match(review, /event\.key === 'Escape'[\s\S]*onClose\(\)/, 'Escape 닫기');
-  assert.match(review, /event\.key !== 'Tab'[\s\S]*querySelectorAll[\s\S]*event\.shiftKey[\s\S]*first\.focus\(\)/,
-    'Tab/Shift+Tab focus containment');
-  assert.match(review, /previousFocusRef\.current\?\.isConnected[\s\S]*previousFocusRef\.current\.focus\(\)/,
-    '닫을 때 trigger focus 복원');
+  const icons = read(path.join(jsRoot, 'icons.js'));
+  const index = read(path.join(appRoot, 'index.html'));
+  assert.match(icons, /assets\/jacky\/brand-mark\.png/);
+  assert.match(index, /assets\/jacky\/favicon-32\.png/);
+  assert.match(index, /assets\/jacky\/apple-touch-icon\.png/);
+  assert.doesNotMatch(main + app, /mascot-review|RG_MASCOT_REVIEW|재키 A\/B\/C 비교/);
+  const svgFiles = filesUnder(appRoot).filter((file) => file.endsWith('.svg'));
+  assert.deepEqual(svgFiles, [], 'hand-coded mascot SVG assets must stay removed');
 });
 
 test('retired product implementation and mascot-as-user fallbacks are absent from active JS', () => {
@@ -87,12 +90,11 @@ test('retired DEV RPCs have an idempotent cleanup migration', () => {
     'migrate-dev workflow가 transaction을 소유하므로 migration 자체 transaction 금지');
 });
 
-test('built bundle contains comparison only for explicit development build', { skip: !['0', '1'].includes(process.env.EXPECT_MASCOT_REVIEW) }, () => {
+test('built bundle excludes retired mascot comparison in every environment', { skip: !['0', '1'].includes(process.env.EXPECT_MASCOT_REVIEW) }, () => {
   const assets = path.join(appRoot, 'dist', 'assets');
-  const bundle = fs.readdirSync(assets).filter((name) => /\.(?:js|svg)$/.test(name))
+  const bundle = fs.readdirSync(assets).filter((name) => /\.(?:js|css|html)$/.test(name))
     .map((name) => read(path.join(assets, name))).join('\n');
-  const expected = process.env.EXPECT_MASCOT_REVIEW === '1';
   for (const marker of ['Jacky / 재키 모델 시트 비교', 'Candidate A · Balanced Sage', 'CANDIDATES, NOT CANONICAL']) {
-    assert.equal(bundle.includes(marker), expected, `${marker} DEV boundary mismatch`);
+    assert.equal(bundle.includes(marker), false, `${marker} must stay retired`);
   }
 });
