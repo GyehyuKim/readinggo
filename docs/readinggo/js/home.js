@@ -217,6 +217,13 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const [ceremony, setCeremony] = _useState(null);
   // 세리머니 문장 카드 → 현재 책 입력으로 잠시 이동하고, 브라우저/Android 뒤로가기로 결과 화면 복원(#1403).
   const _sentenceCeremonyRef = _useRef(null);
+  const _closeCeremonyOnPopRef = _useRef(false);
+  const _openFreshCeremony = (nextCeremony) => {
+    const replacesContinuation = !!_sentenceCeremonyRef.current;
+    _sentenceCeremonyRef.current = null;
+    _closeCeremonyOnPopRef.current = replacesContinuation;
+    setCeremony(nextCeremony);
+  };
   const [showConfetti, setShowConfetti] = _useState(false);
   // 홈 단계 = 활성 책 진척률(book.cur/book.total). 체력/days 추적 없음.
   const _pctOf = (bk) => bk && bk.total ? Math.round(bk.cur / bk.total * 100) : 0;
@@ -505,7 +512,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
               reflectionSentence: result && result.reflectionSentence,
             };
             if (deferCeremony) {
-              setCeremony(resolvedCeremony);
+              _openFreshCeremony(resolvedCeremony);
               setShowConfetti(true);
               setTimeout(() => setShowConfetti(false), 3500);
             } else {
@@ -536,7 +543,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     pendingMilestoneRef.current = _pickMilestone({ isComplete, newStreak: ns.streak, book: ns.book });
 
     if (!deferCeremony) {
-      setCeremony(ceremonyData);
+      _openFreshCeremony(ceremonyData);
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 3500);
     }
@@ -768,6 +775,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   // 세리머니와 겹치지 않게 닫은 뒤 약간의 텀을 두고 연다. 게이트(마일스톤별 1회·하루 1회)는 DataStore.milestone.
   const closeCeremony = () => {
     _sentenceCeremonyRef.current = null;
+    _closeCeremonyOnPopRef.current = false;
     setCeremony(null);
     const m = pendingMilestoneRef.current;
     pendingMilestoneRef.current = null;
@@ -783,8 +791,17 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   const openSentenceFromCeremony = () => {
     if (!ceremony || !_quickSentRef.current) return;
+    const continuationPage = ceremony.reflectionSentence && ceremony.reflectionSentence.page;
+    const hasExistingDraft = drafts.some((draft) => String(draft && draft.text || '').trim());
+    _closeCeremonyOnPopRef.current = false;
     _sentenceCeremonyRef.current = ceremony;
     window.history.pushState({ rgCeremonySentence: true, bookId: homeState.book.id }, '');
+    if (ceremony.reflectionSaved && !hasExistingDraft) {
+      setDrafts([{ text: '' }]);
+      if (Number.isFinite(Number(continuationPage)) && Number(continuationPage) > 0) {
+        setQuickSentPage(String(continuationPage));
+      }
+    }
     setCeremony(null);
     setTimeout(() => {
       const input = _quickSentRef.current;
@@ -796,6 +813,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   const viewSavedFromCeremony = () => {
     if (!ceremony || !_bookQuotesRef.current) return;
+    _closeCeremonyOnPopRef.current = false;
     _sentenceCeremonyRef.current = ceremony;
     window.history.pushState({ rgCeremonySaved: true, bookId: homeState.book.id }, '');
     setCeremony(null);
@@ -807,6 +825,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   const goHomeFromCeremony = () => {
     _sentenceCeremonyRef.current = null;
+    _closeCeremonyOnPopRef.current = false;
     pendingMilestoneRef.current = null;
     setCeremony(null);
     if (onNavigate) onNavigate('home');
@@ -860,10 +879,17 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   _useEffect(() => {
     const onPop = () => {
+      if (_ocrHistoryRef.current) return;
       const previous = _sentenceCeremonyRef.current;
-      if (!previous) return;
       _sentenceCeremonyRef.current = null;
-      setCeremony(previous);
+      if (previous) {
+        _closeCeremonyOnPopRef.current = false;
+        setCeremony(previous);
+        return;
+      }
+      if (!_closeCeremonyOnPopRef.current) return;
+      _closeCeremonyOnPopRef.current = false;
+      setCeremony(null);
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);

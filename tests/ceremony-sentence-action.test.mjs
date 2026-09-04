@@ -8,12 +8,12 @@ const html = fs.readFileSync('docs/readinggo/index.html', 'utf8');
 
 assert.match(ceremony, /className="ceremony-reflection-save" onClick=\{saveReflection\}[\s\S]*내 생각 저장하기/,
   '단일 문장 저장 뒤 완료 화면 안에서 내 생각을 저장할 수 있어야 한다');
-assert.match(ceremony, /className="ceremony-action-next" onClick=\{onContinue\}[\s\S]*다음 문장 기록하기/,
-  '저장 완료 화면의 1차 행동은 다음 문장 기록이어야 한다');
-assert.match(ceremony, /className="ceremony-action-home" onClick=\{onGoHome\}[\s\S]*홈으로 돌아가기/,
-  '저장 완료 화면에서 홈 복귀를 선택할 수 있어야 한다');
-assert.match(ceremony, /onClick=\{onViewSaved\} disabled=\{reflectionSaving\}>저장한 문장 보기<\/button>/,
-  '방금 저장한 문장 영역으로 이동할 수 있고 저장 중에는 이탈을 막아야 한다');
+assert.match(ceremony, /reflectionSaved[\s\S]*className="ceremony-action-next" onClick=\{onContinue\}[\s\S]*다음 문장 남기기/,
+  '생각 저장 완료의 1차 행동은 연속 문장 기록이어야 한다');
+assert.match(ceremony, /reflectionSaved[\s\S]*className="ceremony-action-home" onClick=\{onViewSaved\}[\s\S]*기록 마치기/,
+  '생각 저장 완료의 종료 행동은 방금 저장한 문장 영역으로 가야 한다');
+assert.match(ceremony, /!reflectionSaved[\s\S]*onClick=\{onViewSaved\} disabled=\{reflectionSaving\}>저장한 문장 보기<\/button>/,
+  '생각 저장 전에는 방금 저장한 문장 영역으로 이동할 수 있어야 한다');
 assert.doesNotMatch(ceremony, /내 서재로 가기|onGoLibrary|ceremony-action-continue/,
   '퇴역한 완료 행동 카피와 prop을 다시 만들면 안 된다');
 assert.doesNotMatch(ceremony, /reward-card|onAddSentence/,
@@ -56,10 +56,10 @@ assert.match(home, /const deferCeremony = awaitPersistence && \(sentenceCount ==
   '문장이 없는 체크인과 OCR 단일 저장은 영속 성공 전 완료 화면을 미뤄야 한다');
 assert.match(app, /savedSessionRow[\s\S]*authoritativeCurrentPage[\s\S]*completion\.onSuccess\(\{ reflectionSentence, currentPage: authoritativeCurrentPage \}\)/,
   '완료 callback은 저장 RPC가 반환한 권위 현재 쪽을 전달해야 한다');
-assert.match(home, /if \(deferCeremony\) \{[\s\S]*setCeremony\(resolvedCeremony\)[\s\S]*\} else \{[\s\S]*setCeremony\(current =>/,
-  '지연한 페이지 완료는 성공 callback에서만 열어야 한다');
-assert.match(home, /if \(!deferCeremony\) \{[\s\S]*setCeremony\(ceremonyData\)/,
-  '문장 저장 완료의 기존 낙관 세리머니는 유지해야 한다');
+assert.match(home, /if \(deferCeremony\) \{[\s\S]*_openFreshCeremony\(resolvedCeremony\)[\s\S]*\} else \{[\s\S]*setCeremony\(current =>/,
+  '지연한 페이지·OCR 완료는 성공 callback에서 새 ceremony 경계로 열어야 한다');
+assert.match(home, /if \(!deferCeremony\) \{[\s\S]*_openFreshCeremony\(ceremonyData\)/,
+  '문장 저장 완료의 기존 낙관 세리머니는 새 ceremony 경계로 유지해야 한다');
 assert.match(ceremony, /className="saved-quote" role="region" aria-label="저장한 문장 전체 내용" tabIndex=\{0\}/,
   '긴 저장 문장은 키보드로 진입 가능한 영역이어야 한다');
 assert.match(ceremony, /sentenceNeedsScrollHint = Array\.from\(String\(sentence \|\| ''\)\)\.length > 140[\s\S]*스크롤해서 전체 보기/,
@@ -74,12 +74,18 @@ assert.match(home, /pushState\(\{ rgCeremonySaved: true, bookId: homeState\.book
   '저장 문장 이동도 현재 책 문맥과 뒤로가기를 보존해야 한다');
 assert.match(home, /const goHomeFromCeremony = \(\) => \{[\s\S]*pendingMilestoneRef\.current = null;[\s\S]*onNavigate\('home'\)/,
   '홈 복귀는 대기 overlay를 정리하고 canonical 홈으로 이동해야 한다');
+assert.match(home, /const hasExistingDraft = drafts\.some[\s\S]*if \(ceremony\.reflectionSaved && !hasExistingDraft\) \{[\s\S]*setDrafts\(\[\{ text: '' \}\]\);[\s\S]*setQuickSentPage\(String\(continuationPage\)\)/,
+  '연속 기록은 기존 초안이 없을 때만 빈 문장과 방금 페이지로 초기화해야 한다');
 assert.match(home, /_quickSentRef\.current[\s\S]*scrollIntoView[\s\S]*focus\(\{ preventScroll: true \}\)/,
   '현재 책의 한 문장 입력을 표시하고 포커스해야 한다');
 assert.match(home, /_bookQuotesRef\.current[\s\S]*scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/,
   '현재 책의 저장 문장 영역을 표시해야 한다');
-assert.match(home, /const previous = _sentenceCeremonyRef\.current;[\s\S]*setCeremony\(previous\)/,
-  '웹과 Android WebView popstate에서 직전 결과 화면을 복원해야 한다');
+assert.match(home, /const _openFreshCeremony = \(nextCeremony\) => \{[\s\S]*const replacesContinuation = !!_sentenceCeremonyRef\.current;[\s\S]*_sentenceCeremonyRef\.current = null;[\s\S]*_closeCeremonyOnPopRef\.current = replacesContinuation;[\s\S]*setCeremony\(nextCeremony\)/,
+  '새 저장 완료는 이전 연속 기록 payload를 폐기하고 필요한 경우에만 다음 back 닫기를 예약해야 한다');
+assert.match(home, /_openFreshCeremony\(resolvedCeremony\)[\s\S]*_openFreshCeremony\(ceremonyData\)/,
+  '지연 OCR 완료와 일반 완료 모두 새 ceremony 경계를 사용해야 한다');
+assert.match(home, /const onPop = \(\) => \{[\s\S]*if \(_ocrHistoryRef\.current\) return;[\s\S]*const previous = _sentenceCeremonyRef\.current;[\s\S]*if \(previous\) \{[\s\S]*setCeremony\(previous\)[\s\S]*if \(!_closeCeremonyOnPopRef\.current\) return;[\s\S]*setCeremony\(null\)/,
+  '뒤로가기는 OCR overlay pop에 관여하지 않고 이전 ceremony 복원과 연속 기록 뒤 새 완료 닫기만 처리해야 한다');
 assert.match(html, /\.ceremony-reflection textarea:focus-visible,[\s\S]*\.ceremony-action-home:focus-visible,[\s\S]*\.ceremony-action-secondary button:focus-visible[\s\S]*outline:/,
   '생각 입력부터 완료 행동까지 키보드 포커스가 시각적으로 보여야 한다');
 

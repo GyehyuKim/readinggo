@@ -81,10 +81,10 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
         <button type="button" className="ceremony-dismiss" aria-label="완료 화면 닫기" onClick={onClose} disabled={reflectionSaving}>
           {window.rgIcon('close', 18)}
         </button>
-        <h2>{isComplete ? '완독을 축하해요!' : reflectionSaved ? '내 생각을 저장했어요' : pageOnly ? '오늘도 읽었어요' : '문장을 저장했어요'}</h2>
-        <div className="lead">{reflectionSaved ? '저장한 내용을 확인하고 다음을 선택하세요' : leadText}</div>
+        <h2>{isComplete ? '완독을 축하해요!' : reflectionSaved ? '문장과 생각을 저장했어요' : pageOnly ? '오늘도 읽었어요' : '문장을 저장했어요'}</h2>
+        <div className="lead">{reflectionSaved ? '다음 문장을 이어서 남겨보세요' : leadText}</div>
 
-        {sentence && (
+        {sentence && !reflectionSaved && (
           <div className="saved-quote" role="region" aria-label="저장한 문장 전체 내용" tabIndex={0}>
             <div className="saved-quote-head">
               <span className="label">저장한 문장</span>
@@ -155,30 +155,44 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
           <section className="ceremony-reflection-saved" role="status" aria-live="polite" aria-labelledby="ceremony-reflection-saved-label">
             <div className="ceremony-reflection-saved-head" id="ceremony-reflection-saved-label">
               <span className="ceremony-reflection-saved-icon" aria-hidden="true">✓</span>
-              내가 남긴 생각
+              내 생각까지 저장했어요
             </div>
-            <div className="ceremony-reflection-saved-text" tabIndex={0}>{reflectionDraft.trim()}</div>
           </section>
         )}
         {!isComplete && (
           <div className={`ceremony-actions${reflectionSaved ? ' is-saved' : ''}`}>
-            {reflectionSaved && <div className="ceremony-actions-label">이제 무엇을 할까요?</div>}
-            <button type="button" className="ceremony-action-next" onClick={onContinue} disabled={reflectionSaving}>
-              {pageOnly ? '한 문장 남기기' : '다음 문장 기록하기'}
-            </button>
-            <button type="button" className="ceremony-action-home" onClick={onGoHome} disabled={reflectionSaving}>
-              홈으로 돌아가기
-            </button>
-            {savedSentence && (
-              <div className="ceremony-action-secondary">
-                {reflectionSaved && (
+            {reflectionSaved ? (
+              <>
+                <button type="button" className="ceremony-action-next" onClick={onContinue} disabled={reflectionSaving}>
+                  다음 문장 남기기
+                </button>
+                <button type="button" className="ceremony-action-home" onClick={onViewSaved} disabled={reflectionSaving}>
+                  기록 마치기
+                </button>
+                <div className="ceremony-action-secondary">
                   <button type="button" onClick={onTalkToJacky} disabled={reflectionSaving}>{window.rgIcon('chat', 15)} 재키와 대화하기</button>
+                  {reflectionReady && onShareSentence && (
+                    <button type="button" className="ceremony-action-share" onClick={onShareSentence} disabled={reflectionSaving}>{window.rgIcon('share', 15)} 이 문장 공유하기</button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <button type="button" className="ceremony-action-next" onClick={onContinue} disabled={reflectionSaving}>
+                  {pageOnly ? '한 문장 남기기' : '다음 문장 기록하기'}
+                </button>
+                <button type="button" className="ceremony-action-home" onClick={onGoHome} disabled={reflectionSaving}>
+                  홈으로 돌아가기
+                </button>
+                {savedSentence && (
+                  <div className="ceremony-action-secondary">
+                    {reflectionReady && onShareSentence && (
+                      <button type="button" className="ceremony-action-share" onClick={onShareSentence} disabled={reflectionSaving}>{window.rgIcon('share', 15)} 이 문장 공유하기</button>
+                    )}
+                    <button type="button" onClick={onViewSaved} disabled={reflectionSaving}>저장한 문장 보기</button>
+                  </div>
                 )}
-                {reflectionReady && onShareSentence && (
-                  <button type="button" className="ceremony-action-share" onClick={onShareSentence} disabled={reflectionSaving}>{window.rgIcon('share', 15)} 이 문장 공유하기</button>
-                )}
-                <button type="button" onClick={onViewSaved} disabled={reflectionSaving}>저장한 문장 보기</button>
-              </div>
+              </>
             )}
           </div>
         )}

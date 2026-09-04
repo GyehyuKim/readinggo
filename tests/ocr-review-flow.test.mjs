@@ -57,9 +57,9 @@ check('기존 handleCheckin 단일 호출 경로 사용', /await Promise\.resolv
   && (ocrSaveFlow.match(/handleCheckin\(/g) || []).length === 1);
 check('OCR 단일 저장은 권위 readback 뒤 완료 화면을 연다',
   /const deferCeremony = awaitPersistence && \(sentenceCount === 0 \|\| source === 'ocr_review'\);/.test(checkinFlow)
-  && /if \(deferCeremony\) \{[\s\S]*setCeremony\(resolvedCeremony\)/.test(checkinFlow));
+  && /if \(deferCeremony\) \{[\s\S]*_openFreshCeremony\(resolvedCeremony\)/.test(checkinFlow));
 check('일반 단일 입력은 기존 낙관 완료 화면을 유지한다',
-  /if \(!deferCeremony\) \{[\s\S]*setCeremony\(ceremonyData\)/.test(checkinFlow));
+  /if \(!deferCeremony\) \{[\s\S]*_openFreshCeremony\(ceremonyData\)/.test(checkinFlow));
 check('201~1000자도 길이 기반 private 강제 없이 기존 기본 공개범위 유지',
   !/checked\.sentence\.length > 200/.test(ocrSaveFlow)
   && /sentence: checked\.sentence, kind: 'quote'/.test(ocrSaveFlow));
