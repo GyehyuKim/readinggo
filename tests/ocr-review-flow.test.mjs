@@ -22,6 +22,7 @@ function sourceSection(startToken, endToken) {
   return src.slice(sectionStart, sectionEnd);
 }
 
+const checkinFlow = sourceSection('const handleCheckin = async', '// 빠른 기록');
 const ocrSuccessFlow = sourceSection('const runOcrQuick', 'const runOcrAlbumBatch');
 const ocrSaveFlow = sourceSection('const saveOcrReview', '// 입력 페이지 정규화');
 const ocrCloseFlow = sourceSection('const closeOcrReview', '// 읽는 중 책 목록');
@@ -54,6 +55,11 @@ check('OCR 성공은 drafts에 삽입하지 않음', /setOcrReview\(/.test(ocrSu
 check('검토 dialog 접근성 계약', /role="dialog" aria-modal="true" aria-labelledby="ocr-review-title"/.test(src));
 check('기존 handleCheckin 단일 호출 경로 사용', /await Promise\.resolve\(handleCheckin\(\{ page: progressPage, sentence: checked\.sentence[^}]+awaitPersistence: true/.test(ocrSaveFlow)
   && (ocrSaveFlow.match(/handleCheckin\(/g) || []).length === 1);
+check('OCR 단일 저장은 권위 readback 뒤 완료 화면을 연다',
+  /const deferCeremony = awaitPersistence && \(sentenceCount === 0 \|\| source === 'ocr_review'\);/.test(checkinFlow)
+  && /if \(deferCeremony\) \{[\s\S]*setCeremony\(resolvedCeremony\)/.test(checkinFlow));
+check('일반 단일 입력은 기존 낙관 완료 화면을 유지한다',
+  /if \(!deferCeremony\) \{[\s\S]*setCeremony\(ceremonyData\)/.test(checkinFlow));
 check('201~1000자도 길이 기반 private 강제 없이 기존 기본 공개범위 유지',
   !/checked\.sentence\.length > 200/.test(ocrSaveFlow)
   && /sentence: checked\.sentence, kind: 'quote'/.test(ocrSaveFlow));
