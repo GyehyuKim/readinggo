@@ -1215,21 +1215,15 @@ select{ font-size: 16px !important; min-width: 0; }
   background:var(--brand-tint); text-align:left;
 }
 .ceremony-reflection-saved-head{
-  display:flex; align-items:center; gap:8px; margin-bottom:10px; color:var(--brand-3);
+  display:flex; align-items:center; gap:8px; margin-bottom:0; color:var(--brand-3);
   font-size:13px; font-weight:900;
 }
 .ceremony-reflection-saved-icon{
   display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; flex:0 0 24px;
   border-radius:50%; background:var(--brand); color:#fff; font-size:15px; font-weight:900;
 }
-.ceremony-reflection-saved-text{
-  max-height:140px; overflow-y:auto; overscroll-behavior:contain; padding:12px;
-  border-radius:var(--r-sm); background:var(--card); color:var(--ink);
-  font-size:14px; line-height:1.55; white-space:pre-wrap; -webkit-overflow-scrolling:touch;
-}
 .ceremony-actions{ display:flex; flex-direction:column; gap:8px; margin-top:0; }
 .ceremony-actions.is-saved{ padding-top:2px; }
-.ceremony-actions-label{ margin-bottom:2px; color:var(--ink); font-size:14px; font-weight:900; text-align:left; }
 .ceremony-action-next,.ceremony-action-home{
   width:100%; min-height:48px; padding:11px 14px; border-radius:var(--r-md);
   font-size:14px; font-weight:900; cursor:pointer;
@@ -1255,7 +1249,6 @@ select{ font-size: 16px !important; min-width: 0; }
 .ceremony-reflection textarea:focus-visible,
 .ceremony-reflection-save:focus-visible,
 .ceremony-reflection-jacky:focus-visible,
-.ceremony-reflection-saved-text:focus-visible,
 .ceremony-action-next:focus-visible,
 .ceremony-action-home:focus-visible,
 .ceremony-action-secondary button:focus-visible{

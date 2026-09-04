@@ -26,17 +26,19 @@ assert.match(html, /\.shelf-peek-cover\s*\{[\s\S]*border-radius:[^;]*[2-9][0-9]p
 
 assert.doesNotMatch(ceremony, /className="reward-grid"/,
   '저장 개수를 별도 보상 카드로 반복하면 안 된다');
-assert.match(ceremony, /!isComplete && \([\s\S]*className="ceremony-actions"[\s\S]*이 책에서 계속 기록하기[\s\S]*저장한 문장 보기[\s\S]*내 서재로 가기/,
-  '일반 저장 완료는 세 가지 다음 행동을 우선순위대로 제공해야 한다');
+assert.match(ceremony, /reflectionSaved[\s\S]*다음 문장 남기기[\s\S]*기록 마치기[\s\S]*재키와 대화하기[\s\S]*이 문장 공유하기/,
+  '생각 저장 완료는 연속 기록과 종료를 구분하고 기존 보조 행동을 유지해야 한다');
+assert.doesNotMatch(ceremony, /이 책에서 계속 기록하기|내 서재로 가기/,
+  '퇴역한 완료 행동을 다시 노출하면 안 된다');
 assert.match(ceremony, /className="ceremony-dismiss"[\s\S]*aria-label="완료 화면 닫기"/,
   '행동과 별개인 단순 닫기를 제공해야 한다');
 assert.match(ceremony, /isComplete && \([\s\S]*className="complete-review"[\s\S]*완독 기록 남기기/,
   '완독 별점·소감 흐름은 일반 행동으로 대체하면 안 된다');
-assert.match(home, /onContinue=\{openSentenceFromCeremony\}[\s\S]*onViewSaved=\{viewSavedFromCeremony\}[\s\S]*onGoLibrary=\{goLibraryFromCeremony\}/,
-  'HomeView가 세 행동을 각각 현재 책 문맥에 연결해야 한다');
+assert.match(home, /onContinue=\{openSentenceFromCeremony\}[\s\S]*onViewSaved=\{viewSavedFromCeremony\}[\s\S]*onGoHome=\{goHomeFromCeremony\}/,
+  'HomeView가 연속 기록·저장 결과·홈 행동을 각각 현재 책 문맥에 연결해야 한다');
 assert.match(home, /_bookQuotesRef\.current[\s\S]*scrollIntoView/,
   '저장한 문장 보기는 현재 책 문장 영역으로 이동해야 한다');
 assert.match(app, /<HomeView[\s\S]*onNavigate=\{switchTab\}/,
-  '내 서재 이동은 기존 canonical tab 전환 함수를 재사용해야 한다');
+  '홈 내비게이션은 기존 canonical tab 전환 함수를 재사용해야 한다');
 
 console.log('✓ #1561 서재 양감 탐색·저장 후 행동 회귀 계약');
