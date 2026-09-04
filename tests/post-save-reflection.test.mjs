@@ -10,8 +10,10 @@ assert.match(app, /let savedSentenceRow = null;[\s\S]*savedSentenceRow = await P
   '단일 문장 mutation이 반환한 행을 별도로 보존해야 한다');
 assert.match(app, /mineDb\.find\(x => x\.id === savedSentenceRow\.id\)[\s\S]*reflectionSentence/,
   'readback에서 같은 ID의 문장을 확인해 성찰 문맥을 만들어야 한다');
-assert.match(app, /completion\.onSuccess\(\{ reflectionSentence \}\)/,
-  '저장 완료 콜백에 정확한 성찰 문장을 전달해야 한다');
+assert.match(app, /completion\.onSuccess\(\{ reflectionSentence, currentPage: authoritativeCurrentPage \}\)/,
+  '저장 완료 콜백에 정확한 성찰 문장과 권위 현재 쪽을 전달해야 한다');
+assert.match(app, /notePrivate: !!savedReadbackRow\.note_private,[\s\S]*note_private: !!savedReadbackRow\.note_private/,
+  '저장 완료 readback은 비공개 생각 플래그를 공유 경계까지 전달해야 한다');
 
 assert.match(home, /reflectionPending: sentenceCount === 1/,
   '단일 문장 완료만 성찰 연결을 기다려야 한다');
@@ -23,11 +25,19 @@ assert.match(home, /rgJoinNote\(draft\.trim\(\), rgSplitNote\(sentence\.note\)\.
   'inline 생각 저장은 기존 재키 Q/A를 보존해야 한다');
 assert.match(home, /talkToJackyFromCeremony[\s\S]*RG_openCompanion\(sentence, \{ mode: 'jacky' \}\)/,
   '재키 대화는 방금 문장을 jacky 모드로 열어야 한다');
-assert.match(home, /onSaveReflection=\{saveReflectionFromCeremony\}[\s\S]*onTalkToJacky=\{talkToJackyFromCeremony\}/,
-  '완료 화면에 inline 저장과 재키 대화 콜백을 전달해야 한다');
+assert.match(home, /shareSentenceFromCeremony[\s\S]*shareSentenceWithFormatChoice \|\| window\.shareSentence[\s\S]*if \(!sentence \|\| !sentence\.id \|\| !share\) return;[\s\S]*entry: 'post_save'/,
+  '공유는 권위 ID가 있는 방금 문장을 기존 선택기에 post_save 진입점으로 전달해야 한다');
+assert.match(home, /note: sentence\.note \|\| ''[\s\S]*my_note: sentence\.note \|\| ''/,
+  '생각 저장 뒤 공유에는 최신 저장 note를 전달해야 한다');
+assert.match(home, /onSaveReflection=\{saveReflectionFromCeremony\}[\s\S]*onTalkToJacky=\{talkToJackyFromCeremony\}[\s\S]*onShareSentence=\{shareSentenceFromCeremony\}/,
+  '완료 화면에 inline 저장, 재키 대화, 공유 콜백을 전달해야 한다');
 
 assert.match(ceremony, /reflectionReady[\s\S]*className="ceremony-reflection"/,
   '정확한 문장이 준비된 경우에만 성찰 입력을 보여야 한다');
+assert.match(ceremony, /\{reflectionReady && \([\s\S]*className="ceremony-action-share"[\s\S]*onClick=\{onShareSentence\}[\s\S]*이 문장 공유하기/,
+  '권위 있는 단일 문장이 준비된 경우에만 저장 직후 공유 CTA를 보여야 한다');
+assert.match(html, /\.ceremony-action-secondary \.ceremony-action-share\{[\s\S]*background:var\(--brand-tint\)[\s\S]*color:var\(--brand-3\)[\s\S]*font-weight:900/,
+  '공유 CTA는 비활성처럼 보이지 않는 brand-tonal 위계를 가져야 한다');
 assert.match(ceremony, /textarea[\s\S]*placeholder="이 문장이 나에게 남긴 생각"[\s\S]*value=\{reflectionDraft\}[\s\S]*disabled=\{reflectionStatus === 'saving'\}/,
   '완료 화면 안에 제어된 생각 입력칸이 있고 저장 중에는 초안 변경을 막아야 한다');
 assert.match(ceremony, /await onSaveReflection\(reflectionDraft\)[\s\S]*setReflectionStatus\('saved'\)/,
@@ -45,6 +55,7 @@ for (const actionPattern of [
   /className="ceremony-reflection-jacky"[\s\S]*disabled=\{reflectionSaving\}/,
   /className="ceremony-action-next"[\s\S]*disabled=\{reflectionSaving\}/,
   /className="ceremony-action-home"[\s\S]*disabled=\{reflectionSaving\}/,
+  /onClick=\{onShareSentence\} disabled=\{reflectionSaving\}/,
   /onClick=\{onViewSaved\} disabled=\{reflectionSaving\}/,
   /RG_login[\s\S]*disabled=\{reflectionSaving\}/,
 ]) {

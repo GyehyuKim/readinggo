@@ -14,7 +14,7 @@ function finishCeremony(options) {
 }
 
 /* ── Ceremony ─────────────────────────────────────────── */
-function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome, onSaveReflection, onTalkToJacky }) {
+function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome, onSaveReflection, onTalkToJacky, onShareSentence }) {
   const initialReflectionNote = data && data.reflectionSentence && data.reflectionSentence.note;
   const [rating, setRating] = _useState(0);
   const [reviewText, setReviewText] = _useState('');
@@ -173,6 +173,9 @@ function Ceremony({ data, onClose, onComplete, onContinue, onViewSaved, onGoHome
               <div className="ceremony-action-secondary">
                 {reflectionSaved && (
                   <button type="button" onClick={onTalkToJacky} disabled={reflectionSaving}>{window.rgIcon('chat', 15)} 재키와 대화하기</button>
+                )}
+                {reflectionReady && (
+                  <button type="button" className="ceremony-action-share" onClick={onShareSentence} disabled={reflectionSaving}>{window.rgIcon('share', 15)} 이 문장 공유하기</button>
                 )}
                 <button type="button" onClick={onViewSaved} disabled={reflectionSaving}>저장한 문장 보기</button>
               </div>

@@ -844,6 +844,20 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     window.RG_openCompanion(sentence, { mode: 'jacky' });
   };
 
+  const shareSentenceFromCeremony = () => {
+    const sentence = ceremony && ceremony.reflectionSentence;
+    const share = window.shareSentenceWithFormatChoice || window.shareSentence;
+    if (!sentence || !sentence.id || !share) return;
+    return share({
+      ...sentence,
+      note: sentence.note || '',
+      my_note: sentence.note || '',
+      notePrivate: sentence.notePrivate,
+      note_private: sentence.note_private,
+      entry: 'post_save',
+    });
+  };
+
   _useEffect(() => {
     const onPop = () => {
       const previous = _sentenceCeremonyRef.current;
@@ -1334,6 +1348,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
           onGoHome={goHomeFromCeremony}
           onSaveReflection={saveReflectionFromCeremony}
           onTalkToJacky={talkToJackyFromCeremony}
+          onShareSentence={shareSentenceFromCeremony}
         />,
         document.body
       )}
