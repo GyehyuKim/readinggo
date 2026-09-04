@@ -108,7 +108,7 @@ test('format allowlist preserves the existing 1:1 default', () => {
   );
 });
 
-test('9:16 render uses wallpaper dimensions, safe areas, left alignment, and Sparrow watermark', async () => {
+test('9:16 render uses wallpaper dimensions, safe areas, left alignment, and Jacky raster watermark', async () => {
   await harness.window.renderSentenceCardBlob(sentence, { format: '9:16' });
   const { node, options } = harness.renders.at(-1);
   assert.equal(options.width, 1080);
@@ -119,7 +119,8 @@ test('9:16 render uses wallpaper dimensions, safe areas, left alignment, and Spa
   assert.equal(node.children[1].style.alignItems, 'flex-start');
   assert.equal(node.children[1].children.at(-1).style.textAlign, 'left');
   assert.equal(node.children[4].style.flexDirection, 'column');
-  assert.match(node.children[4].children[0].innerHTML, /<svg[^>]+viewBox="0 0 100 100"/);
+  assert.match(node.children[4].children[0].innerHTML, /<img[^>]+assets\/jacky\/brand-mark\.png/);
+  assert.doesNotMatch(node.children[4].children[0].innerHTML, /<svg/);
   assert.equal(harness.document.body.children.length, 0, 'temporary render node is always removed');
 });
 
