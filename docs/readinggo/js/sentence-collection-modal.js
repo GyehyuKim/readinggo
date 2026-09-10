@@ -37,6 +37,10 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
         bookId: (s.user_book && s.user_book.book_id) || s.book_id || '',
         author: (s.user_book && s.user_book.book && s.user_book.book.author) || '',
         note: s.my_note || '',   // 저장된 참새 대화 — 재오픈 시 이어보기(#418)
+        // 모아보기 → SentenceActions → 공유에서도 저장행의 비공개 설정을 보존한다.
+        notePrivate: !!(s.notePrivate || s.note_private),
+        note_private: !!(s.notePrivate || s.note_private),
+        visibility: s.visibility,
         kind: s.kind || 'quote',
         isPrivate: !!s.is_private,
         when: fmtWhen(s.created_at),   // #608: 작성일자
