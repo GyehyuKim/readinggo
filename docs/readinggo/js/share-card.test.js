@@ -317,6 +317,26 @@ test('AbortError is cancellation and never emits sent success', async () => {
   assert.equal(local.tracks.filter((item) => item.event === 'sentence_share_previewed').length, 1);
 });
 
+test('collection saved-row mapping preserves privacy through image and text sharing', async () => {
+  const collectionSource = readFileSync(new URL('./sentence-collection-modal.js', import.meta.url), 'utf8');
+  const mapping = collectionSource.match(/const mineList = ([\s\S]*?);\n      \/\/ 좋아요/);
+  assert.ok(mapping, 'execute the actual collection mapper, not a duplicate fixture mapper');
+  for (const flags of [{ note_private: true }, { notePrivate: true }, { note_private: false }, {}]) {
+    const row = { id: 'collection-private', text: '[QA] quote', my_note: 'PRIVATE_NOTE_SENTINEL', visibility: 'friends', ...flags };
+    const [mapped] = vm.runInNewContext(mapping[1], { sents: [row], fmtWhen: () => '' });
+    assert.equal(mapped.visibility, 'friends');
+    const isPrivate = !!(flags.note_private || flags.notePrivate);
+    const local = createHarness();
+    const text = local.window.buildShareText(mapped, { includeNote: true });
+    assert.equal(text.includes('PRIVATE_NOTE_SENTINEL'), !isPrivate);
+    for (const format of ['1:1', '9:16']) {
+      await local.window.renderSentenceCardBlob(mapped, { format, includeNote: true });
+      const containsNote = local.renders.at(-1).node.children.some(child => child.attributes['data-rg-share-note'] === 'true');
+      assert.equal(containsNote, !isPrivate);
+    }
+  }
+});
+
 test('sentence callers forward only share-safe fields including visibility and note privacy', () => {
   assert.match(sentenceCardSource, /notePrivate: item\.notePrivate, note_private: item\.note_private, visibility: item\.visibility/);
   assert.match(sentenceCardSource, /notePrivate: sentence\.notePrivate, note_private: sentence\.note_private, visibility: sentence\.visibility/);
