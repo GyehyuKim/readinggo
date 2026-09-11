@@ -1,5 +1,7 @@
 # 백엔드 스펙 (플랫폼·인증·DataStore 계약·데이터 모델)
 
+> **활성 공개 계약 (#1619)**: 책(`user_book`)별 public/private, 신규 private, 모든 현재·미래 문장·생각 상속. 공유 시 전체 책 공개 확인·저장 후 재개. 아래 날짜별 v7–v18 갱신의 문장 3단계/계정 기본값/생각별 비공개는 대체된 이력이다. [backend.md §7.0.1–2](./backend.md)·[share.md §1.1](./share.md)가 정본이며 구현 완료 주장이 아니다.
+>
 > **Split from** `docs/2. specifications/_archive/readinggo-spec.md` v6 (2026-05-28 분할). 원 위치: §7.
 > **v7 갱신 (2026-06-01)**: web-first 재정의. Capacitor 보류 → 순수 웹(Phase 0/1). 운영자 짹·스포일러 컬럼(`is_private`)·`chapter_id` 자동매핑 제거, 완독 별점·소감·마을 테이블 추가, **DataStore 계약(§7.2) 신설**. 변경 이력은 git log 참조.
 > **v7.1 갱신 (2026-06-04, QA 2차)**: `is_private` 재도입 + `note_private`, **DB CHECK 제약**(`04_constraints.sql`), 닉네임 규칙 `{2,20}`, 이메일 **autoconfirm**(베타 한정). [decisions §8.1](./meta/decisions.md).
@@ -32,6 +34,28 @@
 7. XP·둥지·성·방패·하루 만회 전용 데이터 제거는 계속 진행하되 책·문장·진도·세션·위시·공개범위·재독 데이터를 함께 삭제하지 않는다.
 8. 활동함은 현재 `claps`·`follows`·`pokes`의 제한된 서버 projection이다. source row 철회·삭제와 moderation 상태를 재조회 때 반영하고 notification 원장·프로필/콘텐츠 snapshot은 만들지 않는다. 상세는 §7.0.6과 [activity-inbox.md](./activity-inbox.md)를 따른다.
 
+### 7.0.1 책 단위 공개 — 활성 정본 계약
+
+- 공개 단위는 전역 카탈로그 `books`가 아니라 **소유자의 서재 책 `user_books.id`**다. `user_books.visibility`는 NOT NULL `public|private`, 기본값 `private`다. 같은 ISBN을 가진 다른 사용자의 책에는 영향이 없다.
+- 책의 모든 현재·미래 문장(`sentences.text`)과 내 생각(`my_note`)은 부모 책의 공개 상태를 상속한다. 문장별·생각별 예외, 친구 공개, 계정 문장 기본값은 없다. 길이·입력 방식·읽기 상태·완독·재독·방 가입은 공개 상태를 바꾸지 않는다.
+- 부모 참조 누락·소유 불일치·알 수 없는 값·권한 조회 실패는 비소유자에게 공개하지 않는다. 서버는 쓰기마다 `user_book_id`와 인증 소유자를 검증한다. 카탈로그 ID만으로 공개를 결정하지 않는다.
+- 본인은 비공개 책·문장·생각을 계속 저장·조회·편집·내보낸다. 비소유자(anonymous 포함)는 **현재 public인 책의 허용 projection**만 읽는다. 공개 projection은 책 제목·저자·표지·공개 작성자 표시·문장·쪽수·내 생각·출처/권리 metadata를 제공하되 이메일·설정·세션·개인 통계·내부 관리 필드를 제외한다. 소셜 상호작용은 로그인과 기존 UGC/차단/moderation 검증이 필요하다.
+- 서버의 단일 접근 판정을 피드, byBook, 타인 서재/프로필, 직접 문장·책 링크, 좋아요 목록·수·활동함, 검색·공유·OG·story 응답에 적용한다. private의 본문·존재·개수·오류 차이를 공개하지 않는다. 익명 허용을 위해 base table 전체 SELECT를 열지 않고 제한 view/RPC/API를 제공한다.
+- 공개 책에 새 문장·생각을 저장하면 즉시 같은 공개 상태를 따른다. 공개 쓰기와 책 공개 전환에는 현재 UGC 동의가 필요하며 동의 실패는 원본 초안을 보존하고 쓰기를 중단한다. 개인 AI 대화/세션·personalization 동의·방 멤버십·wishlist 설정·운영자 숨김은 이 공개 설정과 별개의 기존 경계를 유지한다.
+
+### 7.0.2 공개 전환·공유·마이그레이션 수용 기준
+
+1. 소유자는 책 상세의 `책 공개 설정`에서 `비공개`/`공개`를 변경한다. private 책의 단독 문장 또는 책 전체 공유는 [share.md §1.1](./share.md)의 같은 확인을 거친다. 확인 범위는 **이 책의 모든 현재·미래 문장과 내 생각**이며 이미지의 선택 범위와 다르다.
+2. `myBooks.setVisibility(userBookId, visibility)`는 소유권·유효값·동의를 서버에서 검증하고 책 한 행을 원자 갱신한 뒤 권위 readback을 반환한다. 하위 행을 하나씩 공개하는 bulk setter가 아니다. 성공 전 공유 payload·링크 복사·외부 share를 실행하지 않는다. 중복 요청은 멱등이며 타인 ID·stale 상태·통신 실패는 성공처럼 처리하지 않는다.
+3. 공유 직전 현재 책 접근을 다시 검사한다. 공개 전환이 성공해도 이후 clipboard/native share가 취소·실패하면 책은 공개로 남고 각각의 결과를 구분해 알린다. 비공개로 되돌리기는 책 설정에서 가능하다. 전환 취소/실패 시 책은 변경되지 않고 공유 선택과 초안은 보존된다.
+4. private 전환 성공 후 신규 공개 요청은 문장·책·story·OG·서비스 캐시 모두 비노출이어야 한다. 권한 확인 전 캐시/snapshot을 반환하지 않고 파생 캐시를 무효화한다. 이미 외부에 저장·게시된 이미지·텍스트·제3자 미리보기 회수는 보장하지 않는다. 서버 상태와 충돌한 낙관 UI를 되돌리고 재조회한다.
+5. **기존 데이터는 기본 private로 이관한다.** 제한/혼합/unknown 문장이 있는 책, 문장이 없는 책, 부모 미해소 기록, 이전 공개 범위를 입증할 수 없는 책은 공개하지 않는다. 기존 `visibility=public`·`is_private=false`·`note_private=false`·계정 기본 public만으로 책 전체와 미래 생각 공개에 동의했다고 보지 않는다. 특히 기존 공개 view에서 `my_note`가 제외되었으므로 false 플래그는 생각 공개 근거가 아니다. public 이관은 책의 전체 현재·미래 문장·생각까지 포괄하는 명시 동의 증거가 있는 책에만 허용한다. 없으면 소유자의 새 공개 확인으로 전환한다.
+6. 기존 ID, 본문·생각, 쪽수, 소유·부모 연결, 원래 생성/독서 timestamp는 보존한다. 분류 근거·전후 건수·원본 fingerprint·백업/복원 검증을 갖춘 재실행 안전 migration을 사용한다. 별도 승인된 특정 소유자 문장 공개 작업은 다른 책/사용자의 동의로 확대하지 않는다. 해당 소유자에게 책 전체 현재·미래 생각까지 포괄하는 명시 승인이 있다면 public 이관으로 보존하고 불필요하게 재비공개하지 않는다. 문장만의 승인인지 불명확하면 운영자가 생각 scope를 확인해 추가 동의를 확보하기 전 public 이관하지 않는다. 이 spec 작업은 live DB를 변경하지 않는다.
+7. 게스트·OCR·배치/import·위시→읽기 시작은 새 `user_book`을 private로 생성한다. 기존 책에 추가한 기록은 그 책 상태를 따른다. 게스트 이관은 책 단위로 멱등 병합하고 충돌·불명확한 동의는 private로 축소하며 원격 검증 전 로컬 원본을 지우지 않는다. 오래된 문장 공개값으로 원격 책을 승격하지 않는다.
+8. 안전 컷오버 순서는 필드/호출 inventory·백업 → private 기본 책 필드와 보수적 이관 → 제한 read/write 경로·새 client → 역할별 직접 검증·지원 최소 버전 강제 → 구 쓰기 차단 → 문장 `visibility`, `is_private`, `note_private` 물리 컬럼과 alias/model/setter·계정 `default_sentence_visibility`·UI/직렬화 제거다. 적용된 과거 SQL은 감사 이력으로 보존하며 새 제거 migration을 쓴다. 호환을 이유로 문장 예외를 영구 유지하지 않는다. 정확한 버전·migration 번호는 구현 inventory 뒤 정한다.
+9. rollback은 공개 경로 차단 또는 최소권한 복원으로 fail-closed한다. 이전 broad SELECT·old public default·구 APK 쓰기를 되살리지 않는다. destructive drop 전 복원 리허설을 통과해야 한다.
+10. DEV 검증 matrix는 owner/nonowner/anonymous/blocked/suspended × public/private/unknown × 동일 ISBN의 다른 소유자 책, 직접 UUID·count·오류·OG·story·캐시를 포함한다. 신규 기본 private, 전체 현재/미래 생각 공개, 취소/저장실패/공유실패/중복 탭/다른 기기 철회, 혼합/빈 책/false note flag migration, legacy 쓰기 차단, ID·본문·timestamp 비손실을 실제 테스트한다. spec lint green은 이 구현·DB 검증을 대체하지 않는다.
+
 ### 7.0.3 현재 보안 갭과 retained surface 컷오버 게이트
 
 저장소 정적 감사상 `users`, `user_books`, `reading_sessions`, `streak`, `claps`의 base SELECT 또는 연관 정책은 현재 제품 표면에 필요한 행·필드보다 넓을 수 있다. 특히 `user_books.ub_sel`은 차단되지 않은 인증 사용자에게 타인의 전체 컬럼을 줄 수 있고, UI 필터는 권한 경계가 아니다. private 문장 UUID에 대한 clap·count·FK/report 오류 차이는 본문 없이도 존재를 추론하게 할 수 있으며, 구 클라이언트가 `friends|followers` 또는 unknown visibility를 `public`으로 정규화하면 공개가 확대된다. 실제 Production 정의·grant·영향은 역할별 직접 검증 전까지 미검증으로 둔다.
@@ -43,7 +67,7 @@
 3. 신규 client 수신·호출 전환 증거와 구버전 실패 동작을 확인한 뒤 최소 지원 버전·업데이트 차단 정책을 승인한다. 정확한 버전은 관측 전에 임의 확정하지 않는다.
 4. 별도 migration release에서 base policy를 owner/minimum-field로 축소하고 owner·nonowner·blocked·anonymous와 `private|followers|public`, 유효/무효/타인 private UUID의 응답·오류 비구분을 직접 검증한다.
 5. rollback은 영향받은 retained UI/제한 경로를 비활성화하거나 승인된 최소권한 이전 정의로 되돌린다. 개인정보 노출을 되살리는 broad base SELECT 복원은 금지한다.
-6. `friends|followers`와 unknown visibility를 이해하지 못하는 client는 `public`으로 확대하지 않고 `private` fail-closed한다. 기존 작성자의 visibility와 `wishlist_public` 값은 별도 승인 없이 확대·재작성하지 않는다.
+6. `friends|followers`와 unknown visibility를 이해하지 못하는 client는 `public`으로 확대하지 않고 `private` fail-closed한다. 레거시 문장 값은 §7.0.2의 보수적 책 이관에만 사용하고 영구 예외로 남기지 않는다. `wishlist_public`은 별도 승인 없이 확대·재작성하지 않는다.
 7. #1260 활동함의 목록·count·mark는 같은 current projection과 moderation filter를 사용한다. source RLS를 줄이는 release는 위 client inventory·최소 버전·직접 역할 검증을 통과해야 하며 활동함 RPC가 base grant 확대를 대신 요구해서는 안 된다.
 
 ### 7.0.6 활동함 읽기 모델·상태 계약 (#1260)
@@ -136,11 +160,8 @@ auth.signInWithEmail(email)                → {data,error}    // 이메일 매�
 //   ↳ #822 체크인 귀속 계약: 등록·활성화로 화면 책을 세팅하는 경로(handleSearchSelectBook·handleActivateUserBook, 그리고 buildStateFromSupabase)는 `appState.book.ubId`(=user_books.id)를 함께 채운다. 체크인은 1순위로 ns.book.ubId 로 user_book 을 해소(없으면 book_id 폴백) → 잘못된 귀속/저장 누락 방지.
 profile.get(userId?)                       → User
 profile.update({display_name, avatar_url, bio})
-settings.get() / settings.update({reminder_hour, default_sentence_visibility, ...})
-//   ↳ #1261·#1474 default_sentence_visibility ∈ {'public','followers','private'}. 키 없음은 기존 호환 'public',
-//      레거시 'friends'는 'followers', 그 밖의 알 수 없는 값은 'private'로 fail-closed한다.
-//      localStorageAdapter는 rg_v41 사용자 상태, supabaseAdapter는 users.settings JSONB에 저장한다.
-//      설정은 이후 신규 문장의 저장값 정본이며 기존 sentences 행이나 열린 초안 본문을 갱신하지 않는다.
+settings.get() / settings.update({reminder_hour, ...})
+// 책 공개는 myBooks.setVisibility 전용. 계정 default_sentence_visibility는 컷오버 후 제거한다.
 personalization.getConsent()                → PersonalizationConsent
 personalization.setConsent({enabled, policyVersion}) → PersonalizationConsent
 personalization.excludeSource({type, id}) / includeSource({type, id})
@@ -159,7 +180,8 @@ books.search(query)                        → Book[]          // DB ilike(즉�
 // 인기도서 사전 아카이브(#239): `worker/index.mjs` `scheduled()`(cron 0 18 * * *) — 알라딘 베스트셀러→ItemLookUp→books upsert(service_role). 등록 지연 0·API 의존 감소. env: SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY·ARCHIVE_DAILY_CAP(기본3000). **(#1044 격리)** 신규 provider 키(KAKAO_REST_KEY/NLK_CERT_KEY) 설치 시 자동 중지(`aladinSeedActive`) — 인기 시드 소스 재설계는 P2 별도 이슈.
 books.get(bookId)                          → Book
 myBooks.list()                             → UserBook[]      // 읽는 중 + 완독 + 중단(aborted). publisher/total_pages는 override 병합값(#431)
-myBooks.add({book, current_page})          → UserBook
+myBooks.add({book, current_page})          → UserBook        // visibility=private
+myBooks.setVisibility(userBookId, visibility) → UserBook      // public|private, 소유자 전용 원자 저장·권위 readback (§7.0.2)
 myBooks.updateBook(userBookId, {publisher?, total_pages?}) → UserBook  // #410/#431: user_books.*_override 저장(공유 books 미수정)
 myBooks.abort(userBookId)                  → UserBook        // #593: 읽던 책 중단 — status='aborted'. current_page 보존(진척 손실 없음), 활성 책이면 active 해제. 되돌리기 가능
 myBooks.resume(userBookId)                 → UserBook        // #593: 중단 책 다시 읽기 — status='aborted' → 'reading'. completed_at 미설정(완독과 무관)
@@ -170,19 +192,16 @@ activeBook.set(userBookId)                                  // = users.active_us
 sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 진도 + 독서 세션 + 내부 리듬 카운터. duration_sec(#430): 읽기 세션 시간(초) 누적. **Supabase: 원자 RPC `checkin_atomic(p_user_book_id, p_page, p_duration, p_today)`(#1161, 43_checkin_atomic.sql)** — user_books.current_page + reading_sessions upsert + streak bump를 한 트랜잭션으로 묶어 구 순차 3-write 부분상태를 막는다. 내부 카운터 규칙은 `_nextStreak`과 SQL을 동기화하며, p_today는 클라이언트 로컬 날짜를 사용한다. XP 호출은 없고 문장 저장은 별도 `sentences.add` 계약이다.
 sessions.list(userBookId)                  → Session[]
 sentences.add({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence  // kind(#360): 사실상 **quote 단일**. 별도 thought 입력은 폐기(#596) — add 는 kind:'quote' 고정·기존 thought 행 quote 전환(27_extinct_thought.sql). kind 컬럼은 롤백 안전상 유지. '내 생각'은 my_note(문장 앵커)로. 20_sentence_kind.sql
-//   ↳ #1474 신규 문장은 저장 시점의 settings.default_sentence_visibility를 단일 정본으로 사용한다.
-//      작성 UI는 문장별 selector를 노출하지 않고 호출부 visibility override는 adapter가 무시한다.
-//      키 없음='public', friends='followers', unknown='private'. DB DEFAULT 'public'은 레거시 방어선으로 유지한다.
-sentences.importExisting({userBookId, sessionId, page, text, my_note?, kind?, visibility}) → Sentence
-//   ↳ 가입 전 이미 저장된 게스트 문장 이관 전용. 당시 visibility를 보존하고 unknown은 private로 축소한다.
-//      신규 생성에 이 API를 사용하지 않으며 add와 importExisting의 호출부를 계약 테스트로 분리한다.
+//   ↳ 신규 문장·생각은 저장 시점 부모 user_book의 visibility를 상속한다. 문장 공개 override는 허용하지 않는다.
+sentences.importExisting({userBookId, sessionId, page, text, my_note?, kind?}) → Sentence
+//   ↳ 게스트 원본 ID·timestamp 보존 이관 전용. 책 단위 보수적 이관(§7.0.2)을 선행한다.
 sentences.setNote(sentenceId, my_note)                       // 사후 감상 추가·편집 (작성 시점 무관, §profile 5.8.4)
 sentences.listByBook(userBookId)           → Sentence[]      // 내 책(user_book) 한 문장
 sentences.byBook(bookId, {limit?, sort?})  → Sentence[]      // 그 책(books.id)의 *타인* 공개 한 문장(#11). 본인 제외(neq user_id), 비-UUID id → []. sort='likes'(#594): 좋아요 많은 순 Top N(clap_count embed), 기본 'recent'(최신순). 각 행에 clapCount 부착
 sentences.feed({cursor})                   → Sentence[]      // 최근(전체 공개) 피드 (§social)
 sentences.feedFollowing({limit})           → Sentence[]      // v7.1: 팔로우 피드
 sentences.feedRecommended({limit})         → Sentence[]      // v7.1: 추천(공유 책 유사도, 비면 최근 폴백)
-sentences.setVisibility(id, {visibility?, note_private?})    // v7.2: visibility 3단계(public|followers|private) + 감상 note_private
+// 문장/생각 공개 setter는 제거한다. 공개 상태는 부모 책에서만 변경한다.
 sentences.listMine()                       → Sentence[]
 sentences.random()                         → Sentence        // 무작위 회상 — 내 과거 한 문장 1개 (§profile 5.8.7)
 
@@ -218,7 +237,7 @@ friends.list() / friends.follow(userId) / friends.unfollow(userId) / friends.isF
 users.search(query)                    → User[]
 users.getByHandle(handle)              → User | null
 users.publicBooks(userId)              → UserBook[]          // 완독 책장 (status='completed', 전체 공개)
-users.publicSentences(userId)          → Sentence[]          // 공개 한 문장 (visibility='public', RLS가 followers/private 필터)
+users.publicSentences(userId)          → Sentence[]          // 현재 public인 소유자 책의 문장·생각, 제한 projection·차단/moderation 적용
 users.publicStreak(userId)             → number              // 타인 스트릭 카운트 (공개)
 users.isHandleAvailable(handle)        → boolean             // 닉네임 중복 검사 (본인 제외)
 users.publicShelf(userId)              → UserBook[]          // v7.2: 타인 책장 — 읽는 중+완독(status 포함) (#4)
@@ -349,7 +368,7 @@ users
   is_npc                bool DEFAULT false
   daily_pace            int  NULL            -- NPC 전용
   active_user_book_id   uuid NULL FK user_books.id   -- 현재 활성 책
-  settings              jsonb DEFAULT '{}'   -- 알림 시간, default_sentence_visibility 등
+  settings              jsonb DEFAULT '{}'   -- 알림 시간 등(문장 공개 기본값 제거)
   xp                    int  DEFAULT 0
   wishlist_public       bool DEFAULT false   -- v8.2 #558: 위시리스트 타인 공개 여부
   nest_emoji            text NOT NULL DEFAULT '🪺'  -- 드리프트 정정 2026-07-09: 둥지 이모지 커스텀(15_add_nest_emoji.sql)
@@ -403,6 +422,7 @@ chapters                                    -- Phase 후순위, 현재 미사용
 
 user_books
   id            uuid PK
+  visibility    text NOT NULL DEFAULT 'private' -- CHECK public|private, 책 전체 문장·생각 상속
   user_id       uuid FK users.id
   book_id       uuid FK books.id
   status        text                 -- 'reading' | 'completed' | 'aborted'(#593: 읽던 책 중단, current_page 보존·되돌리기 가능) | 'archived'(예약, 미사용)
@@ -434,11 +454,10 @@ sentences                                   -- "한 문장" (DB 테이블명 유
   user_book_id  uuid FK user_books.id
   session_id    uuid FK reading_sessions.id NULL
   page          int                  -- 스포일러 블라인드 판정 기준 (§social)
-  text          text                 -- 현행: private 1~1,000자 / public·followers 1~200자 (52_sentence_visibility_length.sql). 목표 #1457은 전 공개범위 1~1,000자
+  text          text                 -- 책 공개 상태와 무관하게 1~1,000 Unicode 문자 (#1457)
   my_note       text NULL            -- 내 감상·코멘트 (선택, 사후 추가·편집). ≤1000자 (CHECK)
-  visibility    text default 'public' -- v7.2: 'public'|'followers'|'private' 3단계. RLS 강제 (§social 5.7.1, 06_privacy_v2.sql). is_private(boolean) 대체
-  is_private    boolean default false -- DEPRECATED (v7.1→v7.2 visibility 마이그레이션 후 미사용. 마이그레이션 호환 위해 컬럼 보존)
-  note_private  boolean default false -- v7.1: 감상만 비공개 (클라 존중 — 컬럼 단위 RLS 불가)
+  -- 공개 필드는 없음. 부모 user_books.visibility를 상속한다(§7.0.1).
+  -- 기존 visibility/is_private/note_private 물리 컬럼은 안전 컷오버 후 제거한다.
   last_resurfaced_at timestamptz NULL -- 드리프트 정정 2026-07-09: 회상 재노출 시각(21_resurface.sql). 코드가 읽고 씀
   created_at    timestamptz
   -- v7 제거: chapter_id (챕터 자동매핑 폐기)
@@ -609,7 +628,7 @@ personalization_controls                    -- #1309 목표 상태. 공개 profi
 > **휴식코스(Pause)**: 채택됐으나 상세(기간·빈도·스트릭 동결) 미정. `systems.md` 계약이 합의된 후속 이슈에서 확정된 뒤 `pause_log` 류 테이블을 본 절에 추가.
 
 JSONB 사용:
-- `users.settings` — `{"reminder_hour": 21, "default_sentence_visibility": "public"}`. 공개범위 값은 `public|followers|private`; 키 없음은 `public`, 레거시 `friends`는 `followers`, unknown은 `private`로 해석한다. 설정 변경은 이후 신규 `sentences.add`의 저장값에만 적용하고 기존 문장을 갱신하지 않는다(#1261·#1474). 개인화 동의·generation·철회·제외 source는 공개 profile row 및 범용 settings update 권한과 분리해 `personalization_controls`에만 저장한다. 알림은 Phase 2 PWA 이후 실동작.
+- `users.settings` — `{"reminder_hour": 21}` 등 개인 설정. 문장 기본 공개 설정은 제거한다. 책 공개는 `user_books.visibility`와 전용 소유자 mutation이 정본이다. 개인화 동의·generation·철회·제외 source는 공개 profile row와 분리된 `personalization_controls`에만 저장한다.
 - 그 외 관계형 컬럼. JSON 남발 금지.
 
 ### 7.4 인덱스
@@ -635,9 +654,9 @@ village_parts(village_id, part_order)                    -- v7 신설
 
 ### 7.5 RLS 정책 (요약)
 
-- `users`: 본인 row update. 다른 유저 select 가능 (피드용 공개 정보)
-- `sentences`: select = `visibility='public' OR user_id=auth.uid() OR (visibility='followers' AND 양방향 follows 존재)` (v7.2 — 3단계 공개 범위, §social 5.7.1, 06_privacy_v2.sql). insert/update 본인만
-- `reading_sessions`, `streak`, `user_books`: insert/update 본인. select 모두 (마을 그리드·완독 별점 공개)
+- `users`: 본인 row update. 타인에게는 피드용 최소 공개 profile projection만 제공하며 base row 전체 SELECT를 허용하지 않는다(§7.0.3).
+- `sentences`: 본인 읽기·쓰기만 base 권한으로 허용하고, 비소유자는 부모 `user_books.visibility=public` 및 차단·moderation을 검증한 최소 공개 projection으로 읽는다. 문장별 공개 정책은 제거한다(§7.0.1–2).
+- `reading_sessions`, `streak`, `user_books`: base 읽기·쓰기는 소유자 범위다. 타인 책 조회는 현재 public인 `user_book`의 허용 projection만 반환하며, 책 공개가 개인 세션·통계 전체 공개를 뜻하지 않는다. 기존 `select 모두`는 축소 대상 as-built이지 목표 권한이 아니다(§7.0.1–3).
 - `follows`: follower_id가 본인인 행만 insert/delete
 - `claps`: from_user_id가 본인인 행만 insert
 - `moderation_reports`: authenticated 사용자는 RPC를 통한 본인 신고 생성과 본인 신고의 id/status만 조회. 원문 detail·운영자 메모를 포함한 전체 조회·상태 변경은 `is_admin()`만. 클라이언트 직접 insert/update는 회수한다.
@@ -779,7 +798,7 @@ Phase 0 (localStorage, `rg_v41`):
 
 **조회·RLS/권한**
 
-- Worker의 제한 SQL/RPC는 bearer의 `auth.uid()`를 내부 owner 조건으로 다시 적용해 `sentences.user_id=auth.uid()` 및 그 owner의 `user_books`/`books` join만 읽는다. `visibility=private`과 `note_private=true`도 owner에게는 허용하지만 타인·service-role 무제한 검색 endpoint는 만들지 않는다.
+- Worker의 제한 SQL/RPC는 bearer의 `auth.uid()`를 내부 owner 조건으로 다시 적용해 `sentences.user_id=auth.uid()` 및 그 owner의 `user_books`/`books` join만 읽는다. 부모 책이 private인 문장·생각도 owner에게는 허용하지만 타인·service-role 무제한 검색 endpoint는 만들지 않는다.
 - RLS가 owner-only 읽기를 강제하고 함수는 고정 `search_path`, 최소 반환 컬럼, authenticated 실행만 허용한다. service role을 사용해야 한다면 함수 내부 owner 조건과 bearer 검증을 둘 다 통과해야 하며, 클라이언트에 service key를 노출하지 않는다.
 - 삭제·감상/Q&A 수정·source 제외는 다음 요청에 즉시 반영한다. cache가 필요하면 요청 메모리 수명 이내만 허용하고 Durable Object, KV, DB, 로그, analytics, `companion_sessions`에 결과·prompt·원문 복사본을 남기지 않는다.
 

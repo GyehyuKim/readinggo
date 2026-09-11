@@ -18,7 +18,7 @@ ReadingGo 공식 Instagram의 `책방지기의 하루 한 문장`도 일반 사�
 
 ### 2.1 하나의 기록, 세 가지 표현
 
-- 원본은 책, 문장, 페이지, `my_note`, 공개범위다.
+- 원본은 소유자의 책(`user_book`), 문장, 페이지, `my_note`이며 문장·생각의 공개는 부모 책의 `public|private`를 상속한다.
 - 한 문장 카드와 완독 이야기는 원본을 복제 입력하지 않고 재사용한다.
 - 매일 남긴 한 문장과 생각이 이후 완독 이야기의 재료가 된다.
 - 공유는 선택 행동이며 저장·완독을 막거나 자동 공개하지 않는다.
@@ -50,8 +50,8 @@ ReadingGo 공식 Instagram의 `책방지기의 하루 한 문장`도 일반 사�
 - 선택 전에 실제 결과 비율의 미리보기를 보여준다.
 - 책 제목·저자·문장·페이지·내 생각·ReadingGo 브랜드를 확인할 수 있어야 한다.
 - `my_note`가 있으면 `내 생각 포함`을 기본 ON으로 제공하되 사용자가 끌 수 있다.
-- `내 한 문장 모아보기`를 포함한 모든 공유 진입점은 저장행의 `note_private`/`notePrivate`와 `visibility`를 보존한다. 비공개 생각은 포함 선택기를 제공하지 않고 이미지·공유 텍스트에서도 제외한다. 두 비공개 필드 중 하나라도 참이면 비공개로 처리한다.
-- 생각이 비공개이거나 문장 공개범위가 `private`이면 이미지 자체는 개인 기기에서 만들 수 있지만 공개 링크를 만들거나 공개됐다고 표시하지 않는다.
+- `내 한 문장 모아보기`를 포함한 모든 공유 진입점은 현재 부모 책 상태를 확인한다. private이면 [share.md §1.1](./share.md)의 책 전체 현재·미래 문장·생각 공개 확인 → 원자 저장·readback → 원래 공유 재개 순서를 따른다. public은 재확인하지 않는다.
+- `내 생각 포함` OFF는 결과물 편집 선택이며 책의 생각을 비공개로 만들지 않는다. 공개 링크에는 책 공개 상속이 적용됨을 안내한다. 컷오버 전 `note_private`/`notePrivate` 보호는 이관 안전장치이고, 기존 false만으로 생각 공개 동의를 추론하지 않는다. 컷오버 후 이 필드와 문장별 공개값은 제거한다.
 
 ### 3.3 Instagram 제약
 
@@ -114,7 +114,7 @@ Instagram이 Web Share의 이미지와 URL을 함께 받아 링크 스티커를 
 
 권장 URL은 `/s/:slug`다.
 
-- 로그인하지 않은 방문자도 `published` 이야기만 볼 수 있다.
+- 로그인하지 않은 방문자도 `published`이면서 원본 소유자 책이 현재 public인 이야기만 볼 수 있다. 상호작용은 로그인과 기존 UGC 권한을 요구한다.
 - 표지, 책 제목·저자, 작성자 표시명, 완독 정보, 선택한 문장과 생각을 모바일 세로 스크롤로 보여준다.
 - 인용문과 사용자 생각의 시각 위계를 분리한다.
 - 하단 CTA는 `나도 이 책의 문장을 기록하기`다.
@@ -127,20 +127,18 @@ v1에서는 새 피드 타입을 만들지 않는다. 기존 완독 책 카드·
 
 ## 6. 공개범위·UGC 안전
 
-- 사용자가 미리보기 후 `발행하기`를 눌러야 공개된다.
-- v1 story visibility는 `public`과 `private(draft·unpublished)`만 지원한다.
-- 발행 취소 시 고유 URL은 즉시 비공개 안내를 반환한다.
-- 원본 문장이 삭제되거나 `private`로 바뀌면 연결된 인용·생각 카드는 공개 응답에서 즉시 제외한다.
-- `followers` 원문은 anonymous 공개 이야기에 포함할 수 없으며, 사용자가 story 발행 전에 `public` 전환을 명시적으로 선택해야 한다.
-- 발행 snapshot은 편집 안정성에 사용할 수 있지만 원본 공개범위를 우회해 노출하는 근거가 아니다.
-- 기존 UGC 약관 동의·신고·차단·작성자 정지·운영자 숨김을 공개 이야기에도 적용한다.
-- 정확한 공개 인용 상한은 한 이야기당 8개이며 서버에서 강제한다.
+- 사용자가 미리보기 후 `발행하기`를 눌러야 발행한다. private 책이라면 먼저 책 전체 현재·미래 문장·생각 공개 확인과 저장·readback을 완료한 뒤 발행을 재개한다. public 책이라고 draft를 자동 발행하지 않는다.
+- story의 `draft|published|unpublished` lifecycle은 유지하며 책 공개 상태와 별개다. 발행 취소는 책을 private로 바꾸지 않고, 책 private 전환은 story 상태를 자동 재작성하지 않는다. 책 재공개 시 여전히 published인 이야기는 다시 읽을 수 있음을 안내한다.
+- 책이 private·삭제·접근불명이면 이야기 전체를 내용 없는 비공개 안내로 반환한다. 삭제·운영자 숨김된 개별 원문은 연결된 인용과 생각 카드 모두 제외하고 표지·OG에도 사용하지 않는다.
+- snapshot은 편집 안정성만 위한 것이다. 페이지 본문뿐 아니라 도입·마무리·제목·표지·OG·캐시도 현재 원본 책 권한 판정 뒤 반환한다. 원본 참조가 끊기거나 다른 소유자/책 문장이면 fail-closed한다.
+- 기존 UGC 약관·신고·차단·작성자 정지·운영자 숨김을 적용한다. 공개 원문 재사용 guidance는 [legal-copyright.md §4.4](./legal-copyright.md)를 따른다.
+- 인용 최대 8개·항목당 500자·전체 2,400자는 이야기 편집 예산으로 서버에서 강제하며 법적으로 안전한 인용 한도라고 설명하지 않는다. 원본 저장 내용은 절단하지 않는다.
 
 ## 7. 데이터·권한 계약
 
 ### 7.1 엔티티
 
-- `reading_stories`: `id`, `user_id`, `book_id`, `slug`, `status`, `title`, `intro`, `outro`, `cover_sentence_id`, `published_at`, timestamps
+- `reading_stories`: `id`, `user_id`, `user_book_id`(권한 정본 FK), `book_id`(카탈로그 참조), `slug`, `status`, `title`, `intro`, `outro`, `cover_sentence_id`, `published_at`, timestamps
 - `reading_story_pages`: `id`, `story_id`, `position`, `type`, `sentence_id`, 허용된 공개 snapshot, `is_cover`, timestamps
 - 기본적으로 사용자·책 한 조합당 이야기 1개다. 재독 버전은 후속이다.
 
@@ -156,7 +154,7 @@ readingStories.unpublish(storyId)                   → ReadingStory
 readingStories.getPublic(slug)                      → PublicReadingStory | null
 ```
 
-게스트는 로컬 draft와 미리보기·이미지 생성을 사용할 수 있다. 공개 발행은 로그인과 UGC 동의를 요구한다.
+게스트는 로컬 draft와 개인 미리보기·이미지 저장을 사용할 수 있다. 외부 공유·공개 발행은 로그인·이관·UGC 동의와 책 공개 확인을 요구하고 성공 뒤 원래 행동을 이어간다.
 
 ### 7.3 서버 검증
 
@@ -164,7 +162,7 @@ readingStories.getPublic(slug)                      → PublicReadingStory | nul
 - 서버가 story 상태, 책 소유, sentence 소유·책 일치, page type, position 중복, cover 최대 1개, 직접 인용 최대 8개를 검증한다.
 - `slug`는 추측하기 어려운 안정적 식별자이며 발행 취소·재발행 뒤에도 가능한 한 유지한다.
 - anonymous는 base table을 직접 조회하지 않는다.
-- 공개 조회는 published 상태와 허용 필드만 반환하는 좁은 RPC/API를 사용한다.
+- 공개 조회는 published 상태·현재 부모 책 public·차단/moderation을 매 요청 검증하고 허용 필드만 반환하는 좁은 RPC/API를 사용한다. 발행 전환도 같은 트랜잭션 안에서 책 권한을 재검증한다.
 - 제한 RPC가 `SECURITY DEFINER`이면 고정 `search_path`, schema-qualified relation, 명시적 grant/revoke를 사용한다.
 - owner, other authenticated, anonymous, blocked, suspended, hidden, invalid slug 역할을 직접 테스트한다.
 

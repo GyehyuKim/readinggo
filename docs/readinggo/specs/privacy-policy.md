@@ -9,9 +9,9 @@
 ## 0. 책나무 은퇴 뒤 retained 데이터의 개인정보 안전 계약
 
 1. 책나무 제품은 종료한다. 책나무 전용 UI·route·flag·DataStore/RPC·analytics를 mascot이나 실험 명분으로 다시 사용하지 않으며, 남은 DB object는 제거 전 fail-closed inventory다.
-2. 문장 본문은 기존 `public|followers|private` 설정과 서버 권한을 따른다. 비공개 문장의 존재·개수·내용과 `my_note`는 retained 피드·프로필·활동함의 비소유자 응답·집계·분석에 포함하지 않는다.
+2. **책 공개 목표 (#1619)**: 신규 서재 책은 private이고 모든 현재·미래 문장·내 생각이 책 상태를 상속한다. 소유자의 책 전체 공개 확인 뒤 public 기록은 로그인 없이 읽을 수 있다. private 책의 존재·개수·본문·생각은 비소유자 응답·집계·분석에 포함하지 않는다. 기존 false note flag는 공개 동의가 아니며 보수적 이관을 적용한다. 책 private 전환 뒤 서비스의 문장·책·story·OG 신규 요청을 차단하되 외부 저장/게시 사본의 회수는 보장하지 않는다. 개인 AI 세션·계정/Auth·분석 동의·읽기방은 별도 경계다. 구현·검증과 실제 게시 시행 전 현재 배포 사실로 주장하지 않는다.
 3. 현행 `users`·`user_books`·`wish_books` 등 base table 직접 read는 권한 경계가 아니다. retained surface가 필요한 owner/current-viewer 최소 projection으로 client를 전환하고, 수신·구버전 호출량을 관측해 최소 지원 버전을 승인한 뒤 별도 migration으로 broad base RLS를 축소한다.
-4. 역할별 직접 API에서 owner·nonowner·blocked·anonymous와 `private|followers|public`, 유효/무효/타인 private UUID의 존재·개수·오류 차이를 검증한다. rollback에서 broad base SELECT를 복원하거나 책나무 전용 API grant를 되살리지 않는다.
+4. 역할별 직접 API에서 owner·nonowner·blocked·anonymous와 부모 책 `private|public|unknown`, 유효/무효/타인 private UUID의 존재·개수·오류 차이를 검증한다. rollback에서 broad base SELECT를 복원하거나 책나무 전용 API grant를 되살리지 않는다.
 5. XP·둥지·성·하루 만회 전용 데이터는 신규 앱에서 사용하지 않으며 구 APK 호환 목적으로 유지하지 않는다. Production 물리 삭제 전 rollback용 backup의 항목·목적·보유 기간·파기 시점을 migration 승인 기록과 처리방침·데이터 내보내기에 반영한다.
 6. 분석 동의 철회 시 향후 이벤트·리플레이 전송 중단뿐 아니라 PostHog identity reset과 기존 이벤트의 삭제 또는 비식별 처리 여부를 결정·검증한다. 현재 처리 범위는 미검증이다.
 7. 계정 삭제가 Supabase 데이터만 지우는지, PostHog·문의·모더레이션 감사로그까지 처리하는지와 각 보존기간을 시스템별로 명시한다. 법적 보존과 사용자 삭제의 경계는 승인 전 미결정이다.

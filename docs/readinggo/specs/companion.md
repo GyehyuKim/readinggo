@@ -177,7 +177,7 @@
 | 자유 감상 | 본인 `sentences.my_note`의 Q/A 밖 감상 블록 | 사용자가 직접 적은 과거 관점 연결 |
 | 저장 Q/A | 본인 `my_note`의 파싱 가능한 Q/A 블록 | 이미 다룬 질문 반복 방지와 명시적 후속 주제 연결 |
 
-- source 문장의 `visibility=private|followers|public`, `note_private` 여부는 **소유자 본인의 개인화 조회에는 제한이 아니다**. 이는 타인 공개 확대가 아니며, owner 검증을 통과한 요청 내부에서만 쓴다.
+- source 문장·생각이 상속하는 부모 책의 `public|private`는 **소유자 본인의 개인화 조회에는 제한이 아니다**. 이는 타인 공개 확대가 아니며 별도 AI opt-in과 owner 검증을 통과한 요청 내부에서만 쓴다. 책 공개가 개인 AI 세션·대화나 개인화 동의를 공개/활성화하지 않는다.
 - 현재 요청과 같은 문장/현재 history의 중복, 사용자가 제외한 source, 삭제된 source, 빈 본문은 후보에서 제외한다. 동일 source의 문장·감상·Q/A를 여러 레코드처럼 부풀리지 않는다.
 - v1 관련성은 같은 `book_id`/저자, 현재 문장·메모·직전 답과의 정규화 키워드 교집합, 최신성을 이용한 결정적 lexical ranking만 허용한다. **embedding·벡터 DB·사용자 profile/summary·감정/성향/문체 라벨·전문 복사본·새 장기 보관소를 만들지 않는다.** 검색 후보와 조립 prompt는 요청 종료 후 폐기하며 로그·analytics·`companion_sessions`에 복사하지 않는다.
 

@@ -564,3 +564,16 @@ SSOT는 [companion.md §4.7](../companion.md#47-내-기록-기반-관련-맥락-
 - 회의 원문, Git/PR/닫힌 이슈, archive 문서, 적용 migration은 역사 증거로 보존한다. 이름 퇴역은 책 선택, 독서 세션, 문장·생각 저장, 완료 후 행동, 공개범위와 기록 비손실을 바꾸지 않는다.
 
 상세 SSOT는 [home-reading.md §5.1](../home-reading.md#51-용어route호환-경계)이다.
+
+### v18.9 — 책 단위 공개와 공유 확인 (#1619)
+
+- **사용자 승인**: 문장마다 선택하는 대신 소유자의 서재 책(`user_book`)을 public/private로 설정한다. 새 책은 private다. 모든 현재·미래 문장·내 생각이 상속하며 독립 문장/생각 privacy는 없다.
+- **공유**: private 책의 단독 문장 또는 책 전체 공유 시 전체 책의 기존·미래 문장·생각 공개를 묻고 저장·readback 성공 뒤 원래 공유를 이어간다. public은 확인을 반복하지 않는다. 다시 private로 바꾸면 서비스 링크·story·OG는 새 요청에서 접근 불가이며 외부 사본 회수는 보장하지 않는다.
+- **접근**: public은 미로그인 읽기, 상호작용은 로그인·기존 UGC 안전 계약. 계정/Auth·방 멤버십·개인 AI·moderation·wishlist는 별개다. story lifecycle은 유지하되 현재 원본 책 권한을 모든 snapshot·표지·OG에 적용한다.
+- **기존 기록**: 제한/혼합/unknown·빈 책은 기본 private 이관, 원본 ID·본문·생각·timestamp 비손실. public 이관은 전체 책의 기존·미래 생각까지 포괄하는 명시 동의 증거가 있어야 한다. 기존 공개 view가 생각을 제외했으므로 `note_private=false`만으로 동의를 추론하지 않는다. 이미 승인된 소유자의 공개 작업을 불필요하게 취소하지 않도록 승인 범위를 확인하고, 생각까지 미포함이면 운영 승인으로 추가 확인 후 책 단위 전환한다. 특정 계정을 하드코딩한 예외는 만들지 않는다.
+- **제거**: 구 문장 공개 UI/계정 기본값/setter/model/physical fields는 백업·보수적 이관·새 client/권한 경로·구 쓰기 차단·역할별 검증 뒤 제거한다. 임시 호환을 영구 문장별 예외로 남기지 않는다.
+- **저작권**: quote/own_thought와 출처·URL·권리 metadata 및 기계 판독 가능한 최소 인용·요약/링크 우선·전문 재구성 금지 guidance를 제공한다. 프롬프트만의 강제력·법적 안전 문자 한도·새 anti-scraping 인프라를 주장하지 않는다.
+- **대체 관계**: §8.1/§8.3 및 후속 문장 3단계, 생각별 비공개, 계정 기본 공개 설정 결정과 미병합 public-only 퇴역 제안을 대체한다. 과거 결정·적용 migration은 감사 이력으로 보존한다. 기존 note privacy 보호는 안전 컷오버 전 유지하며 false 플래그를 공개 동의로 승계하지 않는다.
+- **전달**: 하나의 공개 계약이 여러 활성 spec에 걸치므로 파일 수가 많아도 한 논리 spec-only PR로 정합한다. spec merge 후 별도 구현 PR·DEV 검증·동일 SHA Production 승인 절차를 진행한다. spec 작업은 코드·DB·외부 상태를 변경하지 않으며 본 결정 자체가 구현/운영 완료 증거는 아니다.
+
+SSOT: [backend.md §7.0.1–2](../backend.md), [feed.md §5.7.1](../feed.md), [profile.md](../profile.md), [share.md §1.1](../share.md), [reading-story.md §6](../reading-story.md), [legal-copyright.md §4.4](../legal-copyright.md).
