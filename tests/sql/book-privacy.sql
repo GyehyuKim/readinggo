@@ -40,8 +40,8 @@ begin
  exception when insufficient_privilege then null; end;
  reset role;
  -- Forge a pre-existing intro-only published snapshot to exercise unconditional gate.
- insert into public.reading_stories(user_id,user_book_id,book_id,slug,status)
- values(owner_id,ub,book_id,encode(gen_random_bytes(18),'hex'),'published') returning id,reading_stories.slug into story_id,slug;
+ insert into public.reading_stories(user_id,user_book_id,book_id,slug,status,published_at)
+ values(owner_id,ub,book_id,encode(gen_random_bytes(18),'hex'),'published',now()) returning id,reading_stories.slug into story_id,slug;
  insert into public.reading_story_pages(story_id,position,type,snapshot_text,is_cover)
  values(story_id,0,'intro','Must not leak',false);
  perform set_config('request.jwt.claim.sub','',true); set local role anon;

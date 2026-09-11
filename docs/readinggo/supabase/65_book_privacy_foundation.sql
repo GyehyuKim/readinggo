@@ -30,14 +30,17 @@ create table if not exists public.sentence_conversation_turns (
 alter table public.sentence_conversation_turns enable row level security;
 revoke all on public.sentence_conversation_turns from public,anon,authenticated;
 grant select,insert,delete on public.sentence_conversation_turns to authenticated;
+drop policy if exists conversation_owner on public.sentence_conversation_turns;
 create policy conversation_owner on public.sentence_conversation_turns for all to authenticated
   using(user_id=auth.uid()) with check(user_id=auth.uid() and exists (
     select 1 from public.sentences s join public.user_books ub on ub.id=s.user_book_id
     where s.id=sentence_id and s.user_id=auth.uid() and ub.user_id=auth.uid()));
 
 -- Restrictive fences also intersect any historical permissive policies.
+drop policy if exists book_private_fence on public.user_books;
 create policy book_private_fence on public.user_books as restrictive for select to authenticated
   using(user_id=auth.uid());
+drop policy if exists sentence_private_fence on public.sentences;
 create policy sentence_private_fence on public.sentences as restrictive for select to authenticated
   using(user_id=auth.uid());
 revoke select on public.user_books,public.sentences from anon;
@@ -72,6 +75,7 @@ begin
  end if;
  return new;
 end $$;
+drop trigger if exists book_visibility_guard on public.user_books;
 create trigger book_visibility_guard before insert or update on public.user_books
  for each row execute function public.book_visibility_guard();
 
@@ -132,6 +136,7 @@ begin
   raise exception 'publication_not_allowed' using errcode='42501'; end if;
  return new;
 end $$;
+drop trigger if exists sentence_book_guard on public.sentences;
 create trigger sentence_book_guard before insert or update on public.sentences
  for each row execute function public.sentence_book_guard();
 -- Legacy visibility must neither authorize nor prevent private owner writes.
