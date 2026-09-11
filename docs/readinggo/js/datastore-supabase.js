@@ -226,6 +226,35 @@
 
     /* 내 책 / 활성 책 */
     myBooks: {
+      async getVisibility(userBookId) {
+        const row = unwrap(await sb().rpc('book_visibility_owner', { p_user_book_id: userBookId }));
+        if (!row || row.id !== userBookId || !['public', 'private'].includes(row.visibility)
+          || !Number.isSafeInteger(row.revision) || row.revision < 0) throw new Error('book_visibility_unknown');
+        return row;
+      },
+      async setVisibility(userBookId, visibility, options = {}) {
+        if (!['public', 'private'].includes(visibility)) throw new Error('invalid_visibility_request');
+        const requestId = options.requestId || window.crypto.randomUUID();
+        const expectedRevision = options.expectedRevision === undefined
+          ? (await A.myBooks.getVisibility(userBookId)).revision : options.expectedRevision;
+        if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new Error('invalid_visibility_request');
+        try {
+          const result = unwrap(await sb().rpc('book_set_visibility', {
+            p_user_book_id: userBookId, p_visibility: visibility,
+            p_expected_revision: expectedRevision, p_request_id: requestId,
+          }));
+          const current = await A.myBooks.getVisibility(userBookId);
+          return { ...current, requestId, expectedRevision, replayed: !!result.replayed,
+            appliedRevision: result.appliedRevision, canShare: current.visibility === 'public' };
+        } catch (cause) {
+          const error = new Error('책 공개 설정을 확인하지 못했어요. 다시 확인해 주세요.');
+          Object.assign(error, { cause, outcome: 'unknown', canShare: false, requestId, expectedRevision });
+          throw error;
+        }
+      },
+      async publicBook(userBookId) {
+        return unwrap(await sb().rpc('book_public', { p_user_book_id: userBookId }));
+      },
       async list() {
         const id = await uid();
         const rows = unwrap(await sb().from('user_books').select('*, book:books(*)')
@@ -246,7 +275,7 @@
         const st = (status === 'completed') ? 'completed' : 'reading';
         const tp = (bk && bk.total_pages) || (book && book.total_pages) || 0;
         const ins = {
-          user_id: id, book_id: bk.id, status: st,
+          user_id: id, book_id: bk.id, status: st, visibility: 'private', visibility_revision: 0,
           current_page: st === 'completed' ? (tp || current_page || 0) : (current_page || 0),
         };
         if (migrationUuid) ins.id = migrationUuid;
@@ -385,26 +414,31 @@
     },
 
     /* 한 문장 (sentences) */
+    sentenceConversations: {
+      async list(sentenceId) {
+        return unwrap(await sb().from('sentence_conversation_turns').select('id,sentence_id,role,content,created_at')
+          .eq('sentence_id', sentenceId).eq('user_id', await uid()).order('created_at')) || [];
+      },
+      async add(sentenceId, { role, content }) {
+        if (!['user', 'assistant'].includes(role) || typeof content !== 'string' || !content.trim()
+          || Array.from(content).length > 4000) throw new Error('invalid_conversation_turn');
+        return unwrap(await sb().from('sentence_conversation_turns').insert({
+          sentence_id: sentenceId, user_id: await uid(), role, content,
+        }).select('id,sentence_id,role,content,created_at').single());
+      },
+    },
     sentences: {
       async add({ userBookId, sessionId, page, text, my_note, kind, visibility: _ignoredVisibility }) {
         // #565: userBookId 없이는 insert 금지 — 무효/누락 ID 로 조용히 잘못 저장하지 않는다(명확히 실패).
         if (!userBookId) throw new Error('sentences.add: userBookId 필요 (#565)');
         const id = await uid();
-        // 계정 기본 공개범위가 신규 문장의 단일 정본이다. 호출부의 문장별 override는 무시한다.
-        const settings = await A.settings.get();
-        const sentenceVisibility = defaultSentenceVisibility(settings);
-        const checked = validateSentenceText(text, sentenceVisibility);
-        if (sentenceVisibility !== 'private') {
-          if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION && settings.ugc_terms.accepted_at)) {
-            window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
-            throw new Error('ugc_terms_required');
-          }
-        }
+        const parent = await A.myBooks.getVisibility(userBookId);
+        const checked = validateSentenceText(text, parent.visibility);
         return unwrap(await sb().from('sentences').insert({
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
           page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
-          visibility: sentenceVisibility,
+          // Parent book is the only visibility authority.
         }).select().single());
       },
       // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
@@ -418,18 +452,13 @@
             .eq('id', migrationUuid).eq('user_id', id).maybeSingle());
           if (existing) return existing;
         }
-        const sentenceVisibility = storedSentenceVisibility(visibility);
-        const checked = validateSentenceText(text, sentenceVisibility);
-        const settings = await A.settings.get();
-        if (sentenceVisibility !== 'private'
-          && !(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION && settings.ugc_terms.accepted_at)) {
-          window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
-          throw new Error('ugc_terms_required');
-        }
+        const parent = await A.myBooks.getVisibility(userBookId);
+        if (parent.visibility !== 'private') throw new Error('import_requires_private_book');
+        const checked = validateSentenceText(text, 'private');
         const payload = {
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
           page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
-          kind: 'quote', visibility: sentenceVisibility,
+          kind: 'quote',
         };
         if (migrationUuid) payload.id = migrationUuid;
         try {
@@ -449,8 +478,7 @@
       // 한 문장 본문 편집 (오타 수정, #325) — 본인 행만(RLS)
       async updateText(sentenceId, text) {
         const id = await uid();
-        const current = unwrap(await sb().from('sentences').select('visibility').eq('id', sentenceId).eq('user_id', id).single());
-        const checked = validateSentenceText(text, current && current.visibility);
+        const checked = validateSentenceText(text, 'private');
         return unwrap(await sb().from('sentences').update({ text: checked.text }).eq('id', sentenceId).eq('user_id', id).select().single());
       },
       // 한 문장 페이지 번호 편집 (#683) — 본인 행만(RLS). null = 페이지 미상.
@@ -468,25 +496,16 @@
         unwrap(await sb().from('sentences').delete().eq('id', sentenceId).eq('user_id', await uid()));
         return true;
       },
-      // 한 문장/감상 공개·비공개 토글 (QA #12).
-      // patch: { visibility?: 'public'|'followers'|'private', note_private?: boolean }
-      // note_private(감상 비공개)는 유지. is_private는 deprecated — visibility로 대체(v7.2).
-      async setVisibility(sentenceId, patch) {
-        const id = await uid();
-        const nextPatch = { ...(patch || {}) };
-        if (patch && Object.prototype.hasOwnProperty.call(patch, 'visibility')) {
-          const current = unwrap(await sb().from('sentences').select('text').eq('id', sentenceId).eq('user_id', id).single());
-          const checked = validateSentenceText(current && current.text, patch.visibility);
-          nextPatch.visibility = checked.visibility;
-        }
-        if (nextPatch.visibility === 'public' || nextPatch.visibility === 'followers') {
-          const settings = await A.settings.get();
-          if (!(settings.ugc_terms && settings.ugc_terms.version === window.RG_UGC_TERMS_VERSION && settings.ugc_terms.accepted_at)) {
-            window.dispatchEvent(new CustomEvent('rg:ugc-terms-required'));
-            throw new Error('ugc_terms_required');
-          }
-        }
-        return unwrap(await sb().from('sentences').update(nextPatch).eq('id', sentenceId).eq('user_id', id).select().single());
+      // Removed sentence setters: legacy callers must not promote a book.
+      async setThought(sentenceId, thought) {
+        if (thought != null && (typeof thought !== 'string' || Array.from(thought).length > 1000)) throw new Error('invalid_thought');
+        return unwrap(await sb().from('sentences').update({ publishable_thought: thought })
+          .eq('id', sentenceId).eq('user_id', await uid()).select().single());
+      },
+      async publicByBook(userBookId, sentenceId = null) {
+        return unwrap(await sb().rpc('book_public_quotes', {
+          p_user_book_id: userBookId, p_sentence_id: sentenceId,
+        })) || [];
       },
       async listByBook(userBookId) {
         return unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)
