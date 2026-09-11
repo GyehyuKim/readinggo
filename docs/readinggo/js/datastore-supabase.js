@@ -96,6 +96,37 @@
     };
   }
 
+  // RPC pages are transport bounds, never a product-wide result cap.
+  async function publicPages(name, args = {}, accept = () => true, limit = Infinity) {
+    const out = [];
+    for (let offset = 0; ; offset += 50) {
+      const rows = unwrap(await sb().rpc(name, { ...args, p_limit: 50, p_offset: offset })) || [];
+      out.push(...rows.filter(accept));
+      if (out.length >= limit || rows.length < 50) return out.slice(0, limit);
+    }
+  }
+  function publicSentence(r) {
+    if (!r) return null;
+    const p = r.parent || {}, b = p.book || {}, u = p.author || {};
+    return { id: r.id, user_id: r.userId, user_book_id: r.userBookId,
+      book_id: r.bookId, page: r.page, text: r.text, thought: r.thought,
+      publishable_thought: r.thought, created_at: r.createdAt, visibility: 'public',
+      clapCount: r.clapCount || 0, clap_count: [{ count: r.clapCount || 0 }],
+      user: { handle: u.handle, display_name: u.displayName, avatar_url: u.avatarUrl },
+      user_book: { id: r.userBookId, book_id: r.bookId,
+        book: { ...b, id: r.bookId, cover_url: b.coverUrl } } };
+  }
+  function publicBook(r) {
+    return { id: r.id, book_id: r.bookId, status: r.status, completed_at: r.completedAt,
+      rating: r.rating, review_text: r.reviewText, current_page: r.currentPage,
+      visibility: 'public', book: { ...r.book, id: r.bookId, cover_url: r.book.coverUrl } };
+  }
+  async function ownerSentence(row) {
+    if (!row) return row;
+    const parent = await A.myBooks.getVisibility(row.user_book_id);
+    return { ...row, visibility: parent.visibility };
+  }
+
   const A = {
     /* 인증 — supabase-client.js(RG_SB) 위임 */
     auth: {
@@ -434,62 +465,42 @@
         const id = await uid();
         const parent = await A.myBooks.getVisibility(userBookId);
         const checked = validateSentenceText(text, parent.visibility);
-        return unwrap(await sb().from('sentences').insert({
+        return ownerSentence(unwrap(await sb().from('sentences').insert({
           user_id: id, user_book_id: userBookId, session_id: sessionId || null,
           page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
           // Parent book is the only visibility authority.
-        }).select().single());
+        }).select().single()));
       },
       // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
-      async importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility, migrationId }) {
-        if (!userBookId) throw new Error('sentences.importExisting: userBookId 필요');
-        const id = await uid();
-        const migrationUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(migrationId || ''))
-          ? String(migrationId) : null;
-        if (migrationUuid) {
-          const existing = unwrap(await sb().from('sentences').select('*')
-            .eq('id', migrationUuid).eq('user_id', id).maybeSingle());
-          if (existing) return existing;
-        }
-        const parent = await A.myBooks.getVisibility(userBookId);
-        if (parent.visibility !== 'private') throw new Error('import_requires_private_book');
-        const checked = validateSentenceText(text, 'private');
-        const payload = {
-          user_id: id, user_book_id: userBookId, session_id: sessionId || null,
-          page: (typeof page === 'number') ? page : null, text: checked.text, my_note: my_note || null,
-          kind: 'quote',
-        };
-        if (migrationUuid) payload.id = migrationUuid;
-        try {
-          return unwrap(await sb().from('sentences').insert(payload).select().single());
-        } catch (error) {
-          if (!migrationUuid) throw error;
-          const existing = unwrap(await sb().from('sentences').select('*')
-            .eq('id', migrationUuid).eq('user_id', id).maybeSingle());
-          if (existing) return existing;
-          throw error;
-        }
+      async importExisting({ userBookId, sessionId, page, text, my_note, migrationId, created_at, createdAt, publishable_thought }) {
+        if (!userBookId || !migrationId) throw new Error('import_identity_required');
+        return ownerSentence(unwrap(await sb().rpc('sentence_import_private', {
+          p_user_book_id: userBookId, p_sentence_id: migrationId,
+          p_text: text, p_page: page ?? null, p_session_id: sessionId || null,
+          p_my_note: my_note ?? null, p_thought: publishable_thought ?? null,
+          p_created_at: created_at ?? createdAt ?? null,
+        })));
       },
       // 사후 감상 추가·편집 (작성 시점 무관) — profile §5.8.4
       async setNote(sentenceId, my_note) {
-        return unwrap(await sb().from('sentences').update({ my_note }).eq('id', sentenceId).select().single());
+        return ownerSentence(unwrap(await sb().from('sentences').update({ my_note }).eq('id', sentenceId).select().single()));
       },
       // 한 문장 본문 편집 (오타 수정, #325) — 본인 행만(RLS)
       async updateText(sentenceId, text) {
         const id = await uid();
         const checked = validateSentenceText(text, 'private');
-        return unwrap(await sb().from('sentences').update({ text: checked.text }).eq('id', sentenceId).eq('user_id', id).select().single());
+        return ownerSentence(unwrap(await sb().from('sentences').update({ text: checked.text }).eq('id', sentenceId).eq('user_id', id).select().single()));
       },
       // 한 문장 페이지 번호 편집 (#683) — 본인 행만(RLS). null = 페이지 미상.
       async setPage(sentenceId, page) {
         const p = (typeof page === 'number' && isFinite(page)) ? page : null;
-        return unwrap(await sb().from('sentences').update({ page: p }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
+        return ownerSentence(unwrap(await sb().from('sentences').update({ page: p }).eq('id', sentenceId).eq('user_id', await uid()).select().single()));
       },
       // 종류 변경 인용↔내 의견 (#381) — 본인 행만(RLS)
       async setKind(sentenceId, kind) {
         const k = kind === 'thought' ? 'thought' : 'quote';
-        return unwrap(await sb().from('sentences').update({ kind: k }).eq('id', sentenceId).eq('user_id', await uid()).select().single());
+        return ownerSentence(unwrap(await sb().from('sentences').update({ kind: k }).eq('id', sentenceId).eq('user_id', await uid()).select().single()));
       },
       // 한 문장 삭제 — 본인 행만(RLS). 연결된 companion_sessions 는 FK 정리 정책에 위임.
       async remove(sentenceId) {
@@ -499,8 +510,8 @@
       // Removed sentence setters: legacy callers must not promote a book.
       async setThought(sentenceId, thought) {
         if (thought != null && (typeof thought !== 'string' || Array.from(thought).length > 1000)) throw new Error('invalid_thought');
-        return unwrap(await sb().from('sentences').update({ publishable_thought: thought })
-          .eq('id', sentenceId).eq('user_id', await uid()).select().single());
+        return ownerSentence(unwrap(await sb().from('sentences').update({ publishable_thought: thought })
+          .eq('id', sentenceId).eq('user_id', await uid()).select().single()));
       },
       async publicByBook(userBookId, sentenceId = null) {
         return unwrap(await sb().rpc('book_public_quotes', {
@@ -508,14 +519,17 @@
         })) || [];
       },
       async listByBook(userBookId) {
-        return unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)
-          .order('created_at', { ascending: false }));
+        const rows = unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)
+          .order('created_at', { ascending: false })) || [];
+        const parent = await A.myBooks.getVisibility(userBookId);
+        return rows.map(r => ({ ...r, visibility: parent.visibility }));
       },
       async listMine() {
         const id = await uid();
         // book_id 는 sentences 에 없음 → user_book 임베드로 해소(무작위회상·책상세 타임라인용).
-        return unwrap(await sb().from('sentences').select('*, user_book:user_books(book_id, book:books(title))').eq('user_id', id)
-          .order('created_at', { ascending: false }));
+        const rows = unwrap(await sb().from('sentences').select('*, user_book:user_books(book_id, visibility, book:books(title))').eq('user_id', id)
+          .order('created_at', { ascending: false })) || [];
+        return rows.map(r => ({ ...r, visibility: storedSentenceVisibility(r.user_book && r.user_book.visibility) }));
       },
       // 시간차 되감기 후보 (#346, resurface.md §2) — Q/A 저장 문장, 14일+ 경과, 재소환 14일+ 미경과 제외.
       // 우선순위: 가장 긴 내 답변 → 동률 랜덤. (책 단위 7일 조건은 후속)
@@ -524,7 +538,7 @@
         const now = Date.now(), TH = 14 * 86400000;
         const since = new Date(now - TH).toISOString();
         const rows = unwrap(await sb().from('sentences')
-          .select('*, user_book:user_books(book_id, book:books(title))')
+          .select('*, user_book:user_books(book_id, visibility, book:books(title))')
           .eq('user_id', id).not('my_note', 'is', null).lte('created_at', since)
           .or(`last_resurfaced_at.is.null,last_resurfaced_at.lte.${since}`)
           .limit(100));
@@ -555,40 +569,22 @@
       },
       // 전체 공개 피드 (§social). 책 제목은 user_books→books 중첩 embed.
       async feed({ cursor, limit } = {}) {
-        let q = sb().from('sentences_public')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author))')
-          .order('created_at', { ascending: false }).limit(limit || 30);
-        if (cursor) q = q.lt('created_at', cursor);
-        return unwrap(await q);
+        return (await publicPages('sentences_public_feed', {},
+          r => !cursor || r.createdAt < cursor, limit || 30)).map(publicSentence);
       },
-      // 팔로우 피드 — 내가 팔로우한 사용자들의 한 문장만 (#7)
       async feedFollowing({ limit } = {}) {
-        const id = await uid();
-        const f = unwrap(await sb().from('follows').select('following_id').eq('follower_id', id)) || [];
-        const ids = f.map(x => x.following_id);
-        if (!ids.length) return [];
-        return unwrap(await sb().from('sentences_public')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author))')
-          .in('user_id', ids).order('created_at', { ascending: false }).limit(limit || 30));
+        const f = unwrap(await sb().from('follows').select('following_id').eq('follower_id', await uid())) || [];
+        const ids = new Set(f.map(r => r.following_id));
+        if (!ids.size) return [];
+        return (await publicPages('sentences_public_feed', {}, r => ids.has(r.userId), limit || 30)).map(publicSentence);
       },
-      // 같은 책 피드 — 특정 책의 *다른* 사용자 한 문장 (홈 '같은 책 읽는 사람들', NPC 포함, #1)
       async byBook(bookId, { limit, sort } = {}) {
-        // 데모 book id('b008' 등) 비-UUID 방어 — uuid 컬럼 질의 400 방지.
         if (!bookId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookId)) return [];
-        const me = await uid();
-        // sort='likes'(#594): 짹 많은 순. PostgREST 임베드 집계(claps(count))를 받아 클라에서 정렬·슬라이스
-        // (임베드 aggregate 정렬은 PostgREST에서 불안정 → 후보 풀을 넉넉히 받아 JS 정렬). 기본 'recent'(최신순).
-        const likes = sort === 'likes';
-        const pool = likes ? 50 : (limit || 10);
-        let q = sb().from('sentences_public')
-          .select('*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author)), clap_count:claps(count)')
-          .eq('user_book.book_id', bookId)
-          .order('created_at', { ascending: false }).limit(pool);
-        if (me) q = q.neq('user_id', me);
-        let rows = unwrap(await q) || [];
-        rows = rows.map(r => ({ ...r, clapCount: _clapCount(r) }));
-        if (likes) { rows.sort((a, b) => b.clapCount - a.clapCount); rows = rows.slice(0, limit || 5); }
-        return rows;
+        const me = await uid(), likes = sort === 'likes';
+        let rows = (await publicPages('sentences_public_feed', { p_book_id: bookId },
+          r => r.userId !== me, likes ? 50 : (limit || 10))).map(publicSentence);
+        if (likes) rows.sort((a,b) => b.clapCount - a.clapCount);
+        return rows.slice(0, limit || (likes ? 5 : 10));
       },
       // 무작위 회상 — 내 과거 한 문장 1개 (profile §5.8.7)
       // 추천 (#787, v9) — 좋아요·신선도 점수 랭킹 + 계층 충전(backfill). 항상 N개를 채워 빈 화면을 막는다.
@@ -600,9 +596,6 @@
         const pool = W.poolSize || 120;
         const me = await uid();
         const seen = new Set(), out = [];
-        // Tier1: 같은 책(!inner) + 좋아요 임베드. Tier2: 전체 공개(outer join) + 좋아요 임베드.
-        const SEL_CORE = '*, user:users(handle,display_name,avatar_url), user_book:user_books!inner(book_id, book:books(id,title,cover_url,author)), clap_count:claps(count)';
-        const SEL_POP = '*, user:users(handle,display_name,avatar_url), user_book:user_books(book:books(id,title,cover_url,author)), clap_count:claps(count)';
         const take = (rows) => {
           for (const r of (rows || [])) {
             if (!r || seen.has(r.id)) continue;
@@ -614,20 +607,15 @@
         const mine = unwrap(await sb().from('user_books').select('book_id').eq('user_id', me));
         const bookIds = [...new Set((mine || []).map(r => r.book_id).filter(Boolean))];
         if (bookIds.length) {
-          let q = sb().from('sentences_public').select(SEL_CORE)
-            .in('user_book.book_id', bookIds)
-            .order('created_at', { ascending: false }).limit(pool);
-          if (me) q = q.neq('user_id', me);
-          const rows = (unwrap(await q) || []).slice().sort((a, b) => _recScore(b) - _recScore(a));
+          const rows = (await publicPages('sentences_public_feed', {},
+            r => bookIds.includes(r.bookId) && r.userId !== me, pool)).map(publicSentence)
+            .sort((a,b) => _recScore(b) - _recScore(a));
           take(rows);
         }
         // Tier 2 — 부족분 충전: 전체 공개 문장 중 좋아요 많은 순(동률 최신). RLS가 공개범위 필터.
         if (out.length < N) {
-          let q = sb().from('sentences_public').select(SEL_POP)
-            .order('created_at', { ascending: false }).limit(pool);
-          if (me) q = q.neq('user_id', me);
-          const rows = (unwrap(await q) || []).slice()
-            .sort((a, b) => (_clapCount(b) - _clapCount(a)) || (String(b.created_at) > String(a.created_at) ? 1 : -1));
+          const rows = (await publicPages('sentences_public_feed', {}, r => r.userId !== me, pool))
+            .map(publicSentence).sort((a,b) => _clapCount(b) - _clapCount(a) || String(b.created_at).localeCompare(String(a.created_at)));
           take(rows);
         }
         // Tier 3 — 그래도 부족: 최근 전체 피드(내 문장 포함 가능)
@@ -788,8 +776,11 @@
       // {sentence_id, sentence} 표면 유지(SentenceCollectionModal 호환). to_sentence_id → sentence_id 별칭.
       async list() {
         const id = await uid();
-        return unwrap(await sb().from('claps').select('sentence_id:to_sentence_id, sentence:sentences_public(*, user_book:user_books(book_id, book:books(title)))')
-          .eq('from_user_id', id).order('created_at', { ascending: false }));
+        const rows = unwrap(await sb().from('claps').select('sentence_id:to_sentence_id')
+          .eq('from_user_id', id).order('created_at', { ascending: false })) || [];
+        const hydrated = await Promise.all(rows.map(async r => ({ ...r,
+          sentence: publicSentence(unwrap(await sb().rpc('sentence_public', { p_sentence_id: r.sentence_id }))) })));
+        return hydrated.filter(r => r.sentence);
       },
     },
     wishBooks: {
@@ -989,13 +980,12 @@
         return !rows || rows.length === 0 || (!!me && rows[0] && rows[0].id === me);
       },
       async publicBooks(userId) {
-        if (await A.moderation.isBlocked(userId)) return [];
-        return unwrap(await sb().from('user_books').select('*, book:books(*)')
-          .eq('user_id', userId).eq('status', 'completed').order('completed_at', { ascending: false }));
+        return (await publicPages('user_books_public', { p_owner_id: userId }))
+          .map(publicBook).filter(r => r.status === 'completed')
+          .sort((a,b) => String(b.completed_at).localeCompare(String(a.completed_at)));
       },
       async publicSentences(userId) {
-        return unwrap(await sb().from('sentences_public').select('*, user_book:user_books(book_id, book:books(title))')
-          .eq('user_id', userId).order('created_at', { ascending: false }).limit(50));
+        return (await publicPages('sentences_public_feed', { p_owner_id: userId }, () => true, 50)).map(publicSentence);
       },
       // 공개 스트릭(streak 테이블 select using(true)) — 타인 프로필 표시용 (#10)
       async publicStreak(userId) {
@@ -1004,10 +994,9 @@
       },
       // 타인 책장 전체 — 읽는 중 + 완독 (status 포함). 책장 필터용 (#4)
       async publicShelf(userId) {
-        if (await A.moderation.isBlocked(userId)) return [];
-        return unwrap(await sb().from('user_books').select('*, book:books(*)')
-          .eq('user_id', userId).in('status', ['reading', 'completed'])
-          .order('status', { ascending: true }).order('completed_at', { ascending: false }));
+        return (await publicPages('user_books_public', { p_owner_id: userId })).map(publicBook)
+          .filter(r => ['reading', 'completed'].includes(r.status))
+          .sort((a,b) => a.status.localeCompare(b.status) || String(b.completed_at).localeCompare(String(a.completed_at)));
       },
       // 타인 위시리스트 — wishlist_public=true 인 경우만 반환, 아니면 [] (#558)
       async publicWishlist(userId) {
@@ -1022,11 +1011,10 @@
       // 타인의 특정 책 기여 — 그 책 평점·후기 + 공개 한 문장 (#5)
       async bookContrib(userId, bookId) {
         if (await A.moderation.isBlocked(userId)) return { userBook: null, sentences: [] };
-        const ub = unwrap(await sb().from('user_books').select('id, rating, review_text, status, current_page')
-          .eq('user_id', userId).eq('book_id', bookId).maybeSingle());
-        const sents = unwrap(await sb().from('sentences_public').select('id, text, page, created_at')
-          .eq('user_id', userId).eq('user_book_id', ub ? ub.id : '00000000-0000-0000-0000-000000000000')
-          .order('page', { ascending: true }));
+        const ub = (await publicPages('user_books_public', { p_owner_id: userId }))
+          .map(publicBook).find(r => r.book_id === bookId);
+        const sents = ub ? (await publicPages('sentences_public_feed', { p_owner_id: userId, p_book_id: bookId }))
+          .map(publicSentence).filter(r => r.user_book_id === ub.id).sort((a,b) => (a.page ?? Infinity) - (b.page ?? Infinity)) : [];
         return { userBook: ub || null, sentences: sents || [] };
       },
     },

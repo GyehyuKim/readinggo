@@ -701,19 +701,26 @@ const DataStore = {
       });
     },
     // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
-    importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
+    importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility, migrationId, created_at, publishable_thought }) {
       return localStorageAdapter.mutate(s => {
         const ub = userBookId ? _ubById(s, userBookId) : _activeUB(s);
         if (!ub) return null;
         ub.sentences = ub.sentences || [];
+        const prior = migrationId && _findSentence(s, migrationId);
+        if (prior) {
+          if (prior.user_book_id !== ub.id || prior.text !== text || prior.my_note !== (my_note ?? null)
+            || prior.page !== (typeof page === 'number' ? page : (ub.current_page || 0))
+            || (created_at != null && prior.created_at !== created_at)) throw new Error('idempotency_conflict');
+          return { ...prior, visibility: _storedSentenceVisibility(ub.visibility) };
+        }
         if (ub.visibility === 'public') throw new Error('import_requires_private_book');
         const checked = _validateSentenceText(text, 'private');
         const row = {
-          id: _dsId('se'), user_book_id: ub.id, book_id: ub.book_id,
+          id: migrationId || _dsId('se'), user_book_id: ub.id, book_id: ub.book_id,
           session_id: sessionId || null,
           page: typeof page === 'number' ? page : (ub.current_page || 0),
-          text: checked.text, my_note: my_note || null, kind: 'quote',
-          visibility: checked.visibility, _guest: true, created_at: Date.now(),
+          text, my_note: my_note ?? null, publishable_thought: publishable_thought ?? null, kind: 'quote',
+          visibility: checked.visibility, _guest: true, created_at: created_at ?? Date.now(),
         };
         ub.sentences.push(row);
         return row;
@@ -752,7 +759,7 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
         if (se) se.my_note = my_note;
-        return se;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
     // 한 문장 본문 편집 (오타 수정, #325)
@@ -760,7 +767,7 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
         if (se) se.text = _validateSentenceText(text, se.visibility).text;
-        return se;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
     // 한 문장 페이지 번호 편집 (#683) — Supabase 어댑터와 표면 일치(§7.2). null = 페이지 미상.
@@ -768,7 +775,7 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
         if (se) se.page = (typeof page === 'number' && isFinite(page)) ? page : null;
-        return se;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
     setThought(sentenceId, thought) {
@@ -777,7 +784,7 @@ const DataStore = {
         const se = _findSentence(s, sentenceId);
         if (!se) throw new Error('sentence_not_found');
         se.publishable_thought = thought;
-        return se;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
     // 종류 변경 인용↔내 의견 (#381) — Supabase 어댑터와 표면 일치
