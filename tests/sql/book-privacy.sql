@@ -6,7 +6,7 @@ do $$
 declare
  owner_id uuid:='16190001-0000-4000-8000-000000000001';
  book_id uuid; ub uuid; sentence_id uuid; result jsonb;
- request_id uuid:=gen_random_uuid(); story_id uuid; slug text;
+ request_id uuid:=gen_random_uuid(); story_id uuid; slug text; first_page uuid[]; second_page uuid[];
 begin
  insert into auth.users(id,instance_id,aud,role,email,encrypted_password,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
  values(owner_id,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','privacy@example.invalid','','{}','{}',now(),now());
@@ -24,9 +24,21 @@ begin
  if result->>'revision'<>'1' then raise exception 'revision_failed'; end if;
  if exists(select 1 from public.book_public_quotes(ub) where thought is not null) then raise exception 'legacy_note_leak'; end if;
  update public.sentences set publishable_thought='Explicit thought' where id=sentence_id;
+ insert into public.sentences(user_id,user_book_id,text,visibility,created_at)
+ select owner_id,ub,'Pagination quote '||n,'public',now() + (n||' milliseconds')::interval
+ from generate_series(1,72) n;
+ select array_agg(id order by created_at,id) into first_page
+ from public.book_public_quotes(ub,null,51,0);
+ select array_agg(id order by created_at,id) into second_page
+ from public.book_public_quotes(ub,null,51,50);
+ if cardinality(first_page)<>51 or cardinality(second_page)<>23 then
+  raise exception 'book_quote_pagination_counts %, %',cardinality(first_page),cardinality(second_page); end if;
+ if first_page[51]<>second_page[1]
+   or (select count(*) from unnest(first_page[1:50]) a join unnest(second_page) b on b=a)<>0 then
+  raise exception 'book_quote_pagination_boundary'; end if;
  perform * from public.sentence_conversation_import(sentence_id,
   '[{"id":"16190001-0000-4000-8000-000000000088","role":"assistant","content":"Private assistant"}]');
- if (select thought from public.book_public_quotes(ub))<>'Explicit thought' then raise exception 'explicit_thought_missing'; end if;
+ if (select thought from public.book_public_quotes(ub,sentence_id,1,0))<>'Explicit thought' then raise exception 'explicit_thought_missing'; end if;
  perform public.book_set_visibility(ub,'private',1,gen_random_uuid());
  result:=public.book_set_visibility(ub,'public',0,request_id);
  if result->>'visibility'<>'private' or result->>'revision'<>'2' or result->>'replayed'<>'true' then

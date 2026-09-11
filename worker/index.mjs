@@ -354,7 +354,9 @@ async function publicRecordPage(request, env, url) {
       if (!parent || parent.id !== id) return unavailable(404);
       // Table-valued RPC: PostgREST applies limit/offset before serializing the response.
       // Do not use the global feed: book_public deliberately omits the owner UUID.
-      rows = await publicRecordRpc(request, env, 'book_public_quotes', { p_user_book_id: id, p_sentence_id: null }, '?limit=51&offset=' + offset + '&order=created_at.asc,id.asc');
+      rows = await publicRecordRpc(request, env, 'book_public_quotes', {
+        p_user_book_id: id, p_sentence_id: null, p_limit: 51, p_offset: offset,
+      }, '?limit=51&offset=0&order=created_at.asc,id.asc');
       if (!Array.isArray(rows) || rows.length > 51 || rows.some(r => r.user_book_id !== id || !PUBLIC_UUID.test(r.id))) return unavailable(503);
       // Recheck after the second read: withdrawal must not return a stale parent.
       parent = await publicRecordRpc(request, env, 'book_public', { p_user_book_id: id });

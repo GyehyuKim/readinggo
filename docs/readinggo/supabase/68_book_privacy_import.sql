@@ -76,7 +76,7 @@ language sql stable security definer set search_path=public,pg_temp as $$
  from public.sentences s where s.user_book_id=p_user_book_id
  and (p_sentence_id is null or s.id=p_sentence_id) and public.sentence_public_allowed(s.id)
  order by s.created_at,s.id
- limit least(50,greatest(1,coalesce(p_limit,50))) offset greatest(0,coalesce(p_offset,0));
+ limit least(51,greatest(1,coalesce(p_limit,50))) offset greatest(0,coalesce(p_offset,0));
 $$;
 revoke all on function public.book_public_quotes(uuid,uuid,integer,integer) from public;
 grant execute on function public.book_public_quotes(uuid,uuid,integer,integer) to anon,authenticated,service_role;

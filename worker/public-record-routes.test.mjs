@@ -37,7 +37,7 @@ test('book uses gated RPCs, bounded 50 and parent readback', async () => {
   assert.equal(JSON.parse(result.body).records.length, 50);
   assert.equal(JSON.parse(result.body).collection_complete, false);
   assert.equal(result.calls.length, 3);
-  assert.deepEqual(JSON.parse(result.calls[1].body), { p_user_book_id: bookId, p_sentence_id: null });
+  assert.deepEqual(JSON.parse(result.calls[1].body), { p_user_book_id: bookId, p_sentence_id: null, p_limit: 51, p_offset: 0 });
 });
 test('pagination is transport-bounded, exact-parent scoped and explicitly navigable', async () => {
   const rows = Array.from({ length: 73 }, (_, i) => ({ ...sentence,
@@ -47,10 +47,14 @@ test('pagination is transport-bounded, exact-parent scoped and explicitly naviga
     if (url.pathname.endsWith('/book_public')) return parent;
     assert.ok(url.pathname.endsWith('/book_public_quotes'));
     assert.equal(args.p_user_book_id, bookId);
+    assert.equal(args.p_limit, 51);
     assert.equal(url.searchParams.get('limit'), '51');
+    assert.equal(url.searchParams.get('offset'), '0');
     assert.equal(url.searchParams.get('order'), 'created_at.asc,id.asc');
-    const start = Number(url.searchParams.get('offset'));
-    return rows.slice(start, start + 51);
+    // Model the actual SQL function page first, then PostgREST transport slicing.
+    const sqlPage = rows.slice(args.p_offset, args.p_offset + Math.min(51, args.p_limit));
+    const transportOffset = Number(url.searchParams.get('offset'));
+    return sqlPage.slice(transportOffset, transportOffset + Number(url.searchParams.get('limit')));
   };
   const first = JSON.parse((await run('/public/books/' + bookId + '.json', rpc)).body);
   assert.equal(first.records.length, 50);
@@ -59,6 +63,9 @@ test('pagination is transport-bounded, exact-parent scoped and explicitly naviga
   assert.equal(last.records.length, 23);
   assert.equal(last.has_more, false);
   assert.equal(last.next_url, null);
+  assert.equal(last.offset, 50);
+  assert.deepEqual(first.records.map(r => r.id), rows.slice(0, 50).map(r => r.id));
+  assert.deepEqual(last.records.map(r => r.id), rows.slice(50).map(r => r.id));
   assert.equal(new Set([...first.records, ...last.records].map(r => r.id)).size, 73);
   const html = await run('/public/books/' + bookId, rpc);
   assert.match(html.body, /rel="next"/);
