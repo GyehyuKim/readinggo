@@ -12,6 +12,10 @@
 - ⏳ **의도된 미구현**: 스펙에 후속 범위로 명시됐고 현재 구현되지 않음
 - 🚩 **출시 차단 갭**: 보안·개인정보·영속·검증 문제로 구현 또는 운영 증거 없이는 출시할 수 없음
 
+## 책 공개 #1619 목표와 구현 증거 분리
+
+이 spec-only 변경은 소유자 책 public/private·신규 private·전체 현재/미래 문장·생각 상속, 공유 확인 후 원자 저장·readback·재개, 서버 철회, 보수적 이관 및 구 문장 privacy 물리 제거를 확정한다. 아래 감사표의 문장 3단계·계정 기본값·note 필드 관련 as-built는 제거 전 이력이지 새 계약이 아니다. `backend.md`, `feed.md`, `profile.md`, `home-reading.md`, `share.md`, `reading-story.md`, `legal-copyright.md`, `privacy-policy.md`의 #1619 목표는 **구현/DEV/Production 검증 전**이다. 본인 공개 승인 범위·migration 영향·최소 지원 client 버전과 권한 SQL은 후속 구현/운영에서 실제 증거로 검증한다. 로컬 Markdown/spec lint 통과가 이 검증을 대신하지 않는다.
+
 ## 검증 기준선
 
 > 2026-08-25 PR #1531 spec-only branch의 로컬 실행 보고다. Markdown·spec-align·dependency-free Node 테스트는 실행했고, full build·Playwright는 이 격리 worktree에 `vite`·`playwright`가 설치되지 않아 미실행이다. 영속 receipt는 이 branch의 PR CI run URL로 확정하며, 로컬 PASS를 DEV·Production 적용 증거로 사용하지 않는다.
