@@ -33,11 +33,42 @@ test('JSON allowlists quote/own_thought, rights and machine-readable guidance', 
   assert.doesNotMatch(result.body, /SECRET|PRIVATE_ID|my_note/);
 });
 test('book uses gated RPCs, bounded 50 and parent readback', async () => {
-  const result = await run('/public/books/' + bookId + '.json', url => url.endsWith('book_public') ? parent : Array.from({ length: 60 }, () => ({ ...sentence, user_book_id: bookId })));
+  const result = await run('/public/books/' + bookId + '.json', url => url.endsWith('book_public') ? parent : Array.from({ length: 51 }, () => ({ ...sentence, user_book_id: bookId })));
   assert.equal(JSON.parse(result.body).records.length, 50);
   assert.equal(JSON.parse(result.body).collection_complete, false);
   assert.equal(result.calls.length, 3);
   assert.deepEqual(JSON.parse(result.calls[1].body), { p_user_book_id: bookId, p_sentence_id: null });
+});
+test('pagination is transport-bounded, exact-parent scoped and explicitly navigable', async () => {
+  const rows = Array.from({ length: 73 }, (_, i) => ({ ...sentence,
+    id: '33333333-3333-4333-8333-' + String(i).padStart(12, '0'), user_book_id: bookId }));
+  const rpc = (raw, args) => {
+    const url = new URL(raw);
+    if (url.pathname.endsWith('/book_public')) return parent;
+    assert.ok(url.pathname.endsWith('/book_public_quotes'));
+    assert.equal(args.p_user_book_id, bookId);
+    assert.equal(url.searchParams.get('limit'), '51');
+    assert.equal(url.searchParams.get('order'), 'created_at.asc,id.asc');
+    const start = Number(url.searchParams.get('offset'));
+    return rows.slice(start, start + 51);
+  };
+  const first = JSON.parse((await run('/public/books/' + bookId + '.json', rpc)).body);
+  assert.equal(first.records.length, 50);
+  assert.equal(first.has_more, true);
+  const last = JSON.parse((await run(new URL(first.next_url).pathname + new URL(first.next_url).search, rpc)).body);
+  assert.equal(last.records.length, 23);
+  assert.equal(last.has_more, false);
+  assert.equal(last.next_url, null);
+  assert.equal(new Set([...first.records, ...last.records].map(r => r.id)).size, 73);
+  const html = await run('/public/books/' + bookId, rpc);
+  assert.match(html.body, /rel="next"/);
+  assert.match(html.body, /offset=50/);
+  const accepted = await run('/public/books/' + bookId + '?offset=50', rpc, { headers: { Accept: 'application/json' } });
+  assert.equal(JSON.parse(accepted.body).offset, 50);
+  const bad = await run('/public/books/' + bookId + '?offset=-1', () => { throw Error('must not call'); });
+  assert.equal(bad.response.status, 400); assert.equal(bad.calls.length, 0);
+  const crossed = await run('/public/books/' + bookId + '.json', url => url.endsWith('book_public') ? parent : [{ ...sentence, user_book_id: id }]);
+  assert.equal(crossed.response.status, 503); assert.doesNotMatch(crossed.body, /Own thought/);
 });
 test('private, missing, hidden and blocked RPC denial have identical bodies', async () => {
   const bodies = [];
@@ -55,7 +86,7 @@ test('viewer bearer reaches JWT-verifying RPC, forged identity headers never do'
 });
 test('withdrawal between reads, RPC errors, malformed IDs and HEAD fail safely', async () => {
   let n = 0;
-  const revoked = await run('/public/books/' + bookId, url => url.endsWith('book_public') ? (++n === 1 ? parent : null) : [sentence]);
+  const revoked = await run('/public/books/' + bookId, url => url.endsWith('book_public') ? (++n === 1 ? parent : null) : [{ ...sentence, user_book_id: bookId }]);
   assert.equal(revoked.response.status, 404); assert.doesNotMatch(revoked.body, /Writer/);
   const failure = await run('/public/sentences/' + id, () => { throw Error('SECRET'); });
   assert.equal(failure.response.status, 503); assert.doesNotMatch(failure.body, /SECRET/);

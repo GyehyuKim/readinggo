@@ -569,7 +569,7 @@ function shareSentenceWithFormatChoice(s) {
     Object.assign(actions.style, { display: 'grid', gap: '8px', marginTop: '12px' });
     const guidance = document.createElement('p');
     Object.assign(guidance.style, { margin: '10px 0 4px', color: 'var(--ink-2)', fontSize: '13px', lineHeight: '1.5' });
-    guidance.textContent = '내 생각 포함은 이미지 구성만 바꿔요. 공개 책의 생각은 공개 대상이에요. 책·문장 전용 공개 링크는 아직 제공하지 않아요.';
+    guidance.textContent = '내 생각 포함은 이미지 구성만 바꿔요. 끄더라도 공개 책의 생각은 공개 링크에서 읽을 수 있어요.';
     const focusableButtons = [];
     let settled = false;
     let selectedFormat = '1:1';
@@ -669,6 +669,18 @@ function shareSentenceWithFormatChoice(s) {
       const sent = await _sendPreparedSentence(s || {}, selectedFormat, previewBlob, noteToggle.checked, (s && s.entry) || '');
       busy = false; send.disabled = false;
       if (sent) finish(true);
+    });
+    const link = addButton('문장 링크 복사', actions, false);
+    link.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true; link.disabled = true;
+      try {
+        if (!await ensureBookVisibility(s || {})) return;
+        const url = publicShareUrl(s || {});
+        if (!url || !await _copyText(url)) { _privacyToast('문장 링크를 복사하지 못했어요.'); return; }
+        _trackSentenceShare('sentence_share_sent', { format: selectedFormat, method: 'clipboard', entry: (s && s.entry) || '' });
+        _privacyToast('문장 링크를 복사했어요.');
+      } finally { busy = false; link.disabled = false; }
     });
     const personal = addButton('개인 배경화면 저장 (공개하지 않음)', actions, false);
     personal.addEventListener('click', () => { if (!busy && previewBlob) _downloadBlob(previewBlob, RG_SHARE_FORMATS[selectedFormat].filename); });
