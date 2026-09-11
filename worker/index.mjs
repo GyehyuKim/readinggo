@@ -141,6 +141,7 @@ export default {
   async route(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
+    if (/^\/public\/(books|sentences)(\/|$)/.test(p)) return publicRecordPage(request, env, url);
     // 배포 증명용 비밀 없는 메타데이터. prod 승격 gate가 stable-dev에서 같은 SHA를 확인한다.
     if (p === '/api/release') return json({
       environment: env.ENVIRONMENT || 'production',
@@ -309,6 +310,76 @@ export default {
 /* ── 공개 독서 이야기 HTML/OG (#1590) ─────────────────────────
    Worker에는 anon key 바인딩이 없으므로 기존 service-role secret을 서버 내부에서만 사용한다.
    권한이 좁은 reading_story_public RPC만 호출하며 base table/API 응답은 절대 브라우저에 노출하지 않는다. */
+// #1619: restricted RPCs only. JWT verification is performed by Supabase;
+// never forward cookies, user IDs, or client-supplied identity/claim headers.
+const PUBLIC_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PUBLIC_REUSE = Object.freeze({ summary_and_link_preferred: true, minimal_quotation: true,
+  full_text_reconstruction_allowed: false, public_access_is_reuse_license: false });
+const PUBLIC_GUIDANCE = '요약과 링크를 우선하고 필요한 최소 인용만 출처와 함께 사용하세요. 여러 기록을 이어 책 전문을 재구성하지 마세요. 공개 열람은 재사용 허락이 아니며 요약의 적법성도 보장하지 않아요.';
+async function publicRecordRpc(request, env, name, args) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('unconfigured');
+  const auth = request.headers.get('Authorization');
+  if (auth && !/^Bearer [A-Za-z0-9_.-]+$/.test(auth)) throw new Error('invalid authorization');
+  const response = await fetch(String(env.SUPABASE_URL).replace(/\/$/, '') + '/rest/v1/rpc/' + name, {
+    method: 'POST', headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: auth || 'Bearer ' + env.SUPABASE_SERVICE_ROLE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args), signal: AbortSignal.timeout(3000), cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('unavailable');
+  return response.json();
+}
+async function publicRecordPage(request, env, url) {
+  const match = url.pathname.match(/^\/public\/(books|sentences)\/([^/]+?)(\.json)?$/);
+  const wantsJson = !!match?.[3] || (request.headers.get('Accept') || '').includes('application/json');
+  const headers = { 'Content-Type': wantsJson ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8',
+    'Cache-Control': 'private, no-store', 'Vary': 'Accept, Authorization', 'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'" };
+  const respond = (value, status = 200) => new Response(request.method === 'HEAD' ? null : value, { status, headers });
+  const unavailable = (status) => { headers['X-Robots-Tag'] = 'noindex, nofollow'; return respond(wantsJson
+    ? JSON.stringify({ error: 'unavailable' }) : '<!doctype html><html lang="ko"><meta charset="utf-8"><title>기록을 볼 수 없어요 — ReadingGo</title><main><h1>기록을 볼 수 없어요</h1><a href="/">ReadingGo</a></main></html>', status); };
+  if (!['GET', 'HEAD'].includes(request.method)) { headers.Allow = 'GET, HEAD'; return unavailable(405); }
+  if (!match || !PUBLIC_UUID.test(match[2])) return unavailable(404);
+  const [, type, id] = match;
+  let parent, rows;
+  try {
+    if (type === 'sentences') {
+      const sentence = await publicRecordRpc(request, env, 'sentence_public', { p_sentence_id: id });
+      if (!sentence || sentence.id !== id || sentence.parent?.id !== sentence.userBookId) return unavailable(404);
+      parent = sentence.parent; rows = [sentence];
+    } else {
+      parent = await publicRecordRpc(request, env, 'book_public', { p_user_book_id: id });
+      if (!parent || parent.id !== id) return unavailable(404);
+      rows = await publicRecordRpc(request, env, 'book_public_quotes', { p_user_book_id: id, p_sentence_id: null });
+      // Recheck after the second read: withdrawal must not return a stale parent.
+      parent = await publicRecordRpc(request, env, 'book_public', { p_user_book_id: id });
+      if (!parent || parent.id !== id) return unavailable(404);
+    }
+    if (!parent.book || !Array.isArray(rows)) return unavailable(404);
+    const canonical = url.origin + '/public/' + type + '/' + id;
+    const book = { title: parent.book.title || '', author: parent.book.author || '' };
+    const author = { displayName: parent.author?.displayName || '', handle: parent.author?.handle || '' };
+    const records = rows.slice(0, type === 'sentences' ? 1 : 50).filter(r => PUBLIC_UUID.test(r.id)
+      && (r.userBookId || r.user_book_id) === parent.id).map(r => {
+      const recordUrl = url.origin + '/public/sentences/' + r.id;
+      const source = { book_title: book.title, author: book.author, publisher: null, page: r.page ?? null };
+      const common = { source, source_url: null, canonical_url: recordUrl, rights: 'unknown', reuse_guidance: PUBLIC_REUSE };
+      return { id: r.id, canonical_url: recordUrl, content: [
+        { ...common, content_type: 'quote', text: String(r.text || '') },
+        ...(r.thought ? [{ ...common, content_type: 'own_thought', author, text: String(r.thought) }] : []),
+      ] };
+    });
+    if (type === 'sentences' && records.length !== 1) return unavailable(404);
+    const data = { type, canonical_url: canonical, book, author, records,
+      page_limit: type === 'sentences' ? 1 : 50, collection_complete: type === 'sentences' ? true : false,
+      source_url: null, rights: 'unknown', reuse_guidance: PUBLIC_REUSE, reuse_guidance_text: PUBLIC_GUIDANCE };
+    if (wantsJson) return respond(JSON.stringify(data));
+    const esc = storyEscape;
+    const meta = storyMetaTags({ title: book.title + ' — ReadingGo', description: author.displayName + '님의 공개 독서 기록', canonical, image: url.origin + '/assets/og-card.png' });
+    const articles = records.map(r => `<article>${r.content.map(c => `<section><h2>${c.content_type === 'quote' ? '인용' : '작성자의 생각'}</h2><p style="white-space:pre-wrap">${esc(c.text)}</p></section>`).join('')}<p>출처: ${esc(book.author)} · 《${esc(book.title)}》${r.content[0].source.page == null ? '' : ' · ' + esc(r.content[0].source.page) + '쪽'}</p><a href="${esc(r.canonical_url)}">문장 링크</a></article>`).join('');
+    return respond(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${meta}<link rel="alternate" type="application/json" href="${esc(canonical)}.json"><style>body{max-width:44rem;margin:2rem auto;padding:0 1rem;font-family:system-ui;line-height:1.7;overflow-wrap:anywhere}article{border-bottom:1px solid;padding:1rem 0}</style></head><body><main><h1>${esc(book.title)}</h1><p>${esc(book.author)} · 기록 작성자 ${esc(author.displayName)}</p>${articles}<p>한 화면에는 제한된 공개 기록만 표시합니다. 책 전문이나 전체 내보내기가 아닙니다.</p><p>${esc(PUBLIC_GUIDANCE)}</p><p>권리·라이선스: 확인되지 않음</p><a href="${esc(canonical)}.json">구조화된 공개 응답</a> · <a href="/">ReadingGo</a></main></body></html>`);
+  } catch { return unavailable(503); }
+}
+
 function storyEscape(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',

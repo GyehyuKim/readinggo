@@ -54,6 +54,20 @@ async function _bookPrivacyRun(target, visibility) {
   if (!id || !store || !store.myBooks) throw new Error(_bookPrivacyMessage);
   // Owner-only RPC must never be substituted with catalog identity or cached flags.
   const user = store.auth && await store.auth.currentUser();
+  // Public reshares use read-only, viewer-aware RPCs, never an owner mutation.
+  // Missing ownership is resolved by public lookup first; private/unknown stays guarded.
+  const ownerId = target.userId || target.user_id;
+  if (visibility === 'public' && !_bookPrivacyPending.has(user?.id + ':' + id) && (!user || !ownerId || ownerId !== user.id)) {
+    const parent = store.myBooks.publicBook && await store.myBooks.publicBook(id);
+    if (parent && parent.id === id) {
+      if (target.id) {
+        const rows = store.sentences?.publicByBook && await store.sentences.publicByBook(id, target.id);
+        if (!rows || !rows.some(r => r.id === target.id)) throw new Error(_bookPrivacyMessage);
+      }
+      return { id, visibility: 'public' };
+    }
+    if (ownerId && ownerId !== user?.id) throw new Error(_bookPrivacyMessage);
+  }
   if (!user) { _privacyToast('로그인과 책 이관을 완료한 뒤 다시 공유해 주세요.'); return false; }
   let row = _validBookState(await store.myBooks.getVisibility(id), id);
   const key = user.id + ':' + id;
@@ -88,6 +102,24 @@ const RG_SHARE_LINK = RG_SHARE_ORIGIN
   .replace(/^https?:\/\//, '').replace(/\/$/, '');
 const RG_SHARE_HANDLE = '@readinggo.app';
 const RG_SHARE_LINK_FULL = 'https://' + RG_SHARE_LINK;
+function publicShareUrl(target, type = 'sentences') {
+  const id = type === 'books' ? (target.userBookId || target.user_book_id || target.ubId) : target.id;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '')) return null;
+  return RG_SHARE_ORIGIN + '/public/' + type + '/' + id;
+}
+async function sharePublicRecordLink(target, type = 'sentences') {
+  if (!['books', 'sentences'].includes(type) || !await ensureBookVisibility(target)) return false;
+  const url = publicShareUrl(target, type);
+  if (!url) { _privacyToast('서버에 저장된 기록만 링크로 공유할 수 있어요.'); return false; }
+  try {
+    if (navigator.share) await navigator.share({ url });
+    else if (!await _copyText(url)) throw new Error('copy failed');
+    return true;
+  } catch { _privacyToast('책은 공개 상태예요. 공유는 완료되지 않았어요.'); return false; }
+}
+window.RG_publicShareUrl = publicShareUrl;
+window.RG_sharePublicRecordLink = sharePublicRecordLink;
+
 const RG_SHARE_FORMATS = Object.freeze({
   '1:1': Object.freeze({ width: 1080, height: 1080, filename: 'readinggo-sentence.png' }),
   '9:16': Object.freeze({ width: 1080, height: 1920, filename: 'readinggo-sentence-9x16.png' }),
@@ -125,7 +157,7 @@ function _normalizeSentence(s) {
 function buildShareText(s, opts) {
   const n = _normalizeSentence(s);
   const includeNote = !!(opts && opts.includeNote && n.note);
-  const tail = '\n\n📖 ReadingGo에서 내 한 문장 남기기\n' + RG_SHARE_LINK_FULL;
+  const tail = '\n\n📖 ReadingGo에서 내 한 문장 남기기\n' + (publicShareUrl(s) || RG_SHARE_LINK_FULL);
   if (n.kind === 'thought') {
     const src = [n.author, n.title ? '《' + n.title + '》' : ''].filter(Boolean).join(' ');
     const head = '💭 ' + n.text + (src ? '\n(' + src + '을 읽고)' : '');
