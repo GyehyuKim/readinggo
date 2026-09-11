@@ -709,7 +709,9 @@ const DataStore = {
         const prior = migrationId && _findSentence(s, migrationId);
         if (prior) {
           if (prior.user_book_id !== ub.id || prior.text !== text || prior.my_note !== (my_note ?? null)
-            || prior.page !== (typeof page === 'number' ? page : (ub.current_page || 0))
+            || prior.page !== (typeof page === 'number' ? page : null)
+            || prior.session_id !== (sessionId || null)
+            || prior.publishable_thought !== (publishable_thought ?? null)
             || (created_at != null && prior.created_at !== created_at)) throw new Error('idempotency_conflict');
           return { ...prior, visibility: _storedSentenceVisibility(ub.visibility) };
         }
@@ -718,7 +720,7 @@ const DataStore = {
         const row = {
           id: migrationId || _dsId('se'), user_book_id: ub.id, book_id: ub.book_id,
           session_id: sessionId || null,
-          page: typeof page === 'number' ? page : (ub.current_page || 0),
+          page: typeof page === 'number' ? page : null,
           text, my_note: my_note ?? null, publishable_thought: publishable_thought ?? null, kind: 'quote',
           visibility: checked.visibility, _guest: true, created_at: created_at ?? Date.now(),
         };

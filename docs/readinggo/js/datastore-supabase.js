@@ -987,11 +987,8 @@
       async publicSentences(userId) {
         return (await publicPages('sentences_public_feed', { p_owner_id: userId }, () => true, 50)).map(publicSentence);
       },
-      // 공개 스트릭(streak 테이블 select using(true)) — 타인 프로필 표시용 (#10)
-      async publicStreak(userId) {
-        const row = unwrap(await sb().from('streak').select('current').eq('user_id', userId).maybeSingle());
-        return row ? (row.current || 0) : 0;
-      },
+      // Personal aggregate is not a public projection (§7.0.1). null means unavailable, not zero.
+      async publicStreak(_userId) { return null; },
       // 타인 책장 전체 — 읽는 중 + 완독 (status 포함). 책장 필터용 (#4)
       async publicShelf(userId) {
         return (await publicPages('user_books_public', { p_owner_id: userId })).map(publicBook)
@@ -1169,47 +1166,7 @@
       },
       // 멤버 진척 그리드 — 진도·오늘불빛·최근 한 문장 (§5.3.1). villages.members 로직 재사용.
       async members(roomId) {
-        const today = _today();
-        const vRow = unwrap(await sb().from('villages').select('book_id').eq('id', roomId).maybeSingle());
-        const bookId = vRow && vRow.book_id;
-        const memberRows = unwrap(await sb().from('village_members')
-          .select('joined_at, user:users(id, handle, display_name, streak:streak(current))')
-          .eq('village_id', roomId)) || [];
-        if (!memberRows.length || !bookId) return memberRows;
-        const memberIds = memberRows.map(r => r.user && r.user.id).filter(Boolean);
-        if (!memberIds.length) return memberRows;
-        const ubRows = unwrap(await sb().from('user_books')
-          .select('id, user_id, current_page')
-          .eq('book_id', bookId).in('user_id', memberIds)) || [];
-        const userBookIds = ubRows.map(r => r.id);
-        // 오늘 어떤 책이든 기록했는지(스트릭 동일 기준 — 방 책 한정 X)는 reading_sessions 전체로 판정.
-        const todaySessions = memberIds.length
-          ? unwrap(await sb().from('reading_sessions').select('user_id').in('user_id', memberIds).eq('session_date', today)) || []
-          : [];
-        const todayUserSet = new Set(todaySessions.map(s => s.user_id));
-        const sentRows = userBookIds.length
-          ? unwrap(await sb().from('sentences_public')
-              .select('user_id, user_book_id, text, page')
-              .in('user_book_id', userBookIds)
-              .order('created_at', { ascending: false })
-              .limit(userBookIds.length * 5)) || []
-          : [];
-        const sentByUbId = {};
-        for (const s of sentRows) { if (!sentByUbId[s.user_book_id]) sentByUbId[s.user_book_id] = s; }
-        return memberRows.map(r => {
-          const u = r.user || {};
-          const ub = ubRows.find(x => x.user_id === u.id);
-          const sent = ub ? sentByUbId[ub.id] : null;
-          return {
-            ...r,
-            user: {
-              ...u,
-              cumulativePage: (ub && ub.current_page) || 0,
-              todayRecorded: todayUserSet.has(u.id),   // 오늘 어떤 책이든 기록 = ● (§5.3.1)
-              todaySentence: sent ? { text: sent.text, page: sent.page } : null,
-            },
-          };
-        });
+        return unwrap(await sb().rpc('room_members_public', { p_room_id: roomId })) || [];
       },
       // 토큰 URL 입장 미리보기 (§5.2) — invite_token 직접 조회(전체 스캔 없음).
       async findByToken(token) {
