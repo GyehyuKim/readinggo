@@ -653,6 +653,23 @@ const DataStore = {
 
   /* 한 문장 (sentences) ───────────────────────────── */
   sentenceConversations: {
+    savePair(sentenceId, { q, a, requestId }) {
+      if (!requestId || [q, a].some(v => typeof v !== 'string' || !v.trim() || Array.from(v).length > 4000)) throw new Error('invalid_conversation_pair');
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (!se) throw new Error('sentence_not_found');
+        const turns = se.conversation_turns || [];
+        const old = turns.filter(t => t.request_id === requestId);
+        if (old.length) {
+          if (old.length !== 2 || old[0].content !== q || old[1].content !== a) throw new Error('idempotency_conflict');
+          return old;
+        }
+        const pair = [q, a].map((content, i) => ({ id: window.crypto.randomUUID(), sentence_id: sentenceId, request_id: requestId,
+          role: i ? 'user' : 'assistant', content, created_at: new Date().toISOString() }));
+        se.conversation_turns = [...turns, ...pair];
+        return pair;
+      });
+    },
     list(sentenceId) {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);

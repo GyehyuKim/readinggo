@@ -446,9 +446,39 @@
 
     /* 한 문장 (sentences) */
     sentenceConversations: {
+      async savePair(sentenceId, { q, a, requestId }) {
+        if (!requestId || [q, a].some(v => typeof v !== 'string' || !v.trim() || Array.from(v).length > 4000)) throw new Error('invalid_conversation_pair');
+        const owner = await uid();
+        if (!owner) throw new Error('authentication_required');
+        const key = `rg_conversation_pending:${owner}:${sentenceId}`;
+        const pending = JSON.parse(localStorage.getItem(key) || 'null');
+        if (pending && (pending.requestId !== requestId || pending.q !== q || pending.a !== a)) throw new Error('conversation_pending_retry_required');
+        const receipt = JSON.parse(localStorage.getItem(`${key}:${requestId}`) || 'null');
+        if (receipt && (receipt.q !== q || receipt.a !== a)) throw new Error('idempotency_conflict');
+        const payload = pending || receipt || { requestId, q, a, turns: [q, a].map((content, i) => ({
+          id: window.crypto.randomUUID(), role: i ? 'user' : 'assistant', content, created_at: new Date().toISOString(),
+        })) };
+        localStorage.setItem(key, JSON.stringify(payload)); // durable before network; never erase an unknown outcome
+        const rows = unwrap(await sb().rpc('sentence_conversation_save_pair', { p_sentence_id: sentenceId, p_turns: payload.turns }));
+        if (!rows || rows.length !== 2 || payload.turns.some(t => !rows.some(r => r.id === t.id && r.content === t.content && r.role === t.role && r.sentence_id === sentenceId))) throw new Error('conversation_readback_failed');
+        localStorage.setItem(`${key}:${requestId}`, JSON.stringify(payload));
+        localStorage.removeItem(key);
+        return rows;
+      },
+      async importExisting(sentenceId, turns) {
+        for (let i = 0; i < turns.length; i += 100) {
+          const batch = turns.slice(i, i + 100).map(t => ({ id: t._migration_turn_id || t.id, role: t.role, content: t.content,
+            created_at: t.created_at == null ? null : new Date(t.created_at).toISOString() }));
+          const rows = unwrap(await sb().rpc('sentence_conversation_import', { p_sentence_id: sentenceId, p_turns: batch }));
+          if (!rows || rows.length !== batch.length || batch.some(t => !rows.some(r => r.id === t.id && r.sentence_id === sentenceId && r.role === t.role && r.content === t.content))) throw new Error('conversation_readback_failed');
+        }
+      },
       async list(sentenceId) {
+        const owner = await uid();
+        const pending = JSON.parse(localStorage.getItem(`rg_conversation_pending:${owner}:${sentenceId}`) || 'null');
+        if (pending) await A.sentenceConversations.savePair(sentenceId, pending);
         return unwrap(await sb().from('sentence_conversation_turns').select('id,sentence_id,role,content,created_at')
-          .eq('sentence_id', sentenceId).eq('user_id', await uid()).order('created_at')) || [];
+          .eq('sentence_id', sentenceId).eq('user_id', owner).order('turn_order')) || [];
       },
       async add(sentenceId, { role, content }) {
         if (!['user', 'assistant'].includes(role) || typeof content !== 'string' || !content.trim()

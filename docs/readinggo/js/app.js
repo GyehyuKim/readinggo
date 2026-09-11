@@ -124,15 +124,19 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
       ...ub,
       _migration_user_book_id: ub._remote_user_book_id || ub._migration_user_book_id || newMigrationId(),
       sentences: (Array.isArray(ub.sentences) ? ub.sentences : []).map((se) => (
-        se && se._guest && !se._migration_sentence_id ? { ...se, _migration_sentence_id: newMigrationId() } : se
+        se && se._guest ? { ...se, _migration_sentence_id: se._migration_sentence_id || newMigrationId(),
+          conversation_turns: (se.conversation_turns || []).map(t => ({ ...t, _migration_turn_id: t._migration_turn_id || (isUuid(t.id) ? t.id : newMigrationId()) })),
+        } : se
       )),
     }));
     const pending = { ...(state.pending || {}) };
     if (pending.book && pending.book.title && !pending.book.remote_user_book_id && !pending.book._migration_user_book_id) {
       pending.book = { ...pending.book, _migration_user_book_id: newMigrationId() };
     }
-    if (pending.sentence && pending.sentence.text && !pending.sentence._migration_sentence_id) {
-      pending.sentence = { ...pending.sentence, _migration_sentence_id: newMigrationId() };
+    if (pending.sentence && pending.sentence.text) {
+      pending.sentence = { ...pending.sentence, _migration_sentence_id: pending.sentence._migration_sentence_id || newMigrationId(),
+        conversation_turns: (pending.sentence.conversation_turns || []).map(t => ({ ...t, _migration_turn_id: t._migration_turn_id || (isUuid(t.id) ? t.id : newMigrationId()) })),
+      };
     }
     return { ...state, user_books: userBooks, pending };
   });
@@ -235,6 +239,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
             migrationId: se._migration_sentence_id, created_at: se.created_at,
             publishable_thought: se.publishable_thought ?? null,
           });
+          await DS.sentenceConversations.importExisting(se._migration_sentence_id, se.conversation_turns || []);
           syncedSentenceIds.add(se._migration_sentence_id);
         } catch (e) {
           migrationComplete = false;
@@ -300,6 +305,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
               migrationId: pend.sentence._migration_sentence_id, created_at: pend.sentence.created_at,
               my_note: pend.sentence.my_note ?? null, publishable_thought: pend.sentence.publishable_thought ?? null,
             });
+            await DS.sentenceConversations.importExisting(pend.sentence._migration_sentence_id, pend.sentence.conversation_turns || []);
             pendingSentenceSynced = true;
           } catch (e) { console.warn('[ReadingGo] pending 문장 백필 보류:', e.message); }
         }
@@ -373,24 +379,7 @@ function parseQAPairs(note) {
 // 동의 유저의 과거 대화(my_note)를 companion_sessions 로 1회 backfill (#394) — 해자 집계 채움.
 // 가드: 동의(yes)만(PIPA) + 기존 세션 0건일 때만(라이브 답변 이력 있으면 스킵 = 중복 방지).
 async function backfillCompanionSessions() {
-  const DS = window.SupabaseDataStore;
-  if (!DS || !(DS.companionSessions && DS.companionSessions.add)) return;
-  if (!(window.RG_consent && window.RG_consent.get() === 'yes')) return;
-  try {
-    const existing = (DS.companionSessions.countMine) ? await DS.companionSessions.countMine() : 1;
-    if (existing > 0) return; // 이미 세션 있음 → backfill 안 함
-    const mine = await DS.sentences.listMine().catch(() => []);
-    let n = 0;
-    for (const s of (mine || [])) {
-      if (!s || !s.my_note) continue;
-      const bookId = (s.user_book && s.user_book.book_id) || s.book_id || null;
-      for (const qa of parseQAPairs(s.my_note)) {
-        if (!qa.a) continue; // 답 없는 질문만 있는 노트는 세션 아님
-        try { await DS.companionSessions.add({ bookId, sentence: s.text, question: qa.q, answer: qa.a, lens: 'why' }); n++; } catch (e) {}
-      }
-    }
-    if (n) console.log('[ReadingGo] ✅ my_note → companion_sessions backfill: ' + n + '턴 (#394)');
-  } catch (e) { console.warn('[ReadingGo] companion_sessions backfill 실패:', e); }
+  // #1619: legacy my_note is owner-only raw data, never heuristically converted.
 }
 
 // #822: 쓰기 실패를 사용자에게 노출(silent 제거) + 세션 만료가 원인이면 복구.

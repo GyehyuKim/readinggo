@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { webcrypto } from 'node:crypto';
+const storage = new Map();
+globalThis.localStorage = { getItem:k=>storage.get(k)??null, setItem:(k,v)=>storage.set(k,v), removeItem:k=>storage.delete(k) };
+globalThis.window = { crypto:webcrypto, INITIAL_STATE:{book:null,myQuotes:[]} };
+await import('../docs/readinggo/js/datastore.js');
+const local = window.LocalDataStore;
+local.local.configure({storageKey:'rg_dev_review_persona_conversation',initialState:{user_books:[],settings:{},pending:{},streak:{},claps:{},bookmarks:{},wish_books:[]}});
+const book = local.myBooks.add({book:{title:'Synthetic'}});
+const sentence = local.sentences.add({userBookId:book.id,text:'Synthetic quote',my_note:'Q. legacy\nA. secret'});
+const pair = {q:'Question',a:'Answer',requestId:'stable-request'};
+local.sentenceConversations.savePair(sentence.id,pair);
+local.sentenceConversations.savePair(sentence.id,pair);
+assert.equal(local.sentenceConversations.list(sentence.id).length,2);
+assert.throws(()=>local.sentenceConversations.savePair(sentence.id,{...pair,a:'changed'}),/conflict/);
+assert.throws(()=>local.sentenceConversations.savePair(sentence.id,{...pair,a:''}));
+assert.equal(local.sentenceConversations.list(sentence.id).length,2);
+const remoteRows = new Map(); let lose=true; const calls=[];
+const client = {auth:{getSession:async()=>({data:{session:{user:{id:'owner'}}}})},rpc:async(name,args)=>{
+ calls.push({name,args}); const rows=args.p_turns.map(t=>({...t,sentence_id:args.p_sentence_id}));
+ for(const row of rows) remoteRows.set(row.id,row);
+ if(lose){lose=false;throw Error('lost response');} return {data:rows};
+},from:()=>({select(){return this;},eq(){return this;},order:async()=>({data:[...remoteRows.values()]})})};
+window.RG_SB={client:()=>client};
+await import('../docs/readinggo/js/datastore-supabase.js');
+const remote=window.SupabaseDataStore;
+await assert.rejects(remote.sentenceConversations.savePair('sentence',pair),/lost response/);
+const ids=[...remoteRows.keys()];
+assert.equal((await remote.sentenceConversations.list('sentence')).length,2); // reopen reconciles outbox
+assert.deepEqual([...remoteRows.keys()],ids);
+await remote.sentenceConversations.savePair('sentence',pair);
+assert.equal(remoteRows.size,2);
+await assert.rejects(remote.sentenceConversations.savePair('sentence',{...pair,a:'changed'}),/conflict/);
+await remote.sentenceConversations.importExisting('imported', [{id:'guest-id',role:'user',content:'Guest',created_at:0}]);
+assert.equal(calls.at(-1).args.p_turns[0].created_at,'1970-01-01T00:00:00.000Z');
+assert.equal(calls.at(-1).args.p_turns[0].id,'guest-id');
+console.log('PASS local atomic/replay/conflict; remote lost-response/reopen/replay; stable guest IDs/timestamp');

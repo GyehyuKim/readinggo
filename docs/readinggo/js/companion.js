@@ -151,7 +151,7 @@ function CompanionModal({ sentence, onClose }) {
   const initialExchanges = [];
   const [conversationReady, setConversationReady] = _useState(false);
   const conversationWrite = _useRef(false);
-  const pendingAssistant = _useRef(null);
+  const pendingRequest = _useRef(null);
   _useEffect(() => {
     let alive = true;
     Promise.resolve().then(() => DataStore.sentenceConversations.list(sentence.id)).then(turns => {
@@ -238,12 +238,9 @@ function CompanionModal({ sentence, onClose }) {
     const turn = ex[ex.length - 1];
     if (!sentence.id || !turn || !DataStore.sentenceConversations) return false;
     try {
-      if (pendingAssistant.current !== turn.q) {
-        await DataStore.sentenceConversations.add(sentence.id, { role: 'assistant', content: turn.q });
-        pendingAssistant.current = turn.q;
-      }
-      await DataStore.sentenceConversations.add(sentence.id, { role: 'user', content: turn.a });
-      pendingAssistant.current = null;
+      if (!pendingRequest.current) pendingRequest.current = window.crypto.randomUUID();
+      await DataStore.sentenceConversations.savePair(sentence.id, { ...turn, requestId: pendingRequest.current });
+      pendingRequest.current = null;
       return true;
     } catch (_) { return false; }
   };
