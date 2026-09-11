@@ -86,13 +86,15 @@ function rgRoomStats(members, book) {
   const total = (book && (book.total_pages || book.total)) || 0;
   const count = list.length;
   let todayCount = 0, pctSum = 0;
+  let activityKnown = count > 0, progressKnown = count > 0 && total > 0;
   list.forEach(m => {
     const u = m.user || m;
-    if (u.todayRecorded) todayCount++;
-    const page = u.cumulativePage || 0;
-    pctSum += total > 0 ? Math.min(100, Math.round((page / total) * 100)) : 0;
+    if (u.activityAvailable === false || typeof u.todayRecorded !== 'boolean') activityKnown = false;
+    if (u.todayRecorded === true) todayCount++;
+    if (u.cumulativePage == null) progressKnown = false;
+    else pctSum += total > 0 ? Math.min(100, Math.round((u.cumulativePage / total) * 100)) : 0;
   });
-  return { count, todayCount, avgPct: count ? Math.round(pctSum / count) : 0 };
+  return { count, todayCount: activityKnown ? todayCount : null, avgPct: progressKnown ? Math.round(pctSum / count) : null };
 }
 
 // 숲 한 문장 날짜 — Supabase created_at의 UTC 날짜를 로컬 timezone 변환 없이 고정 표기.
@@ -105,6 +107,7 @@ function rgForestSentenceDate(iso) {
 
 // ●●●●○○ 오늘 불빛 — 읽은 수만큼 채움(최대 8개 표시).
 function RoomTodayDots({ today, count }) {
+  if (today == null) return null;
   const cap = Math.min(8, Math.max(count || 0, 0));
   const on = Math.min(today || 0, cap);
   if (!cap) return null;
@@ -498,7 +501,7 @@ function MyRoomCard({ room, onOpen }) {
     let alive = true;
     Promise.resolve(DataStore.rooms.members(room.id))
       .then(ms => { if (alive) setStats(rgRoomStats(ms, book)); })
-      .catch(() => { if (alive) setStats({ count: 0, todayCount: 0, avgPct: 0 }); });
+      .catch(() => { if (alive) setStats(null); });
     return () => { alive = false; };
   }, [room.id]);
   const cnt = (stats && stats.count) || ((room.village_members && room.village_members[0] && room.village_members[0].count) || 0);
@@ -509,9 +512,9 @@ function MyRoomCard({ room, onOpen }) {
         <div className="rg-room-cardname">{room.name}</div>
         <div className="rg-room-cardline">
           <span>{cnt}명</span>
-          {stats ? <><span>·</span><span>오늘 {stats.todayCount}명</span><RoomTodayDots today={stats.todayCount} count={cnt} /></> : null}
+          {stats && stats.todayCount != null ? <><span>·</span><span>오늘 {stats.todayCount}명</span><RoomTodayDots today={stats.todayCount} count={cnt} /></> : null}
         </div>
-        {stats ? <div className="rg-room-cardpct">평균 진도 {stats.avgPct}%</div> : null}
+        {stats && stats.avgPct != null ? <div className="rg-room-cardpct">평균 진도 {stats.avgPct}%</div> : null}
       </div>
     </button>
   );
@@ -690,10 +693,11 @@ function rgActivePartIndex(parts) {
 }
 
 // 멤버 위치 vs 활성 구간 목표페이지 → 'done' | 'ontrack' | 'behind'.
-// 목표페이지 없으면(자유 구간) 항상 ontrack.
+// 비공개/미상 진도는 unavailable. 목표페이지 없는 공개 진도는 ontrack.
 function rgMemberPartStatus(cumulativePage, endPage) {
+  if (cumulativePage == null) return 'unavailable';
   if (endPage == null) return 'ontrack';
-  const page = cumulativePage || 0;
+  const page = cumulativePage;
   if (page >= endPage) return 'done';
   // 목표의 80% 이상이면 온트랙(거의 따라옴), 그 미만은 뒤처짐.
   return page >= endPage * 0.8 ? 'ontrack' : 'behind';
@@ -847,7 +851,7 @@ function RoomSchedule({ roomId, room, members, totalPages }) {
   // 활성 구간 기준 멤버 상태 집계.
   const statuses = mlist.map(m => {
     const u = m.user || m;
-    return { u, status: rgMemberPartStatus(u.cumulativePage || 0, active ? active.end_page : null) };
+    return { u, status: rgMemberPartStatus(u.cumulativePage, active ? active.end_page : null) };
   });
   const doneCount = statuses.filter(s => s.status === 'done').length;
   const behind = statuses.filter(s => s.status === 'behind');
@@ -869,7 +873,7 @@ function RoomSchedule({ roomId, room, members, totalPages }) {
           <div className="rg-part-active-goal">
             {active.end_page != null ? `목표 ~${active.end_page}쪽` : '목표 페이지 자유'}
           </div>
-          {active.end_page != null && mlist.length > 0 && (
+          {active.end_page != null && mlist.length > 0 && statuses.every(s => s.status !== 'unavailable') && (
             <div className="rg-part-progress">
               <div className="rg-part-progressbar">
                 <span style={{ width: `${mlist.length ? Math.round((doneCount / mlist.length) * 100) : 0}%` }} />
@@ -891,9 +895,9 @@ function RoomSchedule({ roomId, room, members, totalPages }) {
                   onClick={() => { if (u.handle && window.RG_openProfile) window.RG_openProfile(u.handle); }}>
                   {u.handle || u.display_name || '독자'}
                 </button>
-                <span className="rg-part-mempage">{u.cumulativePage || 0}{active.end_page != null ? `/${active.end_page}` : ''}쪽</span>
+                <span className="rg-part-mempage">{u.cumulativePage == null ? '진도 비공개' : `${u.cumulativePage}${active.end_page != null ? `/${active.end_page}` : ''}쪽`}</span>
                 <span className={'rg-part-badge rg-part-' + status}>
-                  {status === 'done' ? '완료' : status === 'behind' ? '뒤처짐' : '온트랙'}
+                  {status === 'unavailable' ? '확인 불가' : status === 'done' ? '완료' : status === 'behind' ? '뒤처짐' : '온트랙'}
                 </span>
                 {status === 'behind' && me && u.id && u.id !== me && (
                   cheered[u.id]
@@ -979,6 +983,8 @@ function RoomModal({ roomId, onClose }) {
         const u = s.user || {};
         return {
           id: s.id, page: s.page, q: s.text,
+          userBookId: s.userBookId || s.user_book_id || (s.user_book && s.user_book.id),
+          note: s.publishable_thought || '', publishable_thought: s.publishable_thought || '',
           nick: u.handle ? ('@' + u.handle) : '@익명',
           avatar: (u.display_name && u.display_name[0]) || window.rgIcon('user', 18),
           claps: s.clapCount,
@@ -1018,7 +1024,7 @@ function RoomModal({ roomId, onClose }) {
         {/* 1줄 요약 */}
         {stats && (
           <div className="rg-room-summary">
-            {stats.count}명 · 오늘 {stats.todayCount}명 읽음 · 평균 진도 {stats.avgPct}%
+            {stats.count}명{stats.todayCount != null ? ` · 오늘 ${stats.todayCount}명 읽음` : ''}{stats.avgPct != null ? ` · 평균 진도 ${stats.avgPct}%` : ''}
           </div>
         )}
 
@@ -1043,16 +1049,16 @@ function RoomModal({ roomId, onClose }) {
               <div className="rg-room-grid">
                 {members.map((m, i) => {
                   const u = m.user || {};
-                  const pct = total > 0 ? Math.min(100, Math.round(((u.cumulativePage || 0) / total) * 100)) : 0;
+                  const pct = u.cumulativePage != null && total > 0 ? Math.min(100, Math.round((u.cumulativePage / total) * 100)) : null;
                   return (
                     <button key={u.id || i} className="rg-room-membercard"
                       onClick={() => { if (u.handle && window.RG_openProfile) window.RG_openProfile(u.handle); }}>
                       <div className="rg-room-membertop">
                         <span className="rg-room-book-icon">{rgRoomBookIcon(pct)}</span>
-                        <span className="rg-room-light" style={{ color: u.todayRecorded ? 'var(--gold)' : 'var(--line)' }}>●</span>
+                        {u.activityAvailable !== false && typeof u.todayRecorded === 'boolean' && <span className="rg-room-light" style={{ color: u.todayRecorded ? 'var(--gold)' : 'var(--line)' }}>●</span>}
                       </div>
                       <div className="rg-room-membername">{u.handle || u.display_name || '독자'}</div>
-                      <div className="rg-room-memberpct">진도 {pct}%</div>
+                      <div className="rg-room-memberpct">{pct == null ? '진도 확인 불가' : `진도 ${pct}%`}</div>
                     </button>
                   );
                 })}
