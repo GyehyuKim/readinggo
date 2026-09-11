@@ -28,7 +28,7 @@ async function buildStateFromSupabase() {
     out.book = { id: '', title: '', author: '', pub: '', cur: 0, total: 0, days: 1, cover: '', fb: ['#9AA7B2', '#C7D0D8'], toc: [], _empty: true };
   }
   // 항상 설정(없으면 []) — 로그인 시 데모 시드(INITIAL_STATE.myQuotes)가 '내 것'으로 남는 문제 방지 (#332).
-  out.myQuotes = (Array.isArray(mine) ? mine : []).map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', createdAt: s.created_at || '', note: s.my_note || '', kind: s.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(s.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(s.visibility) === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
+  out.myQuotes = (Array.isArray(mine) ? mine : []).map(s => ({ id: s.id, text: s.text, bookId: (s.user_book && s.user_book.book_id) || s.book_id || '', bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '', page: s.page, when: '', createdAt: s.created_at || '', userBookId: s.user_book_id || s.userBookId || (s.user_book && s.user_book.id), publishable_thought: s.publishable_thought ?? s.thought ?? null, note: s.my_note || '', kind: s.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(s.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(s.visibility) === 'private' || !!s.is_private, notePrivate: !!s.note_private }));
   // 소셜 isMine 판정 + 스포일러 동기맵: 현재 사용자 + 내 책별 현재 페이지 preload
   try {
     const me = await window.RG_SB.myProfile();
@@ -224,10 +224,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
       const gsents = (ub.sentences || []).filter(se => se && se._guest)
         .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
       for (const se of gsents) {
-        if (window.RG_normalizeStoredSentenceVisibility(se.visibility) !== 'private' && !allowPublic) {
-          migrationComplete = false;
-          continue;
-        }
+        // Legacy visibility never promotes or blocks private import.
         if (!se._migration_sentence_id) {
           migrationComplete = false;
           continue;
@@ -235,7 +232,8 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
         try {
           await DS.sentences.importExisting({
             userBookId: remote.id, page: se.page, text: se.text, my_note: se.my_note || null,
-            kind: se.kind, visibility: se.visibility, migrationId: se._migration_sentence_id,
+            migrationId: se._migration_sentence_id, created_at: se.created_at,
+            publishable_thought: se.publishable_thought ?? null,
           });
           syncedSentenceIds.add(se._migration_sentence_id);
         } catch (e) {
@@ -295,11 +293,12 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
       if (remote && remote.id) {
         pendingBookRemoteId = remote.id;
         pendingBookSynced = true;
-        if (pend.sentence && pend.sentence.text && (window.RG_normalizeStoredSentenceVisibility(pend.sentence.visibility) === 'private' || allowPublic)) {
+        if (pend.sentence && pend.sentence.text) {
           try {
             await DS.sentences.importExisting({
               userBookId: remote.id, page: pend.sentence.page, text: pend.sentence.text,
-              visibility: pend.sentence.visibility, migrationId: pend.sentence._migration_sentence_id,
+              migrationId: pend.sentence._migration_sentence_id, created_at: pend.sentence.created_at,
+              my_note: pend.sentence.my_note ?? null, publishable_thought: pend.sentence.publishable_thought ?? null,
             });
             pendingSentenceSynced = true;
           } catch (e) { console.warn('[ReadingGo] pending 문장 백필 보류:', e.message); }
@@ -939,7 +938,7 @@ function App() {
   useEffect(() => {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).filter(q => q.id !== id) })); };
     const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).map(q => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
-    const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).map(q => q.id === d.id ? { ...q, note: d.note } : q) })); };
+    const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).map(q => q.id === d.id ? { ...q, ...(d.publishable_thought !== undefined ? { publishable_thought: d.publishable_thought } : { note: d.note }) } : q) })); };
     // 한 문장 본문·페이지 수정 (#683/#731) — SentenceActions.saveEdit 의 rg:sentence-updated 반영.
     const onUpd = (e) => { const d = e && e.detail; if (!d || !d.id) return; setAppState(s => ({ ...s, myQuotes: (s.myQuotes || []).map(q => q.id === d.id ? { ...q, text: d.text, page: d.page } : q) })); };
     // 책 상세에서 한 문장 추가 (#584) — 새 문장을 myQuotes 최상단에 반영(중복 가드).
@@ -995,7 +994,7 @@ function App() {
               id: r.id, text: r.text, bookId: r.book_id || '',
               bookTitle: r.book_title || (bk && bk.id === r.book_id ? bk.title : ''),
               page: r.page, when: '', createdAt: r.created_at || '',
-              note: r.my_note || '', kind: r.kind || 'quote',
+              userBookId: r.user_book_id || r.userBookId || (r.user_book && r.user_book.id), publishable_thought: r.publishable_thought ?? r.thought ?? null, note: r.my_note || '', kind: r.kind || 'quote',
               visibility: 'public', isPrivate: false, notePrivate: false,
             };
           }),
@@ -1073,7 +1072,7 @@ function App() {
         if (alive) setUgcTermsRequired(!ugcAccepted && hasPendingPublicUgc());
         // 비공개 게스트 데이터는 동의 전에도 이전하고, 공개 문장만 동의 전까지 로컬에 보존한다.
         await syncPendingToSupabase({ allowPublic: ugcAccepted });
-        backfillCompanionSessions();     // 과거 my_note → companion_sessions 1회 채움(#394, 비차단)
+        // Ambiguous legacy my_note remains owner-only; no inferred migration.
         const next = await buildStateFromSupabase();
         // PostHog 유저 식별 (analytics.md §3.2·§5.4) — 선택 동의('yes')한 로그인 유저만 person profile 연결.
         // 거부·미질문이면 식별 생략(익명 분석은 유지) — PIPA 비필수 분리(#752).
@@ -1163,7 +1162,7 @@ function App() {
         window.localStorageAdapter.mutate(s => {
           s.pending = s.pending || {};
           s.pending.book = { isbn13: b.isbn13 || '', title: b.title || '', author: b.author || '', total_pages: b.total || 0, current_page: b.cur || 0, cover_url: b.cover || '' };
-          s.pending.sentence = { text: sentence, page: qPage, visibility };
+          s.pending.sentence = { text: sentence, page: qPage, created_at: Date.now() };
           return s;
         });
       } catch (e) {}
@@ -1266,7 +1265,7 @@ function App() {
           bookTitle: (savedReadbackBook && savedReadbackBook.title) || (ns.book && ns.book.title) || '',
           author: (savedReadbackBook && savedReadbackBook.author) || (ns.book && ns.book.author) || '',
           page: savedReadbackRow.page,
-          note: savedReadbackRow.my_note || '',
+          userBookId: savedReadbackRow.user_book_id || savedReadbackRow.userBookId || (savedReadbackRow.user_book && savedReadbackRow.user_book.id), publishable_thought: savedReadbackRow.publishable_thought ?? savedReadbackRow.thought ?? null, note: savedReadbackRow.my_note || '',
           notePrivate: !!savedReadbackRow.note_private,
           note_private: !!savedReadbackRow.note_private,
           kind: savedReadbackRow.kind || kind || 'quote',
@@ -1280,7 +1279,7 @@ function App() {
           ...s,
           streak: authoritativeStreak,
           myQuotes: Array.isArray(mineDb)
-            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', note: x.my_note || '', kind: x.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(x.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(x.visibility) === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
+            ? mineDb.map(x => ({ id: x.id, text: x.text, bookId: (x.user_book && x.user_book.book_id) || x.book_id || '', bookTitle: (x.user_book && x.user_book.book && x.user_book.book.title) || '', page: x.page, when: '', createdAt: x.created_at || '', userBookId: x.user_book_id || x.userBookId || (x.user_book && x.user_book.id), publishable_thought: x.publishable_thought ?? x.thought ?? null, note: x.my_note || '', kind: x.kind || 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(x.visibility), isPrivate: window.RG_normalizeStoredSentenceVisibility(x.visibility) === 'private' || !!x.is_private, notePrivate: !!x.note_private }))
             : s.myQuotes,
         }));
         if (completion && completion.onSuccess) completion.onSuccess({ reflectionSentence, currentPage: authoritativeCurrentPage });
