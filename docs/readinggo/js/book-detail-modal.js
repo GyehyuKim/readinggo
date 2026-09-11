@@ -11,7 +11,7 @@ const _bookSentenceLength = (value) => Array.from(String(value == null ? '' : va
 
 const _storyButton = { minHeight:48, border:'none', borderRadius:12, padding:'10px 14px', fontWeight:800, cursor:'pointer' };
 const _storyPublicQuote = (q) => q && q.id && q.visibility === 'public' && !q.isPrivate;
-const _storyPublicNote = (q) => _storyPublicQuote(q) && !q.notePrivate && !q.note_private && !!String(q.note || q.my_note || '').trim();
+const _storyPublicNote = (q) => _storyPublicQuote(q) && !!String(q.publishable_thought || '').trim();
 const _storyBucket = (count) => count <= 0 ? '0' : count <= 3 ? '1_3' : count <= 6 ? '4_6' : '7_plus';
 const _storyLink = (slug) => {
   const origin = ((window.RG_CONFIG && (window.RG_CONFIG.SHARE_ORIGIN || window.RG_CONFIG.API_ORIGIN)) || location.origin).replace(/\/$/, '');
@@ -188,6 +188,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
       const store = window.DataStore;
       const publishedPages = pages();
       if (!(store && store.readingStories)) throw new Error('reading_story_store_unavailable');
+      if (!await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title })) return;
       let merged;
       if (dirty && story && story.status === 'published') {
         if (!store.readingStories.republish) throw new Error('reading_story_store_unavailable');
@@ -225,6 +226,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
   };
   const copyLink = async () => {
     if (!story || story.status !== 'published') return;
+    if (!await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title })) return;
     try { await navigator.clipboard.writeText(_storyLink(story.slug)); showToast('공개 링크를 복사했어요'); if (window.rgTrack) window.rgTrack('reading_story_link_copied', { entry:'editor' }); }
     catch (e) { setError('링크를 복사하지 못했어요. 브라우저 권한을 확인해 주세요.'); }
   };
@@ -236,6 +238,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
       const noteItem = items.find(x => x.type === 'note' && x.sentenceId === quote.id);
       const blob = await window.renderSentenceCardBlob({ ...quote, bookId:book.id, bookTitle:book.title, author:book.author, note:noteItem ? quote.note : '', entry:'reading_story' }, { format, includeNote:!!noteItem });
       const file = new File([blob], format === '9:16' ? 'readinggo-story-9x16.png' : 'readinggo-story-square.png', { type:'image/png' });
+      if (!await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title })) return;
       let method = 'download';
       if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], url:story && story.status === 'published' ? _storyLink(story.slug) : undefined }); method = 'web_share'; }
       else { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast('PNG 이미지를 저장했어요'); }
@@ -279,7 +282,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}><button type="button" aria-pressed={items.some(x=>x.type==='quote'&&x.sentenceId===q.id)} onClick={()=>items.some(x=>x.type==='quote'&&x.sentenceId===q.id)?removeItem(items.findIndex(x=>x.type==='quote'&&x.sentenceId===q.id)):addItem('quote',q.id)} style={{..._storyButton,minHeight:44,background:'var(--brand-soft)',color:'var(--brand-3)'}}>문장 {items.some(x=>x.type==='quote'&&x.sentenceId===q.id)?'선택됨':'선택'}</button>
             {_storyPublicNote(q) && <button type="button" aria-pressed={items.some(x=>x.type==='note'&&x.sentenceId===q.id)} onClick={()=>items.some(x=>x.type==='note'&&x.sentenceId===q.id)?removeItem(items.findIndex(x=>x.type==='note'&&x.sentenceId===q.id)):addItem('note',q.id)} style={{..._storyButton,minHeight:44,background:'var(--paper-2)',color:'var(--ink-2)'}}>생각 {items.some(x=>x.type==='note'&&x.sentenceId===q.id)?'선택됨':'선택'}</button>}</div>
           </div>)}
-          <h3 style={{fontSize:15,margin:'20px 0 8px'}}>카드 순서</h3>{items.length===0?<p style={{fontSize:13,color:'var(--ink-3)'}}>아직 선택한 카드가 없어요.</p>:items.map((item,i)=>{const q=byId.get(item.sentenceId)||{};return <div key={item.type+item.sentenceId} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center',padding:'9px 10px',background:'var(--paper-2)',borderRadius:12,marginBottom:6}}><div><b>{item.type==='quote'?'문장':'내 생각'}</b><div style={{fontSize:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:300}}>{item.type==='quote'?q.text:q.note}</div>{item.type==='quote'&&<label style={{display:'inline-flex',alignItems:'center',minHeight:44,gap:6,fontSize:12}}><input type="radio" name="story-cover" checked={coverId===item.sentenceId} onChange={()=>{setCoverId(item.sentenceId);mark();}} /> 대표 카드</label>}</div><div style={{display:'flex'}}><button aria-label={`${i+1}번 카드를 위로`} disabled={i===0} onClick={()=>move(i,-1)} style={{width:44,height:44}}>↑</button><button aria-label={`${i+1}번 카드를 아래로`} disabled={i===items.length-1} onClick={()=>move(i,1)} style={{width:44,height:44}}>↓</button><button aria-label={`${i+1}번 카드 제거`} onClick={()=>removeItem(i)} style={{width:44,height:44}}>×</button></div></div>})}
+          <h3 style={{fontSize:15,margin:'20px 0 8px'}}>카드 순서</h3>{items.length===0?<p style={{fontSize:13,color:'var(--ink-3)'}}>아직 선택한 카드가 없어요.</p>:items.map((item,i)=>{const q=byId.get(item.sentenceId)||{};return <div key={item.type+item.sentenceId} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center',padding:'9px 10px',background:'var(--paper-2)',borderRadius:12,marginBottom:6}}><div><b>{item.type==='quote'?'문장':'내 생각'}</b><div style={{fontSize:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:300}}>{item.type==='quote'?q.text:q.publishable_thought}</div>{item.type==='quote'&&<label style={{display:'inline-flex',alignItems:'center',minHeight:44,gap:6,fontSize:12}}><input type="radio" name="story-cover" checked={coverId===item.sentenceId} onChange={()=>{setCoverId(item.sentenceId);mark();}} /> 대표 카드</label>}</div><div style={{display:'flex'}}><button aria-label={`${i+1}번 카드를 위로`} disabled={i===0} onClick={()=>move(i,-1)} style={{width:44,height:44}}>↑</button><button aria-label={`${i+1}번 카드를 아래로`} disabled={i===items.length-1} onClick={()=>move(i,1)} style={{width:44,height:44}}>↓</button><button aria-label={`${i+1}번 카드 제거`} onClick={()=>removeItem(i)} style={{width:44,height:44}}>×</button></div></div>})}
           {items.some(x=>x.type==='quote')&&!items.some(x=>x.type==='note')&&<p style={{fontSize:12,color:'var(--brand-3)'}}>내 생각을 더하면 나만의 독서 이야기가 돼요.</p>}
           <label style={{display:'block',fontWeight:800,fontSize:13,marginTop:18}}>마무리 <span style={{color:'var(--ink-3)'}}>(선택)</span><textarea value={outro} maxLength={1200} onChange={e=>{setOutro(e.target.value);mark();}} rows={3} placeholder="누구에게 추천하고 싶은지 남겨보세요" style={{width:'100%',boxSizing:'border-box',marginTop:7,padding:12,border:'1.5px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
         </>}
@@ -295,6 +298,31 @@ function ReadingStoryPages({ pages, book }) {
 }
 
 /* ── BookDetailModal ─────────────────────────────────────── */
+function BookPrivacyControl({ book }) {
+  const [state, setState] = _useState(null);
+  const [busy, setBusy] = _useState(false);
+  const lock = _useRef(false);
+  _useEffect(() => {
+    let alive = true;
+    Promise.resolve().then(() => window.DataStore.myBooks.getVisibility(book.ubId))
+      .then(row => { if (alive) setState(row); }).catch(() => { if (alive) setState(null); });
+    return () => { alive = false; };
+  }, [book.ubId]);
+  const change = async visibility => {
+    if (lock.current) return;
+    lock.current = true; setBusy(true);
+    const row = await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title }, visibility);
+    setState(row || null); setBusy(false); lock.current = false;
+  };
+  return <fieldset disabled={busy} style={{margin:16,padding:12,border:'1px solid var(--line)',borderRadius:'var(--r-sm)'}}>
+    <legend>책 공개 설정</legend>
+    <p role="status">{state ? (state.visibility === 'public' ? '공개' : '비공개') : '공개 설정 확인 필요'}</p>
+    {['private', 'public'].map(value => <label key={value} style={{display:'inline-flex',gap:8,padding:12}}>
+      <input type="radio" name={'book-privacy-'+book.ubId} checked={state?.visibility === value} onChange={() => change(value)} />{value === 'public' ? '공개' : '비공개'}
+    </label>)}
+  </fieldset>;
+}
+
 function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 실 book item: { id, title, author, pub, cover, fb, total, isbn, cur, status, rating, comment }
   const prog = { cur: book.cur || 0 };
@@ -734,6 +762,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           <p style={{fontSize:13, color:'var(--ink-2)', fontWeight:700, margin:'0 0 12px'}}>{[book.author, book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
         </div>
 
+        {book.ubId && <BookPrivacyControl book={book} />}
         <div data-testid="book-detail-content" style={{padding:'16px 20px', maxHeight:'50vh', overflowY:'auto', display:'flex', flexDirection:'column'}}>
           {/* 완독 정보 */}
           {bookshelfEntry && (
@@ -1124,7 +1153,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                         삭제는 rg:sentence-removed 이벤트로 목록 갱신(removedIds 리스너). blind 와 무관하게 내 문장 관리 가능. */}
                     {q.id && window.SentenceActions && (
                       <SentenceActions
-                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, note: q.note || q.my_note || '', notePrivate: q.notePrivate, note_private: q.note_private, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
+                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, userBookId: book.ubId, publishable_thought: q.publishable_thought, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
                         mine fav={!!(bmarks && bmarks.has(q.id))}
                         onRemoved={(rid) => setRemovedIds(m => ({ ...m, [rid]: true }))} />
                     )}

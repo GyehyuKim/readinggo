@@ -16,6 +16,72 @@
    이미지를 내보내느니 표지를 빼는 쪽이 안전하다. (worker 이미지 프록시는 과한 스코프 →
    후속 검토.) */
 
+// One owner-book mutation identity survives unknown outcomes and retries.
+const _bookPrivacyPending = new Map();
+const _bookPrivacyBusy = new Map();
+const _bookPrivacyMessage = '책 공개 설정을 확인하지 못했어요. 다시 확인해 주세요.';
+function _privacyToast(message) { if (typeof showToast === 'function') showToast(message); }
+function _validBookState(row, id) {
+  if (!row || row.id !== id || !['public', 'private'].includes(row.visibility) || !Number.isSafeInteger(row.revision)) throw new Error(_bookPrivacyMessage);
+  return row;
+}
+function _confirmBookPublication(target, visibility) {
+  return new Promise(resolve => {
+    const trigger = document.activeElement;
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('aria-labelledby', 'rg-book-consent-title');
+    dialog.setAttribute('aria-describedby', 'rg-book-consent-body');
+    Object.assign(dialog.style, { border: 'none', borderRadius: 'var(--r-md)', padding: '24px', maxWidth: 'min(420px, 90vw)', background: 'var(--card)', color: 'var(--ink)' });
+    const title = document.createElement('h2'); title.id = 'rg-book-consent-title';
+    title.textContent = visibility === 'public' ? '이 책의 모든 문장과 내 생각을 공개할까요?' : '이 책을 비공개로 바꿀까요?';
+    const body = document.createElement('p'); body.id = 'rg-book-consent-body';
+    body.textContent = '내 책 · ' + (target.bookTitle || target.title || '') + '\n' + (visibility === 'public'
+      ? '이 문장뿐 아니라 이 책에 지금까지 저장한 모든 문장과 내 생각, 앞으로 추가할 기록도 누구나 볼 수 있어요. 책 설정에서 다시 비공개로 바꿀 수 있어요. AI 대화와 미분리된 이전 노트는 공개하지 않아요.'
+      : '책·문장·이야기 링크의 새 접근이 차단돼요. 이미 외부에 저장하거나 게시한 사본은 회수할 수 없어요.');
+    const finish = value => { dialog.close(); dialog.remove(); if (trigger && trigger.focus) trigger.focus(); resolve(value); };
+    const yes = document.createElement('button'); yes.textContent = visibility === 'public' ? '책을 공개하고 공유 계속하기' : '비공개로 변경';
+    const no = document.createElement('button'); no.textContent = '취소';
+    [yes, no].forEach((b, i) => { b.type = 'button'; Object.assign(b.style, { minHeight: '48px', padding: '12px', border: 'none', borderRadius: 'var(--r-sm)', background: i ? 'var(--brand-soft)' : 'var(--brand)', color: i ? 'var(--brand-3)' : 'var(--card)' }); });
+    yes.addEventListener('click', () => finish(true)); no.addEventListener('click', () => finish(false));
+    dialog.addEventListener('cancel', e => { e.preventDefault(); finish(false); });
+    dialog.appendChild(title); dialog.appendChild(body); dialog.appendChild(yes); dialog.appendChild(no);
+    document.body.appendChild(dialog); dialog.showModal(); no.focus();
+  });
+}
+async function _bookPrivacyRun(target, visibility) {
+  const store = window.DataStore;
+  const id = target.userBookId || target.user_book_id || target.ubId;
+  if (!id || !store || !store.myBooks) throw new Error(_bookPrivacyMessage);
+  // Owner-only RPC must never be substituted with catalog identity or cached flags.
+  const user = store.auth && await store.auth.currentUser();
+  if (!user) { _privacyToast('로그인과 책 이관을 완료한 뒤 다시 공유해 주세요.'); return false; }
+  let row = _validBookState(await store.myBooks.getVisibility(id), id);
+  const key = user.id + ':' + id;
+  let pending = _bookPrivacyPending.get(key);
+  if (row.visibility !== visibility) {
+    if (pending && pending.visibility !== visibility) throw new Error(_bookPrivacyMessage);
+    if (!pending) {
+      if (!await _confirmBookPublication(target, visibility)) return false;
+      pending = { visibility, requestId: window.crypto.randomUUID(), expectedRevision: row.revision };
+      _bookPrivacyPending.set(key, pending);
+    }
+    await store.myBooks.setVisibility(id, visibility, { requestId: pending.requestId, expectedRevision: pending.expectedRevision });
+  }
+  row = _validBookState(await store.myBooks.getVisibility(id), id);
+  if (row.visibility !== visibility) throw new Error(_bookPrivacyMessage);
+  if ((await store.auth.currentUser())?.id !== user.id) throw new Error(_bookPrivacyMessage);
+  _bookPrivacyPending.delete(key);
+  return row;
+}
+function ensureBookVisibility(target, visibility = 'public') {
+  const id = target.userBookId || target.user_book_id || target.ubId;
+  if (_bookPrivacyBusy.has(id)) return _bookPrivacyBusy.get(id).then(row => row && row.visibility === visibility ? row : false);
+  const task = _bookPrivacyRun(target, visibility).catch(() => { _privacyToast(_bookPrivacyMessage); return false; })
+    .finally(() => _bookPrivacyBusy.delete(id));
+  _bookPrivacyBusy.set(id, task); return task;
+}
+window.RG_ensureBookVisibility = ensureBookVisibility;
+
 const RG_SHARE_ORIGIN = ((window.RG_CONFIG && (window.RG_CONFIG.SHARE_ORIGIN || window.RG_CONFIG.API_ORIGIN)) || location.origin)
   .replace(/\/$/, '');
 const RG_SHARE_LINK = RG_SHARE_ORIGIN
@@ -50,9 +116,8 @@ function _normalizeSentence(s) {
   const title = (s.bookTitle || (bookMatch ? bk.title : '') || '').trim();
   const author = (s.author || (bookMatch ? bk.author : '') || '').trim();
   const cover = (bookMatch ? (bk.cover || bk.cover_url) : '') || '';
-  const notePrivate = s.notePrivate === true || s.note_private === true;
-  const directNote = String(s.note || '').trim();
-  const note = notePrivate ? '' : (directNote || String(s.my_note || '').trim());
+  const notePrivate = false;
+  const note = String(s.publishable_thought || '').trim();
   return { text, kind, title, author, cover, note, notePrivate };
 }
 
@@ -372,6 +437,7 @@ function _trackSentenceShare(event, props) {
 
 /* 준비된 이미지를 보내거나 저장한다. 성공 이벤트는 실제 OS 공유 완료/다운로드 뒤에만 보낸다. */
 async function _sendPreparedSentence(s, format, blob, includeNote, entry) {
+  if (!await ensureBookVisibility(s)) return false;
   format = normalizeShareFormat(format);
   const layout = RG_SHARE_FORMATS[format];
   const text = buildShareText(s, { includeNote });
@@ -384,7 +450,7 @@ async function _sendPreparedSentence(s, format, blob, includeNote, entry) {
         _trackSentenceShare('sentence_share_sent', { format, method: 'web_share', entry: entry || '' });
         return true;
       } catch (e) {
-        if (e && e.name === 'AbortError') return false;
+        if (e && e.name === 'AbortError') { toast('책은 공개 상태예요. 공유는 완료되지 않았어요.'); return false; }
         console.warn('[ReadingGo] navigator.share 실패 → 폴백:', e && e.message);
       }
     }
@@ -471,7 +537,7 @@ function shareSentenceWithFormatChoice(s) {
     Object.assign(actions.style, { display: 'grid', gap: '8px', marginTop: '12px' });
     const guidance = document.createElement('p');
     Object.assign(guidance.style, { margin: '10px 0 4px', color: 'var(--ink-2)', fontSize: '13px', lineHeight: '1.5' });
-    guidance.textContent = '이미지를 올린 뒤 ReadingGo 링크를 Instagram 링크 스티커에 붙여 넣으세요.';
+    guidance.textContent = '내 생각 포함은 이미지 구성만 바꿔요. 공개 책의 생각은 공개 대상이에요. 책·문장 전용 공개 링크는 아직 제공하지 않아요.';
     const focusableButtons = [];
     let settled = false;
     let selectedFormat = '1:1';
@@ -493,8 +559,8 @@ function shareSentenceWithFormatChoice(s) {
       resolve(result === true);
     };
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') { event.preventDefault(); finish(null); return; }
-      if (event.key !== 'Tab') return;
+      if (event.key === 'Escape') { event.preventDefault(); if (!busy) finish(null); return; }
+      if (busy || event.key !== 'Tab') return;
       const enabledButtons = focusableButtons.filter((button) => !button.disabled);
       const current = enabledButtons.indexOf(document.activeElement);
       if (event.shiftKey && current <= 0) {
@@ -548,6 +614,7 @@ function shareSentenceWithFormatChoice(s) {
       const button = addButton(label, formats, format === selectedFormat);
       button.setAttribute('aria-pressed', String(format === selectedFormat));
       button.addEventListener('click', () => {
+        if (busy) return;
         selectedFormat = format;
         Array.from(formats.children).forEach((item) => {
           const selected = item === button;
@@ -571,23 +638,17 @@ function shareSentenceWithFormatChoice(s) {
       busy = false; send.disabled = false;
       if (sent) finish(true);
     });
-    const copy = addButton('ReadingGo 링크 복사', actions, false);
-    copy.addEventListener('click', async () => {
-      const copied = await _copyText(RG_SHARE_LINK_FULL);
-      if (!copied) return;
-      _trackSentenceShare('sentence_share_sent', { format: selectedFormat, method: 'clipboard', entry: (s && s.entry) || '' });
-      const toast = typeof showToast === 'function' ? showToast : () => {};
-      toast('ReadingGo 링크를 복사했어요');
-    });
+    const personal = addButton('개인 배경화면 저장 (공개하지 않음)', actions, false);
+    personal.addEventListener('click', () => { if (!busy && previewBlob) _downloadBlob(previewBlob, RG_SHARE_FORMATS[selectedFormat].filename); });
     const cancel = addButton('취소', actions, false);
-    cancel.addEventListener('click', () => finish(false));
+    cancel.addEventListener('click', () => { if (!busy) finish(false); });
     cancel.style.background = 'var(--card-soft)';
     cancel.style.color = 'var(--ink-2)';
     dialog.appendChild(title); dialog.appendChild(description); dialog.appendChild(formats); dialog.appendChild(preview);
     if (normalized.note) dialog.appendChild(noteLabel);
     dialog.appendChild(guidance); dialog.appendChild(actions);
     overlay.appendChild(dialog); document.body.appendChild(overlay);
-    overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(null); });
+    overlay.addEventListener('click', (event) => { if (event.target === overlay && !busy) finish(null); });
     document.addEventListener('keydown', onKeyDown);
     squareButton.focus();
     renderPreview();
