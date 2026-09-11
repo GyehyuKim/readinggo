@@ -27,8 +27,15 @@ const query = {
 const client = {
   auth: { getSession: async () => ({ data: { session: { user: { id: userId } } } }) },
   from(table) {
-    assert.equal(table, 'sentences_public');
+    assert.equal(table, 'user_books');
     return query;
+  },
+  rpc(name, args) {
+    assert.equal(name, 'sentences_public_feed');
+    const page = args.p_offset === 0 ? rows.map((row) => ({ ...row, userId: 'other', userBookId: 'ub',
+      bookId, text: row.id, createdAt: '2026-01-01T00:00:00Z', clapCount: Number.isFinite(Number(row.clap_count?.[0]?.count)) ? Number(row.clap_count[0].count) : 0,
+      parent: { id: 'ub', book: {}, author: {} } })) : [];
+    return Promise.resolve({ data: page, error: null });
   },
 };
 const sandbox = {
@@ -41,7 +48,7 @@ vm.runInContext(adapterSource, sandbox);
 
 const normalized = await sandbox.window.SupabaseDataStore.sentences.byBook(bookId, { limit: 50, sort: 'likes' });
 assert.deepEqual(
-  normalized.map((row) => row.clapCount),
+  Array.from(normalized, (row) => row.clapCount),
   [3, 0, 0, 0],
   'byBook은 문자열·null·누락·비숫자 좋아요 수를 유한한 숫자로 정규화한다',
 );

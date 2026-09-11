@@ -4,6 +4,7 @@ import fs from 'node:fs';
 const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const migration = read('docs/readinggo/supabase/49_ugc_moderation.sql');
 const hardening = read('docs/readinggo/supabase/50_ugc_moderation_hardening.sql');
+const bookPrivacy = read('docs/readinggo/supabase/65_book_privacy_foundation.sql');
 const supa = read('docs/readinggo/js/datastore-supabase.js');
 const local = read('docs/readinggo/js/datastore.js');
 const moderation = read('docs/readinggo/js/moderation.js');
@@ -58,7 +59,8 @@ const ugcRequired = home.indexOf("window.dispatchEvent(new CustomEvent('rg:ugc-t
 const checkinPersistence = home.indexOf('checkinResult = onCheckin(', ugcPreflight);
 assert.ok(ugcPreflight >= 0 && ugcRequired > ugcPreflight && checkinPersistence > ugcRequired,
   'public check-in must preflight terms before persistence');
-assert.ok(card.includes("error.message !== 'ugc_terms_required'"), 'visibility UI must not move before a rejected public update');
+assert.match(bookPrivacy, /p_visibility='public'[\s\S]*moderation_terms_accepted\(auth\.uid\(\)\)/, '책 공개 전환은 서버에서 현재 UGC 동의를 검증한다');
+assert.match(card, /userBookId: item\.userBookId[\s\S]*publishable_thought: item\.publishable_thought/, '문장 공유는 부모 책 ID와 분리된 공개 생각만 전달한다');
 assert.ok(admin.includes('moderationReports') && admin.includes('moderationAction'), 'admin moderation queue missing');
 assert.ok(admin.includes('moderationReview') && admin.includes('검토 시작'), 'reviewed-state transition missing');
 assert.ok(guidelines.includes('성적이거나') && guidelines.includes('신고와 차단'), 'public community guidelines incomplete');
@@ -67,11 +69,11 @@ assert.ok(hardening.includes('moderation_guard_public_profile_write'), 'public p
 assert.ok(hardening.includes('moderation_guard_public_review_write'), 'public review writes need a DB consent/suspension guard');
 assert.ok(hardening.includes("where status in ('open', 'reviewed')"), 'only active reports may be unique');
 assert.ok(hardening.includes("on conflict (reporter_id, target_type, target_id) where status in ('open', 'reviewed')"), 'dismissed/actioned reports must create a new open report');
-assert.ok(app.includes("RG_normalizeStoredSentenceVisibility(se.visibility) !== 'private' && !allowPublic"), 'public guest sentences must remain local until consent');
+assert.ok(app.includes('Legacy visibility never promotes or blocks private import'), 'legacy child visibility must not promote or block private guest migration');
 assert.ok(app.includes("pendingBookSynced && (!pend.sentence || !pend.sentence.text || pendingSentenceSynced)"), 'pending book marker must survive sentence failure');
 assert.ok(app.includes('pb.remote_user_book_id'), 'partial retry must reuse the already-created remote book');
 assert.ok(app.includes('syncedSentenceIds.has(se._migration_sentence_id)'), 'guest sentences without local ids must clear only after their migration UUID succeeds');
 assert.ok(supa.includes('if (migrationUuid) ins.id = migrationUuid'), 'guest user_books retries must reuse a client-persisted UUID');
-assert.ok(supa.includes('if (migrationUuid) payload.id = migrationUuid'), 'guest sentence retries must reuse a client-persisted UUID');
+assert.match(supa, /p_sentence_id: migrationId/, 'guest sentence retries must reuse a client-persisted UUID');
 
 console.log('✅ UGC moderation contract passed');

@@ -1,5 +1,4 @@
 -- #1619 unconditional parent gate; private conversation never enters story output.
-begin;
 create or replace function public.reading_story_publish(p_story_id uuid)
 returns jsonb
 language plpgsql
@@ -151,6 +150,3 @@ end;
 $$;
 revoke all on function public.reading_story_public(text) from public;
 grant execute on function public.reading_story_public(text) to anon, authenticated;
-
-
-commit;

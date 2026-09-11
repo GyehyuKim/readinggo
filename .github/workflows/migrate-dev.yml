@@ -225,3 +225,34 @@ jobs:
               raise SystemExit(f'reading story role matrix failed ({error.code}): {detail}')
           print('reading story DEV role matrix passed and rolled back')
           PY
+      - name: Verify final book privacy role matrix with rollback
+        if: inputs.migration == '70_sentence_conversation_reliability.sql'
+        env:
+          DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.error, urllib.request
+          from pathlib import Path
+          files = ['book-privacy.sql', 'book-privacy-import.sql', 'book-privacy-retained.sql',
+                   'book-privacy-rooms.sql']
+          dev_url = os.environ['DEV_SUPABASE_URL'].rstrip('/')
+          match = re.fullmatch(r'https://([a-z0-9]+)\.supabase\.co', dev_url)
+          if not match:
+              raise SystemExit('DEV_SUPABASE_URL is not a canonical Supabase project URL')
+          endpoint = f'https://api.supabase.com/v1/projects/{match.group(1)}/database/query'
+          for filename in files:
+              path = Path('tests/sql') / filename
+              sql = path.read_text()
+              executable = re.sub(r'(?m)^\s*(?:--|\\).*$', '', sql)
+              if not re.search(r'(?is)^\s*begin;.*rollback;\s*$', executable):
+                  raise SystemExit(f'{path} must be transaction-scoped and end in rollback')
+              request = urllib.request.Request(endpoint, data=json.dumps({'query': sql}).encode(), headers={
+                  'Authorization': f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+                  'Content-Type': 'application/json', 'User-Agent': 'readinggo-dev-migration/1.0'}, method='POST')
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response: json.load(response)
+              except urllib.error.HTTPError as error:
+                  raise SystemExit(f'{path} failed ({error.code}): {error.read().decode(errors="replace")[:1000]}')
+          print('final book privacy DEV role matrix passed and rolled back')
+          PY

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 const values = new Map();
 globalThis.localStorage = { getItem: k => values.get(k) ?? null, setItem: (k,v) => values.set(k,v), removeItem: k => values.delete(k) };
@@ -36,6 +37,7 @@ window.RG_SB = { client: () => ({ rpc: async (name,args) => {
     return { data: { ...state, replayed: true, appliedRevision: 1 } };
   }
   if (name === 'book_public_quotes') return { data: [] };
+  if (name === 'sentence_import_private') return { data: { id: args.p_sentence_id, user_book_id: args.p_user_book_id, created_at: args.p_created_at } };
   throw new Error('Unexpected RPC');
 } }) };
 await import('../docs/readinggo/js/datastore-supabase.js');
@@ -48,6 +50,13 @@ await assert.rejects(remote.myBooks.setVisibility('book', 'public', { requestId:
 await assert.rejects(remote.myBooks.setVisibility('book', 'followers'), /invalid_visibility_request/);
 state.visibility = 'unexpected';
 await assert.rejects(remote.myBooks.getVisibility('book'), /book_visibility_unknown/);
+state.visibility = 'private';
+await remote.sentences.importExisting({ userBookId: 'book', migrationId: 'guest-sentence', text: 'Guest quote', created_at: 0 });
+assert.equal(calls.findLast(call => call.name === 'sentence_import_private').args.p_created_at, '1970-01-01T00:00:00.000Z');
+await assert.rejects(remote.sentences.importExisting({ userBookId: 'book', migrationId: 'bad-time', text: 'Guest quote', created_at: Number.NaN }), /invalid_import_timestamp/);
 await remote.sentences.publicByBook('book', 'quote');
-assert.deepEqual(calls.at(-1), { name: 'book_public_quotes', args: { p_user_book_id: 'book', p_sentence_id: 'quote' } });
+assert.deepEqual(calls.at(-1), { name: 'book_public_quotes', args: { p_user_book_id: 'book', p_sentence_id: 'quote', p_limit: 50, p_offset: 0 } });
+const remoteSource = readFileSync(new URL('../docs/readinggo/js/datastore-supabase.js', import.meta.url), 'utf8');
+assert.match(remoteSource, /async remove\(userBookId\)[\s\S]*delete\(\)\.eq\('id', userBookId\)[\s\S]*select\('id'\)\.maybeSingle\(\)[\s\S]*book_delete_not_confirmed[\s\S]*A\.profile\.update/,
+  '책 삭제는 성공 readback 뒤에만 활성 선택을 바꾼다');
 console.log('OK: book privacy defaults, inheritance, projections, replay, lost response, and conversation separation');

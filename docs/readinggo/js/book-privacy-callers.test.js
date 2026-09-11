@@ -8,12 +8,13 @@ const companion = source('companion.js');
 test('conversation caller stores private roles, never rewrites legacy note', async () => {
   const calls = [];
   const sentence = { id: 'sentence-1', note: 'ambiguous Q. legacy', publishable_thought: 'explicit' };
-  const context = { sentence, pendingAssistant: { current: null }, DataStore: { sentenceConversations: { add: async (id, turn) => calls.push({ id, ...turn }) } } };
+  const context = { sentence, pendingRequest: { current: null }, window: { crypto: { randomUUID: () => 'request-1' } },
+    DataStore: { sentenceConversations: { savePair: async (id, turn) => calls.push({ id, ...turn }) } } };
   vm.createContext(context);
   const body = companion.slice(companion.indexOf('  const persist = async'), companion.indexOf('  // 내 감상만 저장'));
   vm.runInContext(body + '\nglobalThis.persist = persist;', context);
   assert.equal(await context.persist([{ q: 'assistant question', a: 'private response' }]), true);
-  assert.deepEqual(calls, [{ id: 'sentence-1', role: 'assistant', content: 'assistant question' }, { id: 'sentence-1', role: 'user', content: 'private response' }]);
+  assert.deepEqual(calls, [{ id: 'sentence-1', q: 'assistant question', a: 'private response', requestId: 'request-1' }]);
   assert.equal(sentence.note, 'ambiguous Q. legacy');
   assert.equal(sentence.publishable_thought, 'explicit');
 });

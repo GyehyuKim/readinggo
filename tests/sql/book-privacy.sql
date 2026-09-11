@@ -2,6 +2,7 @@
 -- Role fixtures and all writes roll back. This file is not production migration SQL.
 begin;
 do $$
+<<privacy_test>>
 declare
  owner_id uuid:='16190001-0000-4000-8000-000000000001';
  book_id uuid; ub uuid; sentence_id uuid; result jsonb;
@@ -23,8 +24,8 @@ begin
  if result->>'revision'<>'1' then raise exception 'revision_failed'; end if;
  if exists(select 1 from public.book_public_quotes(ub) where thought is not null) then raise exception 'legacy_note_leak'; end if;
  update public.sentences set publishable_thought='Explicit thought' where id=sentence_id;
- insert into public.sentence_conversation_turns(sentence_id,user_id,role,content)
- values(sentence_id,owner_id,'assistant','Private assistant');
+ perform * from public.sentence_conversation_import(sentence_id,
+  '[{"id":"16190001-0000-4000-8000-000000000088","role":"assistant","content":"Private assistant"}]');
  if (select thought from public.book_public_quotes(ub))<>'Explicit thought' then raise exception 'explicit_thought_missing'; end if;
  perform public.book_set_visibility(ub,'private',1,gen_random_uuid());
  result:=public.book_set_visibility(ub,'public',0,request_id);
@@ -51,5 +52,15 @@ begin
  exception when insufficient_privilege then null; end;
  reset role;
  if (select my_note from public.sentences where id=sentence_id)<>'Q. secret A. secret' then raise exception 'legacy_data_changed'; end if;
+ reset role; perform set_config('request.jwt.claim.sub',owner_id::text,true); set local role authenticated;
+ -- Publication history and private conversations must cascade with the deleted owner book only.
+ perform public.book_set_visibility(ub,'public',2,gen_random_uuid());
+ delete from public.user_books where id=ub;
+ reset role;
+ if exists(select 1 from public.book_visibility_requests where user_book_id=ub)
+   or exists(select 1 from public.sentence_conversation_turns c where c.sentence_id=privacy_test.sentence_id) then
+  raise exception 'book_delete_privacy_children_remain'; end if;
+ if not exists(select 1 from public.users where id=owner_id) or not exists(select 1 from public.books where id=book_id) then
+  raise exception 'book_delete_removed_unrelated_rows'; end if;
 end $$;
 rollback;

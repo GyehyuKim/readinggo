@@ -8,8 +8,9 @@ function harness({ visibility='private', fail=false, consent=true }={}) {
   let row={id:'ub',visibility,revision:4}; const calls=[];
   const window={crypto:{randomUUID:()=> 'retry-id'},DataStore:{auth:{currentUser:async()=>({id:'owner'})},myBooks:{
     getVisibility:async()=>{calls.push('read');return {...row};},
-    setVisibility:async(id,v,opts)=>{calls.push({...opts});if(fail){fail=false;throw Error('lost');}row={id,visibility:v,revision:5};}
-  }}};
+    setVisibility:async(id,v,opts)=>{calls.push({...opts});if(fail){fail=false;throw Error('lost');}row={id,visibility:v,revision:5};},
+    publicBook:async(id)=>{calls.push('public');return row.visibility==='public'?{id}:null;}
+  },sentences:{publicByBook:async()=>[]}}};
   const ctx=vm.createContext({window,location:{origin:'https://example.test'},console});
   vm.runInContext(source,ctx);
   vm.runInContext('_confirmBookPublication = async () => '+consent,ctx);
@@ -17,11 +18,11 @@ function harness({ visibility='private', fail=false, consent=true }={}) {
 }
 test('private requires consent, exact CAS identity and readback',async()=>{
  const h=harness();const result=await h.window.RG_ensureBookVisibility({userBookId:'ub'});
- assert.equal(result.visibility,'public');assert.deepEqual(JSON.parse(JSON.stringify(h.calls)),['read',{requestId:'retry-id',expectedRevision:4},'read']);
+ assert.equal(result.visibility,'public');assert.deepEqual(JSON.parse(JSON.stringify(h.calls)),['public','read',{requestId:'retry-id',expectedRevision:4},'read','public']);
 });
 test('cancel never writes; public never repeats consent',async()=>{
- const h=harness({consent:false});assert.equal(await h.window.RG_ensureBookVisibility({userBookId:'ub'}),false);assert.equal(h.calls.length,1);
- const p=harness({visibility:'public',consent:false});assert.equal((await p.window.RG_ensureBookVisibility({userBookId:'ub'})).visibility,'public');assert.equal(p.calls.length,2);
+ const h=harness({consent:false});assert.equal(await h.window.RG_ensureBookVisibility({userBookId:'ub'}),false);assert.deepEqual(h.calls,['public','read']);
+ const p=harness({visibility:'public',consent:false});assert.equal((await p.window.RG_ensureBookVisibility({userBookId:'ub'})).visibility,'public');assert.deepEqual(p.calls,['public']);
 });
 test('unknown blocks then retries same identifier and revision',async()=>{
  const h=harness({fail:true});assert.equal(await h.window.RG_ensureBookVisibility({userBookId:'ub'}),false);

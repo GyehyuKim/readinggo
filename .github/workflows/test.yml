@@ -114,6 +114,11 @@ jobs:
           node tests/ugc-sync.test.mjs
           node tests/turnstile-retry.test.mjs
           node tests/wiki-ask-response.test.mjs
+          node tests/book-privacy-adapters.test.mjs
+          node tests/book-privacy-public-readers.test.mjs
+          node tests/book-privacy-room-adapter.test.mjs
+          node tests/conversation-reliability.test.mjs
+          node --test docs/readinggo/js/book-privacy-callers.test.js docs/readinggo/js/book-privacy-ui.test.js docs/readinggo/js/public-projection-ui.test.js docs/readinggo/js/share-card.test.js docs/readinggo/js/public-share-links.test.mjs worker/public-record-routes.test.mjs
           cd docs/readinggo && npm run test:analytics
 
   boot-smoke:

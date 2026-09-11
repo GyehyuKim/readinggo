@@ -1,6 +1,5 @@
 -- #1619 foundation. Apply only with coordinated client cutover; old public reads fail closed.
 -- No legacy note is classified or copied. Existing IDs/text/timestamps remain unchanged.
-begin;
 alter table public.user_books add column if not exists visibility text not null default 'private'
   check (visibility in ('public','private'));
 alter table public.user_books add column if not exists visibility_revision bigint not null default 0;
@@ -8,7 +7,7 @@ alter table public.sentences add column if not exists publishable_thought text
   check (publishable_thought is null or char_length(publishable_thought)<=1000);
 
 create table if not exists public.book_visibility_requests (
-  user_book_id uuid not null references public.user_books(id),
+  user_book_id uuid not null references public.user_books(id) on delete cascade,
   request_id uuid not null,
   expected_revision bigint not null,
   visibility text not null,
@@ -21,7 +20,7 @@ revoke all on public.book_visibility_requests from public, anon, authenticated;
 
 create table if not exists public.sentence_conversation_turns (
   id uuid primary key default gen_random_uuid(),
-  sentence_id uuid not null references public.sentences(id),
+  sentence_id uuid not null references public.sentences(id) on delete cascade,
   user_id uuid not null references public.users(id),
   role text not null check(role in ('user','assistant')),
   content text not null check(char_length(content) between 1 and 4000),
@@ -168,4 +167,3 @@ language sql stable security definer set search_path=public,pg_temp as $$
 $$;
 revoke all on function public.book_public(uuid),public.book_public_quotes(uuid,uuid) from public;
 grant execute on function public.book_public(uuid),public.book_public_quotes(uuid,uuid) to anon,authenticated,service_role;
-commit;

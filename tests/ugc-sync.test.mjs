@@ -101,6 +101,7 @@ function harness(state, options = {}) {
         return saved;
       },
     },
+    sentenceConversations: { importExisting: async () => [] },
     activeBook: { set: async (id) => {
       calls.active.push(id);
       if (options.failActiveOnce && !failed.has('active-once')) {
@@ -124,7 +125,7 @@ function harness(state, options = {}) {
   return { run: fn, state: () => state, calls, remoteBooks, remoteWishes, remoteSentences };
 }
 
-// Private UGC migrates without public consent; public/followers remain retryable until consent.
+// Guest migration creates a private parent; legacy child visibility never blocks or promotes migration.
 {
   const h = harness({ user_books: [{ id: 'local-book', book: { isbn13: '9780000000001', title: '책', author: '작가' }, sentences: [
     { text: '비공개', visibility: 'private', _guest: true },
@@ -132,14 +133,10 @@ function harness(state, options = {}) {
     { text: '팔로워', visibility: 'followers', _guest: true },
   ] }], wish_books: [], pending: {} });
   await h.run({ allowPublic: false });
-  assert.deepEqual(h.calls.sentences.map(x => x.text), ['비공개']);
-  assert.equal(h.state().user_books[0].sentences[0]._guest, undefined);
-  assert.equal(h.state().user_books[0].sentences[1]._guest, true);
-  assert.equal(h.state().user_books[0].sentences[2]._guest, true);
+  assert.deepEqual(h.calls.sentences.map(x => x.text), ['비공개', '공개', '팔로워']);
+  assert.equal(h.calls.adds.length, 1, '세 레거시 child를 하나의 신규 private 부모로 이관');
   await h.run({ allowPublic: true });
   assert.deepEqual(h.calls.sentences.map(x => x.text), ['비공개', '공개', '팔로워']);
-  assert.equal(h.state().user_books[0].sentences[1]._guest, undefined);
-  assert.equal(h.state().user_books[0].sentences[2]._guest, undefined);
   assert.equal(h.calls.adds.length, 1, 'consent retry must reuse the remote book');
 }
 
@@ -238,11 +235,11 @@ function harness(state, options = {}) {
     failBookTitlesOnce: ['재시도 책'], failWishOnce: true,
   });
   await h.run();
-  assert.equal(h.state().user_books[0].sentences[0]._guest, undefined);
+  assert.equal(h.remoteSentences.some(x => x.text === '성공 문장'), true, '성공 sibling은 원격 private import로 보존');
   assert.equal(h.state().user_books[1].sentences[0]._guest, true);
   assert.deepEqual(h.state().wish_books, ['wish-ok', 'wish-retry']);
   await h.run();
-  assert.equal(h.state().user_books[1].sentences[0]._guest, undefined);
+  assert.equal(h.remoteSentences.filter(x => x.text === '재시도 문장').length, 1, '실패 sibling은 재시도에서 한 번만 보존');
   assert.equal(h.remoteBooks.filter(x => x.book.isbn13 === '601').length, 1, 'successful sibling must not duplicate on retry');
   assert.equal(h.calls.wishAdds.length, 2);
 }
@@ -293,7 +290,7 @@ function harness(state, options = {}) {
   await h.run();
   assert.equal(h.remoteBooks.length, 1, 'lost book response must not duplicate user_books');
   assert.equal(h.remoteBooks[0].status, 'aborted');
-  assert.equal(h.state().user_books[0].sentences[0]._guest, undefined);
+  assert.equal(h.remoteSentences.filter(x => x.text === '응답 유실 문장').length, 1, '책 응답 유실 재시도 뒤 문장도 한 번만 보존');
 }
 
 {
@@ -307,7 +304,7 @@ function harness(state, options = {}) {
   assert.equal(h.state().user_books[0].sentences[0]._guest, true);
   await h.run();
   assert.equal(h.remoteSentences.length, 1, 'lost sentence response must reuse the same sentence PK');
-  assert.equal(h.state().user_books[0].sentences[0]._guest, undefined);
+  assert.equal(h.state().user_books[0].sentences[0]._migration_sentence_id, h.remoteSentences[0].id, '응답 유실 조정 뒤 원본과 원격 identity가 일치');
 }
 
 // Identical id-less sentences keep independent migration IDs and success markers.
@@ -318,11 +315,11 @@ function harness(state, options = {}) {
     sentences: [structuredClone(duplicate), structuredClone(duplicate)],
   }] }, { failSentenceAttemptNumbers: [2] });
   await h.run();
-  assert.equal(h.state().user_books[0].sentences[0]._guest, undefined);
+  assert.equal(h.remoteSentences.length, 1, '동일 문장 중 첫 identity만 성공');
   assert.equal(h.state().user_books[0].sentences[1]._guest, true);
   await h.run();
   assert.equal(h.remoteSentences.length, 2);
-  assert.equal(h.state().user_books[0].sentences[1]._guest, undefined);
+  assert.notEqual(h.remoteSentences[0].id, h.remoteSentences[1].id, '동일 본문도 독립 migration identity 보존');
 }
 
 // Canonical UUIDs work without ISBN; unknown wish fallback and different canonical editions never merge.

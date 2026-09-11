@@ -868,10 +868,8 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     if (!sentence || !sentence.id || !share) return;
     return share({
       ...sentence,
-      note: sentence.note || '',
-      my_note: sentence.note || '',
-      notePrivate: sentence.notePrivate,
-      note_private: sentence.note_private,
+      note: sentence.publishable_thought || '',
+      publishable_thought: sentence.publishable_thought || '',
       entry: 'post_save',
     });
   };

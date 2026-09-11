@@ -1,5 +1,12 @@
 -- #1619: immutable identities, atomic private turn batches, owner/parent fences.
-begin;
+alter table public.book_visibility_requests
+  drop constraint if exists book_visibility_requests_user_book_id_fkey,
+  add constraint book_visibility_requests_user_book_id_fkey foreign key (user_book_id)
+    references public.user_books(id) on delete cascade;
+alter table public.sentence_conversation_turns
+  drop constraint if exists sentence_conversation_turns_sentence_id_fkey,
+  add constraint sentence_conversation_turns_sentence_id_fkey foreign key (sentence_id)
+    references public.sentences(id) on delete cascade;
 alter table public.sentence_conversation_turns add column if not exists turn_order bigint generated always as identity;
 create or replace function public.sentence_conversation_import(p_sentence_id uuid,p_turns jsonb)
 returns setof public.sentence_conversation_turns
@@ -50,4 +57,3 @@ create policy conversation_owner on public.sentence_conversation_turns for all t
  using(user_id=auth.uid() and exists(select 1 from public.sentences s join public.user_books b on b.id=s.user_book_id
  where s.id=sentence_id and s.user_id=auth.uid() and b.user_id=auth.uid()))
  with check(false);
-commit;

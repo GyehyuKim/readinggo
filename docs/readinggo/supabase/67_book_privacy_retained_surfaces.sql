@@ -1,6 +1,5 @@
 -- #1619: append-only retained-surface cutover. Deploy with adapter cutover.
 -- Bounds below are operational pagination, NOT a copyright safe-harbor.
-begin;
 create or replace function public.sentence_public_allowed(p_sentence_id uuid)
 returns boolean language sql stable security definer set search_path=public,pg_temp as $$
  select exists(select 1 from public.sentences s join public.user_books ub
@@ -244,5 +243,3 @@ begin
 end $$;
 revoke all on function public.reading_story_report(text,text,text) from public,anon;
 grant execute on function public.reading_story_report(text,text,text) to authenticated;
-
-commit;

@@ -25,6 +25,15 @@ function _validBookState(row, id) {
   if (!row || row.id !== id || !['public', 'private'].includes(row.visibility) || !Number.isSafeInteger(row.revision)) throw new Error(_bookPrivacyMessage);
   return row;
 }
+async function _validatePublicTarget(store, target, id) {
+  const parent = store.myBooks.publicBook && await store.myBooks.publicBook(id);
+  if (!parent || parent.id !== id) throw new Error(_bookPrivacyMessage);
+  if (target.id) {
+    const rows = store.sentences?.publicByBook && await store.sentences.publicByBook(id, target.id);
+    if (!rows || !rows.some(r => r.id === target.id)) throw new Error(_bookPrivacyMessage);
+  }
+  return parent;
+}
 function _confirmBookPublication(target, visibility) {
   return new Promise(resolve => {
     const trigger = document.activeElement;
@@ -58,14 +67,7 @@ async function _bookPrivacyRun(target, visibility) {
   // Missing ownership is resolved by public lookup first; private/unknown stays guarded.
   const ownerId = target.userId || target.user_id;
   if (visibility === 'public' && !_bookPrivacyPending.has(user?.id + ':' + id) && (!user || !ownerId || ownerId !== user.id)) {
-    const parent = store.myBooks.publicBook && await store.myBooks.publicBook(id);
-    if (parent && parent.id === id) {
-      if (target.id) {
-        const rows = store.sentences?.publicByBook && await store.sentences.publicByBook(id, target.id);
-        if (!rows || !rows.some(r => r.id === target.id)) throw new Error(_bookPrivacyMessage);
-      }
-      return { id, visibility: 'public' };
-    }
+    try { await _validatePublicTarget(store, target, id); return { id, visibility: 'public' }; } catch (e) {}
     if (ownerId && ownerId !== user?.id) throw new Error(_bookPrivacyMessage);
   }
   if (!user) { _privacyToast('로그인과 책 이관을 완료한 뒤 다시 공유해 주세요.'); return false; }
@@ -84,6 +86,7 @@ async function _bookPrivacyRun(target, visibility) {
   row = _validBookState(await store.myBooks.getVisibility(id), id);
   if (row.visibility !== visibility) throw new Error(_bookPrivacyMessage);
   if ((await store.auth.currentUser())?.id !== user.id) throw new Error(_bookPrivacyMessage);
+  if (visibility === 'public') await _validatePublicTarget(store, target, id);
   _bookPrivacyPending.delete(key);
   return row;
 }

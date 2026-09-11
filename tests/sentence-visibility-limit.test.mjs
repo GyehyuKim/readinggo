@@ -18,9 +18,8 @@ vm.runInContext(source, sandbox);
 
 const ds = sandbox.window.DataStore;
 const ub = ds.myBooks.add({ book: { id: 'book-1', title: '테스트 책' }, status: 'reading' });
-const scopes = ['public', 'followers', 'private'];
+const scopes = ['private'];
 for (const visibility of scopes) {
-  ds.settings.update({ default_sentence_visibility: visibility });
   for (const length of [200, 201, 1000]) {
     const row = ds.sentences.add({ userBookId: ub.id, text: `  ${'가'.repeat(length)}  `, visibility: visibility === 'private' ? 'public' : 'private' });
     assert.equal(Array.from(row.text).length, length, `${visibility} ${length}자 저장`);
@@ -34,7 +33,9 @@ for (const visibility of scopes) {
 }
 ds.settings.update({ default_sentence_visibility: 'private' });
 const private1000 = ds.sentences.add({ userBookId: ub.id, text: '가'.repeat(1000), visibility: 'private' });
-assert.equal(ds.sentences.setVisibility(private1000.id, { visibility: 'followers' }).visibility, 'followers', '1000자 공개범위 변경 허용');
+assert.equal(ds.sentences.setVisibility, undefined, '문장별 공개범위 변경은 제거');
+ds.myBooks.setVisibility(ub.id, 'public', { requestId: 'publish', expectedRevision: 0 });
+assert.equal(ds.sentences.listByBook(ub.id).find(row => row.id === private1000.id).visibility, 'public', '1000자 문장도 부모 책 공개를 상속');
 assert.equal(Array.from(ds.sentences.updateText(private1000.id, '가'.repeat(1001)).text).length, 1000, '본문 편집도 앞 1000자로 정규화');
 const checkedLong = sandbox.window.RG_validateSentenceText('😀'.repeat(1001), 'followers');
 assert.equal(checkedLong.truncated, true, '공통 validator는 절단 여부를 반환');
@@ -42,9 +43,8 @@ assert.equal(checkedLong.originalLength, 1001, '공통 validator는 원래 Unico
 assert.equal(Array.from(checkedLong.text).length, 1000, '공통 validator는 이모지 경계를 보존해 절단');
 
 const supabaseSource = fs.readFileSync(path.join(root, 'docs/readinggo/js/datastore-supabase.js'), 'utf8');
-assert.match(supabaseSource, /validateSentenceText\(text, sentenceVisibility\)/, 'Supabase insert 사전 검증');
-assert.match(supabaseSource, /select\('visibility'\)[\s\S]+validateSentenceText\(text, current && current\.visibility\)/, 'Supabase 본문 편집 사전 검증');
-assert.match(supabaseSource, /select\('text'\)[\s\S]+validateSentenceText\(current && current\.text, patch\.visibility\)/, 'Supabase visibility 변경 사전 검증');
+assert.match(supabaseSource, /validateSentenceText\(text, parent\.visibility\)/, 'Supabase insert는 부모 책 상태로 검증');
+assert.match(supabaseSource, /validateSentenceText\(text, 'private'\)/, 'Supabase 본문 편집은 길이 계약을 검증');
 
 const migration = fs.readFileSync(path.join(root, 'docs/readinggo/supabase/53_sentence_length_1000_all_visibility.sql'), 'utf8');
 assert.match(migration, /drop constraint if exists sentences_text_len/i, '기존 visibility별 제약 교체');

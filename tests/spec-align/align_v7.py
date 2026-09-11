@@ -222,7 +222,7 @@ INVARIANTS = [
         ["book-info-modal.js"], r"mySents\.map"),
     # #610 표면 통일 락 — 홈·책장 내 문장 카드도 공용 SentenceActions 경유(자체 버튼 렌더 금지).
     ("C", "present", "홈 '이 책 한 문장' 카드 SentenceActions 경유 (#610 표면 통일)",
-        ["home.js"], r"<SentenceActions sentence=\{\{ id: q\.id"),
+        ["home.js"], r"<SentenceActions sentence=\{\{ \.\.\.q, id: q\.id"),
     ("C", "present", "책장 BookDetailModal 한 문장 카드 SentenceActions 경유 (#610 표면 통일)",
         ["book-detail-modal.js"], r"<SentenceActions"),
     # ── 2단 동의 게이팅 (analytics.md §5.4, #752) — 비필수(리플레이·식별)는 'yes'만. PIPA 회귀 락 ──
@@ -230,8 +230,8 @@ INVARIANTS = [
         ["components.js"], r"RG_applyConsent[\s\S]{0,260}startSessionRecording[\s\S]{0,160}stopSessionRecording"),
     ("C", "present", "PostHog identify는 선택 동의('yes')한 로그인 유저만 — 식별 게이팅 (#752)",
         ["app.js"], r"RG_consent\.get\(\) === 'yes'[\s\S]{0,80}posthog\.identify"),
-    ("C", "present", "LLM 대화 backfill은 선택 동의('yes')만 (#394·#752)",
-        ["app.js"], r"RG_consent[\s\S]{0,40}=== 'yes'[\s\S]{0,200}backfill|backfillCompanionSessions[\s\S]{0,260}RG_consent[\s\S]{0,40}=== 'yes'"),
+    ("C", "present", "레거시 my_note 대화는 휴리스틱 backfill 없이 owner-only 보존 (#1619)",
+        ["app.js"], r"backfillCompanionSessions[\s\S]{0,180}legacy my_note is owner-only raw data, never heuristically converted"),
 
     # ── D: Phase 4에서 스트릭 만회는 물리 삭제, 마일스톤 회고는 유지 ──────
     ("D", "absent", "스트릭 복구 정책·DataStore 계약 제거",

@@ -1,5 +1,4 @@
 -- #1619 private import and retained reader completion. No legacy raw note publication.
-begin;
 create or replace function public.sentence_import_private(
  p_user_book_id uuid,p_sentence_id uuid,p_text text,p_page integer default null,
  p_session_id uuid default null,p_my_note text default null,p_thought text default null,
@@ -68,12 +67,16 @@ returns setof jsonb language sql stable security definer set search_path=public,
  order by ub.id
  limit least(50,greatest(1,coalesce(p_limit,20))) offset greatest(0,coalesce(p_offset,0));
 $$;
-create or replace function public.book_public_quotes(p_user_book_id uuid,p_sentence_id uuid default null)
+drop function if exists public.book_public_quotes(uuid,uuid);
+create or replace function public.book_public_quotes(
+ p_user_book_id uuid,p_sentence_id uuid default null,p_limit integer default 50,p_offset integer default 0)
 returns table(id uuid,user_book_id uuid,page integer,text text,thought text,created_at timestamptz)
 language sql stable security definer set search_path=public,pg_temp as $$
  select s.id,s.user_book_id,s.page,s.text,s.publishable_thought,s.created_at
  from public.sentences s where s.user_book_id=p_user_book_id
  and (p_sentence_id is null or s.id=p_sentence_id) and public.sentence_public_allowed(s.id)
- order by s.created_at,s.id;
+ order by s.created_at,s.id
+ limit least(50,greatest(1,coalesce(p_limit,50))) offset greatest(0,coalesce(p_offset,0));
 $$;
-commit;
+revoke all on function public.book_public_quotes(uuid,uuid,integer,integer) from public;
+grant execute on function public.book_public_quotes(uuid,uuid,integer,integer) to anon,authenticated,service_role;

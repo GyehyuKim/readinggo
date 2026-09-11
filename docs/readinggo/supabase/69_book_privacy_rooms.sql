@@ -1,5 +1,4 @@
 -- #1619: room membership is not permission to read private books or personal activity.
-begin;
 create or replace function public.room_members_public(p_room_id uuid)
 returns setof jsonb language sql stable security definer set search_path=public,pg_temp as $$
  select jsonb_build_object('joined_at',m.joined_at,'user',jsonb_build_object(
@@ -24,4 +23,3 @@ returns setof jsonb language sql stable security definer set search_path=public,
 $$;
 revoke all on function public.room_members_public(uuid) from public,anon;
 grant execute on function public.room_members_public(uuid) to authenticated;
-commit;

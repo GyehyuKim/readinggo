@@ -28,6 +28,17 @@
     if (!settings || !Object.prototype.hasOwnProperty.call(settings, 'default_sentence_visibility')) return 'public';
     return storedSentenceVisibility(settings.default_sentence_visibility);
   }
+  function importTimestamp(value) {
+    if (value == null) return null;
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value) || !Number.isSafeInteger(value)) throw new Error('invalid_import_timestamp');
+      const iso = new Date(value).toISOString();
+      if (Number.isNaN(Date.parse(iso))) throw new Error('invalid_import_timestamp');
+      return iso;
+    }
+    if (typeof value !== 'string' || !value.trim() || Number.isNaN(Date.parse(value))) throw new Error('invalid_import_timestamp');
+    return value;
+  }
 
   let _uid = null;
   async function uid() {
@@ -387,6 +398,9 @@
       // 그냥 지우면 active_user_book_id FK 가 set null 로 떨어져 홈이 빈 상태가 된다.
       async remove(userBookId) {
         const u = await A.profile.get();
+        const deleted = unwrap(await sb().from('user_books').delete().eq('id', userBookId)
+          .select('id').maybeSingle());
+        if (!deleted || deleted.id !== userBookId) throw new Error('book_delete_not_confirmed');
         if (u && u.active_user_book_id === userBookId) {
           const id = await uid();
           const next = unwrap(await sb().from('user_books').select('id')
@@ -394,8 +408,7 @@
             .order('started_at', { ascending: false }).limit(1).maybeSingle());
           await A.profile.update({ active_user_book_id: next ? next.id : null });
         }
-        await sb().from('user_books').delete().eq('id', userBookId);
-        return { id: userBookId };
+        return deleted;
       },
     },
     activeBook: {
@@ -483,9 +496,11 @@
       async add(sentenceId, { role, content }) {
         if (!['user', 'assistant'].includes(role) || typeof content !== 'string' || !content.trim()
           || Array.from(content).length > 4000) throw new Error('invalid_conversation_turn');
-        return unwrap(await sb().from('sentence_conversation_turns').insert({
-          sentence_id: sentenceId, user_id: await uid(), role, content,
-        }).select('id,sentence_id,role,content,created_at').single());
+        const turn = { id: window.crypto.randomUUID(), role, content, created_at: new Date().toISOString() };
+        const rows = unwrap(await sb().rpc('sentence_conversation_import', { p_sentence_id: sentenceId, p_turns: [turn] }));
+        const row = rows && rows.find(r => r.id === turn.id && r.sentence_id === sentenceId && r.role === role && r.content === content);
+        if (!row) throw new Error('conversation_readback_failed');
+        return row;
       },
     },
     sentences: {
@@ -505,11 +520,12 @@
       // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
       async importExisting({ userBookId, sessionId, page, text, my_note, migrationId, created_at, createdAt, publishable_thought }) {
         if (!userBookId || !migrationId) throw new Error('import_identity_required');
+        const importedAt = importTimestamp(created_at ?? createdAt ?? null);
         return ownerSentence(unwrap(await sb().rpc('sentence_import_private', {
           p_user_book_id: userBookId, p_sentence_id: migrationId,
           p_text: text, p_page: page ?? null, p_session_id: sessionId || null,
           p_my_note: my_note ?? null, p_thought: publishable_thought ?? null,
-          p_created_at: created_at ?? createdAt ?? null,
+          p_created_at: importedAt,
         })));
       },
       // 사후 감상 추가·편집 (작성 시점 무관) — profile §5.8.4
@@ -544,9 +560,9 @@
           .eq('id', sentenceId).eq('user_id', await uid()).select().single()));
       },
       async publicByBook(userBookId, sentenceId = null) {
-        return unwrap(await sb().rpc('book_public_quotes', {
+        return publicPages('book_public_quotes', {
           p_user_book_id: userBookId, p_sentence_id: sentenceId,
-        })) || [];
+        }, () => true, sentenceId ? 1 : Infinity);
       },
       async listByBook(userBookId) {
         const rows = unwrap(await sb().from('sentences').select('*').eq('user_book_id', userBookId)
