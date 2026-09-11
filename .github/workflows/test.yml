@@ -59,6 +59,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
+      - name: Install app dependencies for privacy UI regression tests
+        working-directory: docs/readinggo
+        run: npm ci
       # 존재하지만 CI 밖에 있던 순수 Node 회귀 테스트를 명시적으로 모두 실행한다 (#1298).
       - name: Core regression tests
         run: |
