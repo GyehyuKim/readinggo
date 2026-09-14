@@ -1,5 +1,17 @@
 -- #1619 foundation. Apply only with coordinated client cutover; old public reads fail closed.
 -- No legacy note is classified or copied. Existing IDs/text/timestamps remain unchanged.
+-- DEV may lack migration 50's helper; install its canonical terms check before callers.
+create or replace function public.moderation_terms_accepted(p_user_id uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.users
+    where id = p_user_id
+      and settings #>> '{ugc_terms,version}' = '2026-08-01'
+      and nullif(settings #>> '{ugc_terms,accepted_at}', '') is not null
+  );
+$$;
+revoke all on function public.moderation_terms_accepted(uuid) from public, anon;
+grant execute on function public.moderation_terms_accepted(uuid) to authenticated;
 alter table public.user_books add column if not exists visibility text not null default 'private'
   check (visibility in ('public','private'));
 alter table public.user_books add column if not exists visibility_revision bigint not null default 0;
