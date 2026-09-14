@@ -10,8 +10,9 @@ const { useState: _useState, useEffect: _useEffect, useRef: _useRef } = React;
 const _bookSentenceLength = (value) => Array.from(String(value == null ? '' : value).trim()).length;
 
 const _storyButton = { minHeight:48, border:'none', borderRadius:12, padding:'10px 14px', fontWeight:800, cursor:'pointer' };
-const _storyPublicQuote = (q) => q && q.id && q.visibility === 'public' && !q.isPrivate;
-const _storyPublicNote = (q) => _storyPublicQuote(q) && !q.notePrivate && !q.note_private && !!String(q.note || q.my_note || '').trim();
+// Owner draft candidates inherit the parent gate at publish/share time.
+const _storyPublicQuote = (q) => q && q.id && !!(q.userBookId || q.user_book_id);
+const _storyPublicNote = (q) => _storyPublicQuote(q) && !!String(q.publishable_thought || '').trim();
 const _storyBucket = (count) => count <= 0 ? '0' : count <= 3 ? '1_3' : count <= 6 ? '4_6' : '7_plus';
 const _storyLink = (slug) => {
   const origin = ((window.RG_CONFIG && (window.RG_CONFIG.SHARE_ORIGIN || window.RG_CONFIG.API_ORIGIN)) || location.origin).replace(/\/$/, '');
@@ -58,7 +59,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
   const reviewTextRef = _useRef(String(reviewText || '').trim());
   const saveQueueRef = _useRef(null);
   if (!saveQueueRef.current) saveQueueRef.current = _createReadingStorySaveQueue();
-  const available = (quotes || []).filter(_storyPublicQuote);
+  const available = (quotes || []).filter(q => _storyPublicQuote(q) && (q.userBookId || q.user_book_id) === book.ubId);
   const byId = new Map(available.map(q => [q.id, q]));
   const mark = () => {
     revisionRef.current += 1;
@@ -82,7 +83,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
         if (!active) return;
       }
       const source = recovered ? fallback.pages : initialStory && Array.isArray(initialStory.pages) ? initialStory.pages : [];
-      setItems(source.filter(p => (p.type === 'quote' || p.type === 'note') && byId.has(p.sentenceId))
+      setItems(source.filter(p => (p.type === 'quote' || p.type === 'note') && byId.has(p.sentenceId) && (p.type !== 'note' || _storyPublicNote(byId.get(p.sentenceId))))
         .map(p => ({ type:p.type, sentenceId:p.sentenceId })));
       setIntro((source.find(p => p.type === 'intro') || {}).text || '');
       setOutro((source.find(p => p.type === 'outro') || {}).text || '');
@@ -188,6 +189,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
       const store = window.DataStore;
       const publishedPages = pages();
       if (!(store && store.readingStories)) throw new Error('reading_story_store_unavailable');
+      if (!await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title })) return;
       let merged;
       if (dirty && story && story.status === 'published') {
         if (!store.readingStories.republish) throw new Error('reading_story_store_unavailable');
@@ -225,6 +227,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
   };
   const copyLink = async () => {
     if (!story || story.status !== 'published') return;
+    if (!await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title })) return;
     try { await navigator.clipboard.writeText(_storyLink(story.slug)); showToast('공개 링크를 복사했어요'); if (window.rgTrack) window.rgTrack('reading_story_link_copied', { entry:'editor' }); }
     catch (e) { setError('링크를 복사하지 못했어요. 브라우저 권한을 확인해 주세요.'); }
   };
@@ -234,8 +237,9 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
     setBusy(true); setError('');
     try {
       const noteItem = items.find(x => x.type === 'note' && x.sentenceId === quote.id);
-      const blob = await window.renderSentenceCardBlob({ ...quote, bookId:book.id, bookTitle:book.title, author:book.author, note:noteItem ? quote.note : '', entry:'reading_story' }, { format, includeNote:!!noteItem });
+      const blob = await window.renderSentenceCardBlob({ id:quote.id, text:quote.text, page:quote.page, userBookId:book.ubId, bookId:book.id, bookTitle:book.title, author:book.author, publishable_thought:noteItem ? quote.publishable_thought : '', entry:'reading_story' }, { format, includeNote:!!noteItem });
       const file = new File([blob], format === '9:16' ? 'readinggo-story-9x16.png' : 'readinggo-story-square.png', { type:'image/png' });
+      if (!await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title })) return;
       let method = 'download';
       if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], url:story && story.status === 'published' ? _storyLink(story.slug) : undefined }); method = 'web_share'; }
       else { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); showToast('PNG 이미지를 저장했어요'); }
@@ -254,7 +258,7 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
     }
     catch (e) { if (e && e.readingStoryDraftStored) onClose(); }
   };
-  const renderedPages = pages().map((p, position) => ({ ...p, position, text:(p.type === 'quote' ? (byId.get(p.sentenceId) || {}).text : p.type === 'note' ? ((byId.get(p.sentenceId) || {}).note || '') : p.text) }));
+  const renderedPages = pages().map((p, position) => ({ ...p, position, text:(p.type === 'quote' ? (byId.get(p.sentenceId) || {}).text : p.type === 'note' ? ((byId.get(p.sentenceId) || {}).publishable_thought || '') : p.text) }));
 
   // BookDetailModal보다 나중에 등록하고 preview를 마지막에 등록해 system/browser back이
   // preview → save-aware editor → underlying book modal 순으로 정확히 한 겹씩 닫게 한다.
@@ -273,13 +277,13 @@ function ReadingStoryEditor({ book, quotes, initialStory, reviewText, entry, onC
         {error && <div role="alert" style={{padding:12,marginBottom:12,borderRadius:12,background:'var(--danger-soft, #FDECEC)',color:'var(--danger)',fontSize:13,fontWeight:700}}>{error} {saveState === '저장 실패' && <button onClick={() => saveNow().catch(()=>{})} style={{marginLeft:6}}>다시 저장</button>}</div>}
         {!ready ? <div aria-busy="true">초안을 불러오는 중…</div> : preview ? <ReadingStoryPages pages={renderedPages} book={book} /> : <>
           <label style={{display:'block',fontWeight:800,fontSize:13}}>도입 <span style={{color:'var(--ink-3)'}}>(선택)</span><textarea value={intro} maxLength={1200} onChange={e=>{setIntro(e.target.value);mark();}} rows={3} placeholder="이 책을 읽은 이유" style={{width:'100%',boxSizing:'border-box',marginTop:7,padding:12,border:'1.5px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
-          <h3 style={{fontSize:15,margin:'20px 0 4px'}}>공개할 문장과 생각 선택</h3><p style={{fontSize:12,color:'var(--ink-3)',margin:'0 0 10px'}}>public 문장만 선택할 수 있어요. 비공개·팔로워 공개 문장과 비공개 생각은 제외돼요.</p>
-          {available.length === 0 ? <div style={{padding:14,background:'var(--paper-2)',borderRadius:12,fontSize:13}}>먼저 기억할 문장을 공개로 남겨보세요.</div> : available.map(q => <div key={q.id} style={{padding:12,border:'1px solid var(--line)',borderRadius:12,marginBottom:8}}>
+          <h3 style={{fontSize:15,margin:'20px 0 4px'}}>문장과 생각 선택</h3><p style={{fontSize:12,color:'var(--ink-3)',margin:'0 0 10px'}}>전체 공개된 책만 공유할 수 있어요.</p>
+          {available.length === 0 ? <div style={{padding:14,background:'var(--paper-2)',borderRadius:12,fontSize:13}}>먼저 기억할 문장을 남겨보세요.</div> : available.map(q => <div key={q.id} style={{padding:12,border:'1px solid var(--line)',borderRadius:12,marginBottom:8}}>
             <div style={{fontFamily:'var(--font-quote)',lineHeight:1.55}}>“{q.text}”</div><div style={{fontSize:11,color:'var(--ink-3)',marginTop:4}}>{q.page != null ? q.page+'쪽' : '페이지 미상'}</div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}><button type="button" aria-pressed={items.some(x=>x.type==='quote'&&x.sentenceId===q.id)} onClick={()=>items.some(x=>x.type==='quote'&&x.sentenceId===q.id)?removeItem(items.findIndex(x=>x.type==='quote'&&x.sentenceId===q.id)):addItem('quote',q.id)} style={{..._storyButton,minHeight:44,background:'var(--brand-soft)',color:'var(--brand-3)'}}>문장 {items.some(x=>x.type==='quote'&&x.sentenceId===q.id)?'선택됨':'선택'}</button>
             {_storyPublicNote(q) && <button type="button" aria-pressed={items.some(x=>x.type==='note'&&x.sentenceId===q.id)} onClick={()=>items.some(x=>x.type==='note'&&x.sentenceId===q.id)?removeItem(items.findIndex(x=>x.type==='note'&&x.sentenceId===q.id)):addItem('note',q.id)} style={{..._storyButton,minHeight:44,background:'var(--paper-2)',color:'var(--ink-2)'}}>생각 {items.some(x=>x.type==='note'&&x.sentenceId===q.id)?'선택됨':'선택'}</button>}</div>
           </div>)}
-          <h3 style={{fontSize:15,margin:'20px 0 8px'}}>카드 순서</h3>{items.length===0?<p style={{fontSize:13,color:'var(--ink-3)'}}>아직 선택한 카드가 없어요.</p>:items.map((item,i)=>{const q=byId.get(item.sentenceId)||{};return <div key={item.type+item.sentenceId} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center',padding:'9px 10px',background:'var(--paper-2)',borderRadius:12,marginBottom:6}}><div><b>{item.type==='quote'?'문장':'내 생각'}</b><div style={{fontSize:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:300}}>{item.type==='quote'?q.text:q.note}</div>{item.type==='quote'&&<label style={{display:'inline-flex',alignItems:'center',minHeight:44,gap:6,fontSize:12}}><input type="radio" name="story-cover" checked={coverId===item.sentenceId} onChange={()=>{setCoverId(item.sentenceId);mark();}} /> 대표 카드</label>}</div><div style={{display:'flex'}}><button aria-label={`${i+1}번 카드를 위로`} disabled={i===0} onClick={()=>move(i,-1)} style={{width:44,height:44}}>↑</button><button aria-label={`${i+1}번 카드를 아래로`} disabled={i===items.length-1} onClick={()=>move(i,1)} style={{width:44,height:44}}>↓</button><button aria-label={`${i+1}번 카드 제거`} onClick={()=>removeItem(i)} style={{width:44,height:44}}>×</button></div></div>})}
+          <h3 style={{fontSize:15,margin:'20px 0 8px'}}>카드 순서</h3>{items.length===0?<p style={{fontSize:13,color:'var(--ink-3)'}}>아직 선택한 카드가 없어요.</p>:items.map((item,i)=>{const q=byId.get(item.sentenceId)||{};return <div key={item.type+item.sentenceId} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,alignItems:'center',padding:'9px 10px',background:'var(--paper-2)',borderRadius:12,marginBottom:6}}><div><b>{item.type==='quote'?'문장':'내 생각'}</b><div style={{fontSize:12,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:300}}>{item.type==='quote'?q.text:q.publishable_thought}</div>{item.type==='quote'&&<label style={{display:'inline-flex',alignItems:'center',minHeight:44,gap:6,fontSize:12}}><input type="radio" name="story-cover" checked={coverId===item.sentenceId} onChange={()=>{setCoverId(item.sentenceId);mark();}} /> 대표 카드</label>}</div><div style={{display:'flex'}}><button aria-label={`${i+1}번 카드를 위로`} disabled={i===0} onClick={()=>move(i,-1)} style={{width:44,height:44}}>↑</button><button aria-label={`${i+1}번 카드를 아래로`} disabled={i===items.length-1} onClick={()=>move(i,1)} style={{width:44,height:44}}>↓</button><button aria-label={`${i+1}번 카드 제거`} onClick={()=>removeItem(i)} style={{width:44,height:44}}>×</button></div></div>})}
           {items.some(x=>x.type==='quote')&&!items.some(x=>x.type==='note')&&<p style={{fontSize:12,color:'var(--brand-3)'}}>내 생각을 더하면 나만의 독서 이야기가 돼요.</p>}
           <label style={{display:'block',fontWeight:800,fontSize:13,marginTop:18}}>마무리 <span style={{color:'var(--ink-3)'}}>(선택)</span><textarea value={outro} maxLength={1200} onChange={e=>{setOutro(e.target.value);mark();}} rows={3} placeholder="누구에게 추천하고 싶은지 남겨보세요" style={{width:'100%',boxSizing:'border-box',marginTop:7,padding:12,border:'1.5px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
         </>}
@@ -295,13 +299,38 @@ function ReadingStoryPages({ pages, book }) {
 }
 
 /* ── BookDetailModal ─────────────────────────────────────── */
+function BookPrivacyControl({ book }) {
+  const [state, setState] = _useState(null);
+  const [busy, setBusy] = _useState(false);
+  const lock = _useRef(false);
+  _useEffect(() => {
+    let alive = true;
+    Promise.resolve().then(() => window.DataStore.myBooks.getVisibility(book.ubId))
+      .then(row => { if (alive) setState(row); }).catch(() => { if (alive) setState(null); });
+    return () => { alive = false; };
+  }, [book.ubId]);
+  const change = async visibility => {
+    if (lock.current) return;
+    lock.current = true; setBusy(true);
+    const row = await window.RG_ensureBookVisibility({ userBookId:book.ubId, bookTitle:book.title }, visibility);
+    setState(row || null); setBusy(false); lock.current = false;
+  };
+  return <fieldset disabled={busy} style={{margin:16,padding:12,border:'1px solid var(--line)',borderRadius:'var(--r-sm)'}}>
+    <legend>책 공개 설정</legend>
+    <p role="status">{state ? (state.visibility === 'public' ? '공개' : '비공개') : '공개 설정 확인 필요'}</p>
+    {['private', 'public'].map(value => <label key={value} style={{display:'inline-flex',gap:8,padding:12}}>
+      <input type="radio" name={'book-privacy-'+book.ubId} checked={state?.visibility === value} onChange={() => change(value)} />{value === 'public' ? '공개' : '비공개'}
+    </label>)}
+  </fieldset>;
+}
+
 function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 실 book item: { id, title, author, pub, cover, fb, total, isbn, cur, status, rating, comment }
   const prog = { cur: book.cur || 0 };
   const progressPct = book.total ? Math.round((prog.cur / book.total) * 100) : 0;
   // 삭제(#325 후속): 낙관적 제거 — bookQuotes 는 prop 파생이라 삭제분을 로컬에서 즉시 거름.
   const [removedIds, setRemovedIds] = _useState({});
-  const bookQuotes = (allQuotes || []).filter(q => q.bookId === book.id && !removedIds[q.id])
+  const bookQuotes = (allQuotes || []).filter(q => (book.ubId ? (q.userBookId || q.user_book_id) === book.ubId : q.bookId === book.id) && !removedIds[q.id])
     // 페이지 내림차순(#737) — 미상(null)은 맨 아래, 동일 페이지는 최신순. 홈(home.js)와 정책 일치.
     .slice()
     .sort((a, b) => {
@@ -337,7 +366,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
         id: row.id, text: row.text || t, bookId: book.id, bookTitle: book.title, author: book.author,
         page: (typeof row.page === 'number' ? row.page : (typeof pg === 'number' ? pg : 0)), when: '방금',
-        createdAt: row.created_at || '', note: row.my_note || '', kind: 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(row.visibility),
+        createdAt: row.created_at || '', userBookId: book.ubId, publishable_thought: row.publishable_thought ?? null, note: row.my_note || '', kind: 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(row.visibility),
       } } }));
       setAddText(''); setAddPage(''); setAddOpen(false);
       showToast(wasTruncated ? '1,000자를 넘어 앞부분만 저장했어요' : '한 문장을 남겼어요');
@@ -360,7 +389,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
         id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
         page: (typeof row.page === 'number' ? row.page : 0), when: '방금',
-        createdAt: row.created_at || '', note: row.my_note || '', kind: 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(row.visibility),
+        createdAt: row.created_at || '', userBookId: book.ubId, publishable_thought: row.publishable_thought ?? null, note: row.my_note || '', kind: 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(row.visibility),
       } } }));
       return row;
     });
@@ -700,7 +729,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       const date = fmtDate(q.createdAt || q.when);
       lines.push(`### p.${q.page ?? '?'}${date ? ` · ${date}` : ''}`);
       lines.push(`> ${q.text || ''}`);
-      const note = q.note || '';
+      const note = [q.publishable_thought, q.note].filter(Boolean).join('\n\n'); // Personal export includes retained legacy notes.
       if (note) { lines.push(''); lines.push(note); }
       lines.push('');
     });
@@ -734,6 +763,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
           <p style={{fontSize:13, color:'var(--ink-2)', fontWeight:700, margin:'0 0 12px'}}>{[book.author, book.pub].map(x => (x || '').trim()).filter(Boolean).join(' · ')}</p>
         </div>
 
+        {book.ubId && <><BookPrivacyControl book={book} /><button type="button" style={_storyButton} onClick={() => window.RG_sharePublicRecordLink({ userBookId: book.ubId, bookTitle: book.title }, 'books')}>책 전체 공유</button></>}
         <div data-testid="book-detail-content" style={{padding:'16px 20px', maxHeight:'50vh', overflowY:'auto', display:'flex', flexDirection:'column'}}>
           {/* 완독 정보 */}
           {bookshelfEntry && (
@@ -811,7 +841,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
               <h3 id="reading-story-heading" style={{fontSize:14,margin:'0 0 5px'}}>내 독서 이야기</h3>
               {storyLoading ? <div role="status" aria-busy="true" style={{fontSize:12,color:'var(--ink-3)'}}>이야기 상태를 불러오는 중…</div>
                 : storyLoadError ? <div role="alert" style={{fontSize:12,color:'var(--danger)'}}>이야기 상태를 불러오지 못했어요. <button onClick={loadReadingStory}>다시 시도</button></div>
-                : bookQuotes.filter(_storyPublicQuote).length === 0 ? <><p style={{fontSize:12,color:'var(--ink-2)',margin:'0 0 8px'}}>먼저 기억할 문장을 공개로 남겨보세요.</p><button type="button" onClick={()=>{const target=document.querySelector('[data-section="secondary-add-quote"]');if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}} style={{..._storyButton,minHeight:44,background:'var(--brand-soft)',color:'var(--brand-3)'}}>문장 남기러 가기</button></>
+                : bookQuotes.filter(_storyPublicQuote).length === 0 ? <><p style={{fontSize:12,color:'var(--ink-2)',margin:'0 0 8px'}}>먼저 기억할 문장을 남겨보세요.</p><button type="button" onClick={()=>{const target=document.querySelector('[data-section="secondary-add-quote"]');if(target)target.scrollIntoView({behavior:'smooth',block:'start'});}} style={{..._storyButton,minHeight:44,background:'var(--brand-soft)',color:'var(--brand-3)'}}>문장 남기러 가기</button></>
                 : <><p style={{fontSize:12,color:'var(--ink-2)',margin:'0 0 8px'}}>{readingStory&&readingStory.status==='published'?'공개 중인 이야기를 보고 공유하거나 편집할 수 있어요.':readingStory?'비공개 초안을 이어서 완성해 보세요.':'문장과 생각을 골라 나만의 완독 이야기를 만들어요.'}</p><button type="button" onClick={()=>setStoryOpen(true)} style={{..._storyButton,minHeight:44,background:'var(--brand)',color:'#fff'}}>{readingStory&&readingStory.status==='published'?'이야기 보기·공유하기':readingStory?'이야기 이어서 만들기':'독서 이야기 만들기'}</button></>}
             </section>
           )}
@@ -1091,11 +1121,11 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                             과거(#404) 자유 감상 편집 폐지는 my_note 덮어쓰기 충돌 탓이었고, 이제 감상/Q/A 를
                             블록 분리(rgSplitNote/rgJoinNote)해 서로 보존하므로 자유 감상을 다시 둔다. */}
                         {q.id && (() => {
-                          const parts = window.rgSplitNote ? window.rgSplitNote(q.note) : { free: (q.note || ''), qa: '' };
+                          const parts = { free: q.publishable_thought || '', qa: '' };
                           const turns = parts.qa ? parts.qa.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
                           const open = (m) => window.RG_openCompanion && window.RG_openCompanion({
                             id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author,
-                            page: q.page, note: q.note, kind: q.kind,
+                            page: q.page, note: q.note, kind: q.kind, userBookId: book.ubId, publishable_thought: q.publishable_thought,
                           }, { mode: m });
                           const tonal = { display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:999, border:'1px solid var(--brand-soft)', background:'var(--brand-soft)', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer' };
                           return (
@@ -1124,7 +1154,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
                         삭제는 rg:sentence-removed 이벤트로 목록 갱신(removedIds 리스너). blind 와 무관하게 내 문장 관리 가능. */}
                     {q.id && window.SentenceActions && (
                       <SentenceActions
-                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, note: q.note || q.my_note || '', notePrivate: q.notePrivate, note_private: q.note_private, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
+                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, userBookId: book.ubId, publishable_thought: q.publishable_thought, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
                         mine fav={!!(bmarks && bmarks.has(q.id))}
                         onRemoved={(rid) => setRemovedIds(m => ({ ...m, [rid]: true }))} />
                     )}

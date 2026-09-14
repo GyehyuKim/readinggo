@@ -7,12 +7,6 @@
 // loadBabel 파일별 eval 스코프 → 훅 재구조분해 필수(#761).
 const { useState, useEffect } = React;
 
-function normalizeDefaultSentenceVisibility(settings) {
-  if (!settings || !Object.prototype.hasOwnProperty.call(settings, 'default_sentence_visibility')) return 'public';
-  const configured = settings.default_sentence_visibility;
-  if (configured === 'friends') return 'followers';
-  return configured === 'public' || configured === 'followers' || configured === 'private' ? configured : 'private';
-}
 
 function PersonalizationExclusions({ available }) {
   const [items, setItems] = useState([]);
@@ -70,21 +64,6 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
   const [personalizationOn, setPersonalizationOn] = useState(false);
   const [personalizationBusy, setPersonalizationBusy] = useState(personalizationAvailable);
   const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced'); // 참새 질문 결 (#375)
-  // 한 문장 기본 공개 범위 (#1261) — 저장 완료 후에만 선택 상태를 확정한다.
-  const [sentenceVisibility, setSentenceVisibility] = useState('public');
-  const [sentenceVisibilityBusy, setSentenceVisibilityBusy] = useState(true);
-  useEffect(() => {
-    let alive = true;
-    const settingsApi = window.DataStore && window.DataStore.settings;
-    if (!(settingsApi && settingsApi.get)) { setSentenceVisibilityBusy(false); return () => { alive = false; }; }
-    Promise.resolve(settingsApi.get()).then((settings) => {
-      if (!alive) return;
-      setSentenceVisibility(normalizeDefaultSentenceVisibility(settings));
-    }).catch(() => {
-      if (alive) showToast('기본 공개 범위를 불러오지 못했어요. 다시 열어 주세요.');
-    }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
-    return () => { alive = false; };
-  }, []);
   useEffect(() => {
     let alive = true;
     if (!personalizationAvailable) return () => { alive = false; };
@@ -101,16 +80,6 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
       else { const row = await window.RG_personalization.optIn(); if (!(row && row.enabled)) throw new Error('readback failed'); setPersonalizationOn(true); showToast('내 기록을 참고한 대화를 켰어요', { sparrow: true }); }
     } catch (e) { showToast(e && e.code === 'revoke_pending' ? '철회 처리 중이에요. 잠시 후 다시 확인해 주세요.' : '설정을 저장하지 못했어요. 다시 시도해 주세요.'); }
     finally { setPersonalizationBusy(false); }
-  };
-  const saveSentenceVisibility = (next) => {
-    if (sentenceVisibilityBusy || next === sentenceVisibility) return;
-    const settingsApi = window.DataStore && window.DataStore.settings;
-    if (!(settingsApi && settingsApi.update)) { showToast('기본 공개 범위를 저장하지 못했어요. 다시 시도해 주세요.'); return; }
-    setSentenceVisibilityBusy(true);
-    Promise.resolve(settingsApi.update({ default_sentence_visibility: next }))
-      .then(() => { setSentenceVisibility(next); })
-      .catch(() => showToast('기본 공개 범위를 저장하지 못했어요. 다시 시도해 주세요.'))
-      .finally(() => setSentenceVisibilityBusy(false));
   };
   // 스트릭 리마인더 (#1033) — 매일 정해진 시각 로컬 알림. 네이티브에서만 실효(웹은 토글 비노출).
   const reminderApi = window.RG_streakReminder;
@@ -278,26 +247,7 @@ function SettingsModal({ onClose, spoilerReveal, setSpoilerReveal }) {
             </div>
             <PersonalizationExclusions available={personalizationAvailable} />
           </>}
-          <fieldset disabled={sentenceVisibilityBusy} style={{ margin: '8px 0 0', padding: '12px', borderRadius: 12, border: '1.5px solid var(--line)' }}>
-            <legend style={{ padding: '0 4px', fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>한 문장 기본 공개 범위</legend>
-            <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
-              {[
-                { value: 'public', label: '전체 공개', description: '피드에 공개돼요' },
-                { value: 'followers', label: '친구 공개', description: '맞팔 친구만 볼 수 있어요' },
-                { value: 'private', label: '나만 보기', description: '나만 볼 수 있어요' },
-              ].map((option) => (
-                <label key={option.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: sentenceVisibilityBusy ? 'default' : 'pointer', opacity: sentenceVisibilityBusy ? 0.6 : 1 }}>
-                  <input type="radio" name="default-sentence-visibility" value={option.value}
-                    checked={sentenceVisibility === option.value}
-                    onChange={() => saveSentenceVisibility(option.value)} />
-                  <span>
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{option.label}</span>
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{option.description}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+
           {isSupabase && (
             <button onClick={() => window.RG_openBlockedUsers && window.RG_openBlockedUsers()}
               style={{ width: '100%', marginTop: 8, padding: '11px 12px', borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-2)', fontWeight: 800, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}>
@@ -435,20 +385,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
   const [personalizationOn, setPersonalizationOn] = useState(false);
   const [personalizationBusy, setPersonalizationBusy] = useState(personalizationAvailable);
   const [qPreset, setQPreset] = useState(window.RG_companionPreset ? window.RG_companionPreset.get() : 'balanced');
-  const [sentenceVisibility, setSentenceVisibility] = useState('public');
-  const [sentenceVisibilityBusy, setSentenceVisibilityBusy] = useState(true);
-  useEffect(() => {
-    let alive = true;
-    const settingsApi = window.DataStore && window.DataStore.settings;
-    if (!(settingsApi && settingsApi.get)) { setSentenceVisibilityBusy(false); return () => { alive = false; }; }
-    Promise.resolve(settingsApi.get()).then((s) => {
-      if (!alive) return;
-      setSentenceVisibility(normalizeDefaultSentenceVisibility(s));
-    }).catch(() => {
-      if (alive) showToast('기본 공개 범위를 불러오지 못했어요.');
-    }).finally(() => { if (alive) setSentenceVisibilityBusy(false); });
-    return () => { alive = false; };
-  }, []);
+
   useEffect(() => {
     let alive = true;
     if (!personalizationAvailable) return () => { alive = false; };
@@ -465,16 +402,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
     } catch (e) { showToast(e && e.code === 'revoke_pending' ? '철회 처리 중이에요. 잠시 후 다시 확인해 주세요.' : '설정을 저장하지 못했어요.'); }
     finally { setPersonalizationBusy(false); }
   };
-  const saveSentenceVisibility = (next) => {
-    if (sentenceVisibilityBusy || next === sentenceVisibility) return;
-    const settingsApi = window.DataStore && window.DataStore.settings;
-    if (!(settingsApi && settingsApi.update)) { showToast('기본 공개 범위를 저장하지 못했어요.'); return; }
-    setSentenceVisibilityBusy(true);
-    Promise.resolve(settingsApi.update({ default_sentence_visibility: next }))
-      .then(() => setSentenceVisibility(next))
-      .catch(() => showToast('기본 공개 범위를 저장하지 못했어요.'))
-      .finally(() => setSentenceVisibilityBusy(false));
-  };
+
   const isSupabase = window.DataStore === window.SupabaseDataStore;
   const [wishPublic, setWishPublic] = useState(!!(window.RG_ME && window.RG_ME.wishlist_public));
   const toggleWishPublic = () => {
@@ -693,20 +621,7 @@ function SettingsView({ spoilerReveal, setSpoilerReveal }) {
           <div style={{ padding: '0 14px 14px' }}><PersonalizationExclusions available={personalizationAvailable} /></div>
         </>}
         <div style={{ height: 1, background: 'var(--line)' }} />
-        <fieldset disabled={sentenceVisibilityBusy} style={{ margin: 0, padding: '14px', border: 'none' }}>
-          <legend style={{ float: 'left', width: '100%', padding: 0, fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', marginBottom: 10 }}>한 문장 기본 공개 범위</legend>
-          <div style={{ display: 'flex', gap: 8, clear: 'both' }}>
-            {[{ value: 'public', label: '전체 공개' }, { value: 'followers', label: '친구 공개' }, { value: 'private', label: '나만 보기' }].map((opt) => {
-              const sel = sentenceVisibility === opt.value;
-              return (
-                <label key={opt.value} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, cursor: sentenceVisibilityBusy ? 'default' : 'pointer', padding: '10px 12px', borderRadius: 'var(--r-sm)', border: `1.5px solid ${sel ? 'var(--brand)' : 'var(--line)'}`, background: sel ? 'var(--brand-tint)' : 'var(--paper)', opacity: sentenceVisibilityBusy ? 0.6 : 1 }}>
-                  <input type="radio" name="sv-range-sv" value={opt.value} checked={sel} onChange={() => saveSentenceVisibility(opt.value)} style={{ margin: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 800, color: sel ? 'var(--brand-3)' : 'var(--ink)' }}>{opt.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
+
         <div style={{ height: 1, background: 'var(--line)' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', gap: 10 }}>
           <div style={{ flex: 1 }}>

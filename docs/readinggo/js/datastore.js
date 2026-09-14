@@ -20,11 +20,10 @@ const RG_V41_KEY = 'rg_v41';
 // 한 문장 저장 계약(#1457): 공개범위와 무관하게 공백 제거 후 최대 1,000자.
 // 생성·본문 편집·공개범위 변경이 같은 정규화를 써서 로컬 우회를 막는다.
 function _storedSentenceVisibility(value) {
-  if (value === 'friends') return 'followers';
-  return value === 'public' || value === 'followers' || value === 'private' ? value : 'private';
+  return value === 'public' ? 'public' : 'private';
 }
 function _defaultSentenceVisibility(settings) {
-  if (!settings || !Object.prototype.hasOwnProperty.call(settings, 'default_sentence_visibility')) return 'public';
+  if (!settings || !Object.prototype.hasOwnProperty.call(settings, 'default_sentence_visibility')) return 'private';
   return _storedSentenceVisibility(settings.default_sentence_visibility);
 }
 window.RG_normalizeStoredSentenceVisibility = _storedSentenceVisibility;
@@ -442,6 +441,35 @@ const DataStore = {
      localStorage 모드(게스트/Phase0)에서 LibraryView·홈 캐러셀이 호출.
      누락 시 DataStore.myBooks.list() 가 throw → 서재 탭 전체 크래시(무가드). */
   myBooks: {
+    getVisibility(userBookId) {
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) throw new Error('book_not_found');
+        return { id: ub.id, visibility: _storedSentenceVisibility(ub.visibility), revision: ub.visibility_revision || 0 };
+      });
+    },
+    setVisibility(userBookId, visibility, options = {}) {
+      if (!['public', 'private'].includes(visibility)) throw new Error('invalid_visibility_request');
+      return localStorageAdapter.mutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) throw new Error('book_not_found');
+        const revision = ub.visibility_revision || 0;
+        const expectedRevision = options.expectedRevision === undefined ? revision : options.expectedRevision;
+        const requestId = options.requestId || _dsId('visibility');
+        ub.visibility_requests = ub.visibility_requests || {};
+        const prior = ub.visibility_requests[requestId];
+        if (prior && (prior.visibility !== visibility || prior.expectedRevision !== expectedRevision)) throw new Error('idempotency_conflict');
+        if (!prior) {
+          if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== revision) throw new Error('visibility_revision_conflict');
+          ub.visibility = visibility;
+          ub.visibility_revision = revision + 1;
+          ub.visibility_requests[requestId] = { visibility, expectedRevision, appliedRevision: revision + 1 };
+        }
+        return { id: ub.id, visibility: _storedSentenceVisibility(ub.visibility), revision: ub.visibility_revision,
+          requestId, expectedRevision, replayed: !!prior, appliedRevision: ub.visibility_requests[requestId].appliedRevision,
+          canShare: ub.visibility === 'public' };
+      });
+    },
     list() {
       return localStorageAdapter.mutate(s => (s.user_books || []).map(_applyBookOverrides));
     },
@@ -466,7 +494,7 @@ const DataStore = {
               publisher: book.publisher || '', total_pages: tp,
               cover_url: book.cover_url || '', isbn13: book.isbn13 || '',
             },
-            status: st,
+            status: st, visibility: 'private', visibility_revision: 0,
             current_page: st === 'completed' ? (tp || current_page || 0) : (current_page || 0),
             rating: rt, review_text: null,
             started_at: _today(), completed_at: st === 'completed' ? _today() : null, sessions: [], sentences: [],
@@ -624,6 +652,42 @@ const DataStore = {
   },
 
   /* 한 문장 (sentences) ───────────────────────────── */
+  sentenceConversations: {
+    savePair(sentenceId, { q, a, requestId }) {
+      if (!requestId || [q, a].some(v => typeof v !== 'string' || !v.trim() || Array.from(v).length > 4000)) throw new Error('invalid_conversation_pair');
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (!se) throw new Error('sentence_not_found');
+        const turns = se.conversation_turns || [];
+        const old = turns.filter(t => t.request_id === requestId);
+        if (old.length) {
+          if (old.length !== 2 || old[0].content !== q || old[1].content !== a) throw new Error('idempotency_conflict');
+          return old;
+        }
+        const pair = [q, a].map((content, i) => ({ id: window.crypto.randomUUID(), sentence_id: sentenceId, request_id: requestId,
+          role: i ? 'user' : 'assistant', content, created_at: new Date().toISOString() }));
+        se.conversation_turns = [...turns, ...pair];
+        return pair;
+      });
+    },
+    list(sentenceId) {
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        return se ? (se.conversation_turns || []).map(turn => ({ ...turn })) : [];
+      });
+    },
+    add(sentenceId, { role, content }) {
+      if (!['user', 'assistant'].includes(role) || typeof content !== 'string' || !content.trim()
+        || Array.from(content).length > 4000) throw new Error('invalid_conversation_turn');
+      return localStorageAdapter.mutate(s => {
+        const se = _findSentence(s, sentenceId);
+        if (!se) throw new Error('sentence_not_found');
+        const turn = { id: _dsId('turn'), sentence_id: sentenceId, role, content, created_at: Date.now() };
+        (se.conversation_turns = se.conversation_turns || []).push(turn);
+        return turn;
+      });
+    },
+  },
   sentences: {
     add({ userBookId, sessionId, page, text, my_note, kind, visibility: _ignoredVisibility }) {
       return localStorageAdapter.mutate(s => {
@@ -633,7 +697,7 @@ const DataStore = {
         if (!ub) return null;
         ub.sentences = ub.sentences || [];
         // 계정/게스트 기본 공개범위가 신규 문장의 단일 정본이다. 호출부 override는 무시한다.
-        const requestedVisibility = _defaultSentenceVisibility(s.settings);
+        const requestedVisibility = _storedSentenceVisibility(ub.visibility);
         const checked = _validateSentenceText(text, requestedVisibility);
         const row = {
           id: _dsId('se'),
@@ -654,18 +718,28 @@ const DataStore = {
       });
     },
     // 가입 전 이미 저장된 게스트 문장 이관 전용. 신규 add와 달리 당시 privacy를 보존한다.
-    importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility }) {
+    importExisting({ userBookId, sessionId, page, text, my_note, kind, visibility, migrationId, created_at, publishable_thought }) {
       return localStorageAdapter.mutate(s => {
         const ub = userBookId ? _ubById(s, userBookId) : _activeUB(s);
         if (!ub) return null;
         ub.sentences = ub.sentences || [];
-        const checked = _validateSentenceText(text, visibility);
+        const prior = migrationId && _findSentence(s, migrationId);
+        if (prior) {
+          if (prior.user_book_id !== ub.id || prior.text !== text || prior.my_note !== (my_note ?? null)
+            || prior.page !== (typeof page === 'number' ? page : null)
+            || prior.session_id !== (sessionId || null)
+            || prior.publishable_thought !== (publishable_thought ?? null)
+            || (created_at != null && prior.created_at !== created_at)) throw new Error('idempotency_conflict');
+          return { ...prior, visibility: _storedSentenceVisibility(ub.visibility) };
+        }
+        if (ub.visibility === 'public') throw new Error('import_requires_private_book');
+        const checked = _validateSentenceText(text, 'private');
         const row = {
-          id: _dsId('se'), user_book_id: ub.id, book_id: ub.book_id,
+          id: migrationId || _dsId('se'), user_book_id: ub.id, book_id: ub.book_id,
           session_id: sessionId || null,
-          page: typeof page === 'number' ? page : (ub.current_page || 0),
-          text: checked.text, my_note: my_note || null, kind: 'quote',
-          visibility: checked.visibility, _guest: true, created_at: Date.now(),
+          page: typeof page === 'number' ? page : null,
+          text, my_note: my_note ?? null, publishable_thought: publishable_thought ?? null, kind: 'quote',
+          visibility: checked.visibility, _guest: true, created_at: created_at ?? Date.now(),
         };
         ub.sentences.push(row);
         return row;
@@ -674,7 +748,7 @@ const DataStore = {
     listByBook(userBookId) {
       return localStorageAdapter.mutate(s => {
         const ub = _ubById(s, userBookId) || _activeUB(s);
-        return ub ? (ub.sentences || []).slice() : [];
+        return ub ? (ub.sentences || []).map(se => ({ ...se, visibility: _storedSentenceVisibility(ub.visibility) })) : [];
       });
     },
     listMine() {
@@ -683,20 +757,20 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const out = [];
         (s.user_books || []).forEach(ub => (ub.sentences || []).forEach(se =>
-          out.push({ ...se, book_title: (ub.book && ub.book.title) || '' })));
+          out.push({ ...se, visibility: _storedSentenceVisibility(ub.visibility), book_title: (ub.book && ub.book.title) || '' })));
         return out;
       });
     },
     feed() {
       // 전체 공개 피드 — 최신순 (§social). 합성 문장으로 빈 상태를 채우지 않는다(#1431).
       return localStorageAdapter.mutate(s =>
-        _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+        (s.user_books || []).filter(ub => ub.visibility === 'public').flatMap(ub => (ub.sentences || []).map(se => ({ id: se.id, user_book_id: ub.id, text: se.text, page: se.page, thought: se.publishable_thought || null, created_at: se.created_at }))).sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
       );
     },
     // 추천 (#787) — Phase 0 은 타 사용자 없음 → 실제 로컬 문장만 반환(#1431).
     feedRecommended() {
       return localStorageAdapter.mutate(s =>
-        _allSentences(s).slice().sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+        (s.user_books || []).filter(ub => ub.visibility === 'public').flatMap(ub => (ub.sentences || []).map(se => ({ id: se.id, user_book_id: ub.id, text: se.text, page: se.page, thought: se.publishable_thought || null, created_at: se.created_at }))).sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
       );
     },
     // 사후 감상 추가·편집 (§5.8.4) — Supabase 어댑터와 표면 일치(§7.2)
@@ -704,7 +778,7 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
         if (se) se.my_note = my_note;
-        return se;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
     // 한 문장 본문 편집 (오타 수정, #325)
@@ -712,7 +786,7 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
         if (se) se.text = _validateSentenceText(text, se.visibility).text;
-        return se;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
     // 한 문장 페이지 번호 편집 (#683) — Supabase 어댑터와 표면 일치(§7.2). null = 페이지 미상.
@@ -720,19 +794,16 @@ const DataStore = {
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
         if (se) se.page = (typeof page === 'number' && isFinite(page)) ? page : null;
-        return se;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
-    // 공개 범위 변경 — Supabase 어댑터와 표면 일치
-    setVisibility(sentenceId, { visibility }) {
+    setThought(sentenceId, thought) {
+      if (thought != null && (typeof thought !== 'string' || Array.from(thought).length > 1000)) throw new Error('invalid_thought');
       return localStorageAdapter.mutate(s => {
         const se = _findSentence(s, sentenceId);
-        if (se) {
-          const checked = _validateSentenceText(se.text, visibility);
-          se.text = checked.text;
-          se.visibility = checked.visibility;
-        }
-        return se;
+        if (!se) throw new Error('sentence_not_found');
+        se.publishable_thought = thought;
+        return se ? { ...se, visibility: _storedSentenceVisibility((_ubById(s, se.user_book_id) || {}).visibility) } : se;
       });
     },
     // 종류 변경 인용↔내 의견 (#381) — Supabase 어댑터와 표면 일치
@@ -847,7 +918,7 @@ const DataStore = {
             if (!sentence) throw new Error('reading_story_sentence_mismatch');
             if (page.type === 'quote') quotes++;
             if (page.isCover) covers++;
-            return { type: page.type, position, sentenceId: sentence.id, text: page.type === 'quote' ? sentence.text : sentence.my_note, page: sentence.page, isCover: !!page.isCover };
+            return { type: page.type, position, sentenceId: sentence.id, text: page.type === 'quote' ? sentence.text : sentence.publishable_thought, page: sentence.page, isCover: !!page.isCover };
           }
           const text = String(page.text || '').trim();
           if (!text || Array.from(text).length > 1200 || page.isCover) throw new Error('reading_story_text_length');
@@ -900,8 +971,8 @@ const DataStore = {
         for (const page of story.pages || []) {
           if (page.type === 'quote' || page.type === 'note') {
             const sentence = (ub.sentences || []).find(x => x.id === page.sentenceId);
-            if (!sentence || sentence.visibility !== 'public' || (page.type === 'note' && (sentence.note_private || !String(sentence.my_note || '').trim()))) return null;
-            pages.push({ type: page.type, position: page.position, text: page.type === 'quote' ? String(sentence.text || '').slice(0, 500) : sentence.my_note, page: sentence.page, isCover: !!page.isCover });
+            if (!sentence || !_ubById(s, sentence.user_book_id) || _ubById(s, sentence.user_book_id).visibility !== 'public' || (page.type === 'note' && !String(sentence.publishable_thought || '').trim())) return null;
+            pages.push({ type: page.type, position: page.position, text: page.type === 'quote' ? String(sentence.text || '').slice(0, 500) : sentence.publishable_thought, page: sentence.page, isCover: !!page.isCover });
           } else pages.push({ type: page.type, position: page.position, text: page.text, page: null, isCover: false });
         }
         return { slug: story.slug, title: (ub.book && ub.book.title) || '', publishedAt: story.publishedAt, completedAt: ub.completed_at, book: { title: (ub.book && ub.book.title) || '', author: (ub.book && ub.book.author) || '', coverUrl: (ub.book && ub.book.cover_url) || '' }, author: { displayName: 'ReadingGo 독자', handle: '', avatarUrl: '' }, pages };

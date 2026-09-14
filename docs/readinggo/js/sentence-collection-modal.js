@@ -32,7 +32,7 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
     ]).then(([sents, bms]) => {
       if (!alive) return;
       const mineList = (sents || []).map(s => ({
-        id: s.id, text: s.text, page: s.page,
+        id: s.id, text: s.text, page: s.page, userBookId: s.user_book_id || s.userBookId, publishable_thought: s.publishable_thought ?? s.thought ?? null,
         bookTitle: (s.user_book && s.user_book.book && s.user_book.book.title) || '',
         bookId: (s.user_book && s.user_book.book_id) || s.book_id || '',
         author: (s.user_book && s.user_book.book && s.user_book.book.author) || '',
@@ -52,7 +52,7 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
         const se = b.sentence || {};
         const ub = se.user_book || {};
         return {
-          id: b.sentence_id, text: se.text || '', page: se.page,
+          id: b.sentence_id, text: se.text || '', page: se.page, userBookId: se.user_book_id || se.userBookId, publishable_thought: se.publishable_thought ?? se.thought ?? null,
           bookTitle: (ub.book && ub.book.title) || se.bookTitle || '',
           bookId: ub.book_id || se.book_id || '',
           author: (ub.book && ub.book.author) || se.author || '',
@@ -95,7 +95,7 @@ function SentenceCollectionModal({ onClose, initialFilter, initialMode }) {
   const byBook = {};
   if (filter === 'book') filtered.forEach(s => { const k = s.bookTitle || '기타'; (byBook[k] = byBook[k] || []).push(s); });
   const renderLine = (s) => (
-    <div key={s.id} onClick={() => { if (window.RG_openCompanion) window.RG_openCompanion({ id: s.id, text: s.text, bookId: s.bookId, bookTitle: s.bookTitle, author: s.author, page: s.page, note: s.note || s.my_note || '', kind: s.kind }); }}
+    <div key={s.id} onClick={() => { if (!s.saved && window.RG_openCompanion) window.RG_openCompanion({ ...s, id: s.id, text: s.text, bookId: s.bookId, bookTitle: s.bookTitle, author: s.author, page: s.page, note: s.note || s.my_note || '', kind: s.kind }); }}
       style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: 10, marginBottom: 8, cursor: 'pointer' }}>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4 }}>
         {s.bookTitle ? s.bookTitle + ' · ' : ''}{s.page != null ? s.page + 'p' : ''}{s.when ? ' · ' + s.when : ''}

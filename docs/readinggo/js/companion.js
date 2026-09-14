@@ -143,12 +143,28 @@ function CompanionModal({ sentence, onClose }) {
   // 미지정이면 그 문장이 이미 가진 성찰(rgNoteKind) → 없으면 기본값(RG_REFLECT_DEFAULT).
   const _startMode = (sentence._openMode === 'note' || sentence._openMode === 'jacky')
     ? sentence._openMode
-    : (rgNoteKind(sentence.note) || RG_REFLECT_DEFAULT);
+    : RG_REFLECT_DEFAULT;
   const [mode, setMode] = _useState(_startMode === 'note' ? 'note' : 'jacky');
   // 내 감상(자유 메모) 초안 — my_note 의 비-Q/A 블록(rgSplitNote.free). 저장 시 재키 Q/A 보존.
-  const [noteDraft, setNoteDraft] = _useState(() => rgSplitNote(sentence.note).free);
+  const [noteDraft, setNoteDraft] = _useState(() => sentence.publishable_thought || '');
   const [noteSaving, setNoteSaving] = _useState(false);
-  const initialExchanges = parseNoteToExchanges(sentence.note);
+  const initialExchanges = [];
+  const [conversationReady, setConversationReady] = _useState(false);
+  const conversationWrite = _useRef(false);
+  const pendingRequest = _useRef(null);
+  _useEffect(() => {
+    let alive = true;
+    Promise.resolve().then(() => DataStore.sentenceConversations.list(sentence.id)).then(turns => {
+      if (!alive) return;
+      const pairs = []; let q = null;
+      for (const turn of turns) {
+        if (turn.role === 'assistant') q = turn.content;
+        else if (turn.role === 'user' && q !== null) { pairs.push({ q, a: turn.content }); q = null; }
+      }
+      setExchanges(pairs); setDone(pairs.length >= COMPANION_MAX_TURNS); setConversationReady(true);
+    }).catch(() => { if (alive) { setLoading(false); showToast('대화를 불러오지 못했어요. 다시 열어 주세요.'); } });
+    return () => { alive = false; };
+  }, [sentence.id]);
   const initiallyAtCap = initialExchanges.length >= COMPANION_MAX_TURNS;
   const [exchanges, setExchanges] = _useState(initialExchanges);
   const [question, setQuestion] = _useState(null);
@@ -201,10 +217,10 @@ function CompanionModal({ sentence, onClose }) {
   // 재키 질문 생성 — 재키 모드에서만(감상 모드는 LLM 호출 안 함, #1070). 감상→재키 전환으로
   // 처음 재키에 들어올 때 1회 생성. 이미 질문이 있거나 종료(done)면 재생성하지 않는다.
   _useEffect(() => {
-    if (mode !== 'jacky' || question || done) return;
+    if (mode !== 'jacky' || !conversationReady || question || done) return;
     let alive = true;
     setLoading(true);
-    const past = parseNoteToExchanges(sentence.note);
+    const past = exchanges;
     if (past.length >= COMPANION_MAX_TURNS) { setLoading(false); setDone(true); return; }
     // 질문 생성은 사용자가 요청한 핵심 서비스 처리다. 선택 동의는 아래 archiveCompanion과
     // 리플레이·식별 분석만 제어하며, 미동의자도 최소 문장/책/해당 대화만 전송해 같은 추론을 받는다.
@@ -213,32 +229,31 @@ function CompanionModal({ sentence, onClose }) {
       : genCompanionQuestion(sentence.text, bt, au, sentence.kind, '', sentence);
     gen.then((q) => { if (alive) { commitCompanionQuestion(q, setQuestion, setPersonalizationSources); setLoading(false); } });
     return () => { alive = false; };
-  }, [mode]);
+  }, [mode, conversationReady]);
   // 새 질문·답변·로딩 변화 시 대화 말단을 view로 — 답변 생성에 의한 화면 점프·오탭 방지 (#407)
   _useEffect(() => {
     try { _compTailRef.current && _compTailRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch (e) {}
   }, [question, loading, done, exchanges.length]);
-  const persist = (ex) => {
-    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) return Promise.resolve(false);
-    if (!ex || !ex.length) return Promise.resolve(false);   // 빈 대화로 기존 my_note 덮어쓰기 방지 (#404)
-    const qa = ex.map((e) => `Q. ${e.q}\nA. ${e.a}`).join('\n\n');
-    const note = rgJoinNote(rgSplitNote(sentence.note).free, qa);   // 내 감상 블록 보존 (#1070)
-    return Promise.resolve(DataStore.sentences.setNote(sentence.id, note)).then(() => {
-      sentence.note = note;
-      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+  const persist = async (ex) => {
+    const turn = ex[ex.length - 1];
+    if (!sentence.id || !turn || !DataStore.sentenceConversations) return false;
+    try {
+      if (!pendingRequest.current) pendingRequest.current = window.crypto.randomUUID();
+      await DataStore.sentenceConversations.savePair(sentence.id, { ...turn, requestId: pendingRequest.current });
+      pendingRequest.current = null;
       return true;
-    }).catch(() => false);
+    } catch (_) { return false; }
   };
   // 내 감상만 저장 (#1070) — 재키 Q/A 는 보존하고 자유 감상 블록만 교체. 빈 감상 저장 = 감상 블록 제거.
   // 재키를 강제하지 않고 이 한 번으로 성찰이 완결된다(데이터=my_note, 양 어댑터 setNote 표면 일치).
   const saveFreeNote = () => {
-    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) { onClose(); return; }
+    if (!sentence.id || !(DataStore.sentences && DataStore.sentences.setThought)) { onClose(); return; }
     const free = noteDraft.trim();
-    const note = rgJoinNote(free, rgSplitNote(sentence.note).qa);   // 재키 대화 보존
+    const note = free; // Explicit thought only; legacy raw note is untouched.
     setNoteSaving(true);
-    Promise.resolve(DataStore.sentences.setNote(sentence.id, note || null)).then(() => {
-      sentence.note = note;
-      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+    Promise.resolve(DataStore.sentences.setThought(sentence.id, note || null)).then(() => {
+      sentence.publishable_thought = note;
+      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, publishable_thought: note } }));
       if (window.rgTrack) window.rgTrack('reflection_note_saved', { book_id: sentence.bookId || '', chars: free.length });
       setNoteSaving(false);
       onClose();
@@ -256,14 +271,16 @@ function CompanionModal({ sentence, onClose }) {
       onClose();
     }).catch(() => showToast('삭제 실패 — 잠시 후 다시'));
   };
-  const submit = () => {
+  const submit = async () => {
     const a = answer.trim();
-    if (!a || !question || exchanges.length >= COMPANION_MAX_TURNS) return;
+    if (!a || !question || conversationWrite.current || !conversationReady || exchanges.length >= COMPANION_MAX_TURNS) return;
     const ex = [...exchanges, { q: question, a }];
+    conversationWrite.current = true;
+    const saved = await persist(ex);
+    conversationWrite.current = false;
+    if (!saved) { showToast('대화를 저장하지 못했어요. 답변은 그대로 두었어요.'); return; }
     setExchanges(ex); setAnswer('');
-    persist(ex).then((saved) => {
-      if (saved && consent === 'yes') rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
-    });
+    if (consent === 'yes') rgTrack('answer_saved', { book_id: sentence.bookId || '', lens: 'why', answer_length: a.length });
     archiveCompanion(sentence.bookId, sentence.text, question, a); // 서버 아카이브 (#295)
     // 저장된 Q/A 포함 누적 10턴 도달 시 종료. 선택 동의 여부는 이용 가능 턴 수와 무관하다(#1409).
     if (ex.length >= COMPANION_MAX_TURNS) { setQuestion(null); setDone(true); return; }
@@ -421,10 +438,11 @@ function CompanionModal({ sentence, onClose }) {
               <div style={{ fontSize: 12.5, color: 'var(--ink-3)', fontWeight: 600, lineHeight: 1.6, marginBottom: 8 }}>
                 재키 없이, 이 문장에 대한 내 감상만 남겨요.
               </div>
-              <textarea value={noteDraft} onChange={(e) => { if (e.target.value.length <= 2000) setNoteDraft(e.target.value); }}
+              <textarea value={noteDraft} onChange={(e) => { if (Array.from(e.target.value).length <= 1000) setNoteDraft(e.target.value); }}
                 placeholder="이 문장에서 떠오른 생각·감정을 자유롭게 적어요…" rows={7} aria-label="내 감상"
                 style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid var(--line)', borderRadius: 12, padding: '11px 13px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.6, resize: 'vertical', background: 'var(--paper-2)', color: 'var(--ink)', outline: 'none' }} />
-              {rgSplitNote(sentence.note).qa ? (
+              {sentence.note ? <details><summary>이전 비공개 메모 원문</summary><div style={{whiteSpace:'pre-wrap'}}>{sentence.note}</div></details> : null}
+              {exchanges.length ? (
                 <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.5 }}>
                   재키와 나눈 대화는 그대로 보관돼요 — '재키와 대화'에서 볼 수 있어요.
                 </div>

@@ -36,6 +36,14 @@ const query = {
 const client = {
   auth: { getSession: async () => ({ data: { session: { user: { id: userId } } } }) },
   from(table) { assert.equal(table, 'claps'); return query; },
+  rpc(name, args) {
+    assert.equal(name, 'sentence_public');
+    assert.equal(args.p_sentence_id, sentenceId);
+    return Promise.resolve({ data: { ...sanitizedSentence, userId: sanitizedSentence.user_id,
+      userBookId: sanitizedSentence.user_book_id, bookId: sanitizedSentence.user_book.book_id,
+      createdAt: sanitizedSentence.created_at, parent: { id: sanitizedSentence.user_book_id,
+        book: sanitizedSentence.user_book.book, author: {} } }, error: null });
+  },
 };
 const sandbox = {
   window: {
@@ -51,7 +59,7 @@ vm.createContext(sandbox);
 vm.runInContext(adapterSource, sandbox);
 
 const rows = await sandbox.window.SupabaseDataStore.claps.list();
-assert.match(selected, /sentence:sentences_public\(/, '좋아요 목록은 공개 문장 뷰를 embed해야 한다');
+assert.equal(selected, 'sentence_id:to_sentence_id', '좋아요 원장은 대상 ID만 읽고 공개 projection을 별도 검증한다');
 assert.equal(rows.length, 1);
 assert.equal(rows[0].sentence.text, sanitizedSentence.text, '타인 문장이 RLS-safe view에서 목록까지 전달된다');
 assert.equal(rows.filter((row) => row.sentence).length, rows.length, '프로필 count와 모달 렌더 수가 일치한다');

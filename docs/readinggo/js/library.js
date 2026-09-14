@@ -155,7 +155,7 @@ function _mapWish(w) {
 function _mapUserBook(ub) {
   const b = ub.book || {};
   return {
-    ubId: ub.id, id: ub.book_id,
+    ubId: ub.id, userBookId: ub.id, id: ub.book_id, visibility: ub.visibility,
     title: b.title || '제목 없음', author: b.author || '', pub: b.publisher || '',
     cover: b.cover_url || '', fb: ['#9AA7B2', '#C7D0D8'],
     total: b.total_pages || 0, isbn: b.isbn13 || '',

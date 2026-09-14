@@ -89,7 +89,7 @@ function SentenceCard({ item, bookId, noBlind }) {
         </span>
         {/* #650 A: 외부 공유 — 이미지 카드 + Web Share/텍스트 폴백 (share-card.js) */}
         {window.shareSentence ? (
-          <button type="button" className="chip" aria-label="한 문장 공유" onClick={() => (window.shareSentenceWithFormatChoice || window.shareSentence)({ id: item.id, text: item.q, bookId: bookId, bookTitle: cardTitle, author: item.author, page: item.page, kind: item.kind, note: item.note, my_note: item.my_note, notePrivate: item.notePrivate, note_private: item.note_private, visibility: item.visibility })}>
+          <button type="button" className="chip" aria-label="한 문장 공유" onClick={() => (window.shareSentenceWithFormatChoice || window.shareSentence)({ id: item.id, text: item.q, bookId: bookId, bookTitle: cardTitle, author: item.author, page: item.page, kind: item.kind, userBookId: item.userBookId || item.user_book_id || item.ubId, publishable_thought: item.publishable_thought })}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M8 1.5l2.5 2.5L8 6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M10.5 4H5C3.3 4 2 5.3 2 7v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -118,16 +118,8 @@ function SentenceCard({ item, bookId, noBlind }) {
    #641: 짹+저장(구 bookmark) → 단일 좋아요(claps). 자기 문장 좋아요 허용(저장 통일).
    표면별 버튼 드리프트 방지를 위한 공용 단일 출처. align_v7 invariant 로 락.
    props: sentence{id,text,bookId,bookTitle,author,page,note,visibility,isPrivate}, mine, fav(좋아요 초기상태), onRemoved */
-const _SA_VIS = ['public', 'followers', 'private'];
-const _SA_VIS_ICON = {
-  public: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/><ellipse cx="6" cy="6" rx="2.5" ry="5" stroke="currentColor" strokeWidth="1.2"/><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1.2"/></svg>,
-  followers: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="4.5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1 10c0-2 1.5-3 3.5-3s3.5 1 3.5 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="9" cy="3.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/><path d="M8 10c0-1.5.8-2.5 2-2.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>,
-  private: <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5.5" width="8" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
-};
-const _SA_VIS_LABEL = { public: '전체공개', followers: '친구공개', private: '나만 보기' };
 function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const id = sentence && sentence.id;
-  const [vis, setVis] = useState(sentence.visibility || (sentence.isPrivate ? 'private' : 'public'));
   const [liked, setLiked] = useState(!!favInit);
   const [likeN, setLikeN] = useState(sentence.claps || sentence.clapCount || 0);
   // #683: 수정 = 문장 본문 + 페이지 인라인 편집. (이전엔 잘못 동반자 대화 모달로 연결됨.)
@@ -146,23 +138,6 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink-2)', padding: '3px 9px', lineHeight: 1 };
   const chipOn = { ...chip, background: 'var(--brand-tint)', borderColor: 'var(--brand)', color: 'var(--brand-3)' };
-  const _visChip = {
-    public:    { ...chip, background: 'rgba(63,209,127,0.1)', borderColor: 'rgba(63,209,127,0.4)', color: 'var(--brand)' },
-    followers: { ...chip, background: 'rgba(88,130,255,0.1)', borderColor: 'rgba(88,130,255,0.4)', color: 'var(--ink-2)' },
-    private:   { ...chip, background: 'rgba(120,120,130,0.1)', borderColor: 'rgba(120,120,130,0.35)', color: 'var(--ink-3)' },
-  };
-  const cycleVis = (e) => {
-    stop(e);
-    if (!(DataStore.sentences && DataStore.sentences.setVisibility)) return;
-    const next = _SA_VIS[(_SA_VIS.indexOf(vis) + 1) % _SA_VIS.length];
-    Promise.resolve(DataStore.sentences.setVisibility(id, { visibility: next })).then(() => {
-      setVis(next);
-      sentence.visibility = next;
-      window.dispatchEvent(new CustomEvent('rg:sentence-vis', { detail: { id, visibility: next } }));
-    }).catch((error) => {
-      if (!error || error.message !== 'ugc_terms_required') showToast('공개 범위를 바꾸지 못했어요');
-    });
-  };
   // #683: 수정 = 인라인 편집 폼 열기 (동반자 대화 모달 X). 드래프트를 현재 값으로 리셋 후 진입.
   const edit = (e) => { stop(e); setDText(sentence.text || ''); setDPage(sentence.page == null ? '' : String(sentence.page)); setEditing(true); };
   const cancelEdit = (e) => { stop(e); setEditing(false); };
@@ -195,7 +170,7 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     {likeN > 0 ? likeN : '좋아요'}
   </button>;
   // #650 A: 외부 공유 — 이미지 카드(html-to-image) + Web Share/텍스트 폴백. share-card.js.
-  const share = (e) => { stop(e); const shareFn = window.shareSentenceWithFormatChoice || window.shareSentence; if (shareFn) shareFn({ id, text: sentence.text, bookId: sentence.bookId, bookTitle: sentence.bookTitle, author: sentence.author, page: sentence.page, note: sentence.note, my_note: sentence.my_note, notePrivate: sentence.notePrivate, note_private: sentence.note_private, visibility: sentence.visibility, kind: sentence.kind }); };
+  const share = (e) => { stop(e); const shareFn = window.shareSentenceWithFormatChoice || window.shareSentence; if (shareFn) shareFn({ id, text: sentence.text, bookId: sentence.bookId, bookTitle: sentence.bookTitle, author: sentence.author, page: sentence.page, userBookId: sentence.userBookId || sentence.user_book_id || sentence.ubId, publishable_thought: sentence.publishable_thought, kind: sentence.kind }); };
   const shareBtn = window.shareSentence ? <button onClick={share} title="외부 공유 (이미지 카드)" style={chip}>
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M9 7.5v3H1.5v-7H4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -232,7 +207,6 @@ function SentenceActions({ sentence, mine, fav: favInit, onRemoved }) {
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }} onClick={stop}>
       {mine ? (
         <>
-          <button onClick={cycleVis} title="공개 범위 변경 (전체→친구→나만 보기)" style={_visChip[vis]}><span>{_SA_VIS_ICON[vis]}</span><span>{_SA_VIS_LABEL[vis]}</span></button>
           {likeBtn}
           {shareBtn}
           <button onClick={edit} title="수정 (문장·페이지)" style={chip}>

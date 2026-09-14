@@ -102,7 +102,7 @@ function BookInfoModal({ bookId, onClose }) {
       .then(rows => {
         if (!alive) return;
         const mine = (Array.isArray(rows) ? rows : []).filter(r => ((r.user_book && r.user_book.book_id) || r.book_id) === bookId);
-        setMySents(mine.map(r => ({ id: r.id, text: r.text || '', page: r.page, bookId, bookTitle: (r.user_book && r.user_book.book && r.user_book.book.title) || '', visibility: r.visibility, isPrivate: r.is_private, note: r.my_note || '', notePrivate: !!r.note_private, note_private: !!r.note_private, kind: r.kind })));
+        setMySents(mine.map(r => ({ id: r.id, userBookId: r.userBookId || r.user_book_id || (r.user_book && r.user_book.id), text: r.text || '', page: r.page, bookId, bookTitle: (r.user_book && r.user_book.book && r.user_book.book.title) || '', visibility: r.visibility, note: r.publishable_thought || '', publishable_thought: r.publishable_thought || '', kind: r.kind })));
       })
       .catch(() => { if (alive) setMySents([]); });
     return () => { alive = false; };
@@ -201,7 +201,9 @@ function BookInfoModal({ bookId, onClose }) {
                   return (
                     <SentenceCard key={s.id} bookId={bk.id} noBlind
                       item={{ id: s.id, q: decodeEntities(s.text || ''), nick: u.handle ? '@' + u.handle : (u.display_name || '익명'), avatar: window.rgIcon('user', 20),
-                              page: s.page, time: '', claps: s.clapCount || 0, bookId: bk.id, bookTitle: '', isMine: false }} />
+                              page: s.page, time: '', claps: s.clapCount || 0, bookId: bk.id, bookTitle: '', isMine: false,
+                              userBookId: s.userBookId || s.user_book_id || (s.user_book && s.user_book.id),
+                              note: s.publishable_thought || '', publishable_thought: s.publishable_thought || '' }} />
                   );
                 })}
               </div>

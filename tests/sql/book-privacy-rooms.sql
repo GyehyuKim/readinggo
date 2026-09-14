@@ -1,0 +1,40 @@
+-- Synthetic disposable PG after migration69. Everything rolls back.
+begin;
+do $$
+declare o uuid:=gen_random_uuid(); v uuid:=gen_random_uuid(); b uuid; ub uuid; s uuid; room uuid; p jsonb;
+begin
+ insert into auth.users(id,raw_user_meta_data) values(o,'{}'),(v,'{}');
+ update public.users set settings='{"ugc_terms":{"version":"2026-08-01","accepted_at":"2026-09-03T00:00:00Z"}}' where id in(o,v);
+ insert into public.books(title,author) values('Room fixture','Synthetic') returning id into b;
+ insert into public.user_books(user_id,book_id,current_page) values(o,b,42) returning id into ub;
+ insert into public.sentences(user_id,user_book_id,text,my_note) values(o,ub,'Quote','SECRET') returning id into s;
+ insert into public.villages(book_id,name,visibility,created_by) values(b,'Private room','private',o) returning id into room;
+ insert into public.village_members(village_id,user_id) values(room,o);
+ perform set_config('request.jwt.claim.sub',v::text,true); set local role authenticated;
+ if exists(select 1 from public.room_members_public(room)) then raise exception 'private_room_leak'; end if;
+ reset role; insert into public.village_members(village_id,user_id) values(room,v);
+ set local role authenticated;
+ select x into p from public.room_members_public(room) x where x->'user'->>'id'=o::text;
+ if p is null or p->'user'->>'cumulativePage' is not null or p->'user'->>'todaySentence' is not null then raise exception 'private_book_leak'; end if;
+ if p->'user'->>'todayRecorded' is not null or p->'user'->>'streak' is not null then raise exception 'personal_activity_leak'; end if;
+ reset role; perform set_config('request.jwt.claim.sub',o::text,true); set local role authenticated;
+ perform public.book_set_visibility(ub,'public',0,gen_random_uuid());
+ reset role; perform set_config('request.jwt.claim.sub',v::text,true); set local role authenticated;
+ select x into p from public.room_members_public(room) x where x->'user'->>'id'=o::text;
+ if p->'user'->>'cumulativePage'<>'42' or p->'user'->'todaySentence'->>'text'<>'Quote' or p::text like '%SECRET%' then raise exception 'public_room_projection'; end if;
+ reset role; insert into public.moderation_hidden_sentences(sentence_id,hidden_by) values(s,v);
+ set local role authenticated;
+ select x into p from public.room_members_public(room) x where x->'user'->>'id'=o::text;
+ if p->'user'->>'todaySentence' is not null then raise exception 'hidden_sentence_leak'; end if;
+ reset role; insert into public.user_blocks(blocker_id,blocked_id) values(o,v);
+ set local role authenticated;
+ if exists(select 1 from public.room_members_public(room) x where x->'user'->>'id'=o::text) then raise exception 'reverse_block_profile_leak'; end if;
+ reset role; delete from public.user_blocks where blocker_id=o;
+ insert into public.moderation_suspended_users(user_id,suspended_by) values(o,v);
+ set local role authenticated;
+ if exists(select 1 from public.room_members_public(room) x where x->'user'->>'id'=o::text) then raise exception 'suspended_profile_leak'; end if;
+ reset role; set local role anon;
+ begin perform public.room_members_public(room); raise exception 'anon_granted'; exception when insufficient_privilege then null; end;
+ reset role;
+end $$;
+rollback;

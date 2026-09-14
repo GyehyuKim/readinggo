@@ -85,3 +85,15 @@ test('migration and bootstrap schema preserve protected book, sentence, progress
   assert.match(schema, /current_page\s+int/i);
   assert.match(schema, /session_date\s+date/i);
 });
+
+test('final-70 role gate includes API-safe conversation SQL and sends its checked payload', () => {
+  assert.match(migrateDevWorkflow, /'book-privacy-rooms\.sql', '\.\.\/conversation-reliability\.pg\.sql'/);
+  assert.match(migrateDevWorkflow, /json\.dumps\(\{'query': executable\}\)/,
+    'the Supabase query payload must be the same SQL that passed transaction checks');
+  const fixture = fs.readFileSync(path.join(root, 'tests', 'conversation-reliability.pg.sql'), 'utf8');
+  assert.doesNotMatch(fixture, /^\s*\\/m, 'Management API SQL must not contain psql backslash directives');
+  const executable = fixture.replace(/^\s*(?:--|\\).*$/gm, '');
+  assert.match(executable, /^\s*begin;[\s\S]*rollback;\s*$/i);
+  const payload = JSON.parse(JSON.stringify({ query: executable }));
+  assert.equal(payload.query, executable, 'payload JSON parsing must preserve the executable SQL exactly');
+});

@@ -12,23 +12,23 @@ assert.match(app, /mineDb\.find\(x => x\.id === savedSentenceRow\.id\)[\s\S]*ref
   'readback에서 같은 ID의 문장을 확인해 성찰 문맥을 만들어야 한다');
 assert.match(app, /completion\.onSuccess\(\{ reflectionSentence, currentPage: authoritativeCurrentPage \}\)/,
   '저장 완료 콜백에 정확한 성찰 문장과 권위 현재 쪽을 전달해야 한다');
-assert.match(app, /notePrivate: !!savedReadbackRow\.note_private,[\s\S]*note_private: !!savedReadbackRow\.note_private/,
-  '저장 완료 readback은 비공개 생각 플래그를 공유 경계까지 전달해야 한다');
+assert.match(app, /publishable_thought: savedReadbackRow\.publishable_thought \?\? savedReadbackRow\.thought \?\? null/,
+  '저장 완료 readback은 분리된 공개 가능 생각을 보존해야 한다');
 
 assert.match(home, /reflectionPending: sentenceCount === 1/,
   '단일 문장 완료만 성찰 연결을 기다려야 한다');
 assert.match(home, /onSuccess: \(result\) =>[\s\S]*reflectionSentence: result && result\.reflectionSentence/,
   '저장 성공 결과를 현재 완료 화면에 연결해야 한다');
-assert.match(home, /saveReflectionFromCeremony[\s\S]*DataStore\.sentences\.setNote\(sentence\.id, note \|\| null\)/,
-  'inline 생각은 방금 저장한 정확한 sentence ID에 setNote로 저장해야 한다');
-assert.match(home, /rgJoinNote\(draft\.trim\(\), rgSplitNote\(sentence\.note\)\.qa\)/,
-  'inline 생각 저장은 기존 재키 Q/A를 보존해야 한다');
+assert.match(home, /saveReflectionFromCeremony[\s\S]*DataStore\.sentences\.setThought\(sentence\.id, note \|\| null\)/,
+  'inline 생각은 방금 저장한 정확한 sentence ID의 공개 가능 생각 필드에 저장해야 한다');
+assert.doesNotMatch(home, /saveReflectionFromCeremony[\s\S]*setNote\(/,
+  'owner-only legacy my_note를 공개 생각으로 재사용하지 않는다');
 assert.match(home, /talkToJackyFromCeremony[\s\S]*RG_openCompanion\(sentence, \{ mode: 'jacky' \}\)/,
   '재키 대화는 방금 문장을 jacky 모드로 열어야 한다');
 assert.match(home, /shareSentenceFromCeremony[\s\S]*shareSentenceWithFormatChoice \|\| window\.shareSentence[\s\S]*if \(!sentence \|\| !sentence\.id \|\| !share\) return;[\s\S]*entry: 'post_save'/,
   '공유는 권위 ID가 있는 방금 문장을 기존 선택기에 post_save 진입점으로 전달해야 한다');
-assert.match(home, /note: sentence\.note \|\| ''[\s\S]*my_note: sentence\.note \|\| ''/,
-  '생각 저장 뒤 공유에는 최신 저장 note를 전달해야 한다');
+assert.match(home, /note: sentence\.publishable_thought \|\| ''[\s\S]*publishable_thought: sentence\.publishable_thought \|\| ''/,
+  '생각 저장 뒤 공유에는 분리된 최신 공개 가능 생각만 전달해야 한다');
 assert.match(home, /onSaveReflection=\{saveReflectionFromCeremony\}[\s\S]*onTalkToJacky=\{talkToJackyFromCeremony\}[\s\S]*typeof window\.shareSentenceWithFormatChoice === 'function'[\s\S]*typeof window\.shareSentence === 'function'[\s\S]*\? shareSentenceFromCeremony : null/,
   '완료 화면은 inline 저장·재키 callback과 함께 공유 함수가 있을 때만 공유 callback을 전달해야 한다');
 
@@ -46,7 +46,7 @@ assert.match(ceremony, /const \[reflectionStatus, setReflectionStatus\] = _useSt
   'history 복원으로 remount돼도 저장 완료 상태로 초기화해야 한다');
 assert.match(ceremony, /reflectionWasSaved[\s\S]*setReflectionStatus\(reflectionWasSaved \? 'saved' : 'idle'\)[\s\S]*\[reflectionId, reflectionWasSaved\]/,
   '동일 문장 payload의 저장 완료 marker 갱신을 반영해야 한다');
-assert.match(home, /const markReflectionSaved = current[\s\S]*reflectionSaved: true[\s\S]*reflectionSentence: \{ \.\.\.current\.reflectionSentence, note \}[\s\S]*_sentenceCeremonyRef\.current = markReflectionSaved\(_sentenceCeremonyRef\.current\)[\s\S]*setCeremony\(markReflectionSaved\)/,
+assert.match(home, /const markReflectionSaved = current[\s\S]*reflectionSaved: true[\s\S]*reflectionSentence: \{ \.\.\.current\.reflectionSentence, publishable_thought: note \}[\s\S]*_sentenceCeremonyRef\.current = markReflectionSaved\(_sentenceCeremonyRef\.current\)[\s\S]*setCeremony\(markReflectionSaved\)/,
   '저장 성공 시 현재 화면과 history ref에 완료 marker·최신 note를 함께 보존해야 한다');
 assert.match(ceremony, /const reflectionSaving = reflectionReady && reflectionStatus === 'saving'/,
   '저장 요청 중 이탈 행동을 하나의 상태로 막아야 한다');

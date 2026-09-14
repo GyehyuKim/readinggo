@@ -68,6 +68,11 @@ function createHarness(toBlob) {
   const copied = [];
   const window = {
     RG_CONFIG: { API_ORIGIN: 'https://readinggo.example' },
+    DataStore: {
+      auth: { currentUser: async () => null },
+      myBooks: { publicBook: async id => ({ id }) },
+      sentences: { publicByBook: async (userBookId, id) => [{ id, userBookId }] },
+    },
     htmlToImage: {
       toBlob: async (node, options) => {
         renders.push({ node, options });
@@ -93,7 +98,7 @@ function createHarness(toBlob) {
 }
 
 const harness = createHarness();
-const sentence = { id: 's1', text: '오래 보아야 사랑스럽다. 너도 그렇다.', bookTitle: '풀꽃', author: '나태주' };
+const sentence = { id: '22222222-2222-4222-8222-222222222222', userBookId: '11111111-1111-4111-8111-111111111111', text: '오래 보아야 사랑스럽다. 너도 그렇다.', bookTitle: '풀꽃', author: '나태주' };
 
 test('format allowlist preserves the existing 1:1 default', () => {
   assert.equal(harness.window.RG_normalizeShareFormat(), '1:1');
@@ -288,17 +293,17 @@ test('format picker traps Tab and restores focus to its trigger on Escape', asyn
 
 test('public note defaults on, opt-out removes it, and private notes are never rendered or shared', async () => {
   const local = createHarness();
-  const choice = local.window.shareSentenceWithFormatChoice({ ...sentence, note: '천천히 읽고 싶다', visibility: 'public' });
+  const choice = local.window.shareSentenceWithFormatChoice({ ...sentence, publishable_thought: '천천히 읽고 싶다', visibility: 'public' });
   await new Promise((resolve) => setTimeout(resolve, 0));
   const dialog = local.document.body.children[0].children[0];
   const noteToggle = dialog.children[4].children[0];
   assert.equal(noteToggle.checked, true);
   assert.equal(local.renders.at(-1).node.children.some((child) => child.attributes['data-rg-share-note'] === 'true'), true);
-  assert.match(local.window.buildShareText({ ...sentence, note: '천천히 읽고 싶다' }, { includeNote: true }), /내 생각: 천천히/);
+  assert.match(local.window.buildShareText({ ...sentence, publishable_thought: '천천히 읽고 싶다' }, { includeNote: true }), /내 생각: 천천히/);
   noteToggle.checked = false;
   await noteToggle.listeners.get('change')();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.doesNotMatch(local.window.buildShareText({ ...sentence, note: '천천히 읽고 싶다' }, { includeNote: false }), /천천히/);
+  assert.doesNotMatch(local.window.buildShareText({ ...sentence, publishable_thought: '천천히 읽고 싶다' }, { includeNote: false }), /천천히/);
   local.documentListeners.get('keydown')({ key: 'Escape', preventDefault() {} });
   await choice;
 
@@ -328,29 +333,46 @@ test('collection saved-row mapping preserves privacy through image and text shar
     const isPrivate = !!(flags.note_private || flags.notePrivate);
     const local = createHarness();
     const text = local.window.buildShareText(mapped, { includeNote: true });
-    assert.equal(text.includes('PRIVATE_NOTE_SENTINEL'), !isPrivate);
+    assert.equal(text.includes('PRIVATE_NOTE_SENTINEL'), false, 'raw legacy notes never become publishable');
     for (const format of ['1:1', '9:16']) {
       await local.window.renderSentenceCardBlob(mapped, { format, includeNote: true });
       const containsNote = local.renders.at(-1).node.children.some(child => child.attributes['data-rg-share-note'] === 'true');
-      assert.equal(containsNote, !isPrivate);
+      assert.equal(containsNote, false);
     }
   }
 });
 
-test('sentence callers forward only share-safe fields including visibility and note privacy', () => {
-  assert.match(sentenceCardSource, /notePrivate: item\.notePrivate, note_private: item\.note_private, visibility: item\.visibility/);
-  assert.match(sentenceCardSource, /notePrivate: sentence\.notePrivate, note_private: sentence\.note_private, visibility: sentence\.visibility/);
-  assert.match(bookDetailSource, /notePrivate: q\.notePrivate, note_private: q\.note_private/);
-  assert.match(bookInfoSource, /notePrivate: !!r\.note_private, note_private: !!r\.note_private/);
+test('sentence callers forward separated publishable thoughts rather than legacy privacy flags', () => {
+  assert.match(sentenceCardSource, /publishable_thought: item\.publishable_thought/);
+  assert.match(sentenceCardSource, /publishable_thought: sentence\.publishable_thought/);
+  assert.match(bookDetailSource, /publishable_thought/);
+  // BookInfoModal's legacy mapper is still caller-owned; the output boundary
+  // rejects its raw note (covered above), rather than promoting it to a thought.
 });
 
-test('link action copies the working ReadingGo service URL separately from the image', async () => {
+test('revoked or unknown permissions block both external image and link output', async () => {
+  for (const fail of [async () => null, async () => { throw Error('unknown'); }]) {
+    const local = createHarness();
+    local.window.DataStore.myBooks.publicBook = fail;
+    assert.equal(await local.window.shareSentence(sentence), false);
+    const choice = local.window.shareSentenceWithFormatChoice(sentence);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const actions = local.document.body.children[0].children[0].children.at(-1);
+    await actions.children[1].listeners.get('click')();
+    assert.equal(local.copied.length, 0);
+    assert.equal(local.shares.length, 0);
+    local.documentListeners.get('keydown')({ key: 'Escape', preventDefault() {} });
+    assert.equal(await choice, false);
+  }
+});
+
+test('link action rechecks permission and copies the exact public sentence URL', async () => {
   const local = createHarness();
   const choice = local.window.shareSentenceWithFormatChoice(sentence);
   await new Promise((resolve) => setTimeout(resolve, 0));
   const actions = local.document.body.children[0].children[0].children.at(-1);
   await actions.children[1].listeners.get('click')();
-  assert.equal(local.copied.at(-1), 'https://readinggo.example');
+  assert.equal(local.copied.at(-1), 'https://readinggo.example/public/sentences/' + sentence.id);
   assert.equal(local.tracks.at(-1).props.method, 'clipboard');
   local.documentListeners.get('keydown')({ key: 'Escape', preventDefault() {} });
   assert.equal(await choice, false);

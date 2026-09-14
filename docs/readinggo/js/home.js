@@ -238,7 +238,7 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   _useEffect(() => {
     const onRm = (e) => { const id = e && e.detail && e.detail.id; if (!id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).filter((q) => q.id !== id) })); };
     const onKind = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, kind: d.kind } : q) })); };
-    const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, note: d.note } : q) })); };
+    const onNote = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, ...(d.publishable_thought !== undefined ? { publishable_thought: d.publishable_thought } : { note: d.note }) } : q) })); };
     // 한 문장 본문·페이지 수정 (#683/#731) — '이 책 한 문장' 카드 즉시 반영.
     const onUpd = (e) => { const d = e && e.detail; if (!d || !d.id) return; setHomeState((ns) => ({ ...ns, myQuotes: (ns.myQuotes || []).map((q) => q.id === d.id ? { ...q, text: d.text, page: d.page } : q) })); };
     window.addEventListener('rg:sentence-removed', onRm);
@@ -417,17 +417,16 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
   const handleCheckin = async ({ page, sentence, kind, sentPage, sentences, awaitPersistence, source = 'home' }) => {
     const correlationId = window.RG_createCheckinCorrelationId();
     const itemCount = Array.isArray(sentences) ? sentences.filter((item) => item && item.text && String(item.text).trim()).length : (sentence ? 1 : 0);
-    let settings;
+    let defaultVisibility = 'private';
     try {
-      settings = await Promise.resolve(window.DataStore.settings.get());
+      const parentId = homeState.book && homeState.book.ubId;
+      if (parentId) {
+        const parent = await window.DataStore.myBooks.getVisibility(parentId);
+        defaultVisibility = parent.visibility === 'public' ? 'public' : 'private';
+      }
     } catch (error) {
       throw await reportCheckinPreflightFailure({ source, error, correlationId, itemCount });
     }
-    const configuredVisibility = settings && settings.default_sentence_visibility;
-    const defaultVisibility = configuredVisibility == null ? 'public'
-      : (configuredVisibility === 'friends' ? 'followers'
-        : (configuredVisibility === 'public' || configuredVisibility === 'followers' || configuredVisibility === 'private'
-          ? configuredVisibility : 'private'));
     // #1457: 낙관 UI·게스트 pending·이벤트 payload도 실제 영속값과 같도록 체크인 경계에서 먼저 정규화한다.
     const normalizeText = (text, scope) => window.RG_validateSentenceText
       ? window.RG_validateSentenceText(text, scope).text
@@ -833,22 +832,22 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
 
   const saveReflectionFromCeremony = (draft) => {
     const sentence = ceremony && ceremony.reflectionSentence;
-    if (!sentence || !sentence.id || !(DataStore.sentences && DataStore.sentences.setNote)) {
+    if (!sentence || !sentence.id || !(DataStore.sentences && DataStore.sentences.setThought)) {
       return Promise.reject(new Error('reflection_sentence_unavailable'));
     }
-    const note = rgJoinNote(draft.trim(), rgSplitNote(sentence.note).qa);
-    return Promise.resolve(DataStore.sentences.setNote(sentence.id, note || null)).then(() => {
-      sentence.note = note;
+    const note = draft.trim();
+    return Promise.resolve(DataStore.sentences.setThought(sentence.id, note || null)).then(() => {
+      sentence.publishable_thought = note;
       const markReflectionSaved = current => current && current.reflectionSentence && current.reflectionSentence.id === sentence.id
-        ? { ...current, reflectionSaved: true, reflectionSentence: { ...current.reflectionSentence, note } }
+        ? { ...current, reflectionSaved: true, reflectionSentence: { ...current.reflectionSentence, publishable_thought: note } }
         : current;
       _sentenceCeremonyRef.current = markReflectionSaved(_sentenceCeremonyRef.current);
       setCeremony(markReflectionSaved);
       setHomeState(current => ({
         ...current,
-        myQuotes: (current.myQuotes || []).map(q => q.id === sentence.id ? { ...q, note } : q),
+        myQuotes: (current.myQuotes || []).map(q => q.id === sentence.id ? { ...q, publishable_thought: note } : q),
       }));
-      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, note } }));
+      window.dispatchEvent(new CustomEvent('rg:sentence-note', { detail: { id: sentence.id, publishable_thought: note } }));
       if (window.rgTrack) window.rgTrack('reflection_note_saved', { book_id: sentence.bookId || '', chars: draft.trim().length, source: 'post_save' });
       return true;
     });
@@ -869,10 +868,8 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
     if (!sentence || !sentence.id || !share) return;
     return share({
       ...sentence,
-      note: sentence.note || '',
-      my_note: sentence.note || '',
-      notePrivate: sentence.notePrivate,
-      note_private: sentence.note_private,
+      note: sentence.publishable_thought || '',
+      publishable_thought: sentence.publishable_thought || '',
       entry: 'post_save',
     });
   };
@@ -1277,17 +1274,17 @@ function HomeView({ state, onCheckin, onOpenSearch, onNavigate }) {
           const _bk = getBook(q.bookId);
           const bkTitle = q.bookTitle || (_bk && _bk.id === q.bookId ? _bk.title : '') || '책';
           // 재키 대화 턴 수 (#654) — my_note의 Q. 블록 수. 축적 신호(분수 표기 안 함), 0이면 숨김.
-          const turns = q.note ? q.note.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
+          const turns = (q.conversation_turns || []).filter(t => t.role === 'user').length;
           // 내 감상(자유 메모) — my_note 의 비-Q/A 블록 (#1070). 카드에 미리보기 + '감상 수정' 진입.
-          const noteFree = window.rgSplitNote ? window.rgSplitNote(q.note).free : '';
+          const noteFree = q.publishable_thought || '';
           // 문장별 성찰 진입 (#1070) — 모드를 명시해 연다: 'note'(내 감상만) / 'jacky'(재키와 대화).
           const openReflect = (m) => window.RG_openCompanion && window.RG_openCompanion(
-            { id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind }, { mode: m });
+            { ...q, id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind }, { mode: m });
           return (
             <window.QuoteCard key={q.id || i} q={q} variant="home">
               {/* 한 문장 액션 계약 (#610) — 공용 SentenceActions(공개범위+좋아요+수정+삭제). 삭제는 rg:sentence-removed 이벤트로 자동 갱신. */}
               {q.id && window.SentenceActions && (
-                <SentenceActions sentence={{ id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }} mine fav={favIds.has(q.id)} />
+                <SentenceActions sentence={{ ...q, id: q.id, text: q.text, bookId: q.bookId, bookTitle: bkTitle, page: q.page, note: q.note, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }} mine fav={favIds.has(q.id)} />
               )}
               {q.id && (
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
