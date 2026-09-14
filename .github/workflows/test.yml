@@ -190,6 +190,7 @@ jobs:
           npm run preview &
           for i in $(seq 1 30); do curl -sf http://localhost:4173/ >/dev/null && break; sleep 1; done
           SMOKE_URL=http://localhost:4173/ npm run smoke
+          node --test story-editor-ux.test.mjs
 
   lint:
     name: lint (biome)
