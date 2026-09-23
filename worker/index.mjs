@@ -104,6 +104,26 @@ export class BookProviderGuard {
   }
 }
 
+// Gemini 프로젝트 키를 공유하는 모든 Worker 요청과 재시도를 단일 타임라인에 예약한다.
+// 클라이언트별 지연은 협조적 최적화일 뿐이며, 이 객체가 provider-wide 10 RPM 계약의 권위 경계다.
+export class VisionProviderGuard {
+  constructor(state) { this.storage = state.storage; }
+
+  async fetch(request) {
+    if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+    let body;
+    try { body = await request.json(); } catch (e) { return json({ error: 'invalid request' }, 400); }
+    const intervalMs = boundedInt(body && body.intervalMs, 6200, 6000, 60000);
+    const now = Date.now();
+    return this.storage.transaction(async (txn) => {
+      const stored = Number(await txn.get('nextAvailableAt')) || 0;
+      const scheduledAt = Math.max(now, stored);
+      await txn.put('nextAvailableAt', scheduledAt + intervalMs);
+      return json({ waitMs: Math.max(0, scheduledAt - now), intervalMs });
+    });
+  }
+}
+
 function boundedInt(value, fallback, min, max) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
@@ -1702,17 +1722,58 @@ function bufToBase64(buf) {
 }
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+const VISION_MAX_TRIES = 3;
+const VISION_SHORT_RETRY_MAX_SECONDS = 8;
+const VISION_PROVIDER_INTERVAL_MS = 6200;
+
+export async function reserveVisionProviderSlot(env, wait = sleep) {
+  if (!env.VISION_PROVIDER_GUARD) {
+    if (env.ENVIRONMENT === 'production') throw visionProviderError('vision_rate_guard_unavailable', 502);
+    return;
+  }
+  try {
+    const namespace = env.VISION_PROVIDER_GUARD;
+    const stub = typeof namespace.getByName === 'function'
+      ? namespace.getByName('gemini-project')
+      : namespace.get(namespace.idFromName('gemini-project'));
+    const response = await stub.fetch(new Request('https://vision-rate-guard/reserve', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ intervalMs: VISION_PROVIDER_INTERVAL_MS }),
+    }));
+    if (!response.ok) throw new Error('reservation rejected');
+    const data = await response.json();
+    const waitMs = Math.max(0, Number(data && data.waitMs) || 0);
+    if (waitMs > 0) await wait(waitMs);
+  } catch (error) {
+    if (error && error.code === 'vision_rate_guard_unavailable') throw error;
+    throw visionProviderError('vision_rate_guard_unavailable', 502);
+  }
+}
+
+function visionRetryAfterSeconds(response, bodyText) {
+  const header = Number(response && response.headers && response.headers.get('retry-after'));
+  const bodyMatch = String(bodyText || '').match(/retry in\s+([0-9.]+)s/i);
+  const seconds = Number.isFinite(header) && header > 0 ? header : bodyMatch ? Number(bodyMatch[1]) : 0;
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(120, Math.max(1, Math.ceil(seconds))) : 6;
+}
+
+function visionProviderError(code, status, retryAfterSeconds = 0) {
+  const error = new Error(code);
+  error.code = code;
+  error.status = status;
+  error.retryAfterSeconds = retryAfterSeconds;
+  return error;
+}
 
 // Gemini Flash vision 호출 (OpenAI 호환). VISION_* env + GEMINI_API_KEY.
-// 재시도(#1006): Gemini 무료 티어는 egress 지역에 따라 400 FAILED_PRECONDITION
-// ("User location is not supported")을 간헐 반환한다(워커가 도는 Cloudflare PoP의
-// 송출 지역에 좌우 — 실측 ~50% flap). 같은 요청을 재시도하면 다른 경로/PoP로 나가
-// 성공률이 크게 오른다. 429/5xx(일시 과부하)도 함께 재시도. 본문 변경 없음(멱등).
+// 짧은 429/5xx/지역 flap은 Worker에서 재시도하고, quota window가 긴 429는 안전한 코드와
+// Retry-After만 클라이언트에 전달한다. provider 본문·키·업로드 원문은 응답/로그에 싣지 않는다.
 // system/userText 인자(#1042 서가 비전 추출 재사용) — 기본값은 강조 추출(기존 #844 호출부 무변).
 async function callVision({ env, dataUrl, maxTokens, system, userText }) {
   const base = (env.VISION_BASE_URL || '').replace(/\/$/, '');
   const model = env.VISION_MODEL, key = env.GEMINI_API_KEY;
-  if (!base || !model || !key) throw new Error('VISION env 미설정');
+  if (!base || !model || !key) throw visionProviderError('vision_unconfigured', 503);
   const payload = JSON.stringify({
     model,
     messages: [
@@ -1725,34 +1786,41 @@ async function callVision({ env, dataUrl, maxTokens, system, userText }) {
     temperature: 0.1,
     max_tokens: maxTokens || 800,
   });
-  const MAX_TRIES = 3;
-  let lastErr = '';
-  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-    let r;
+  for (let attempt = 1; attempt <= VISION_MAX_TRIES; attempt++) {
+    let response;
     try {
-      r = await fetch(`${base}/chat/completions`, {
+      await reserveVisionProviderSlot(env);
+      response = await fetch(`${base}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: payload,
       });
-    } catch (e) {                                   // 네트워크 실패 — 재시도 대상
-      lastErr = 'fetch ' + String((e && e.message) || e);
-      if (attempt < MAX_TRIES) { await sleep(350 * attempt); continue; }
-      throw new Error('VISION ' + lastErr);
+    } catch {
+      if (attempt < VISION_MAX_TRIES) { await sleep(350 * attempt); continue; }
+      throw visionProviderError('vision_transport_failure', 502);
     }
-    if (r.ok) {
-      const d = await r.json();
-      return ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+    if (response.ok) {
+      const data = await response.json();
+      return ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
     }
-    const bodyText = await r.text().catch(() => '');
-    lastErr = 'HTTP ' + r.status + (bodyText ? ' :: ' + bodyText.slice(0, 200) : '');
-    // 재시도 가능 분류: 429/5xx(일시) + 400 FAILED_PRECONDITION(지역 flap). 그 외(401/403 등)는 즉시 중단.
-    const retryable = r.status === 429 || r.status >= 500
-      || (r.status === 400 && /FAILED_PRECONDITION|User location/i.test(bodyText));
-    if (!retryable || attempt === MAX_TRIES) break;
-    await sleep(350 * attempt);
+    const bodyText = await response.text().catch(() => '');
+    if (response.status === 429) {
+      const retryAfterSeconds = visionRetryAfterSeconds(response, bodyText);
+      if (attempt < VISION_MAX_TRIES && retryAfterSeconds <= VISION_SHORT_RETRY_MAX_SECONDS) {
+        await sleep(retryAfterSeconds * 1000);
+        continue;
+      }
+      throw visionProviderError('vision_rate_limited', 429, retryAfterSeconds);
+    }
+    const retryable = response.status >= 500
+      || (response.status === 400 && /FAILED_PRECONDITION|User location/i.test(bodyText));
+    if (retryable && attempt < VISION_MAX_TRIES) {
+      await sleep(350 * attempt);
+      continue;
+    }
+    throw visionProviderError(retryable ? 'vision_upstream_unavailable' : 'vision_upstream_rejected', 502);
   }
-  throw new Error('VISION ' + lastErr);
+  throw visionProviderError('vision_upstream_unavailable', 502);
 }
 
 // 배치 OCR (#844) — 사진 1장 → 강조 문장 배열 { sentences }. 클라가 N장 순차 호출.
@@ -1769,8 +1837,22 @@ async function extractHighlightsProxy(request, env) {
     const dataUrl = `data:${file.type || 'image/jpeg'};base64,${bufToBase64(buf)}`;
     const sentences = parseHighlights(await callVision({ env, dataUrl }));
     return json({ sentences }, 200);
-  } catch (e) {
-    return json({ error: 'vision 호출 실패: ' + String((e && e.message) || e) }, 502);
+  } catch (error) {
+    const code = error && error.code ? error.code : 'vision_upstream_failure';
+    const retryAfterSeconds = Number(error && error.retryAfterSeconds) || 0;
+    const status = error && error.status === 429 ? 429 : 502;
+    console.warn(JSON.stringify({ event: 'vision_failure', code, status, retry_after_seconds: retryAfterSeconds || undefined }));
+    if (status === 429) {
+      return new Response(JSON.stringify({ error: 'vision rate limited', code }), {
+        status,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+          'retry-after': String(retryAfterSeconds || 6),
+        },
+      });
+    }
+    return json({ error: 'vision 호출 실패', code }, status);
   }
 }
 

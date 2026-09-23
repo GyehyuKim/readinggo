@@ -396,26 +396,14 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     if (result.saved > 0 && window.rgTrack) window.rgTrack('text_import_saved', { book_id: book.id, saved: result.saved });
     return result;
   };
-  // #844 배치 OCR — 앨범 N장 → 각 장 Gemini vision 강조 추출(순차+지연, 무료 10 RPM) → 추출 문장 → BatchQuoteImport(initialItems) 검토.
+  // #844 배치 OCR — 공용 계약이 같은 사진 429 재시도와 부분 성공 보존을 담당한다.
   const runOcrBatch = async (files) => {
     if (!book.ubId) { showToast('이 책에는 추가할 수 없어요'); return; }
     setOcrBusy(true); setOcrProgress({ done: 0, total: files.length });
-    const all = [];
-    let failed = 0;   // #1006 추출 실패(서버 비2xx·네트워크) 장 수 — '문장 못 찾음'과 구분해 정직한 안내.
-    for (let i = 0; i < files.length; i++) {
-      try {
-        const fd = new FormData();
-        fd.append('document', files[i], files[i].name || ('p' + i + '.jpg'));
-        const r = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
-        if (!r.ok) { failed++; }              // 503(미설정)·502(vision 실패, 지역 flap 포함) 등 → 실패로 집계
-        else { const d = await r.json(); if (d && Array.isArray(d.sentences)) all.push(...d.sentences); }
-      } catch (e) { failed++; /* 네트워크 실패 — 부분 완료 */ }
-      setOcrProgress({ done: i + 1, total: files.length });
-      if (i < files.length - 1) await new Promise((res) => setTimeout(res, 1200));
-    }
+    const { items, failed } = await window.RG_extractHighlightBatch(files, {
+      onProgress: setOcrProgress,
+    });
     setOcrBusy(false);
-    const seen = new Set(), items = [];
-    all.forEach((t) => { const k = (t || '').trim(); if (k && !seen.has(k)) { seen.add(k); items.push(k); } });
     if (!items.length) {
       // #1006 실패(서버/지역 outage)를 사진 탓으로 오인 표시하지 않는다.
       if (failed >= files.length) showToast('추출에 실패했어요 — 잠시 후 다시 시도해 주세요');

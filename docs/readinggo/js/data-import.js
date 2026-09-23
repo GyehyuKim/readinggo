@@ -64,24 +64,13 @@ function DataImport({ onClose }) {
     finally { setBusy(false); }
   };
 
-  // 스크린샷 N장 → 각 장 vision 추출(순차+지연 1.2s, 무료 10 RPM). book-detail-modal.runOcrBatch 로직 재사용.
+  // 스크린샷 N장 → 공용 OCR 계약(같은 사진 429 재시도·부분 성공 보존).
   const runExtract = async (files) => {
     setBusy(true); setProgress({ done: 0, total: files.length });
-    const all = []; let failed = 0;
-    for (let i = 0; i < files.length; i++) {
-      try {
-        const fd = new FormData();
-        fd.append('document', files[i], files[i].name || ('p' + i + '.jpg'));
-        const r = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
-        if (!r.ok) failed++;
-        else { const d = await r.json(); if (d && Array.isArray(d.sentences)) all.push(...d.sentences); }
-      } catch (e) { failed++; }
-      setProgress({ done: i + 1, total: files.length });
-      if (i < files.length - 1) await new Promise(res => setTimeout(res, 1200));
-    }
+    const { items: out, failed } = await window.RG_extractHighlightBatch(files, {
+      onProgress: setProgress,
+    });
     setBusy(false); setProgress(null);
-    const seen = new Set(), out = [];
-    all.forEach(t => { const k = (t || '').trim(); if (k && !seen.has(k)) { seen.add(k); out.push(k); } });
     if (!out.length) {
       if (failed >= files.length) showToast('추출에 실패했어요 — 잠시 후 다시 시도해 주세요');
       else showToast('밑줄 문장을 찾지 못했어요 — 목록이 또렷한 스크린샷으로');

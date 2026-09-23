@@ -41,9 +41,18 @@ simple = { limit = 30, period = 60 }
 name = "BOOK_PROVIDER_GUARD"
 class_name = "BookProviderGuard"
 
+# Gemini key를 공유하는 모든 호출·재시도를 provider-wide 10 RPM으로 직렬화한다.
+[[durable_objects.bindings]]
+name = "VISION_PROVIDER_GUARD"
+class_name = "VisionProviderGuard"
+
 [[migrations]]
 tag = "book-provider-guard-v1"
 new_sqlite_classes = ["BookProviderGuard"]
+
+[[migrations]]
+tag = "vision-provider-guard-v1"
+new_sqlite_classes = ["VisionProviderGuard"]
 
 # 비밀 아님(클라에도 공개). service_role·UPSTAGE 키만 `wrangler secret put` 로.
 [vars]
