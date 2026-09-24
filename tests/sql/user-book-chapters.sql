@@ -3,7 +3,7 @@ begin;
 do $$
 declare
   owner_id uuid := '16270000-0000-4000-8000-000000000001';
-  other_id uuid := '16270000-0000-4000-8000-000000000002';
+  other_id uuid := '26270000-0000-4000-8000-000000000002';
   catalog_id uuid;
   owner_book uuid;
   before_rows jsonb;
