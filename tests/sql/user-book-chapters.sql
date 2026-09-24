@@ -73,7 +73,8 @@ begin
   end if;
   reset role;
 
-  insert into public.moderation_suspended_users(user_id) values(owner_id);
+  insert into public.moderation_suspended_users(user_id,suspended_by,reason)
+    values(owner_id,other_id,'chapter fixture');
   set local role anon;
   if exists(select 1 from public.user_book_chapters_public(owner_book)) then
     raise exception 'suspended_owner_chapters_leaked';
