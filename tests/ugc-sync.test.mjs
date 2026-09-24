@@ -20,9 +20,10 @@ function harness(state, options = {}) {
   const remoteBooks = (options.remoteBooks || []).map(x => structuredClone(x));
   const remoteWishes = (options.remoteWishes || []).map(x => structuredClone(x));
   const remoteSentences = [];
+  const remoteChapters = new Map();
   const catalog = new Map(remoteWishes.map(x => [x.book_id || (x.book && x.book.id), x.book]).filter(x => x[0]));
   const booksById = options.booksById || {};
-  const calls = { adds: [], aborts: [], reviews: [], sentences: [], active: [], wishAdds: [], upserts: [], sessions: 0 };
+  const calls = { adds: [], aborts: [], reviews: [], sentences: [], chapters: [], active: [], wishAdds: [], upserts: [], sessions: 0 };
   const failed = new Set();
   const failOnce = (kind, key, configured) => {
     if (!configured || !configured.includes(key) || failed.has(`${kind}:${key}`)) return false;
@@ -115,6 +116,18 @@ function harness(state, options = {}) {
   const context = {
     window: {
       localStorageAdapter, SupabaseDataStore,
+      RG_migrateGuestChapters: async ({ chapters, remoteUserBookId }) => {
+        calls.chapters.push({ remoteUserBookId, rows: structuredClone(chapters || []) });
+        if (options.failChaptersOnce && !failed.has('chapters-once')) {
+          failed.add('chapters-once');
+          throw new Error('synthetic chapter failure');
+        }
+        const intended = structuredClone(chapters || []);
+        const current = remoteChapters.get(remoteUserBookId) || [];
+        if (current.length && JSON.stringify(current) !== JSON.stringify(intended)) throw new Error('chapter_migration_conflict');
+        remoteChapters.set(remoteUserBookId, intended);
+        return { complete: true, rows: intended, replayed: current.length > 0 };
+      },
       RG_normalizeStoredSentenceVisibility: normalizeVisibility,
       getBook: (id) => booksById[id] || options.fallbackBook || null,
       crypto: { randomUUID: () => `20000000-0000-4000-8000-${String(++migrationSeq).padStart(12, '0')}` },
@@ -122,7 +135,7 @@ function harness(state, options = {}) {
     console: { log() {}, warn() {} }, Set, Map,
   };
   const fn = vm.runInNewContext(`(${extractFunction('syncPendingToSupabase')})`, context);
-  return { run: fn, state: () => state, calls, remoteBooks, remoteWishes, remoteSentences };
+  return { run: fn, state: () => state, calls, remoteBooks, remoteWishes, remoteSentences, remoteChapters };
 }
 
 // Guest migration creates a private parent; legacy child visibility never blocks or promotes migration.
@@ -184,6 +197,27 @@ function harness(state, options = {}) {
   assert.deepEqual(h.calls.reviews, [{ id: h.remoteBooks[1].id, review: '소감 재시도' }]);
   assert.equal(h.remoteBooks[0].status, 'aborted');
   assert.equal(h.remoteBooks[1].review_text, '소감 재시도');
+}
+
+// Chapter-only failure keeps the local TOC and retries only that incomplete stage.
+{
+  const chapter = { title: '첫 장', start_page: 1, depth: 0, position: 0 };
+  const state = { active_user_book_id: null, wish_books: [], pending: {}, user_books: [{
+    id: 'chapter-retry', status: 'reading', book: { isbn13: '883', title: '목차 재시도', author: 'L' },
+    chapters: [chapter], sentences: [{ text: '이미 옮긴 문장', page: null, visibility: 'private', _guest: true }],
+  }] };
+  const h = harness(state, { failChaptersOnce: true });
+  await h.run();
+  assert.equal(h.state().user_books[0]._migration_complete, false);
+  assert.equal(h.state().user_books[0]._migration_chapters_complete, false);
+  assert.equal(h.remoteSentences.length, 1);
+  await h.run();
+  assert.equal(h.calls.adds.length, 1, 'chapter retry must reuse the remote book');
+  assert.equal(h.remoteSentences.length, 1, 'chapter retry must not duplicate sentences');
+  assert.equal(h.calls.chapters.length, 2);
+  assert.deepEqual(h.remoteChapters.get(h.remoteBooks[0].id), [chapter]);
+  assert.equal(h.state().user_books[0]._migration_chapters_complete, true);
+  assert.equal(h.state().user_books[0]._migration_complete, true);
 }
 
 // Existing remote rows match by ISBN/title+author and are reused without overwriting status/page.

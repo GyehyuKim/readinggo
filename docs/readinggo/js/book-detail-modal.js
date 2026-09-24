@@ -324,6 +324,115 @@ function BookPrivacyControl({ book }) {
   </fieldset>;
 }
 
+const _chapterErrorCopy = {
+  title_required:'제목을 입력해 주세요.', start_page_invalid:'시작 페이지는 1 이상의 정수여야 해요.',
+  start_page_over_total:'시작 페이지가 이 판본의 전체 쪽수를 넘어요.', depth_invalid:'깊이는 0 이상의 정수여야 해요.',
+  position_invalid:'행 순서를 다시 확인해 주세요.', first_depth_invalid:'첫 행의 깊이는 0이어야 해요.',
+  start_page_duplicate:'앞 행과 시작 페이지가 같아요.', start_page_not_increasing:'시작 페이지는 앞 행보다 커야 해요.',
+  depth_jump:'앞 행보다 두 단계 이상 깊어질 수 없어요.', duplicate_row:'같은 행이 중복됐어요.',
+};
+
+function ChapterSettingsDialog({ book, initialRows, onSaved, onClose }) {
+  const copyRows = (rows) => (rows || []).map((row, position) => ({ title:row.title || '', start_page:row.start_page == null ? '' : String(row.start_page), depth:row.depth == null ? 0 : String(row.depth), position }));
+  const [draft, setDraft] = _useState(() => copyRows(initialRows));
+  const [baseline, setBaseline] = _useState(() => copyRows(initialRows));
+  const [paste, setPaste] = _useState('');
+  const [busy, setBusy] = _useState(false);
+  const [feedback, setFeedback] = _useState('');
+  const dialogRef = _useRef(null);
+  const validation = window.RG_chapterUI.validateDraft(draft, book.total || null);
+  const byRow = new Map();
+  validation.errors.forEach(error => byRow.set(error.index, [...(byRow.get(error.index) || []), error.code]));
+  const dirty = JSON.stringify(draft.map(({ title, start_page, depth }) => ({ title, start_page:String(start_page), depth:String(depth) }))) !== JSON.stringify(baseline.map(({ title, start_page, depth }) => ({ title, start_page:String(start_page), depth:String(depth) })));
+  const requestClose = () => {
+    if (busy) return;
+    if (dirty && !window.confirm('저장하지 않은 목차 변경을 버릴까요?')) return;
+    onClose();
+  };
+  const overlayBack = window.useOverlayBack || (() => {});
+  overlayBack(true, requestClose);
+  _useEffect(() => {
+    const dialog = dialogRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const first = dialog && dialog.querySelector('textarea, input, button');
+    window.setTimeout(() => first && first.focus(), 0);
+    const keydown = (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); requestClose(); return; }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled])')];
+      if (!focusable.length) return;
+      const head = focusable[0], tail = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === head) { event.preventDefault(); tail.focus(); }
+      else if (!event.shiftKey && document.activeElement === tail) { event.preventDefault(); head.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { document.removeEventListener('keydown', keydown); document.body.style.overflow = previousOverflow; };
+  }, [dirty, busy]);
+  const update = (index, field, value) => setDraft(rows => rows.map((row, i) => i === index ? { ...row, [field]:value } : row));
+  const move = (index, delta) => setDraft(rows => {
+    const target = index + delta;
+    if (target < 0 || target >= rows.length) return rows;
+    const next = rows.slice(); [next[index], next[target]] = [next[target], next[index]];
+    return next.map((row, position) => ({ ...row, position }));
+  });
+  const importPaste = () => {
+    const parsed = window.RG_chapterUI.parsePaste(paste);
+    if (!parsed.count) { setFeedback('변환할 목차 줄이 없어요.'); return; }
+    if (dirty && !window.confirm('현재 편집 중인 행을 붙여넣기 결과로 바꿀까요?')) return;
+    setDraft(copyRows(parsed.rows)); setFeedback(`${parsed.count}개 행으로 변환했어요. 저장 전에 확인해 주세요.`);
+  };
+  const reload = async () => {
+    if (dirty && !window.confirm('편집 중인 내용을 버리고 저장된 목차를 다시 불러올까요?')) return;
+    setBusy(true); setFeedback('저장된 목차를 다시 불러오는 중…');
+    try {
+      const rows = await Promise.resolve(DataStore.chapters.list(book.ubId));
+      const copied = copyRows(rows); setDraft(copied); setBaseline(copied); setFeedback('저장된 목차를 다시 불러왔어요.');
+    } catch (e) { setFeedback('목차를 다시 불러오지 못했어요. 편집 내용은 그대로예요.'); }
+    finally { setBusy(false); }
+  };
+  const save = async () => {
+    if (busy || !validation.valid) return;
+    if (!window.confirm(`목차 ${validation.rows.length}개 행으로 전체 교체할까요?`)) return;
+    setBusy(true); setFeedback('저장 중…');
+    let replaceError = null;
+    try { await Promise.resolve(DataStore.chapters.replace(book.ubId, validation.rows)); }
+    catch (e) { replaceError = e; }
+    try {
+      const readback = await Promise.resolve(DataStore.chapters.list(book.ubId));
+      if (!window.RG_chapters.sameRows(validation.rows, readback)) throw replaceError || new Error('chapter_readback_mismatch');
+      setFeedback('목차를 저장했어요.');
+      if (window.showToast) window.showToast('목차를 저장했어요');
+      onSaved(readback);
+    } catch (e) {
+      setFeedback('저장을 확인하지 못했어요. 편집 내용은 그대로예요. 다시 저장하거나 저장본을 다시 불러와 주세요.');
+      setBusy(false);
+    }
+  };
+  return <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) requestClose(); }} style={{position:'fixed',inset:0,zIndex:1350,background:'rgba(0,0,0,0.48)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="chapter-settings-title" style={{width:'min(100%, 620px)',maxHeight:'calc(var(--app-h, 100dvh) - var(--safe-top, 0px) - 12px)',overflowY:'auto',background:'var(--card)',borderRadius:'18px 18px 0 0',padding:'18px 16px calc(18px + var(--safe-bottom, 0px))',boxSizing:'border-box'}}>
+      <header style={{display:'flex',alignItems:'flex-start',gap:10}}><div style={{flex:1,minWidth:0}}><h2 id="chapter-settings-title" style={{margin:0,fontSize:18}}>목차 설정</h2><p style={{margin:'4px 0 0',fontSize:12,color:'var(--ink-2)'}}>{book.title}</p></div><button type="button" aria-label="목차 설정 닫기" onClick={requestClose} style={{width:44,height:44,border:'none',borderRadius:'50%',background:'var(--paper-2)',color:'var(--ink-2)'}}>{window.rgIcon('close',16)}</button></header>
+      <label style={{display:'block',marginTop:14,fontSize:13,fontWeight:800}}>목차 붙여넣기<textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={4} placeholder={'제목\t페이지 또는 제목 | 페이지\n  들여쓴 소제목 | 24'} style={{width:'100%',boxSizing:'border-box',marginTop:7,padding:10,border:'1.5px solid var(--line)',borderRadius:12,font:'inherit',resize:'vertical'}} /></label>
+      <button type="button" onClick={importPaste} disabled={busy} style={{minHeight:44,marginTop:8,padding:'8px 14px',border:'none',borderRadius:12,background:'var(--brand-soft)',color:'var(--brand-3)',fontWeight:800}}>붙여넣기 행으로 변환</button>
+      <div role="status" aria-live="polite" style={{minHeight:20,marginTop:8,fontSize:12,fontWeight:700,color:validation.valid?'var(--ink-3)':'var(--danger)'}}>{feedback || `${draft.length}개 행 · 오류 ${validation.errors.length}개`}</div>
+      <div aria-label="목차 행 편집" style={{marginTop:8}}>{draft.map((row,index) => {
+        const codes = [...new Set(byRow.get(index) || [])]; const errorId = `chapter-row-${index}-errors`;
+        return <div key={index} style={{padding:10,marginBottom:8,border:'1px solid var(--line)',borderRadius:12,background:'var(--paper-2)'}}>
+          <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(72px,0.35fr) minmax(62px,0.3fr)',gap:6}}>
+            <label style={{fontSize:11,fontWeight:800}}>제목<input aria-describedby={codes.length?errorId:undefined} value={row.title} onChange={e=>update(index,'title',e.target.value)} style={{width:'100%',boxSizing:'border-box',minHeight:44,marginTop:4,padding:8,border:'1px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
+            <label style={{fontSize:11,fontWeight:800}}>시작 쪽<input aria-describedby={codes.length?errorId:undefined} inputMode="numeric" value={row.start_page} onChange={e=>update(index,'start_page',e.target.value)} style={{width:'100%',boxSizing:'border-box',minHeight:44,marginTop:4,padding:8,border:'1px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
+            <label style={{fontSize:11,fontWeight:800}}>깊이<input aria-describedby={codes.length?errorId:undefined} inputMode="numeric" value={row.depth} onChange={e=>update(index,'depth',e.target.value)} style={{width:'100%',boxSizing:'border-box',minHeight:44,marginTop:4,padding:8,border:'1px solid var(--line)',borderRadius:12,font:'inherit'}} /></label>
+          </div>
+          {codes.length>0 && <ul id={errorId} style={{margin:'7px 0 0',paddingLeft:18,color:'var(--danger)',fontSize:12}}>{codes.map(code=><li key={code}>{_chapterErrorCopy[code] || code}</li>)}</ul>}
+          <div style={{display:'flex',justifyContent:'flex-end',gap:2,marginTop:5}}><button type="button" aria-label={`${index+1}번 목차 위로 이동`} disabled={index===0||busy} onClick={()=>move(index,-1)} style={{width:44,height:44}}>↑</button><button type="button" aria-label={`${index+1}번 목차 아래로 이동`} disabled={index===draft.length-1||busy} onClick={()=>move(index,1)} style={{width:44,height:44}}>↓</button><button type="button" aria-label={`${index+1}번 목차 한 단계 내어쓰기`} disabled={Number(row.depth)<=0||busy} onClick={()=>update(index,'depth',Math.max(0,Number(row.depth)||0)-1)} style={{width:44,height:44}}>←</button><button type="button" aria-label={`${index+1}번 목차 한 단계 들여쓰기`} disabled={busy} onClick={()=>update(index,'depth',(Number(row.depth)||0)+1)} style={{width:44,height:44}}>→</button><button type="button" aria-label={`${index+1}번 목차 삭제`} disabled={busy} onClick={()=>setDraft(rows=>rows.filter((_,i)=>i!==index).map((item,position)=>({...item,position})))} style={{minWidth:44,height:44,color:'var(--danger)'}}>삭제</button></div>
+        </div>;
+      })}</div>
+      <button type="button" onClick={()=>setDraft(rows=>[...rows,{title:'',start_page:'',depth:rows.length?String(rows[rows.length-1].depth||0):'0',position:rows.length}])} disabled={busy} style={{minHeight:44,width:'100%',border:'none',borderRadius:12,background:'var(--paper-2)',fontWeight:800}}>행 추가</button>
+      <div style={{position:'sticky',bottom:0,display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8,paddingTop:12,background:'var(--card)'}}><button type="button" onClick={reload} disabled={busy} style={{minHeight:48,border:'none',borderRadius:12,background:'var(--brand-soft)',color:'var(--brand-3)',fontWeight:800}}>저장본 다시 불러오기</button><button type="button" onClick={save} disabled={busy||!validation.valid} style={{minHeight:48,border:'none',borderRadius:12,background:'var(--brand)',color:'#fff',fontWeight:800,opacity:(busy||!validation.valid)?0.55:1}}>{busy?'처리 중…':'목차 저장'}</button></div>
+    </section>
+  </div>;
+}
+
 function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 실 book item: { id, title, author, pub, cover, fb, total, isbn, cur, status, rating, comment }
   const prog = { cur: book.cur || 0 };
@@ -331,14 +440,40 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
   // 삭제(#325 후속): 낙관적 제거 — bookQuotes 는 prop 파생이라 삭제분을 로컬에서 즉시 거름.
   const [removedIds, setRemovedIds] = _useState({});
   const bookQuotes = (allQuotes || []).filter(q => (book.ubId ? (q.userBookId || q.user_book_id) === book.ubId : q.bookId === book.id) && !removedIds[q.id])
-    // 페이지 내림차순(#737) — 미상(null)은 맨 아래, 동일 페이지는 최신순. 홈(home.js)와 정책 일치.
     .slice()
     .sort((a, b) => {
-      const pa = (typeof a.page === 'number') ? a.page : -Infinity;
-      const pb = (typeof b.page === 'number') ? b.page : -Infinity;
-      if (pb !== pa) return pb - pa;
-      return String(b.createdAt || b.when || '').localeCompare(String(a.createdAt || a.when || ''));
+      const at = Date.parse(a.createdAt || a.created_at || a.when || '') || 0;
+      const bt = Date.parse(b.createdAt || b.created_at || b.when || '') || 0;
+      return bt - at || String(b.id || '').localeCompare(String(a.id || ''));
     });
+  const [chapterRows, setChapterRows] = _useState([]);
+  const [chapterLoading, setChapterLoading] = _useState(!!book.ubId);
+  const [chapterLoadError, setChapterLoadError] = _useState('');
+  const [chapterView, setChapterView] = _useState('all');
+  const [expandedChapters, setExpandedChapters] = _useState(() => new Set());
+  const [chapterSettingsOpen, setChapterSettingsOpen] = _useState(false);
+  const chapterSettingsTriggerRef = _useRef(null);
+  const loadChapters = (resetView = false) => {
+    if (!book.ubId || !(DataStore.chapters && DataStore.chapters.list)) { setChapterRows([]); setChapterLoading(false); return; }
+    setChapterLoading(true); setChapterLoadError('');
+    Promise.resolve(DataStore.chapters.list(book.ubId)).then(rows => {
+      const next = Array.isArray(rows) ? rows : [];
+      setChapterRows(next); setChapterLoading(false);
+      if (resetView) setChapterView(book.status === 'completed' && next.length ? 'chapters' : 'all');
+    }).catch(() => { setChapterLoading(false); setChapterLoadError('목차를 불러오지 못했어요. 다시 시도해 주세요.'); });
+  };
+  _useEffect(() => {
+    setChapterRows([]); setExpandedChapters(new Set()); setChapterView('all');
+    loadChapters(true);
+  }, [book.ubId, book.status]);
+  let chapterProjection = null;
+  let chapterProjectionError = false;
+  if (!chapterLoading && !chapterLoadError) {
+    try {
+      chapterProjection = window.RG_chapters.project(chapterRows, bookQuotes.map(q => ({ ...q, created_at:q.created_at || q.createdAt || q.when || '' })), book.total || null);
+    } catch (e) { chapterProjectionError = true; }
+  }
+  const chapterModel = chapterProjection ? window.RG_chapterUI.buildViewModel(chapterProjection, chapterView, expandedChapters) : null;
   // 한 문장 추가 (#584) — 책 상세에서 직접(완독 책 포함). app.js 가 rg:sentence-added 로 myQuotes 갱신 → 목록 자동 반영.
   const [addOpen, setAddOpen] = _useState(false);
   const [addText, setAddText] = _useState('');
@@ -365,7 +500,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       if (!row || !row.id) { showToast('저장 실패 — 잠시 후 다시'); return; }
       window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
         id: row.id, text: row.text || t, bookId: book.id, bookTitle: book.title, author: book.author,
-        page: (typeof row.page === 'number' ? row.page : (typeof pg === 'number' ? pg : 0)), when: '방금',
+        page: (typeof row.page === 'number' ? row.page : (typeof pg === 'number' ? pg : null)), when: '방금',
         createdAt: row.created_at || '', userBookId: book.ubId, publishable_thought: row.publishable_thought ?? null, note: row.my_note || '', kind: 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(row.visibility),
       } } }));
       setAddText(''); setAddPage(''); setAddOpen(false);
@@ -388,7 +523,7 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
       if (window.rgTrack) window.rgTrack('sentence_added', { book_id: book.id, kind: 'quote', source: 'book_detail_import' });
       window.dispatchEvent(new CustomEvent('rg:sentence-added', { detail: { quote: {
         id: row.id, text: row.text || text, bookId: book.id, bookTitle: book.title, author: book.author,
-        page: (typeof row.page === 'number' ? row.page : 0), when: '방금',
+        page: (typeof row.page === 'number' ? row.page : null), when: '방금',
         createdAt: row.created_at || '', userBookId: book.ubId, publishable_thought: row.publishable_thought ?? null, note: row.my_note || '', kind: 'quote', visibility: window.RG_normalizeStoredSentenceVisibility(row.visibility),
       } } }));
       return row;
@@ -746,9 +881,28 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     showToast('Markdown 저장됨');
   };
 
+  const renderQuoteCard = (q) => {
+    const revealKey = q.id || `${q.page}-${q.createdAt || q.created_at || q.when || ''}`;
+    const blinded = !revealAll && !revealed[revealKey] && isSentenceBlinded(book.id, q.page);
+    return <div key={revealKey} style={{background:'var(--card)',border:'1.5px solid var(--line)',borderRadius:12,padding:12,marginBottom:10}}>
+      <div style={{fontSize:11,color:'var(--ink-3)',fontWeight:700,marginBottom:6}}><span>{q.page == null ? '페이지 미입력' : `${q.page}p`}{q.when ? ` · ${q.when}` : ''}</span></div>
+      {blinded ? <button type="button" className="spoiler-blind" onClick={()=>setRevealed(values=>({...values,[revealKey]:true}))} style={{width:'100%',minHeight:44,border:'none'}}>내가 아직 안 읽은 부분 · 눌러서 보기</button> : <>
+        {q.kind === 'thought' ? <div style={{fontSize:13,color:'var(--ink)',fontWeight:400,lineHeight:'1.5'}}>{q.text}</div> : <div style={{fontFamily:'var(--font-quote)',fontSize:13,color:'var(--ink)',fontWeight:400,lineHeight:'1.5',fontStyle:'italic'}}>“{q.text}”</div>}
+        {q.id && (() => {
+          const parts = { free:q.publishable_thought || '', qa:'' };
+          const turns = parts.qa ? parts.qa.split(/\n\n+/).filter(block=>/^Q\./.test(block.trim())).length : 0;
+          const open = (mode) => window.RG_openCompanion && window.RG_openCompanion({ id:q.id,text:q.text,bookId:book.id,bookTitle:book.title,author:book.author,page:q.page,note:q.note,kind:q.kind,userBookId:book.ubId,publishable_thought:q.publishable_thought }, { mode });
+          const tonal = {display:'inline-flex',alignItems:'center',gap:5,minHeight:44,padding:'5px 12px',borderRadius:999,border:'1px solid var(--brand-soft)',background:'var(--brand-soft)',fontSize:11,fontWeight:800,color:'var(--brand-3)',cursor:'pointer'};
+          return <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>{parts.free ? <button type="button" onClick={()=>open('note')} style={{padding:'8px 10px',border:'none',background:'var(--paper-2)',borderRadius:12,fontSize:12,color:'var(--ink-2)',lineHeight:1.5,cursor:'pointer',whiteSpace:'pre-wrap',maxHeight:96,overflow:'hidden',textAlign:'left'}}>{parts.free}</button> : null}<div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}><button type="button" onClick={()=>open('note')} style={tonal}>{window.rgIcon('pen',12)}{parts.free?'감상 수정':'내 감상'}</button><button type="button" onClick={()=>open('jacky')} style={tonal}><window.SparrowInline size={13} /> {turns?`재키와 대화 (${turns})`:'재키와 대화'}</button></div></div>;
+        })()}
+      </>}
+      {q.id && window.SentenceActions && <SentenceActions sentence={{id:q.id,text:q.text,bookId:book.id,bookTitle:book.title,author:book.author,page:q.page,userBookId:book.ubId,publishable_thought:q.publishable_thought,kind:q.kind,visibility:q.visibility,isPrivate:q.isPrivate}} mine fav={!!(bmarks&&bmarks.has(q.id))} onRemoved={rid=>setRemovedIds(values=>({...values,[rid]:true}))} />}
+    </div>;
+  };
+
   return (
-    <div className="modal-backdrop show" onClick={e => { if (!reviewOpen && e.target === e.currentTarget) onClose(); }}>
-      <div className="sheet" role="dialog" aria-label={`${book.title} 책 상세`} aria-hidden={reviewOpen ? 'true' : undefined} inert={reviewOpen ? '' : undefined}>
+    <div className="modal-backdrop show" onClick={e => { if (!reviewOpen && !chapterSettingsOpen && e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" role="dialog" aria-label={`${book.title} 책 상세`} aria-hidden={(reviewOpen || chapterSettingsOpen) ? 'true' : undefined} inert={(reviewOpen || chapterSettingsOpen) ? '' : undefined}>
         <div className="sheet-grip" />
         <button onClick={onClose} aria-label="닫기" style={{position:'absolute', top:8, right:10, background:'rgba(0,0,0,0.06)', border:'none', borderRadius:'50%', width:44, height:44, cursor:'pointer', color:'var(--ink-2)', zIndex:2, display:'inline-flex', alignItems:'center', justifyContent:'center'}}>{window.rgIcon('close',16)}</button>
         
@@ -1090,79 +1244,23 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             </div>
           )}
 
-          {bookQuotes.length > 0 && (
-            <div data-section="secondary-quotes" style={{order:2}}>
-              <div style={{fontSize:14, fontWeight:900, color:'var(--ink)', marginBottom:10, display:'flex', alignItems:'center', gap:6}}>
-                {window.rgIcon('book',15)}<span>내 한 문장 {bookQuotes.length}개</span>
-              </div>
-              {bookQuotes.map((q, i) => {
-                const blinded = !revealAll && !revealed[i] &&
-                  isSentenceBlinded(book.id, q.page);
-                return (
-                  <div key={i} style={{background:'var(--card)', border:'1.5px solid var(--line)', borderRadius:'8px', padding:12, marginBottom:10}}>
-                    <div style={{fontSize:11, color:'var(--ink-3)', fontWeight:700, marginBottom:6}}>
-                      <span>{q.page}p · {q.when}</span>
-                    </div>
-                    {blinded ? (
-                      <div className="spoiler-blind" onClick={() => setRevealed(r => ({ ...r, [i]: true }))}>
-                        ⚠️ 내가 아직 안 읽은 부분 · 탭하면 보기
-                      </div>
-                    ) : (
-                      <>
-                        {/* 인용은 "이탤릭", 내 의견은 💭 (#360) */}
-                        {q.kind === 'thought' ? (
-                          <div style={{fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5'}}>💭 {q.text}</div>
-                        ) : (
-                          <div style={{fontFamily:'var(--font-quote)', fontSize:13, color:'var(--ink)', fontWeight:400, lineHeight:'1.5', fontStyle:'italic'}}>
-                            "{q.text}"
-                          </div>
-                        )}
-                        {/* 문장별 "내 감상만" vs "재키와 대화" (#1070) — 홈와 동일 진입(CompanionModal, 모드 명시).
-                            과거(#404) 자유 감상 편집 폐지는 my_note 덮어쓰기 충돌 탓이었고, 이제 감상/Q/A 를
-                            블록 분리(rgSplitNote/rgJoinNote)해 서로 보존하므로 자유 감상을 다시 둔다. */}
-                        {q.id && (() => {
-                          const parts = { free: q.publishable_thought || '', qa: '' };
-                          const turns = parts.qa ? parts.qa.split(/\n\n+/).filter((b) => /^Q\./.test(b.trim())).length : 0;
-                          const open = (m) => window.RG_openCompanion && window.RG_openCompanion({
-                            id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author,
-                            page: q.page, note: q.note, kind: q.kind, userBookId: book.ubId, publishable_thought: q.publishable_thought,
-                          }, { mode: m });
-                          const tonal = { display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:999, border:'1px solid var(--brand-soft)', background:'var(--brand-soft)', fontSize:11, fontWeight:800, color:'var(--brand-3)', cursor:'pointer' };
-                          return (
-                            <div style={{marginTop:8, display:'flex', flexDirection:'column', gap:6}}>
-                              {/* 내 감상 미리보기 — 자유 감상 블록만(재키 Q/A 제외). 탭하면 감상 수정. */}
-                              {parts.free ? (
-                                <div onClick={() => open('note')}
-                                  style={{padding:'8px 10px', background:'var(--paper-2)', borderRadius:12, fontSize:12, color:'var(--ink-2)', lineHeight:1.5, cursor:'pointer', whiteSpace:'pre-wrap', maxHeight:96, overflow:'hidden'}}>
-                                  {parts.free}
-                                </div>
-                              ) : null}
-                              <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-                                <button onClick={() => open('note')} style={tonal}>
-                                  {window.rgIcon('pen', 12)}{parts.free ? '감상 수정' : '내 감상'}
-                                </button>
-                                <button onClick={() => open('jacky')} style={tonal}>
-                                  <window.SparrowInline size={13} /> {turns ? `재키와 대화 (${turns})` : '재키와 대화'}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </>
-                    )}
-                    {/* 한 문장 액션 계약 (#610) — 자체 렌더 대신 공용 SentenceActions(공개범위+좋아요+수정+삭제) 경유.
-                        삭제는 rg:sentence-removed 이벤트로 목록 갱신(removedIds 리스너). blind 와 무관하게 내 문장 관리 가능. */}
-                    {q.id && window.SentenceActions && (
-                      <SentenceActions
-                        sentence={{ id: q.id, text: q.text, bookId: book.id, bookTitle: book.title, author: book.author, page: q.page, userBookId: book.ubId, publishable_thought: q.publishable_thought, kind: q.kind, visibility: q.visibility, isPrivate: q.isPrivate }}
-                        mine fav={!!(bmarks && bmarks.has(q.id))}
-                        onRemoved={(rid) => setRemovedIds(m => ({ ...m, [rid]: true }))} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {book.ubId && <section data-section="secondary-chapters" aria-labelledby="chapter-section-title" style={{order:2,marginBottom:14}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h3 id="chapter-section-title" style={{fontSize:14,margin:0}}>목차와 문장 보기</h3>{!chapterLoading&&!chapterLoadError&&!chapterProjectionError&&<p style={{fontSize:12,color:'var(--ink-3)',margin:'4px 0 0'}}>{chapterProjection&&chapterProjection.hasToc?`목차 ${chapterRows.length}개 행`:'목차를 설정하면 챕터별로 볼 수 있어요'}</p>}</div><button ref={chapterSettingsTriggerRef} type="button" onClick={()=>setChapterSettingsOpen(true)} style={{minHeight:44,flex:'0 0 auto',padding:'8px 12px',border:'none',borderRadius:12,background:'var(--brand-soft)',color:'var(--brand-3)',fontWeight:800}}>목차 설정</button></div>
+            {chapterLoading&&<div role="status" aria-busy="true" style={{fontSize:12,color:'var(--ink-3)',marginTop:8}}>목차를 불러오는 중…</div>}
+            {chapterLoadError&&<div role="alert" style={{fontSize:12,color:'var(--danger)',marginTop:8}}>{chapterLoadError} <button type="button" onClick={()=>loadChapters(false)} style={{minHeight:44}}>다시 시도</button></div>}
+            {chapterProjectionError&&<div role="alert" style={{fontSize:12,color:'var(--danger)',marginTop:8}}>문장을 챕터로 분류하지 못했어요. 전체 문장은 그대로 볼 수 있어요.</div>}
+          </section>}
+
+          {(bookQuotes.length > 0 || (chapterProjection&&chapterProjection.hasToc)) && <div data-section="secondary-quotes" style={{order:2}}>
+            <div style={{fontSize:14,fontWeight:900,color:'var(--ink)',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>{window.rgIcon('book',15)}<span>내 한 문장 {bookQuotes.length}개</span></div>
+            {chapterProjection&&chapterProjection.hasToc&&<div role="tablist" aria-label="문장 보기" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,WebkitOverflowScrolling:'touch'}}>{[
+              ['all','전체',chapterProjection.counts.all],['chapters','챕터별',chapterProjection.counts.chaptered],['page_missing','페이지 미입력',chapterProjection.counts.page_missing],['outside_toc','목차 밖',chapterProjection.counts.outside_toc],
+            ].map(([value,label,count])=><button key={value} type="button" role="tab" aria-selected={chapterView===value} onClick={()=>setChapterView(value)} style={{minHeight:44,flex:'0 0 auto',padding:'8px 12px',border:'none',borderRadius:12,background:chapterView===value?'var(--brand)':'var(--brand-soft)',color:chapterView===value?'#fff':'var(--brand-3)',fontWeight:800}}>{label} {count}</button>)}</div>}
+            {chapterModel&&chapterModel.view==='chapters' ? (chapterModel.groups.length===0 ? <div style={{padding:14,borderRadius:12,background:'var(--paper-2)',fontSize:13}}>이 목차에 연결된 문장이 없어요. <button type="button" onClick={()=>setChapterView('all')} style={{minHeight:44}}>전체 보기</button></div> : chapterModel.groups.map(group=>{
+              const panelId=`chapter-sentences-${group.position}`;
+              return <section key={group.position} aria-label={group.title} style={{marginLeft:`${Math.min(group.depth*12,36)}px`,marginBottom:8,border:'1px solid var(--line)',borderRadius:12,overflow:'hidden'}}><button type="button" aria-expanded={group.expanded} aria-controls={panelId} onClick={()=>setExpandedChapters(values=>{const next=new Set(values);if(next.has(group.position))next.delete(group.position);else next.add(group.position);return next;})} style={{width:'100%',minHeight:52,padding:'9px 10px',border:'none',background:'var(--paper-2)',color:'var(--ink)',display:'flex',alignItems:'center',gap:8,textAlign:'left'}}><span aria-hidden="true">{group.expanded?'−':'+'}</span><span role="heading" aria-level={Math.min(6,3+group.depth)} style={{flex:1,minWidth:0,fontWeight:800,lineHeight:1.45,overflowWrap:'anywhere'}}>{group.title}</span><span style={{fontSize:11,color:'var(--ink-3)',whiteSpace:'nowrap'}}>{group.direct_count}개{group.aggregate_count!==group.direct_count?` · 전체 ${group.aggregate_count}개`:''}</span></button>{group.expanded&&<div id={panelId} style={{padding:'10px 10px 0'}}>{group.visible_sentences.length?group.visible_sentences.map(renderQuoteCard):<p style={{fontSize:12,color:'var(--ink-3)'}}>이 챕터에 직접 연결된 문장이 없어요.</p>}</div>}</section>;
+            })) : chapterModel ? (chapterModel.sentences.length ? chapterModel.sentences.map(renderQuoteCard) : <div style={{padding:14,borderRadius:12,background:'var(--paper-2)',fontSize:13}}>{chapterModel.view==='page_missing'?'페이지를 입력하지 않은 문장이 없어요.':chapterModel.view==='outside_toc'?'목차 밖 문장이 없어요.':'아직 남긴 문장이 없어요.'}</div>) : bookQuotes.map(renderQuoteCard)}
+          </div>}
         </div>
 
         {!bookshelfEntry && (
@@ -1217,6 +1315,8 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
             finally { setBatchBusy(false); }
           }} />
       )}
+
+      {chapterSettingsOpen && <ChapterSettingsDialog book={book} initialRows={chapterRows} onClose={()=>{setChapterSettingsOpen(false);window.setTimeout(()=>chapterSettingsTriggerRef.current&&chapterSettingsTriggerRef.current.focus(),0);}} onSaved={(rows)=>{setChapterRows(rows);if(!rows.length)setChapterView('all');setChapterSettingsOpen(false);window.setTimeout(()=>chapterSettingsTriggerRef.current&&chapterSettingsTriggerRef.current.focus(),0);}} />}
 
       {reviewOpen && (
         <div role="presentation" data-testid="review-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) closeReview(); }}

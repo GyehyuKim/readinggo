@@ -10,6 +10,9 @@ import './js/turnstile.js';   // #1158/#1159 Turnstile 봇 검증 — RG_apiFetc
 
 // 3) 데모/컴포넌트 — 기존 loadBabel 순서 그대로(주석은 index.html 의존성 메모).
 import './js/data.js';
+import './js/chapter-core.js';
+import './js/chapter-ui.js';
+import './js/chapter-migration.js';
 import './js/datastore.js';
 
 import './js/icons.js';

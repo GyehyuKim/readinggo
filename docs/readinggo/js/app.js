@@ -181,7 +181,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
     const ub = ubs[i] || {};
     const bk = meta(ub);
     const bookKey = ub.id || ('book-' + i);
-    if (ub._migration_complete) continue;
+    if (ub._migration_complete && ub._migration_chapters_complete) continue;
     try {
       const persistedTargetId = ub._migration_target_user_book_id || ub._remote_user_book_id || '';
       const lookupId = persistedTargetId || ub._migration_user_book_id || '';
@@ -205,6 +205,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
         migrationOwned = true;
       }
       let migrationComplete = true;
+      let chaptersComplete = ub._migration_chapters_complete === true;
       localToRemote.set(bookKey, remote);
       if (migrationOwned && ub.status === 'aborted' && remote.status !== 'aborted') {
         try {
@@ -223,6 +224,18 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
         } catch (e) {
           migrationComplete = false;
           console.warn('[ReadingGo] 게스트 완독 소감 백필 보류:', e.message);
+        }
+      }
+      if (!chaptersComplete) {
+        try {
+          const chapterResult = await window.RG_migrateGuestChapters({
+            chapters: ub.chapters || [], remoteUserBookId: remote.id, dataStore: DS,
+            totalPages: ub.total_pages_override || (ub.book && ub.book.total_pages) || null,
+          });
+          chaptersComplete = chapterResult.complete === true;
+        } catch (e) {
+          chaptersComplete = false;
+          console.warn('[ReadingGo] 게스트 목차 백필 보류:', e.message);
         }
       }
       const gsents = (ub.sentences || []).filter(se => se && se._guest)
@@ -248,7 +261,7 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
       }
       migrationResults.set(bookKey, {
         targetId: remote.id, owned: migrationOwned, complete: migrationComplete,
-        activeComplete: ub._migration_active_complete === true,
+        activeComplete: ub._migration_active_complete === true, chaptersComplete,
       });
     } catch (e) { console.warn('[ReadingGo] 게스트 책 1권 백필 보류:', e.message); }
   }
@@ -349,7 +362,8 @@ async function syncPendingToSupabase({ allowPublic = false } = {}) {
       if (result) {
         ub._migration_target_user_book_id = result.targetId;
         ub._migration_owned = result.owned;
-        ub._migration_complete = result.complete;
+        ub._migration_complete = result.complete && result.chaptersComplete;
+        ub._migration_chapters_complete = result.chaptersComplete;
         ub._migration_active_complete = result.activeComplete;
         if (result.owned) ub._remote_user_book_id = result.targetId;
       }
