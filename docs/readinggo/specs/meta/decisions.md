@@ -577,3 +577,17 @@ SSOT는 [companion.md §4.7](../companion.md#47-내-기록-기반-관련-맥락-
 - **전달**: 하나의 공개 계약이 여러 활성 spec에 걸치므로 파일 수가 많아도 한 논리 spec-only PR로 정합한다. spec merge 후 별도 구현 PR·DEV 검증·동일 SHA Production 승인 절차를 진행한다. spec 작업은 코드·DB·외부 상태를 변경하지 않으며 본 결정 자체가 구현/운영 완료 증거는 아니다.
 
 SSOT: [backend.md §7.0.1–2](../backend.md), [feed.md §5.7.1](../feed.md), [profile.md](../profile.md), [share.md §1.1](../share.md), [reading-story.md §6](../reading-story.md), [legal-copyright.md §4.4](../legal-copyright.md).
+
+### v18.10 — 개인 판본 목차와 챕터별 문장 회고 (#1627, 2026-09-24)
+
+- **귀속·대체 관계**: 목차는 공유 `books`가 아니라 개인 판본인 `user_books.id`에 귀속한다. 과거 `chapters.book_id`, 저장 `end_page`, `chapter_order`, `sentences.chapter_id` 자동 매핑 계약은 이 결정으로 명시적으로 대체한다.
+- **행 계약**: `user_book_chapters`는 `user_book_id`, `title`, `start_page`, `depth`, `position`을 저장한다. 끝 페이지는 다음 목차 행의 `start_page - 1`에서 조회 시 파생하며 마지막 행은 열린 끝 또는 책 총 쪽수까지다. 같은 시작 페이지·역순·1 미만·알려진 총 쪽수 초과는 저장하지 않는다.
+- **분류**: 문장 행을 이동·복제하거나 분류값을 물질화하지 않고 `sentences.page`와 현재 목차 범위를 매번 대조한다. `page=null`은 그대로 `페이지 미입력`, 첫 시작 전·마지막 유효 범위 뒤 등 어느 직접 범위에도 들지 않으면 `목차 밖`으로 남기며 추측하지 않는다.
+- **중첩 집계**: 각 행은 다음 목차 행까지의 직접 범위를 갖는다. 상위 행의 집계는 그 아래 더 깊은 연속 하위 행들의 직접 범위까지 합산하되 문장 한 건을 화면 전체 합계에 중복 계산하지 않는다.
+- **저장·권한**: `DataStore.chapters.list(userBookId)`와 `replace(userBookId, rows)`를 게스트·로그인 어댑터에 같은 의미로 제공하고 전체 교체는 원자적이다. base table은 owner-only이며 비소유자 공개 읽기는 `book_public_allowed`를 재사용하는 최소 projection RPC만 허용한다. 책 삭제 시 cascade한다.
+- **이관**: 게스트 목차는 책의 안정 식별자에 묶어 멱등 이관하고 원격 전체 행 readback 전 로컬 원본을 지우지 않는다. 부분 실패·소유 불일치·알 수 없는 depth/페이지는 성공으로 축소하지 않고 fail-closed한다.
+- **화면**: 읽는 중과 완독은 같은 `BookDetailModal`에서 같은 목차 설정·문장 분류를 사용한다. 완독은 기본 `챕터별`, 그 밖의 상태와 목차 없는 책은 기존 `전체` 최신순 타임라인을 기본으로 하며 사용자가 `전체 / 챕터별 / 페이지 미입력 / 목차 밖`을 전환할 수 있다. 목차 입력 첫 버전은 여러 줄 붙여넣기 → 행 변환 → 저장 전 검토·편집이며 OCR·외부 목차 API·AI 요약은 제외한다.
+- **검증 근거**: Notion 원문·URL은 저장소에 복사하지 않고 개수·경계만 사용한다. 검증 fixture 기대값은 304쪽 판본, 수집 문장 135개, 수동 연결 125개, 세부 챕터 13개, 페이지 미확인 21개, 수동 목차 미확인 10개, 챕터별 감상 13개다. 수동 목차 미확인 10개는 `목차 밖` 기대값이 아니며 정확한 시작 페이지 입력 후 자동 분류와 비교한다.
+- **전달**: 이 결정은 spec-only이며 코드·schema·migration·test는 후속 구현 PR에서 다룬다. 정상·오류·빈 상태·권한·접근성·결정적 순서를 DEV와 Android 실제 화면에서 검증한 뒤 동일 SHA 승격 절차를 따른다.
+
+SSOT: [backend.md §7.0.7](../backend.md#707-개인-판본-목차와-조회-분류-계약-1627), [profile.md §5.8.4](../profile.md#584-책-상세--export), [home-reading.md §5.4](../home-reading.md#54-문장-기록과-정확한-저장-행).

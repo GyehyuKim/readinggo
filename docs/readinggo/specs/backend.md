@@ -19,6 +19,7 @@
 > **v18.3 개인화 retrieval 결정 (2026-08-25, #1309)**: 누적 개인 기록은 별도 계정 opt-in 뒤 `/api/companion/context`가 Supabase bearer identity로 본인 기록만 요청 시 조회한다. 최대 5건·2,000 Unicode 문자, 복사본/embedding/profile summary 없음. DEV 구현은 허용하되 #1373 전 Production 승격은 차단한다.
 > **v18.4 검색 결과 예산 결정 (2026-08-28, #1544)**: `GET /aladin` 검색은 제품 총 상한 10 안에서 카카오 또는 레거시 알라딘 결과를 먼저 보존하고, 주 공급자가 상한을 채우지 못한 경우에만 Google Books가 남은 슬롯을 실시간 보강한다. 공급자별 고정 `5+5` 할당은 관련 국내 도서를 누락시키므로 폐기한다.
 > **v18.5 일반 검색 연속 조회 결정 (2026-08-28, #1547)**: v18.4의 고정 제품 총 상한 10은 첫 화면 크기와 전체 검색 상한을 혼동해, 제목 일치 후보가 먼저 10건을 채우면 뒤쪽의 저자·출판사 일치 후보를 조회하지 못하게 했다. 일반 검색 의미와 공급자 관련도 순서는 유지하되 고정 총상한을 폐기하고, 첫 10개 작품 뒤에는 공급자가 끝날 때까지 `더 보기`로 연속 조회한다. 판 그룹핑으로 표시 행이 줄면 다음 공급자 페이지에서 자동 보충한다.
+> **v18.10 개인 판본 목차 결정 (2026-09-24, #1627)**: 목차는 `user_book_chapters`로 개인 `user_book`에 귀속한다. 끝 페이지와 문장 분류는 조회 시 파생하고 `sentences.chapter_id`를 저장하지 않는다. 게스트/localStorage와 로그인/Supabase는 원자 `chapters.list/replace` 계약과 fail-closed 이관 의미를 공유한다.
 > **편집 정책**: 이 영역 변경은 이 파일 PR로. spec-only PR 룰 ([LF](../../1.%20research_and_lectures/lecture-frameworks.md#lf-week6-spec-only-pr)) 준수.
 
 ## 7. 백엔드 스펙
@@ -80,6 +81,39 @@
 - `activity_inbox_unread_count()`는 목록과 같은 현재 90일·최신 100개 projection에서 `event_key <> all(seen_event_keys)`인 행을 센다. `activity_inbox_mark_seen(p_event_keys text[])`는 최대 100개 key를 받아 같은 transaction에서 다시 계산한 본인 허용 projection과 교집합하고 기존 set과 원자 병합한 뒤 현재 projection으로 100개 이하 prune한다. 목록 이후 late commit·동률 timestamp 활동은 전달 set에 없으므로 unread로 남으며, 임의·타인·삭제된 key는 저장하지 않는다.
 - 제한 RPC가 `SECURITY DEFINER`를 사용하면 고정 `search_path`와 schema-qualified relation, 명시적 `authenticated` execute grant, `anon/public` revoke를 적용한다. state base table은 RLS를 켜되 클라이언트 직접 `INSERT/UPDATE/DELETE` grant·policy를 두지 않고 읽음 mutation은 bounded mark-seen RPC만 허용한다. 본인 `SELECT`만 허용하며 타인 접근은 금지한다.
 - source table의 기존 base SELECT를 활동함 때문에 넓히지 않는다. base RLS 축소·구버전 컷오버는 §7.0.3의 별도 게이트를 유지한다.
+
+### 7.0.7 개인 판본 목차와 조회 분류 계약 (#1627)
+
+#### 저장 정본과 범위 파생
+
+- 목차 정본은 공유 서지 `books`가 아니라 소유자의 판본 `user_books.id`에 매달린 `user_book_chapters`다. 같은 `book_id`를 읽는 사용자끼리 목차를 공유·덮어쓰지 않는다. 과거의 공유 `chapters(book_id, end_page, chapter_order)` 계약은 이 절이 **명시적으로 supersede**하며 신규 읽기·쓰기·이관에 사용하지 않는다.
+- 저장 필드는 `id`, `user_book_id`, `title`, `start_page`, `depth`, `position`과 감사 시각뿐이다. `title`은 trim 후 비어 있지 않고, `start_page`는 1 이상의 정수, `depth`는 0 이상의 정수, `position`은 0부터 끊김 없는 정수다. `position` 순서의 `start_page`는 엄격히 증가해야 하며 중복·역순을 허용하지 않는다. 알려진 판본 총 쪽수가 있으면 `start_page <= effective_total_pages`를 강제한다.
+- 트리는 첫 행 `depth=0`, 다음 행은 이전 행보다 한 단계보다 많이 깊어질 수 없다는 규칙으로 검증한다. 깊이가 줄어드는 것은 어느 조상 단계로도 가능하다. 들여쓰기만 저장하며 별도 parent ID는 만들지 않는다.
+- 행 `i`의 **직접 범위**는 `[start_page_i, start_page_(i+1)-1]`이다. 마지막 행은 판본 총 쪽수를 알면 거기까지, 모르면 열린 끝까지다. `end_page`는 어떤 table·local JSON·sentence에도 저장하지 않고 정렬된 현재 목차에서만 파생한다.
+- 상위 행의 **집계 범위**는 해당 행의 직접 범위와, 다음 `depth <= 현재 depth` 행 직전까지 이어지는 연속 하위 행들의 직접 범위 합이다. UI는 각 행의 `direct_count`와 상위 `aggregate_count`를 구분한다. 한 문장은 하나의 직접 범위에만 속하며 전체 합계 계산에서 중복하지 않는다.
+
+#### 문장 분류
+
+- 분류 입력은 같은 `user_book_id`의 현재 목차와 `sentences.page`뿐이다. `sentences.chapter_id`, sentence의 `end_page`, materialized classification, 분류 cache table을 만들지 않는다. 목차 수정 직후 기존·신규 문장을 이동·복제·갱신하지 않고 같은 함수로 다시 분류한다.
+- `page IS NULL`은 원값을 보존하고 `page_missing`(`페이지 미입력`)으로 분류한다. 0·음수·비정수 같은 기존 손상값도 임의 보정하거나 챕터에 넣지 않고 fail-closed `outside_toc`으로 보낸다.
+- 양의 정수 페이지가 직접 범위 하나에 들어가면 그 행에 분류한다. 첫 시작 페이지 전, 또는 알려진 총 쪽수/마지막 유효 범위 뒤의 값은 `outside_toc`(`목차 밖`)이다. 총 쪽수 미상인 마지막 행은 열린 끝이므로 그 시작 이후의 양의 정수를 받는다. 제목·문장 텍스트·위치 추측으로 빈 페이지를 채우지 않는다.
+- 목차가 0행이면 분류 탭을 강제하지 않고 기존 `전체` 최신순 타임라인을 그대로 사용한다. `전체`도 분류와 무관하게 기존 문장 전부를 날짜 내림차순으로 보존하며 `page_missing`·`outside_toc` 문장을 숨기지 않는다.
+- 정렬은 목차 `position ASC`, 각 챕터 안 문장 `page ASC NULLS LAST, created_at ASC, id ASC`로 결정적이다. `전체`의 기존 `created_at DESC` 타임라인은 변경하지 않는다. 같은 데이터는 게스트와 로그인 경로에서 같은 bucket·count·순서를 반환해야 한다.
+
+#### 권한·공개 projection
+
+- `user_book_chapters` base table의 `SELECT/INSERT/UPDATE/DELETE`는 해당 `user_books.user_id=auth.uid()` 소유자만 허용한다. `user_books` 삭제 시 `ON DELETE CASCADE`한다. 다른 사용자와 `anon`에게 base table grant/policy를 열지 않는다.
+- 소유자 아닌 독자의 목차 표시는 전용 최소 RPC를 통해서만 제공한다. RPC는 viewer 인자를 신뢰하지 않고 대상 `user_book_id`에 기존 `book_public_allowed`를 서버 내부에서 먼저 적용하며, 허용될 때만 `title`, `start_page`, `depth`, `position`을 반환한다. private·unknown·부모 미해소·차단·moderation·권한 오류는 빈 결과/동일 오류로 fail-closed하고 목차 존재·행 수 차이를 누출하지 않는다.
+- 공개 문장과의 챕터별 projection도 같은 `book_public_allowed`와 현재 문장 moderation을 한 서버 경계에서 적용한다. private 문장 본문·존재·개수, owner 전용 chapter ID/감사 시각은 반환하지 않는다. 목차 편의를 이유로 `user_books`, `sentences`, `user_book_chapters` base SELECT를 넓히지 않는다.
+
+#### 구현 수용 기준
+
+1. 정상: 0/1/13개 행, 중첩 depth, 첫·경계·마지막 페이지에서 두 어댑터의 파생 끝·직접/집계 count·결정적 순서가 같다.
+2. 오류: 빈 제목, 중복/역순/범위 밖 시작 페이지, 잘못된 depth/position, 원자 replace 중 네트워크·DB·localStorage 실패는 이전 전체 목록을 보존하고 성공 readback을 만들지 않는다.
+3. 빈 상태: 목차 없음, 문장 없음, `page_missing`만 있음, `outside_toc`만 있음이 서로 구분되며 기존 `전체`와 no-TOC 동작은 회귀하지 않는다.
+4. 권한: owner CRUD, 다른 로그인 사용자, anonymous, public/private/unknown, blocked/suspended, 임의 UUID와 삭제 cascade를 직접 검증한다. 비소유자의 base table 접근은 0건/거부이고 최소 RPC만 `book_public_allowed`와 동일하게 열린다.
+5. 이관: 게스트/로그인 결과 동등성, 중복 재시도, 부분 실패, 원격 readback 불일치, 같은 canonical 책으로 합쳐지는 충돌을 검증하며 실패 시 로컬 원본을 유지한다.
+6. 근거 fixture는 Notion 원문·URL 없이 개수·경계만 가진다: 304쪽, 문장 135개, 수동 연결 125개, 세부 챕터 13개, `page_missing` 21개, 수동 목차 미확인 10개, 챕터별 감상 13개. 수동 목차 미확인 10개를 `outside_toc` 기대값으로 간주하지 않으며, 정확한 목차 입력 뒤 자동 분류 결과와 비교한다. 불일치는 목차 경계 오류와 문장 페이지 오류로 나눠 보고하고 추측 배정하지 않는다.
 
 ### 7.1 플랫폼
 
@@ -189,6 +223,15 @@ myBooks.abort(userBookId)                  → UserBook        // #593: 읽던 �
 myBooks.resume(userBookId)                 → UserBook        // #593: 중단 책 다시 읽기 — status='aborted' → 'reading'. completed_at 미설정(완독과 무관)
 activeBook.get()                           → UserBook | null
 activeBook.set(userBookId)                                  // = users.active_user_book_id UPDATE
+
+// 개인 판본 목차 (#1627)
+chapters.list(userBookId)                  → UserBookChapter[]
+chapters.replace(userBookId, rows)         → UserBookChapter[] // rows={title,start_page,depth,position}; 전체 검증+전체 교체+권위 readback을 한 원자 단위로 수행
+chapters.publicByBook(userBookId)          → PublicUserBookChapter[] // book_public_allowed를 적용한 {title,start_page,depth,position} 최소 projection
+//   ↳ list/replace는 소유자 경로다. localStorageAdapter는 메모리 사본 검증 후 한 번만 persist하고,
+//      supabaseAdapter는 owner-bound transaction/RPC에서 delete+insert를 완료한다. 일부 행만 보이는 상태 금지.
+//   ↳ replace 재시도는 canonical rows가 같으면 같은 최종 목록을 만들며, 실패/응답 유실은 list readback으로
+//      조정한다. title/start_page/depth/position이 모두 일치하기 전 성공 처리하거나 로컬 원본을 지우지 않는다.
 
 // 일일 기록 (세션 + 한 문장)
 sessions.addToday({userBookId, page, duration_sec?}) → Session  // 하루 첫 기록: 진도 + 독서 세션 + 내부 리듬 카운터. duration_sec(#430): 읽기 세션 시간(초) 누적. **Supabase: 원자 RPC `checkin_atomic(p_user_book_id, p_page, p_duration, p_today)`(#1161, 43_checkin_atomic.sql)** — user_books.current_page + reading_sessions upsert + streak bump를 한 트랜잭션으로 묶어 구 순차 3-write 부분상태를 막는다. 내부 카운터 규칙은 `_nextStreak`과 SQL을 동기화하며, p_today는 클라이언트 로컬 날짜를 사용한다. XP 호출은 없고 문장 저장은 별도 `sentences.add` 계약이다.
@@ -414,14 +457,6 @@ books
   rank_steady   int  NULL
   created_at    timestamptz
 
-chapters                                    -- Phase 후순위, 현재 미사용 (챕터 XP 후순위)
-  id            uuid PK
-  book_id       uuid FK books.id
-  title         text
-  start_page    int
-  end_page      int
-  chapter_order int
-
 user_books
   id            uuid PK
   visibility    text NOT NULL DEFAULT 'private' -- CHECK public|private, 책 전체 문장·생각 상속
@@ -437,6 +472,19 @@ user_books
   total_pages_override int     NULL  -- #431: BookEditModal 수정값. 공유 books.total_pages 대신 표시(읽기 시 override 우선)
   companion_recap      text    NULL  -- 드리프트 정정 2026-07-09: 참새 대화 요약(19_companion_recap.sql). 코드가 읽고 씀
   UNIQUE(user_id, book_id)
+
+user_book_chapters                         -- #1627: 소유자 개인 판본 목차
+  id            uuid PK
+  user_book_id  uuid FK user_books.id ON DELETE CASCADE
+  title         text NOT NULL               -- trim 후 1자 이상
+  start_page    int NOT NULL CHECK (start_page >= 1)
+  depth         int NOT NULL DEFAULT 0 CHECK (depth >= 0)
+  position      int NOT NULL CHECK (position >= 0)
+  created_at    timestamptz
+  updated_at    timestamptz
+  UNIQUE(user_book_id, position)
+  UNIQUE(user_book_id, start_page)
+  -- end_page/parent_id/book_id 없음. 순서·depth·총 쪽수의 교차행 검증은 owner-bound replace RPC가 원자 강제
 
 reading_sessions
   id               uuid PK
@@ -455,14 +503,14 @@ sentences                                   -- "한 문장" (DB 테이블명 유
   user_id       uuid FK users.id
   user_book_id  uuid FK user_books.id
   session_id    uuid FK reading_sessions.id NULL
-  page          int                  -- 스포일러 블라인드 판정 기준 (§social)
+  page          int NULL             -- null 보존; 스포일러 기준이며 #1627에서는 page_missing
   text          text                 -- 책 공개 상태와 무관하게 1~1,000 Unicode 문자 (#1457)
   my_note       text NULL            -- 내 감상·코멘트 (선택, 사후 추가·편집). ≤1000자 (CHECK)
   -- 공개 필드는 없음. 부모 user_books.visibility를 상속한다(§7.0.1).
   -- 기존 visibility/is_private/note_private 물리 컬럼은 안전 컷오버 후 제거한다.
   last_resurfaced_at timestamptz NULL -- 드리프트 정정 2026-07-09: 회상 재노출 시각(21_resurface.sql). 코드가 읽고 씀
   created_at    timestamptz
-  -- v7 제거: chapter_id (챕터 자동매핑 폐기)
+  -- chapter_id 없음. #1627도 page+현재 user_book_chapters 범위로 조회 시 분류
 
 streak
   user_id              uuid PK FK users.id
@@ -638,6 +686,7 @@ JSONB 사용:
 ```
 follows(follower_id), follows(following_id)
 sentences(user_id, created_at desc), sentences(user_book_id, created_at)
+user_book_chapters(user_book_id, position), user_book_chapters(user_book_id, start_page)
 reading_sessions(user_id, session_date desc)
 books(rank_recent), books(rank_steady)
 claps(to_sentence_id)                          -- v7 변경 (구 to_session_id)
@@ -659,6 +708,7 @@ village_parts(village_id, part_order)                    -- v7 신설
 - `users`: 본인 row update. 타인에게는 피드용 최소 공개 profile projection만 제공하며 base row 전체 SELECT를 허용하지 않는다(§7.0.3).
 - `sentences`: 본인 읽기·쓰기만 base 권한으로 허용하고, 비소유자는 부모 `user_books.visibility=public` 및 차단·moderation을 검증한 최소 공개 projection으로 읽는다. 문장별 공개 정책은 제거한다(§7.0.1–2).
 - `reading_sessions`, `streak`, `user_books`: base 읽기·쓰기는 소유자 범위다. 타인 책 조회는 현재 public인 `user_book`의 허용 projection만 반환하며, 책 공개가 개인 세션·통계 전체 공개를 뜻하지 않는다. 기존 `select 모두`는 축소 대상 as-built이지 목표 권한이 아니다(§7.0.1–3).
+- `user_book_chapters`: base CRUD는 부모 `user_book` 소유자만 가능하다. 비소유자·anonymous는 base table을 읽지 않고 `book_public_allowed`를 내부 적용하는 최소 목차/분류 RPC만 사용한다(§7.0.7).
 - `follows`: follower_id가 본인인 행만 insert/delete
 - `claps`: from_user_id가 본인인 행만 insert
 - `moderation_reports`: authenticated 사용자는 RPC를 통한 본인 신고 생성과 본인 신고의 id/status만 조회. 원문 detail·운영자 메모를 포함한 전체 조회·상태 변경은 `is_admin()`만. 클라이언트 직접 insert/update는 회수한다.
@@ -729,6 +779,7 @@ OAuth 콜백 직후 동기화 → localStorage 비움:
 - 로컬 어댑터 `sentences.add`는 게스트가 직접 남긴 문장에 **`_guest: true`** 태그(시드 `_seed()` 문장은 태그 없음 → 백필 제외).
 - `syncPendingToSupabase`(app.js)는 `_guest` 문장을 가진 **모든 user_book**을 이전: 책 upsert → 문장 `add({text, page, my_note, kind})`로 **대화(my_note)·종류까지 보존**. 활성 책은 로컬 `active_user_book_id` 매핑 유지.
 - 이전 후 `pending` 비우고 `_guest` 플래그 제거(재동기화 방지). 시드 완독 책은 `_guest` 문장이 없어 미이전(폴루션 방지).
+- **게스트 목차 이관 (#1627 목표)**: 로컬 목차는 local `user_book.id`와 canonical 책 식별자의 기존 이관 매핑으로 원격 `user_books.id`를 먼저 확정한 뒤 `chapters.replace`한다. 같은 원격 책으로 합쳐질 로컬 원본이 둘 이상이거나 원격에 다른 canonical rows가 있으면 자동 병합·append하지 않고 충돌로 중단한다. 전체 원격 `chapters.list`가 정규화된 `title/start_page/depth/position`과 일치할 때만 해당 로컬 목차를 migrated로 표시한다. OAuth 재진입·응답 유실 재시도는 중복 행을 만들지 않으며 부분 성공·권한 오류·readback 불일치에서는 로컬 원본을 보존한다.
 - 참여 가시화: `answer_saved`(PostHog)는 동의와 무관하게 발화(`rgTrack`→`posthog.capture`) — 미동의 게스트의 engagement도 집계됨.
 - **동의 유저 my_note → `companion_sessions` 백필 (#394, 구현)**: 로그인 시 `backfillCompanionSessions()`(app.js) — 동의(`yes`)·기존 세션 0건일 때만(중복 방지) sentence `my_note`의 `Q./A.` 쌍을 파싱(`parseQAPairs`)해 `companionSessions.add`. 가드용 `companionSessions.countMine()` 양 어댑터 추가(로컬=0). 미동의 유저 제외(PIPA). 해자 집계(`companion_sessions`)를 과거 대화로 채움.
 
@@ -745,8 +796,8 @@ Phase 0 (localStorage, `rg_v41`):
 ```json
 {
   "user_books": [
-    { "id": "uuid", "book": { ... }, "current_page": 72, "rating": null, "sessions": [...], "sentences": [...] },
-    { "id": "uuid", "book": { ... }, "current_page": 5,  "rating": null, "sessions": [...], "sentences": [...] }
+    { "id": "uuid", "book": { ... }, "current_page": 72, "rating": null, "chapters": [{ "title": "...", "start_page": 1, "depth": 0, "position": 0 }], "sessions": [...], "sentences": [...] },
+    { "id": "uuid", "book": { ... }, "current_page": 5,  "rating": null, "chapters": [], "sessions": [...], "sentences": [...] }
   ],
   "active_user_book_id": "uuid"
 }
