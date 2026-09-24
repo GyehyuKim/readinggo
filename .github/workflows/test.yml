@@ -122,7 +122,7 @@ jobs:
           node tests/book-privacy-room-adapter.test.mjs
           node tests/conversation-reliability.test.mjs
           node --test docs/readinggo/js/book-privacy-callers.test.js docs/readinggo/js/book-privacy-ui.test.js docs/readinggo/js/public-projection-ui.test.js docs/readinggo/js/share-card.test.js docs/readinggo/js/public-share-links.test.mjs worker/public-record-routes.test.mjs
-          cd docs/readinggo && npm run test:analytics
+          cd docs/readinggo && npm run test:chapters && npm run test:analytics
 
   boot-smoke:
     name: boot-smoke (Vite 빌드 회귀)

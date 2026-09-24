@@ -12,6 +12,7 @@
     "test:analytics": "node --test js/analytics.test.js",
     "test:share-card": "node --test js/share-card.test.js",
     "test:reading-story": "node --test js/reading-story.test.js",
+    "test:chapters": "node --test js/chapter-core.test.js js/chapter-datastore.test.js js/chapter-ui.test.js",
     "test:page-input-width": "node page-input-width.test.mjs",
     "audit:ui": "node ui-audit-sweep.mjs"
   },

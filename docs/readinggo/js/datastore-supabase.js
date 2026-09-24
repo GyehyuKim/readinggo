@@ -457,6 +457,42 @@
       },
     },
 
+    /* 개인 판본 목차 (#1627). Owner replacement is one RPC transaction and
+       success is reported only after authoritative readback matches. */
+    chapters: {
+      async list(userBookId) {
+        return unwrap(await sb().from('user_book_chapters')
+          .select('id,user_book_id,title,start_page,depth,position,created_at,updated_at')
+          .eq('user_book_id', userBookId).order('position', { ascending: true })) || [];
+      },
+      async replace(userBookId, rows) {
+        const books = await A.myBooks.list();
+        const parent = (books || []).find(book => book.id === userBookId);
+        if (!parent) throw new Error('book_not_found');
+        const total = parent.total_pages_override || (parent.book && parent.book.total_pages) || null;
+        const normalized = window.RG_chapters.assertValid(rows, total);
+        try {
+          unwrap(await sb().rpc('user_book_chapters_replace', {
+            p_user_book_id: userBookId, p_rows: normalized,
+          }));
+        } catch (cause) {
+          // A lost response may follow a committed transaction. Reconcile instead
+          // of blindly declaring failure or issuing a different overwrite.
+          try {
+            const recovered = await this.list(userBookId);
+            if (window.RG_chapters.sameRows(normalized, recovered)) return recovered;
+          } catch (readError) {}
+          throw cause;
+        }
+        const readback = await this.list(userBookId);
+        if (!window.RG_chapters.sameRows(normalized, readback)) throw new Error('chapter_readback_mismatch');
+        return readback;
+      },
+      async publicByBook(userBookId) {
+        return unwrap(await sb().rpc('user_book_chapters_public', { p_user_book_id: userBookId })) || [];
+      },
+    },
+
     /* 한 문장 (sentences) */
     sentenceConversations: {
       async savePair(sentenceId, { q, a, requestId }) {

@@ -254,6 +254,26 @@ const localStorageAdapter = (function () {
     return out;
   }
 
+  // Whole-value commit used by all-or-nothing local replacements. Persist first so
+  // quota/storage failures leave both the durable value and in-memory cache unchanged.
+  function atomicMutate(fn) {
+    const current = read();
+    const next = _clone(current);
+    const out = fn(next);
+    localStorage.setItem(_storageKey, JSON.stringify(next));
+    _cache = next;
+    let version = 0;
+    try {
+      version = (Number(localStorage.getItem(_versionKey())) || 0) + 1;
+      localStorage.setItem(_versionKey(), String(version));
+    } catch (e) {}
+    if (_writeHook) {
+      _markDirty();
+      try { _writeHook(_clone(next), version); } catch (e) { console.warn('[DataStore] DEV 동기화 예약 실패:', e.message); }
+    }
+    return out;
+  }
+
   // DEV 검수처럼 별도 로컬 namespace가 필요한 부팅 경로를 위한 안전한 어댑터 API.
   // 기본값은 항상 rg_v41이며, 호출부가 localStorage/cache를 직접 만지지 않게 한다.
   function configure({ storageKey, initialState }) {
@@ -328,7 +348,7 @@ const localStorageAdapter = (function () {
     } catch (e) { throw new Error('DEV 검수 브라우저 식별자를 만들 수 없음'); }
   }
 
-  return { read, write, mutate, configure, reset, currentKey, replace, setWriteHook, isDirty, markDirty: _markDirty, clearDirty, clientId, version, getRevision, setRevision, clearRevision };
+  return { read, write, mutate, atomicMutate, configure, reset, currentKey, replace, setWriteHook, isDirty, markDirty: _markDirty, clearDirty, clientId, version, getRevision, setRevision, clearRevision };
 })();
 
 /* ── 내부 조회 헬퍼 ──────────────────────────────── */
@@ -651,6 +671,34 @@ const DataStore = {
     },
   },
 
+  /* 개인 판본 목차 (#1627). chapters live inside their user_book in the
+     local mirror; replacement validates before an all-or-nothing persist. */
+  chapters: {
+    list(userBookId) {
+      const state = localStorageAdapter.read();
+      const ub = _ubById(state, userBookId);
+      if (!ub) throw new Error('book_not_found');
+      return (ub.chapters || []).map(row => ({ ...row })).sort((a, b) => a.position - b.position);
+    },
+    replace(userBookId, rows) {
+      const state = localStorageAdapter.read();
+      const current = _ubById(state, userBookId);
+      if (!current) throw new Error('book_not_found');
+      const total = current.total_pages_override || (current.book && current.book.total_pages) || null;
+      const normalized = window.RG_chapters.assertValid(rows, total);
+      return localStorageAdapter.atomicMutate(s => {
+        const ub = _ubById(s, userBookId);
+        if (!ub) throw new Error('book_not_found');
+        ub.chapters = normalized.map((row, index) => ({
+          id: (rows[index] && rows[index].id) || _dsId('chapter'), user_book_id: userBookId,
+          ...row,
+        }));
+        return ub.chapters.map(row => ({ ...row }));
+      });
+    },
+    publicByBook() { return Promise.resolve([]); },
+  },
+
   /* 한 문장 (sentences) ───────────────────────────── */
   sentenceConversations: {
     savePair(sentenceId, { q, a, requestId }) {
@@ -704,7 +752,7 @@ const DataStore = {
           user_book_id: ub.id,
           book_id: ub.book_id,
           session_id: sessionId || null,
-          page: typeof page === 'number' ? page : (ub.current_page || 0),
+          page: page === null ? null : (typeof page === 'number' ? page : (ub.current_page || 0)),
           text: checked.text,
           my_note: my_note || null,
           kind: 'quote',   // '내 생각'(thought) 폐기 — 항상 인용(quote) (#596)
