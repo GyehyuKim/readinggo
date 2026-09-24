@@ -29,6 +29,10 @@ class_name = "PromptExperimentLimiter"
 name = "BOOK_PROVIDER_GUARD"
 class_name = "BookProviderGuard"
 
+[[durable_objects.bindings]]
+name = "VISION_PROVIDER_GUARD"
+class_name = "VisionProviderGuard"
+
 [[migrations]]
 tag = "prompt-experiment-limiter-v1"
 new_sqlite_classes = ["PromptExperimentLimiter"]
@@ -36,6 +40,10 @@ new_sqlite_classes = ["PromptExperimentLimiter"]
 [[migrations]]
 tag = "book-provider-guard-v1"
 new_sqlite_classes = ["BookProviderGuard"]
+
+[[migrations]]
+tag = "vision-provider-guard-v1"
+new_sqlite_classes = ["VisionProviderGuard"]
 
 [vars]
 ENVIRONMENT = "development"
