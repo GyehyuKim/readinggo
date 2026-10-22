@@ -1715,7 +1715,7 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 // 송출 지역에 좌우 — 실측 ~50% flap). 같은 요청을 재시도하면 다른 경로/PoP로 나가
 // 성공률이 크게 오른다. 429/5xx(일시 과부하)도 함께 재시도. 본문 변경 없음(멱등).
 // system/userText 인자(#1042 서가 비전 추출 재사용) — 기본값은 강조 추출(기존 #844 호출부 무변).
-async function callVision({ env, dataUrl, maxTokens, system, userText }) {
+async function callVision({ env, dataUrl, detailDataUrls = [], maxTokens, system, userText }) {
   const base = (env.VISION_BASE_URL || '').replace(/\/$/, '');
   const model = env.VISION_MODEL, key = env.GEMINI_API_KEY;
   if (!base || !model || !key) throw new Error('VISION env 미설정');
@@ -1726,6 +1726,7 @@ async function callVision({ env, dataUrl, maxTokens, system, userText }) {
       { role: 'user', content: [
         { type: 'text', text: userText || '이 이미지가 책 페이지면 강조(밑줄/형광펜)된 문장을, 독서앱의 저장한 밑줄·메모 목록이면 각 행의 문장을 원문 그대로 추출해.' },
         { type: 'image_url', image_url: { url: dataUrl } },
+        ...detailDataUrls.map(url => ({ type: 'image_url', image_url: { url } })),
       ] },
     ],
     temperature: 0.1,
@@ -1769,11 +1770,20 @@ async function extractHighlightsProxy(request, env) {
   try { form = await request.formData(); } catch { return json({ error: 'invalid form' }, 400); }
   const file = form.get('document');
   if (!file || typeof file === 'string') return json({ error: 'document(이미지) 필요' }, 422);
-  if (file.size && file.size > OCR_MAX_BYTES) return json({ error: '이미지가 너무 큽니다(최대 8MB)' }, 413);
+  const details = form.getAll('detail');
+  if (details.length > 4) return json({ error: '상세 보기는 최대 4개입니다' }, 422);
+  const images = [file, ...details];
+  if (images.some(image => typeof image === 'string' || !image.size || !/^image\/(jpeg|png|webp)$/.test(image.type))) return json({ error: '지원하는 이미지 파일 필요' }, 422);
+  if (images.reduce((sum, image) => sum + image.size, 0) > OCR_MAX_BYTES) return json({ error: '이미지 합계가 너무 큽니다(최대 8MB)' }, 413);
   try {
     const buf = await file.arrayBuffer();
     const dataUrl = `data:${file.type || 'image/jpeg'};base64,${bufToBase64(buf)}`;
-    const sentences = parseHighlights(await callVision({ env, dataUrl }));
+    const detailDataUrls = [];
+    for (const detail of details) {
+      detailDataUrls.push(`data:${detail.type};base64,${bufToBase64(await detail.arrayBuffer())}`);
+    }
+    const userText = details.length ? '첫 이미지는 전체 원본의 전송 사본이다. 이후 이미지는 같은 원본의 상세 보기이며 순서는 왼쪽 위, 왼쪽 아래, 오른쪽 위, 오른쪽 아래다. 별도 페이지나 새로운 문장이 아니다. 전체 보기로 강조 범위와 읽기 순서를 판별하고 상세 보기로 작은 글자·음절·각주를 확인한다. 겹친 구절은 한 번만 반환한다. 상세 보기의 잘린 경계를 원문 경계로 보지 말고 전체 보기와 대조한다. 보이지 않는 글자는 추정하지 않는다.' : undefined;
+    const sentences = parseHighlights(await callVision({ env, dataUrl, detailDataUrls, userText }));
     return json({ sentences }, 200);
   } catch (e) {
     return json({ error: 'vision 호출 실패: ' + String((e && e.message) || e) }, 502);
