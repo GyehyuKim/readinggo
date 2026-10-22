@@ -19,7 +19,7 @@ const bundle = await build({
 ${editor}
 const root = createRoot(document.getElementById('root'));
 window.mountEditor = props => root.render(React.createElement(ReadingStoryEditor, props));`,
-    resolveDir: new URL('.', import.meta.url).pathname, loader: 'jsx' },
+    resolveDir: new URL('./js/', import.meta.url).pathname, loader: 'jsx' },
   bundle: true, write: false, format: 'iife', define: { 'process.env.NODE_ENV': '"production"' },
 });
 const book = { id:'catalog-fixture', ubId:'owner-book', title:'독서 이야기 검증용 책', author:'테스트 저자' };
