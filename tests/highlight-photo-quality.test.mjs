@@ -96,6 +96,10 @@ test('real proxy/vision payload preserves punctuation, independent spans and API
   assert.equal(result.status, 200);
   assert.deepEqual(result.data, { sentences: ['합성 구절 7.', '다른 구절!'] });
   const prompt = sandbox.payload.messages[0].content;
+  assert.equal(sandbox.payload.max_tokens, 8192);
+  assert.equal(sandbox.payload.reasoning_effort, 'low');
+  assert.deepEqual(sandbox.payload.response_format.json_schema.schema, { type: 'array', items: { type: 'string' } });
+  assert.equal(sandbox.payload.response_format.json_schema.strict, true);
   for (const rule of ['왼쪽 페이지', '오른쪽 페이지', '음절', '각주 표지', '문장 부호', '실제 글자·표시 증거', '이웃 문장']) assert.ok(prompt.includes(rule));
 });
 
