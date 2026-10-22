@@ -1715,9 +1715,9 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 // 송출 지역에 좌우 — 실측 ~50% flap). 같은 요청을 재시도하면 다른 경로/PoP로 나가
 // 성공률이 크게 오른다. 429/5xx(일시 과부하)도 함께 재시도. 본문 변경 없음(멱등).
 // system/userText 인자(#1042 서가 비전 추출 재사용) — 기본값은 강조 추출(기존 #844 호출부 무변).
-async function callVision({ env, dataUrl, detailDataUrls = [], maxTokens, system, userText, reasoningEffort, responseFormat }) {
+async function callVision({ env, dataUrl, detailDataUrls = [], maxTokens, system, userText, reasoningEffort, responseFormat, modelOverride }) {
   const base = (env.VISION_BASE_URL || '').replace(/\/$/, '');
-  const model = env.VISION_MODEL, key = env.GEMINI_API_KEY;
+  const model = modelOverride || env.VISION_MODEL, key = env.GEMINI_API_KEY;
   if (!base || !model || !key) throw new Error('VISION env 미설정');
   const payload = JSON.stringify({
     model,
@@ -1788,7 +1788,7 @@ async function extractHighlightsProxy(request, env) {
     // Gemini 2.5의 thinking과 최종 JSON이 800 token을 공유하면 확대 판독이 잘릴 수 있다.
     // 강조 경로만 예산/형식을 명시한다. 서가 비전 등 다른 호출은 기존 설정을 보존한다.
     const sentences = parseHighlights(await callVision({ env, dataUrl, detailDataUrls, userText,
-      maxTokens: 8192, reasoningEffort: 'low',
+      maxTokens: 8192, reasoningEffort: 'low', modelOverride: env.HIGHLIGHT_MODEL,
       responseFormat: { type: 'json_schema', json_schema: { name: 'highlight_sentences', strict: true,
         schema: { type: 'array', items: { type: 'string' } } } },
     }));

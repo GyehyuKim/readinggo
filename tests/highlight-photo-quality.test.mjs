@@ -103,6 +103,16 @@ test('real proxy/vision payload preserves punctuation, independent spans and API
   for (const rule of ['왼쪽 페이지', '오른쪽 페이지', '음절', '각주 표지', '문장 부호', '실제 글자·표시 증거', '이웃 문장']) assert.ok(prompt.includes(rule));
 });
 
+test('dedicated highlight model overrides vision only when configured', async () => {
+  env.HIGHLIGHT_MODEL = 'synthetic-precise';
+  try {
+    assert.equal((await extract('[]')).status, 200);
+    assert.equal(sandbox.payload.model, 'synthetic-precise');
+  } finally { delete env.HIGHLIGHT_MODEL; }
+  await extract('[]');
+  assert.equal(sandbox.payload.model, env.VISION_MODEL);
+});
+
 test('genuine empty array remains successful', async () => {
   assert.deepEqual(await extract('[]'), { status: 200, data: { sentences: [] } });
 });
