@@ -1788,7 +1788,8 @@ async function extractHighlightsProxy(request, env) {
     // Gemini 2.5의 thinking과 최종 JSON이 800 token을 공유하면 확대 판독이 잘릴 수 있다.
     // 강조 경로만 예산/형식을 명시한다. 서가 비전 등 다른 호출은 기존 설정을 보존한다.
     const sentences = parseHighlights(await callVision({ env, dataUrl, detailDataUrls, userText,
-      maxTokens: 8192, reasoningEffort: 'low', modelOverride: env.HIGHLIGHT_MODEL,
+      maxTokens: env.HIGHLIGHT_REASONING_EFFORT === 'medium' ? 16384 : 8192,
+      reasoningEffort: env.HIGHLIGHT_REASONING_EFFORT === 'medium' ? 'medium' : 'low', modelOverride: env.HIGHLIGHT_MODEL,
       responseFormat: { type: 'json_schema', json_schema: { name: 'highlight_sentences', strict: true,
         schema: { type: 'array', items: { type: 'string' } } } },
     }));

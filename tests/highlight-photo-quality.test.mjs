@@ -113,6 +113,19 @@ test('dedicated highlight model overrides vision only when configured', async ()
   assert.equal(sandbox.payload.model, env.VISION_MODEL);
 });
 
+test('medium reasoning has a separate output allowance; unknown values keep safe defaults', async () => {
+  try {
+    env.HIGHLIGHT_REASONING_EFFORT = 'medium';
+    await extract('[]');
+    assert.equal(sandbox.payload.max_tokens, 16384);
+    assert.equal(sandbox.payload.reasoning_effort, 'medium');
+    env.HIGHLIGHT_REASONING_EFFORT = 'unknown';
+    await extract('[]');
+    assert.equal(sandbox.payload.max_tokens, 8192);
+    assert.equal(sandbox.payload.reasoning_effort, 'low');
+  } finally { delete env.HIGHLIGHT_REASONING_EFFORT; }
+});
+
 test('genuine empty array remains successful', async () => {
   assert.deepEqual(await extract('[]'), { status: 200, data: { sentences: [] } });
 });
