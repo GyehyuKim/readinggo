@@ -24,7 +24,7 @@ jobs:
           cd docs/readinggo
           npm ci
           npm run build
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           npm run preview &
           for i in $(seq 1 30); do curl -sf http://localhost:4173/ >/dev/null && break; sleep 1; done
           SMOKE_URL=http://localhost:4173/ npm run smoke
@@ -90,5 +90,5 @@ jobs:
         run: |
           cd docs/readinggo
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           SMOKE_URL="${SMOKE_URL%/}/" npm run smoke
