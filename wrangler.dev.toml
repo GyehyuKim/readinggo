@@ -5,6 +5,10 @@ main = "worker/index.mjs"
 compatibility_date = "2026-06-01"
 preview_urls = true
 
+# #1633 Gemini 지역 거부 복구: 공식 실행 위치 힌트(국가/보관 위치 보증 아님).
+[placement]
+region = "gcp:asia-northeast1"
+
 [build]
 command = "cd docs/readinggo && npm ci && VITE_READINGGO_ENV=development npm run build"
 

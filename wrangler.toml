@@ -15,6 +15,10 @@ compatibility_date = "2026-06-01"
 # render-smoke 를 돌려 #880류 런타임/edge 회귀를 머지 전 차단(H3·H5).
 preview_urls = true
 
+# #1633 DEV 검증 후 동일 SHA 승격. 공식 실행 위치 힌트이며 보관 국가 보증 아님.
+[placement]
+region = "gcp:asia-northeast1"
+
 # #871 Vite 전환 — 배포 전 Vite 빌드 실행(Cloudflare Workers Build / 로컬 wrangler deploy 공통).
 # ⚠️ Workers Build 가 대시보드 빌드 명령을 별도로 가지면 그쪽도 동일하게 설정 필요.
 [build]
