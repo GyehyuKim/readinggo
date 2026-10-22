@@ -1672,7 +1672,7 @@ const HIGHLIGHT_SYSTEM = `너는 이미지에서 사용자가 강조·저장한 
 펼침 사진은 왼쪽 페이지를 위에서 아래로 먼저 읽고, 그다음 오른쪽 페이지를 위에서 아래로 읽는다. 인쇄 줄바꿈으로 나뉜 하나의 강조 문장은 읽기 순서대로 이어 하나의 완문으로 복원한다. 페이지 경계에서 단어가 음절 단위로 나뉘어도 양쪽에 실제 보이는 음절을 하나도 누락하지 않고 원래 단어로 이어 쓴다. 같은 펼침 사진의 왼쪽 페이지 끝과 오른쪽 페이지 시작에 동일한 강조 문장의 연속임을 보여주는 실제 글자·표시 증거가 있을 때만 연결한다. 독립된 강조 구절은 각각 별도 항목이다. 완문을 만들려고 표시 없는 문장이나 사진 밖의 글자를 추정해 채우지 않는다. 다른 사진과의 연결은 하지 않는다.
 머리말·쪽수·각주 본문·각주 표지(작은 위첨자 숫자 등)는 제외한다. 각주 표지를 물음표·마침표 등 문장 부호로 바꾸지 않는다. 본문에 실제 인쇄된 문장 부호와 숫자는 보존하며, 문장 부호를 새로 붙이거나 바꾸지 않는다.
 (B) 독서앱(교보·밀리 등)의 저장한 밑줄·메모 목록 스크린샷: 각 행의 저장 문장만 읽고, 진행률·날짜·시간·페이지 번호·버튼·앱 이름·메뉴·별점 등 UI는 제외한다.
-공통: 원문의 단어·철자·문장 부호를 그대로 보존한다. 교정·동의어 치환·요약·번역·새 문장 생성은 금지한다. 읽을 수 없는 글자나 불확실한 표시 범위는 추측하지 말고 해당 구절을 제외한다. 강조·저장된 구절이 확실히 없을 때만 []를 반환한다.`;
+공통: 반환 직전에 각 구절의 모든 글자 아래에 실제 강조선이 있는지 전체 보기와 확대 보기를 대조한다. 강조선이 끝난 뒤 인쇄된 이웃 문장은 절대로 덧붙이지 않는다. 작은 숫자와 닫는 괄호(예: 3), ¹)는 각주 표지일 수 있으므로 본문의 문장 부호와 구분한다. 원문의 단어·철자·문장 부호를 그대로 보존한다. 교정·동의어 치환·요약·번역·새 문장 생성은 금지한다. 읽을 수 없는 글자나 불확실한 표시 범위는 추측하지 말고 해당 구절을 제외한다. 강조·저장된 구절이 확실히 없을 때만 []를 반환한다.`;
 
 // JSON 문자열 배열 견고 파싱 — 코드펜스·잡텍스트 제거, 공백·중복 제거, 상한 40개.
 // 길이 초과 원문도 검토 초안까지 전달하고 저장 계층에서 1,000자를 강제한다(#1457).
@@ -1715,7 +1715,7 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 // 송출 지역에 좌우 — 실측 ~50% flap). 같은 요청을 재시도하면 다른 경로/PoP로 나가
 // 성공률이 크게 오른다. 429/5xx(일시 과부하)도 함께 재시도. 본문 변경 없음(멱등).
 // system/userText 인자(#1042 서가 비전 추출 재사용) — 기본값은 강조 추출(기존 #844 호출부 무변).
-async function callVision({ env, dataUrl, detailDataUrls = [], maxTokens, system, userText }) {
+async function callVision({ env, dataUrl, detailDataUrls = [], maxTokens, system, userText, reasoningEffort, responseFormat }) {
   const base = (env.VISION_BASE_URL || '').replace(/\/$/, '');
   const model = env.VISION_MODEL, key = env.GEMINI_API_KEY;
   if (!base || !model || !key) throw new Error('VISION env 미설정');
@@ -1731,6 +1731,8 @@ async function callVision({ env, dataUrl, detailDataUrls = [], maxTokens, system
     ],
     temperature: 0.1,
     max_tokens: maxTokens || 800,
+    reasoning_effort: reasoningEffort,
+    response_format: responseFormat,
   });
   const MAX_TRIES = 3;
   let lastErr = '';
@@ -1783,7 +1785,13 @@ async function extractHighlightsProxy(request, env) {
       detailDataUrls.push(`data:${detail.type};base64,${bufToBase64(await detail.arrayBuffer())}`);
     }
     const userText = details.length ? '첫 이미지는 전체 원본의 전송 사본이다. 이후 이미지는 같은 원본의 상세 보기이며 순서는 왼쪽 위, 왼쪽 아래, 오른쪽 위, 오른쪽 아래다. 별도 페이지나 새로운 문장이 아니다. 전체 보기로 강조 범위와 읽기 순서를 판별하고 상세 보기로 작은 글자·음절·각주를 확인한다. 겹친 구절은 한 번만 반환한다. 상세 보기의 잘린 경계를 원문 경계로 보지 말고 전체 보기와 대조한다. 보이지 않는 글자는 추정하지 않는다.' : undefined;
-    const sentences = parseHighlights(await callVision({ env, dataUrl, detailDataUrls, userText }));
+    // Gemini 2.5의 thinking과 최종 JSON이 800 token을 공유하면 확대 판독이 잘릴 수 있다.
+    // 강조 경로만 예산/형식을 명시한다. 서가 비전 등 다른 호출은 기존 설정을 보존한다.
+    const sentences = parseHighlights(await callVision({ env, dataUrl, detailDataUrls, userText,
+      maxTokens: 8192, reasoningEffort: 'low',
+      responseFormat: { type: 'json_schema', json_schema: { name: 'highlight_sentences', strict: true,
+        schema: { type: 'array', items: { type: 'string' } } } },
+    }));
     return json({ sentences }, 200);
   } catch (e) {
     return json({ error: 'vision 호출 실패: ' + String((e && e.message) || e) }, 502);
