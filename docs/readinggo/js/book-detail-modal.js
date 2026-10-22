@@ -1,3 +1,5 @@
+import { prepareHighlightImage } from './highlight-image.js';
+
 /* =========================================================
    ReadingGo — book-detail-modal.js  (#761 모듈화: library.js에서 추출)
    BookDetailModal: 책장 책 상세(완독 별점·소감·한 문장·관련도서·Markdown export).
@@ -540,10 +542,15 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     for (let i = 0; i < files.length; i++) {
       try {
         const fd = new FormData();
-        fd.append('document', files[i], files[i].name || ('p' + i + '.jpg'));
+        const prepared = await prepareHighlightImage(files[i]);
+        fd.append('document', prepared, 'p' + i + '.jpg');
         const r = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
         if (!r.ok) { failed++; }              // 503(미설정)·502(vision 실패, 지역 flap 포함) 등 → 실패로 집계
-        else { const d = await r.json(); if (d && Array.isArray(d.sentences)) all.push(...d.sentences); }
+        else {
+          const d = await r.json();
+          if (!d || !Array.isArray(d.sentences) || d.sentences.some(t => typeof t !== 'string')) throw new Error('invalid highlight response');
+          all.push(...d.sentences);
+        }
       } catch (e) { failed++; /* 네트워크 실패 — 부분 완료 */ }
       setOcrProgress({ done: i + 1, total: files.length });
       if (i < files.length - 1) await new Promise((res) => setTimeout(res, 1200));

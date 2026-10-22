@@ -1,3 +1,5 @@
+import { prepareHighlightImage } from './highlight-image.js';
+
 /* =========================================================
    ReadingGo — data-import.js  (#1150 데이터 주권 · 가져오기)
    타사 앱(교보·밀리 등) "저장한 밑줄" 스크린샷 → Gemini vision(/api/extract-highlights)
@@ -71,10 +73,15 @@ function DataImport({ onClose }) {
     for (let i = 0; i < files.length; i++) {
       try {
         const fd = new FormData();
-        fd.append('document', files[i], files[i].name || ('p' + i + '.jpg'));
+        const prepared = await prepareHighlightImage(files[i]);
+        fd.append('document', prepared, 'p' + i + '.jpg');
         const r = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
         if (!r.ok) failed++;
-        else { const d = await r.json(); if (d && Array.isArray(d.sentences)) all.push(...d.sentences); }
+        else {
+          const d = await r.json();
+          if (!d || !Array.isArray(d.sentences) || d.sentences.some(t => typeof t !== 'string')) throw new Error('invalid highlight response');
+          all.push(...d.sentences);
+        }
       } catch (e) { failed++; }
       setProgress({ done: i + 1, total: files.length });
       if (i < files.length - 1) await new Promise(res => setTimeout(res, 1200));

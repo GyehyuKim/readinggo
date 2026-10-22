@@ -1667,21 +1667,27 @@ async function ocrProxy(request, env) {
    → Gemini Flash vision(이미지 이해)으로 강조 표시된 문장만 추출. 원문 충실(환각 가드는 클라 검토 큐).
    키/모델은 VISION_* env. OpenAI 호환 chat completions + image_url. 클라가 N장 순차 호출(rate limit). */
 // 한 엔드포인트로 두 종류의 이미지 처리(#844 책 페이지 강조 + #1150 타사앱 저장 밑줄 목록 스크린샷).
-const HIGHLIGHT_SYSTEM = '너는 사용자가 강조·저장한 문장을 이미지에서 원문 그대로 뽑아내는 추출기다. 두 종류의 이미지를 처리한다: (A) 책 페이지 사진 — 밑줄·형광펜·괄호·별표로 강조 표시된 문장만. (B) 독서앱(교보·밀리 등)의 "저장한 밑줄·메모" 목록 스크린샷 — 각 행이 한 문장이므로 그 문장 텍스트를 모두. 강조/저장된 문장을 원문 그대로 JSON 문자열 배열로 출력한다. 형식: ["문장1","문장2"]. 규칙: (1) (A)는 강조 표시된 문장만 — 강조 안 된 본문·머리말·쪽번호·각주 제외. (B)는 목록의 각 문장만 — UI 텍스트(진행률 %·날짜·시간·페이지 번호·버튼·앱 이름·메뉴·별점)는 모두 제외. (2) 원문 그대로 — 단어 변경·교정·요약·번역·합치기·새 문장 생성 절대 금지. (3) 강조·저장된 문장이 전혀 없으면 빈 배열 []. (4) 설명·코드펜스 없이 JSON 배열만 출력.';
+const HIGHLIGHT_SYSTEM = `너는 이미지에서 사용자가 강조·저장한 원문만 전사하는 추출기다. 설명·코드펜스 없이 JSON 문자열 배열만 출력한다: ["문장1","문장2"].
+(A) 책 페이지 사진: 먼저 밑줄·형광펜·괄호·별표의 실제 표시 범위와 시작·끝을 확인하고 그 범위의 글자만 읽는다. 같은 인쇄 줄이나 문단에 있어도 표시 없는 앞뒤 이웃 문장은 포함하지 않는다. 문장 일부만 표시했다면 그 부분만 반환한다.
+펼침 사진은 왼쪽 페이지를 위에서 아래로 먼저 읽고, 그다음 오른쪽 페이지를 위에서 아래로 읽는다. 인쇄 줄바꿈으로 나뉜 하나의 강조 문장은 읽기 순서대로 이어 하나의 완문으로 복원한다. 페이지 경계에서 단어가 음절 단위로 나뉘어도 양쪽에 실제 보이는 음절을 하나도 누락하지 않고 원래 단어로 이어 쓴다. 같은 펼침 사진의 왼쪽 페이지 끝과 오른쪽 페이지 시작에 동일한 강조 문장의 연속임을 보여주는 실제 글자·표시 증거가 있을 때만 연결한다. 독립된 강조 구절은 각각 별도 항목이다. 완문을 만들려고 표시 없는 문장이나 사진 밖의 글자를 추정해 채우지 않는다. 다른 사진과의 연결은 하지 않는다.
+머리말·쪽수·각주 본문·각주 표지(작은 위첨자 숫자 등)는 제외한다. 각주 표지를 물음표·마침표 등 문장 부호로 바꾸지 않는다. 본문에 실제 인쇄된 문장 부호와 숫자는 보존하며, 문장 부호를 새로 붙이거나 바꾸지 않는다.
+(B) 독서앱(교보·밀리 등)의 저장한 밑줄·메모 목록 스크린샷: 각 행의 저장 문장만 읽고, 진행률·날짜·시간·페이지 번호·버튼·앱 이름·메뉴·별점 등 UI는 제외한다.
+공통: 원문의 단어·철자·문장 부호를 그대로 보존한다. 교정·동의어 치환·요약·번역·새 문장 생성은 금지한다. 읽을 수 없는 글자나 불확실한 표시 범위는 추측하지 말고 해당 구절을 제외한다. 강조·저장된 구절이 확실히 없을 때만 []를 반환한다.`;
 
 // JSON 문자열 배열 견고 파싱 — 코드펜스·잡텍스트 제거, 공백·중복 제거, 상한 40개.
 // 길이 초과 원문도 검토 초안까지 전달하고 저장 계층에서 1,000자를 강제한다(#1457).
 function parseHighlights(s) {
-  if (!s) return [];
-  let t = String(s).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  const a = t.indexOf('['), b = t.lastIndexOf(']');
-  if (a >= 0 && b > a) t = t.slice(a, b + 1);
+  // 빈/잘린 응답은 강조 없음([])과 다르다. 호출부에서 502로 전달한다.
+  if (!s) throw new Error('invalid highlight response');
+  const t = String(s).trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
   let arr;
-  try { arr = JSON.parse(t); } catch { return []; }
-  if (!Array.isArray(arr)) return [];
+  try { arr = JSON.parse(t); } catch { throw new Error('invalid highlight JSON'); }
+  if (!Array.isArray(arr) || arr.some(it => typeof it !== 'string' && !(it && typeof it.text === 'string'))) {
+    throw new Error('invalid highlight array');
+  }
   const seen = new Set(), out = [];
   for (const it of arr) {
-    const text = String(typeof it === 'string' ? it : (it && it.text) || '').trim();
+    const text = (typeof it === 'string' ? it : it.text).trim();
     if (!text) continue;
     const key = text.replace(/\s+/g, '').toLowerCase();
     if (seen.has(key)) continue;
