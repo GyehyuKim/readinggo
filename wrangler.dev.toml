@@ -52,8 +52,5 @@ PROMPT_EXPERIMENT_DAILY_LIMIT = "1000"
 PROMPT_EXPERIMENT_TIMEOUT_MS = "30000"
 VISION_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 VISION_MODEL = "gemini-2.5-flash"
-# #1633 강조 문장 판독만 분리. 서가 비전 모델과 Solar는 유지한다.
-HIGHLIGHT_MODEL = "gemini-2.5-flash"
-HIGHLIGHT_REASONING_EFFORT = "medium"
 
 # 의도적으로 [triggers]와 R2 binding이 없다. DEV는 cron, prod R2, 문의 GitHub sync를 실행하지 않는다.
