@@ -64,5 +64,5 @@ jobs:
         run: |
           cd docs/readinggo
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           npm run smoke
