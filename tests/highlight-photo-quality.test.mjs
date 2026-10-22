@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { prepareHighlightImage } from '../docs/readinggo/js/highlight-image.js';
+import { prepareHighlightImage, prepareHighlightViews } from '../docs/readinggo/js/highlight-image.js';
 
 function browserHarness(sizes = [100]) {
   const calls = [], image = { width: 4000, height: 3000, close() { calls.push('close'); } };
@@ -123,11 +123,12 @@ for (const [name, start, end] of [
   test(`${name} runs preparation per photo and preserves successes across preparation/API failures`, async () => {
     const source = readFileSync(new URL('../docs/readinggo/js/' + name, import.meta.url), 'utf8');
     const body = source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
-    const values = [], toasts = [], uploads = [], prepared = [];
+    const values = [], toasts = [], uploads = [], prepared = [], detailCounts = [];
     const context = {
       book: { ubId: 'synthetic' }, FormData, setTimeout: fn => fn(),
       prepareHighlightImage: async file => { prepared.push(file); if (file === 'bad') throw Error('decode'); return new Blob(['jpeg'], { type: 'image/jpeg' }); },
-      window: { RG_apiFetch: async (_url, opts) => { uploads.push(opts.body.get('document')); return Response.json(uploads.length === 1 ? { sentences: ['합성 문장.'] } : { invalid: true }); } },
+      prepareHighlightViews: async file => { prepared.push(file); if (file === 'bad') throw Error('decode'); return { overview: new Blob(['jpeg'], { type: 'image/jpeg' }), details: Array.from({ length: 4 }, () => new Blob(['detail'], { type: 'image/jpeg' })) }; },
+      window: { RG_apiFetch: async (_url, opts) => { uploads.push(opts.body.get('document')); detailCounts.push(opts.body.getAll('detail').length); return Response.json(uploads.length === 1 ? { sentences: ['합성 문장.'] } : { invalid: true }); } },
       showToast: text => toasts.push(text),
       setOcrItems: v => values.push(v), setItems: v => values.push(v), setStep() {},
       setOcrBusy() {}, setOcrProgress() {}, setBusy() {}, setProgress() {},
@@ -136,8 +137,74 @@ for (const [name, start, end] of [
     await context.run(['good', 'bad', 'malformed']);
     assert.deepEqual(prepared, ['good', 'bad', 'malformed']);
     assert.equal(uploads.length, 2);
+    assert.deepEqual(detailCounts, name.startsWith('book') ? [4, 4] : [0, 0]);
     assert.ok(uploads.every(file => file.type === 'image/jpeg' && file.name.endsWith('.jpg')));
     assert.deepEqual(Array.from(values[0]), ['합성 문장.']);
     assert.ok(toasts.some(text => text.includes('2장')));
   });
 }
+
+
+test('detail views decode once, cover all corners with overlap, do not upscale or mutate source', async () => {
+  const h = browserHarness(), draws = [];
+  h.canvas.getContext = () => ({ fillRect() {}, drawImage(...args) { draws.push(args.slice(1)); } });
+  const file = new Blob(['synthetic-original']);
+  const views = await prepareHighlightViews(file, h.browser);
+  assert.equal(views.details.length, 4);
+  assert.equal(h.calls.filter(c => c.options).length, 1);
+  assert.deepEqual(draws, [
+    [0, 0, 4000, 3000],
+    [0, 0, 2400, 1800, 0, 0, 2400, 1800],
+    [0, 1200, 2400, 1800, 0, 0, 2400, 1800],
+    [1600, 0, 2400, 1800, 0, 0, 2400, 1800],
+    [1600, 1200, 2400, 1800, 0, 0, 2400, 1800],
+  ]);
+  assert.equal(await file.text(), 'synthetic-original');
+  assert.equal(h.calls.at(-1), 'close');
+  assert.equal(h.canvas.width, 0);
+});
+
+test('detail budget retries quality before shrinking and releases bitmap on any detail failure', async () => {
+  const h = browserHarness([1.5 * 1024 * 1024, 100]);
+  await prepareHighlightViews({}, h.browser);
+  assert.equal(h.calls[2].quality, 0.88);
+  assert.equal(h.calls[2].width, 4000);
+  const failed = browserHarness([100, null]);
+  await assert.rejects(prepareHighlightViews({}, failed.browser), /変換|변환/);
+  assert.equal(failed.calls.at(-1), 'close');
+  assert.equal(failed.canvas.width, 0);
+});
+
+test('one provider call receives overview plus four ordered details with same-photo instructions', async () => {
+  sandbox.content = '["합성 구절."]';
+  const form = new FormData();
+  form.append('document', new Blob(['overview'], { type: 'image/jpeg' }));
+  for (let i = 0; i < 4; i++) form.append('detail', new Blob(['detail' + i], { type: 'image/jpeg' }));
+  const response = await sandbox.proxy(new Request('https://app.test', { method: 'POST', body: form }), env);
+  assert.equal(response.status, 200);
+  const parts = sandbox.payload.messages[1].content;
+  assert.equal(parts.filter(p => p.type === 'image_url').length, 5);
+  assert.ok(parts[0].text.includes('같은 원본'));
+  assert.ok(parts[0].text.includes('추정하지 않는다'));
+  assert.equal(parts[1].image_url.url, 'data:image/jpeg;base64,' + btoa('overview'));
+  for (let i = 0; i < 4; i++) assert.equal(parts[i + 2].image_url.url, 'data:image/jpeg;base64,' + btoa('detail' + i));
+  assert.equal(sandbox.payload.model, env.VISION_MODEL);
+});
+
+test('proxy rejects excessive details, invalid files and aggregate size before provider dispatch', async () => {
+  for (const [details, status] of [
+    [Array.from({ length: 5 }, () => new Blob(['x'], { type: 'image/jpeg' })), 422],
+    [['not a file'], 422],
+    [[new Blob(['x'], { type: 'text/plain' })], 422],
+    [[new Blob([],{ type: 'image/jpeg' })], 422],
+    [[new Blob([new Uint8Array(8 * 1024 * 1024)], { type: 'image/jpeg' })], 413],
+  ]) {
+    const form = new FormData();
+    form.append('document', new Blob(['overview'], { type: 'image/jpeg' }));
+    details.forEach(detail => form.append('detail', detail));
+    sandbox.payload = null;
+    const response = await sandbox.proxy(new Request('https://app.test', { method: 'POST', body: form }), env);
+    assert.equal(response.status, status);
+    assert.equal(sandbox.payload, null);
+  }
+});

@@ -1,4 +1,4 @@
-import { prepareHighlightImage } from './highlight-image.js';
+import { prepareHighlightViews } from './highlight-image.js';
 
 /* =========================================================
    ReadingGo — book-detail-modal.js  (#761 모듈화: library.js에서 추출)
@@ -542,8 +542,9 @@ function BookDetailModal({ book, allQuotes, onClose, onActivate }) {
     for (let i = 0; i < files.length; i++) {
       try {
         const fd = new FormData();
-        const prepared = await prepareHighlightImage(files[i]);
-        fd.append('document', prepared, 'p' + i + '.jpg');
+        const prepared = await prepareHighlightViews(files[i]);
+        fd.append('document', prepared.overview, 'p' + i + '.jpg');
+        prepared.details.forEach((detail, j) => fd.append('detail', detail, 'p' + i + '-detail' + j + '.jpg'));
         const r = await window.RG_apiFetch('/api/extract-highlights', { method: 'POST', body: fd });
         if (!r.ok) { failed++; }              // 503(미설정)·502(vision 실패, 지역 flap 포함) 등 → 실패로 집계
         else {
